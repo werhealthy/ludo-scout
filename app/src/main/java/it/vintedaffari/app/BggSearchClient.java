@@ -5,13 +5,13 @@ public final class BggSearchClient {
  public static final class Game {public String id,name,imageUrl,type,categories,editionName,editionId;public Integer year,playtime,minPlayers,maxPlayers,rank,voters,qualityScore,marketUsedMedianCents,marketUsedMinCents,marketUsedCount;public Double rating,geekRating,weight;public boolean local;public String notice;public int searchScore;public final List<String> aliases=new ArrayList<>();public final List<Edition> editions=new ArrayList<>();@Override public String toString(){return name+(year==null?"":" ("+year+")")+("boardgameexpansion".equals(type)?" · Espansione":"");}}
  public interface Callback{void ok(List<Game> games);void error(String e);}
  private static final long QUEUE_SEARCH_BUDGET_MS=2_500L;
- private final ExecutorService exec=Executors.newSingleThreadExecutor();private final ExecutorService directExec=Executors.newSingleThreadExecutor();private final Context context;private volatile Map<String,Integer> localPriceRefs,localNewPriceRefs;private volatile Map<String,Game> localByIdIndex;private volatile List<Game> localCatalogIndex;private volatile long localCatalogLoadMs;private volatile int localExactScans,localExactCacheHits,localExactTimeouts,localFuzzyTimeouts;private volatile boolean queueSearchTimedOut=false;
+ private final ExecutorService exec=Executors.newSingleThreadExecutor();private final ExecutorService directExec=Executors.newSingleThreadExecutor();private final Context context;private volatile Map<String,Integer> localPriceRefs,localNewPriceRefs;private volatile Map<String,Game> localByIdIndex;private volatile List<Game> localCatalogIndex;private volatile long[] localExactHashIndex;private volatile long localCatalogLoadMs;private volatile int localExactScans,localExactCacheHits,localExactTimeouts,localFuzzyTimeouts;private volatile boolean queueSearchTimedOut=false;
  private final Map<String,List<Game>> fastCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(32,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>24;}});
  private final Map<String,List<Game>> queueFuzzyCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(40,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>32;}});
  private final Map<String,List<Game>> queueExactCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(72,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>64;}});
  public BggSearchClient(Context c){context=c.getApplicationContext();}
  public void warmup(){exec.execute(()->{try{priceRefs();}catch(Exception ignored){}});}
- public void shutdown(){fastCache.clear();queueFuzzyCache.clear();queueExactCache.clear();localByIdIndex=null;localCatalogIndex=null;exec.shutdownNow();directExec.shutdownNow();}
+ public void shutdown(){fastCache.clear();queueFuzzyCache.clear();queueExactCache.clear();localByIdIndex=null;localCatalogIndex=null;localExactHashIndex=null;exec.shutdownNow();directExec.shutdownNow();}
  public void resetQueueSearchBudget(){queueSearchTimedOut=false;}
  public boolean queueSearchTimedOut(){return queueSearchTimedOut;}
  public boolean configured(){return !TextUtils.isEmpty(BuildConfig.BGG_TOKEN)&&!"PASTE_YOUR_BGG_TOKEN_HERE".equals(BuildConfig.BGG_TOKEN);}
@@ -49,9 +49,10 @@ public final class BggSearchClient {
  public List<Game> localCandidatesIndexed(String query){
   String key=normalize(query);if(key.isEmpty())return Collections.emptyList();
   List<Game> cached=queueFuzzyCache.get(key);if(cached!=null)return copySearchResults(cached);
-  long started=android.os.SystemClock.elapsedRealtime();
   try{
    ensureCatalogIndex();List<Game> catalog=localCatalogIndex;if(catalog==null||catalog.isEmpty())return Collections.emptyList();
+   // Cold catalog/index creation is a one-time bootstrap cost, not a per-query fuzzy scan timeout.
+   long started=android.os.SystemClock.elapsedRealtime();
    BggManualSearchRanking.Query rankedQuery=BggManualSearchRanking.prepare(query);
    PriorityQueue<RankedLocal> top=new PriorityQueue<>(16,(a,b)->{int cc=Integer.compare(a.score,b.score);if(cc!=0)return cc;return Integer.compare(rankValue(b.game),rankValue(a.game));});
    int scanned=0;
@@ -74,13 +75,19 @@ public final class BggSearchClient {
  public List<Game> localExactCandidates(String query){
   String key=normalize(query);if(key.isEmpty())return Collections.emptyList();
   List<Game> cached=queueExactCache.get(key);if(cached!=null){localExactCacheHits++;return copySearchResults(cached);}
-  long started=android.os.SystemClock.elapsedRealtime();
   try{
-   ensureCatalogIndex();List<Game> catalog=localCatalogIndex;if(catalog==null)return Collections.emptyList();
-   ArrayList<Game> hit=new ArrayList<>();localExactScans++;int scanned=0;
-   for(Game g:catalog){
-    if((++scanned&63)==0&&android.os.SystemClock.elapsedRealtime()-started>QUEUE_SEARCH_BUDGET_MS){queueSearchTimedOut=true;localExactTimeouts++;return Collections.emptyList();}
-    boolean match=key.equals(normalize(g.name));
+   // The old implementation normalized every title/alias across all 31k games on every lookup.
+   // On Pixel that exceeded the 2.5s safety budget on every exact scan and manufactured BGG review.
+   // Build one compact primitive hash index with the catalog instead. Hash collisions are always
+   // verified against the original strings before a candidate is returned.
+   ensureCatalogIndex();List<Game> catalog=localCatalogIndex;long[] index=localExactHashIndex;
+   if(catalog==null||index==null)return Collections.emptyList();
+   ArrayList<Game> hit=new ArrayList<>();HashSet<Integer> seen=new HashSet<>();localExactScans++;
+   int hash=key.hashCode();long base=((long)hash)<<32;int pos=Arrays.binarySearch(index,base);if(pos<0)pos=-pos-1;else while(pos>0&&(int)(index[pos-1]>>32)==hash)pos--;
+   while(pos<index.length&&(int)(index[pos]>>32)==hash){
+    int gameIndex=(int)(index[pos]&0xffffffffL);pos++;
+    if(gameIndex<0||gameIndex>=catalog.size()||!seen.add(gameIndex))continue;
+    Game g=catalog.get(gameIndex);boolean match=key.equals(normalize(g.name));
     if(!match)for(String alias:g.aliases)if(key.equals(normalize(alias))){match=true;break;}
     if(match)hit.add(copySearchGame(g));
    }
@@ -90,17 +97,25 @@ public final class BggSearchClient {
  /** Builds only the shared queue-process catalog and BGG-id index in one gzip pass. Exact alias
   * lookup is lazy/cached, avoiding the large all-alias HashMap that dominated cold starts. */
  private void ensureCatalogIndex()throws Exception{
-  if(localByIdIndex!=null&&localCatalogIndex!=null)return;
+  if(localByIdIndex!=null&&localCatalogIndex!=null&&localExactHashIndex!=null)return;
   synchronized(this){
-   if(localByIdIndex!=null&&localCatalogIndex!=null)return;
+   if(localByIdIndex!=null&&localCatalogIndex!=null&&localExactHashIndex!=null)return;
    long started=android.os.SystemClock.elapsedRealtime();Map<String,Game> byId=new HashMap<>(40000);ArrayList<Game> catalog=new ArrayList<>(32000);
    try(BufferedReader reader=new BufferedReader(new InputStreamReader(new java.util.zip.GZIPInputStream(openSearchIndex()),java.nio.charset.StandardCharsets.UTF_8),64*1024)){
     String line;while((line=reader.readLine())!=null){String[] c=line.split("\t",-1);if(c.length<8)continue;Game g=fromIndex(c);if(TextUtils.isEmpty(g.id)||TextUtils.isEmpty(g.name))continue;byId.put(g.id,g);catalog.add(g);}
    }
-   localCatalogIndex=Collections.unmodifiableList(catalog);localByIdIndex=Collections.unmodifiableMap(byId);localCatalogLoadMs=android.os.SystemClock.elapsedRealtime()-started;
+   int exactEntries=0;for(Game g:catalog)exactEntries+=1+g.aliases.size();
+   long[] exact=new long[exactEntries];int at=0;
+   for(int i=0;i<catalog.size();i++){
+    Game g=catalog.get(i);String primary=normalize(g.name);if(!primary.isEmpty())exact[at++]=packExactHash(primary,i);
+    for(String alias:g.aliases){String n=normalize(alias);if(!n.isEmpty())exact[at++]=packExactHash(n,i);}
+   }
+   if(at<exact.length)exact=Arrays.copyOf(exact,at);Arrays.sort(exact);
+   localCatalogIndex=Collections.unmodifiableList(catalog);localByIdIndex=Collections.unmodifiableMap(byId);localExactHashIndex=exact;localCatalogLoadMs=android.os.SystemClock.elapsedRealtime()-started;
   }
  }
- public String localIndexSummary(){List<Game> c=localCatalogIndex;return "build=bgg-local-index-v3;loaded="+(c!=null)+";games="+(c==null?0:c.size())+";loadMs="+localCatalogLoadMs+";exactScans="+localExactScans+";exactCacheHits="+localExactCacheHits+";exactTimeouts="+localExactTimeouts+";fuzzyTimeouts="+localFuzzyTimeouts+";searchBudgetMs="+QUEUE_SEARCH_BUDGET_MS+";exactCacheSize="+queueExactCache.size()+";fuzzyCacheSize="+queueFuzzyCache.size();}
+ private static long packExactHash(String normalized,int gameIndex){return (((long)normalized.hashCode())<<32)|(gameIndex&0xffffffffL);}
+ public String localIndexSummary(){List<Game> c=localCatalogIndex;long[] x=localExactHashIndex;return "build=bgg-local-index-v4;loaded="+(c!=null)+";games="+(c==null?0:c.size())+";exactEntries="+(x==null?0:x.length)+";loadMs="+localCatalogLoadMs+";exactScans="+localExactScans+";exactCacheHits="+localExactCacheHits+";exactTimeouts="+localExactTimeouts+";fuzzyTimeouts="+localFuzzyTimeouts+";searchBudgetMs="+QUEUE_SEARCH_BUDGET_MS+";exactCacheSize="+queueExactCache.size()+";fuzzyCacheSize="+queueFuzzyCache.size();}
  private static final class RankedLocal{final Game game;final int score;RankedLocal(Game game,int score){this.game=game;this.score=score;}}
  private static int rankValue(Game g){return g==null||g.rank==null||g.rank<=0?Integer.MAX_VALUE:g.rank;}
  private static int compareRankedBestFirst(RankedLocal a,RankedLocal b){int c=Integer.compare(b.score,a.score);if(c!=0)return c;return Integer.compare(rankValue(a.game),rankValue(b.game));}
