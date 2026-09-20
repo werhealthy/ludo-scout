@@ -35,10 +35,11 @@ public final class QueueJobRunner {
         long batchStarted=android.os.SystemClock.elapsedRealtime();
         try{
         List<GameRecord> pending=market.provisionalGamesForMatching(Math.max(1,Math.min(40,limit)));
-        int handled=0,fuzzySearches=0,matched=0,reviewDecisions=0,reviewWrites=0,reviewWriteMisses=0,quarantined=0;
+        int handled=0,fuzzySearches=0,matched=0,reviewDecisions=0,reviewWrites=0,reviewWriteMisses=0,quarantined=0,timedOut=0;
         for(GameRecord g:pending){
             if(g==null)continue;
             try{
+                matcher.resetQueueSearchBudget();
                 market.setLaneStatus("bgg","MATCHING",g.name,0L);
                 BggSearchClient.Game chosen=null; double confidence=0; String reviewReason=null; List<BggSearchClient.Game> fuzzyCandidates=java.util.Collections.emptyList();
                 List<String> variants=BggTitleNormalizer.variants(g.name);
@@ -53,22 +54,26 @@ public final class QueueJobRunner {
                 }
 
                 // 2) Exact primary-name/alias match after conservative marketplace cleanup.
-                boolean sawAmbiguousExact=false;
+                boolean sawAmbiguousExact=false,searchTimedOut=false;
                 if(chosen==null){
                     for(String q:variants){
                         List<BggSearchClient.Game> exact=matcher.localExactCandidates(q);
+                        if(matcher.queueSearchTimedOut()){searchTimedOut=true;reviewReason="Ricerca BGG locale oltre il budget di stabilità";break;}
                         if(exact.size()==1){chosen=exact.get(0);confidence=q.equals(BggTitleNormalizer.clean(g.name))?99:98;break;}
                         if(exact.size()>1)sawAmbiguousExact=true;
                     }
                 }
 
-                // 3) Fuzzy only when there is a clear winner. Cleanup raises recall without
-                // accepting same-title collisions; expansions/sequel words were never stripped.
-                if(chosen==null&&!sawAmbiguousExact){
+                // 3) Fuzzy only when there is a clear winner. A local scan that exceeds the bounded
+                // CPU budget is never trusted partially: it becomes review instead of stalling/crashing
+                // the queue process or manufacturing a winner before the catalog was fully scanned.
+                if(chosen==null&&!sawAmbiguousExact&&!searchTimedOut){
                     String q=variants.get(variants.size()-1);
                     fuzzySearches++;
                     fuzzyCandidates=matcher.localCandidatesIndexed(q);
-                    if(!fuzzyCandidates.isEmpty()){
+                    searchTimedOut=matcher.queueSearchTimedOut();
+                    if(searchTimedOut)reviewReason="Ricerca BGG fuzzy oltre il budget di stabilità";
+                    else if(!fuzzyCandidates.isEmpty()){
                         BggSearchClient.Game best=fuzzyCandidates.get(0);
                         int second=fuzzyCandidates.size()>1?fuzzyCandidates.get(1).searchScore:0;
                         int gap=best.searchScore-second;
@@ -76,12 +81,15 @@ public final class QueueJobRunner {
                             chosen=best; confidence=Math.min(98,92+(best.searchScore-920)/20.0);
                         }else reviewReason=fuzzyCandidates.size()>1?"Più match BGG plausibili":"Match BGG non abbastanza sicuro";
                     }else reviewReason="Nessun candidato BGG locale";
-                }else if(chosen==null){
+                }else if(chosen==null&&!searchTimedOut){
                     reviewReason="Più giochi BGG hanno lo stesso titolo";
                 }
 
-                if(chosen!=null){market.assignAutoBggMatch(g.id,chosen,confidence);matched++;}
-                else {
+                if(chosen!=null&&!searchTimedOut){market.assignAutoBggMatch(g.id,chosen,confidence);matched++;}
+                else if(searchTimedOut){
+                    timedOut++;reviewDecisions++;int changed=market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason);
+                    if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;
+                }else {
                     BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.unresolvedTitle(g.name,fuzzyCandidates,sawAmbiguousExact);
                     if(gate.action==BoardGameIntakeGate.Action.REVIEW){
                         reviewDecisions++;int changed=market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);
@@ -100,7 +108,7 @@ public final class QueueJobRunner {
         market.setDiagnosticState("bgg_local_match",handled,
                 "build=bgg-local-match-v3;state=DONE;singleFlight=true;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
                         ";reviewDecisions="+reviewDecisions+";reviewWrites="+reviewWrites+";reviewWriteMisses="+reviewWriteMisses+
-                        ";quarantined="+quarantined+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
+                        ";quarantined="+quarantined+";timedOut="+timedOut+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
         return handled;
         }finally{BGG_IDENTITY_RUNNING.set(false);}
     }
