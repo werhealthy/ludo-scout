@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.8-bgg-local-index-performance`
-- versionCode: `122`
+- Baseline version: `5.12.9-bgg-historical-drain`
+- versionCode: `123`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -93,6 +93,17 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - The retained id map reuses the same `Game` objects already held by the exact index, adding map references rather than duplicating the full catalog objects. It is cleared on `shutdown()`.
 - Historical audit scheduling remains deliberately bounded (2 games/service loop, 4/recovery worker); this change removes wasted CPU/I/O instead of increasing network rate or priority.
 - Regression: `regression/bgg_local_index_performance_v5128.py` protects against restoring per-ID full catalog scans.
+- No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.9 Historical BGG drain scheduling
+- Pixel Test 3 on 5.12.8 improved revalidation from 20 to 47 processed games, proving the per-game full-index scan was removed, but 96 eligible historical games remained after five minutes.
+- Root cause after the index fix was scheduling, not matching cost: the foreground BGG lane still processed only two historical games per loop, ran historical cleanup before current BGG identity work, and service/recovery liveness did not consider historical pending rows.
+- Priority is now explicit: current BGG identity matching -> current BGG enrichment -> historical revalidation. Historical work runs only when no current BGG work is runnable.
+- Foreground historical cleanup drains up to 24 games per burst and yields 350 ms between bursts. The revalidator itself caps any caller at 32 games; no network calls are introduced.
+- `historicalBggRevalidationPendingCount()` is now the canonical executable pending metric and requires an ACTIVE listing, so liveness/diagnostics cannot be held open by archived-only games.
+- Foreground-service liveness and BGG lane supervision include historical pending work. WorkManager recovery also includes historical pending work in health/rescheduling decisions, preventing the audit from silently stopping when it is the only remaining task.
+- Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
+- Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
 
 ## Known UX direction
