@@ -706,7 +706,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(source==null||bundleDatabase==null||TextUtils.isEmpty(source.sellerId))return;
         List<DealRecord> same=new ArrayList<>();
         for(DealRecord d:database.getDeals("all_with_review",1200))if(d!=null&&source.sellerId.equals(d.sellerId))same.add(d);
-        if(same.size()<2){bundleDatabase.replace(source.signature,source.sellerId,Collections.emptyList());return;}
+        if(same.size()<2){bundleDatabase.clearSellerGraph(source.sellerId);bundleDatabase.setDiagnostic(source.signature,source.sellerId,"NO_BOARDGAMES",same.size(),0,0,"Seller graph sceso sotto due giochi attivi");return;}
         for(DealRecord d:same){List<BundleSuggestion> out=BundlePlanner.forSource(d,same);bundleDatabase.replace(d.signature,d.sellerId,out);bundleDatabase.setDiagnostic(d.signature,d.sellerId,out.isEmpty()?"NO_BOARDGAMES":"BUNDLE_READY",same.size(),out.size(),out.size(),out.isEmpty()?"Seller graph senza coppie eleggibili":"Seller graph locale");}
     }
 
@@ -715,8 +715,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
         Map<String,List<DealRecord>> bySeller=new LinkedHashMap<>();
         for(DealRecord d:database.getDeals("all_with_review",1500))if(d!=null&&!TextUtils.isEmpty(d.sellerId))bySeller.computeIfAbsent(d.sellerId,k->new ArrayList<>()).add(d);
         int sellers=0,bundles=0;
-        for(List<DealRecord> group:bySeller.values()){
-            if(group.size()<2)continue;sellers++;
+        for(Map.Entry<String,List<DealRecord>> entry:bySeller.entrySet()){
+            List<DealRecord> group=entry.getValue();
+            if(group.size()<2){bundleDatabase.clearSellerGraph(entry.getKey());continue;}sellers++;
             for(DealRecord d:group){List<BundleSuggestion> out=BundlePlanner.forSource(d,group);bundleDatabase.replace(d.signature,d.sellerId,out);bundleDatabase.setDiagnostic(d.signature,d.sellerId,out.isEmpty()?"NO_BOARDGAMES":"BUNDLE_READY",group.size(),out.size(),out.size(),out.isEmpty()?"Seller graph senza coppie eleggibili":"Seller graph locale");bundles+=out.size();}
         }
         diag().edit().putInt("bundleLocalGraphSellers",sellers).putInt("bundleLocalGraphSuggestions",bundles).apply();
