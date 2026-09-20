@@ -30,6 +30,9 @@ public final class QueueDrainWorker extends Worker {
     @NonNull @Override public Result doWork() {
         Context context = getApplicationContext();
         QueueWorkScheduler.ensureRecovery(context);
+        // The foreground queue owns normal execution. If it is already alive or still starting,
+        // recovery must not open a competing DB/matcher graph in the same process.
+        if(QueueKeepAliveService.isRunningOrStarting())return Result.success();
         DealDatabase db = new DealDatabase(context);
         MarketStore market = new MarketStore(context, db);
         // WorkManager is recovery, but a living Service process is not enough evidence that its
