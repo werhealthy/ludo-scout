@@ -12,7 +12,7 @@
 - `QueueDrainWorker` now stands down before opening queue SQLite whenever `QueueKeepAliveService` owns the queue.
 - Moved queue DB initialization/maintenance, reconcile/sweep, lane supervision and notification-state queries off the default-process main thread. `onStartCommand()` no longer performs SQLite work synchronously, addressing the observed `SystemJobService onStartJob` ANR and `SQLITE_BUSY` contention.
 - Added retryable JS-engine readiness probing (500 ms, bounded to 30 s) so a slow/restarted WebView cannot strand `PENDING_ANALYSIS` after a package update.
-- Pending JS analysis is now active-run-first: while one Motore job is active, later scrolls remain genuinely waiting instead of consuming classifier work ahead of it.
+- Pending JS analysis is now active-run-first end to end: persisted MarketStore state, not the `:radar` RAM queue, owns batch selection. Later scrolls remain genuinely waiting and are picked up automatically after the active run closes.
 - System exit diagnostics v3 add current-installed-build counters alongside epoch/24h history.
 - Added `regression/queue_single_owner_anr_engine_recovery_v51218.py` and wired it into PR/beta CI.
 - No schema migration, signing/applicationId, CI versionCode-strategy, Firebase, secret or network-rate changes.
