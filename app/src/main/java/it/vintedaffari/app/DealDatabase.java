@@ -301,11 +301,16 @@ public final class DealDatabase extends SQLiteOpenHelper {
         return next!=null?next:wrap;
     }
 
+    /** UI-facing count stays intentionally lightweight. It counts newly acquired sessions after the
+     * current owner using timestamps only; older yielded work is shown as DEFERRED in run history and
+     * diagnostics instead of making the overview rebuild every session's joined state. */
     public synchronized int waitingObservationSessionCount(){
-        long now=System.currentTimeMillis();ObservationSession active=activeObservationSession();if(active==null)return 0;int count=0;
-        for(ObservationSession candidate:recentObservationSessions(now-7L*24L*60L*60_000L,80))
-            if(candidate.startAt!=active.startAt&&!engineAutomaticDone(candidate,now))count++;
-        return count;
+        ObservationSession active=activeObservationSession();if(active==null)return 0;
+        int sessions=0;long previous=-1L;
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT observed_at FROM observations WHERE observed_at>? ORDER BY observed_at ASC",new String[]{String.valueOf(active.endAt)})){
+            while(c.moveToNext()){long at=c.getLong(0);if(previous<0||at-previous>=ENGINE_SESSION_GAP_MS)sessions++;previous=at;}
+        }
+        return sessions;
     }
 
     public synchronized boolean isObservationSessionWaiting(ObservationSession session){
