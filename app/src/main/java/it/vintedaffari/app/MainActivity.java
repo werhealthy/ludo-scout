@@ -653,7 +653,7 @@ private void openDetail(DealRecord d){
         return false;
     }
     private double bundleGameScore(DealRecord d){if(d==null)return 0;if(d.qualityScore!=null)return d.qualityScore/10.0;return d.rating==null?0:d.rating;}
-    private boolean bundleGameEligible(DealRecord d){if(d==null||!DealPolicy.ratingEligible(d))return false;double score=bundleGameScore(d);if(score<6.0)return false;String lc=d.languageCode==null?"":d.languageCode.toUpperCase(Locale.ROOT);return !(isForeignLanguage(lc)&&lc.contains("DEP"));}
+    private boolean bundleGameEligible(DealRecord d){if(d==null||!"ACTIVE".equals(d.lifecycle)||"verify".equals(d.tier)||!DealPolicy.ratingEligible(d)||!DealEvaluator.evaluate(d).visible())return false;double score=bundleGameScore(d);if(score<6.0)return false;String lc=d.languageCode==null?"":d.languageCode.toUpperCase(Locale.ROOT);return !(isForeignLanguage(lc)&&lc.contains("DEP"));}
     private double bundleQuality(List<DealRecord> games){if(games==null||games.isEmpty())return 0;double sum=0;for(DealRecord d:games)sum+=bundleGameScore(d);return sum/games.size();}
     private List<DealRecord> bundleDealsForSource(DealRecord source){
         LinkedHashMap<String,DealRecord> unique=new LinkedHashMap<>();
