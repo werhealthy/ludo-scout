@@ -33,9 +33,15 @@ jobs:
         env:
           BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
           ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
         run: |
           test -n "$BGG_TOKEN" || (echo "Missing GitHub secret: BGG_TOKEN" && exit 1)
           test -n "$ANDROID_DEBUG_KEYSTORE_BASE64" || (echo "Missing GitHub secret: ANDROID_DEBUG_KEYSTORE_BASE64" && exit 1)
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON" || (echo "Missing GitHub secret: FIREBASE_SERVICE_ACCOUNT_JSON" && exit 1)
+          test -n "$FIREBASE_APP_ID" || (echo "Missing GitHub secret: FIREBASE_APP_ID" && exit 1)
+          test -n "$FIREBASE_TESTERS" || (echo "Missing GitHub secret: FIREBASE_TESTERS" && exit 1)
 
       - name: Restore existing Android debug signing key
         env:
@@ -70,7 +76,7 @@ jobs:
       - name: Verify built APK signing certificate
         run: |
           EXPECTED_SHA256="C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710"
-          ACTUAL_SHA256="$(${ANDROID_HOME}/build-tools/35.0.0/apksigner verify --print-certs app/build/outputs/apk/debug/app-debug.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:lower:]' '[:upper:]')"
+          ACTUAL_SHA256="$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs app/build/outputs/apk/debug/app-debug.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:lower:]' '[:upper:]')"
           echo "Built APK signer SHA256: $ACTUAL_SHA256"
           test "$ACTUAL_SHA256" = "$EXPECTED_SHA256" || (echo "Unexpected APK signing certificate" && exit 1)
 
@@ -81,3 +87,21 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Prepare Firebase credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
+
+      - name: Distribute beta to Firebase App Distribution
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
+        run: |
+          npx --yes firebase-tools@latest appdistribution:distribute app/build/outputs/apk/debug/app-debug.apk \
+            --app "$FIREBASE_APP_ID" \
+            --testers "$FIREBASE_TESTERS" \
+            --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
