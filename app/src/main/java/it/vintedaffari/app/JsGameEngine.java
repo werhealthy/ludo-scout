@@ -37,6 +37,9 @@ public final class JsGameEngine {
     private boolean ready = false;
     private boolean attached = false;
     private ReadyListener readyListener;
+    private int verifyAttempts = 0;
+    private static final int MAX_VERIFY_ATTEMPTS = 45;
+    private static final long VERIFY_RETRY_MS = 2_000L;
 
     public JsGameEngine(Context context, WindowManager windowManager) {
         this.context = context;
@@ -74,6 +77,10 @@ public final class JsGameEngine {
 
         attachHiddenWebView();
         webView.loadUrl("file:///android_asset/engine/engine.html");
+        // A cold WebView parsing the bundled catalog can take materially longer than page creation,
+        // especially immediately after an APK update. Do not rely on one onPageFinished callback:
+        // keep a bounded readiness watchdog until the bridge is actually usable.
+        webView.postDelayed(this::verifyEngine, VERIFY_RETRY_MS);
     }
 
     private void attachHiddenWebView() {
@@ -103,25 +110,31 @@ public final class JsGameEngine {
     }
 
     private void verifyEngine() {
-        if (webView == null) return;
+        if (webView == null || ready) return;
+        final WebView current=webView;
+        final int attempt=++verifyAttempts;
         String js = "(() => JSON.stringify({ready:!!globalThis.VintedAffariAndroidBridge?.ready,gameCount:globalThis.VintedAffariAndroidBridge?.gameCount||0}))()";
-        webView.evaluateJavascript(js, value -> {
+        current.evaluateJavascript(js, value -> {
+            if(current!=webView||ready)return;
             try {
                 String decoded = decodeJavascriptString(value);
                 JSONObject state = new JSONObject(decoded);
                 ready = state.optBoolean("ready", false);
                 int gameCount = state.optInt("gameCount", 0);
                 if (ready) {
-                    Log.d(TAG, "Motore JS pronto: " + gameCount + " giochi");
+                    Log.d(TAG, "Motore JS pronto: " + gameCount + " giochi · tentativo " + attempt);
                     if (readyListener != null) readyListener.onReady(gameCount);
-                } else {
-                    String message = "Il runtime JS non risulta pronto.";
-                    Log.e(TAG, message);
-                    if (readyListener != null) readyListener.onError(message);
+                    return;
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Errore verifica runtime JS", e);
-                if (readyListener != null) readyListener.onError(e.getMessage());
+                Log.w(TAG, "Runtime JS non ancora verificabile al tentativo " + attempt, e);
+            }
+            if(attempt<MAX_VERIFY_ATTEMPTS&&webView!=null){
+                current.postDelayed(this::verifyEngine,VERIFY_RETRY_MS);
+            }else{
+                String message = "Il runtime JS non risulta pronto dopo "+attempt+" tentativi.";
+                Log.e(TAG, message);
+                if (readyListener != null) readyListener.onError(message);
             }
         });
     }
@@ -179,6 +192,7 @@ public final class JsGameEngine {
 
     public void destroy() {
         ready = false;
+        verifyAttempts = MAX_VERIFY_ATTEMPTS;
         if (webView == null) return;
         try {
             if(context instanceof android.app.Activity && webView.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)webView.getParent()).removeView(webView);else if (attached && windowManager != null) windowManager.removeViewImmediate(webView);
