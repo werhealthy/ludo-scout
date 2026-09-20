@@ -7,6 +7,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.content.SharedPreferences;
+import android.webkit.ConsoleMessage;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -23,6 +25,7 @@ public final class JsGameEngine {
     public interface ReadyListener {
         void onReady(int gameCount);
         void onError(String message);
+        default void onState(String state, String detail) {}
     }
 
     public interface BatchListener {
@@ -39,6 +42,8 @@ public final class JsGameEngine {
     private boolean verifyInFlight = false;
     private boolean verifyRetryScheduled = false;
     private long verifyStartedAt = 0L;
+    private int verifyAttempts = 0;
+    private String lastConsoleError = "";
     private ReadyListener readyListener;
     private static final long READY_RETRY_MS = 500L;
     private static final long READY_TIMEOUT_MS = 30_000L;
@@ -56,6 +61,7 @@ public final class JsGameEngine {
         this.readyListener = listener;
         if (webView != null) return;
 
+        state("WEBVIEW_CREATE","context="+context.getClass().getSimpleName());
         webView = new WebView(context);
         webView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         webView.setBackgroundColor(0x00000000);
@@ -69,10 +75,20 @@ public final class JsGameEngine {
         settings.setDatabaseEnabled(false);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(ConsoleMessage message) {
+                if(message!=null&&message.messageLevel()==ConsoleMessage.MessageLevel.ERROR){
+                    lastConsoleError=message.message()==null?"":message.message();
+                    state("CONSOLE_ERROR","line="+message.lineNumber()+";source="+safe(message.sourceId())+";message="+safe(lastConsoleError));
+                }
+                return super.onConsoleMessage(message);
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                state("PAGE_FINISHED","url="+safe(url));
                 verifyEngine();
             }
         });
@@ -103,8 +119,10 @@ public final class JsGameEngine {
         try {
             windowManager.addView(webView, params);
             attached = true;
+            state("ATTACHED","overlay=true");
         } catch (Exception e) {
             Log.e(TAG, "Impossibile montare il runtime JS", e);
+            state("ATTACH_ERROR",safe(String.valueOf(e.getMessage())));
             if (readyListener != null) readyListener.onError(e.getMessage());
         }
     }
@@ -113,7 +131,9 @@ public final class JsGameEngine {
         if (webView == null || ready || verifyInFlight) return;
         verifyInFlight=true;
         final WebView current=webView;
-        String js = "(() => JSON.stringify({ready:!!globalThis.VintedAffariAndroidBridge?.ready,gameCount:globalThis.VintedAffariAndroidBridge?.gameCount||0}))()";
+        final int attempt=++verifyAttempts;
+        state("VERIFY_START","attempt="+attempt);
+        String js = "(() => JSON.stringify({ready:!!globalThis.VintedAffariAndroidBridge?.ready,gameCount:globalThis.VintedAffariAndroidBridge?.gameCount||0,bridge:!!globalThis.VintedAffariAndroidBridge,catalog:!!globalThis.VintedLocalCatalog,games:globalThis.VintedLocalCatalog?.games?.length||0,doc:document.readyState}))()";
         current.evaluateJavascript(js, value -> {
             verifyInFlight=false;
             if(current!=webView||ready)return;
@@ -122,13 +142,17 @@ public final class JsGameEngine {
                 JSONObject state = new JSONObject(decoded);
                 ready = state.optBoolean("ready", false);
                 int gameCount = state.optInt("gameCount", 0);
+                String detail="attempt="+attempt+";doc="+safe(state.optString("doc",""))+";bridge="+state.optBoolean("bridge",false)+";catalog="+state.optBoolean("catalog",false)+";games="+state.optInt("games",0)+";gameCount="+gameCount;
+                state("VERIFY_RESULT",detail);
                 if (ready) {
                     Log.d(TAG, "Motore JS pronto: " + gameCount + " giochi");
+                    state("READY","games="+gameCount+";attempt="+attempt);
                     if (readyListener != null) readyListener.onReady(gameCount);
                     return;
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Runtime JS non ancora verificabile", e);
+                state("VERIFY_PARSE_ERROR","attempt="+attempt+";message="+safe(String.valueOf(e.getMessage())));
             }
             retryVerifyOrFail(current);
         });
@@ -142,7 +166,9 @@ public final class JsGameEngine {
             return;
         }
         String message="Il runtime JS non risulta pronto dopo "+elapsed+" ms.";
+        if(!lastConsoleError.isEmpty())message+="; console="+lastConsoleError;
         Log.e(TAG,message);
+        state("TIMEOUT","elapsedMs="+elapsed+";attempts="+verifyAttempts+";console="+safe(lastConsoleError));
         if(readyListener!=null)readyListener.onError(message);
     }
 
@@ -153,6 +179,16 @@ public final class JsGameEngine {
             verifyRetryScheduled=false;
             verifyEngine();
         },Math.max(1L,delayMs));
+    }
+
+    private void state(String state,String detail){
+        try{if(readyListener!=null)readyListener.onState(state==null?"":state,detail==null?"":detail);}catch(Throwable ignored){}
+    }
+
+    private static String safe(String s){
+        if(s==null)return "";
+        String x=s.replace('\n',' ').replace('\r',' ').replace(';',',');
+        return x.length()>240?x.substring(0,240):x;
     }
 
     public void analyze(List<VintedCard> cards, BatchListener listener) {
@@ -211,6 +247,8 @@ public final class JsGameEngine {
         verifyInFlight = false;
         verifyRetryScheduled = false;
         verifyStartedAt = Long.MAX_VALUE;
+        verifyAttempts = 0;
+        lastConsoleError = "";
         if (webView == null) return;
         try {
             if(context instanceof android.app.Activity && webView.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)webView.getParent()).removeView(webView);else if (attached && windowManager != null) windowManager.removeViewImmediate(webView);
