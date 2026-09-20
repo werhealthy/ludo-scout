@@ -17,10 +17,13 @@ public final class QueueWakeReceiver extends BroadcastReceiver {
         final String action=intent.getAction();
         final long delay=intent.getLongExtra(QueueWorkScheduler.EXTRA_DELAY,10_000L);
 
-        // Starting the foreground owner is a cheap framework call; its own onCreate now performs
-        // only startForeground on the main thread. Never run WorkManager enqueue/database work in
-        // BroadcastReceiver.onReceive because JobService callbacks share this process main thread.
-        if (QueueWorkScheduler.ACTION_NOW.equals(action)) QueueKeepAliveService.ensureRunning(app);
+        // ACTION_NOW has one owner only: the foreground service. Falling through and also
+        // enqueuing QueueDrainWorker created two same-process queue consumers and unnecessary
+        // SQLite/heap contention exactly while the default process was cold-starting.
+        if (QueueWorkScheduler.ACTION_NOW.equals(action)) {
+            QueueKeepAliveService.ensureRunning(app);
+            return;
+        }
 
         final BroadcastReceiver.PendingResult pending=goAsync();
         try{
