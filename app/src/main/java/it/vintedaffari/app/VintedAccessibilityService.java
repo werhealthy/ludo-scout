@@ -1344,6 +1344,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
                 "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+
+                "bggHistoricalRevalidation={"+marketDiag.historicalBggRevalidationSummary()+"}\n"+
                 "vintedPriceRefresh={"+priceRefreshSummary+"}\n"+
                 "vintedCandidateSnapshotStore={"+VintedCandidateSnapshotStore.summary(context)+"}\n"+
                 "vintedPublicHourlyBudget="+VintedPublicSession.hourlyBudget()+"\n"+
