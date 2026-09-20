@@ -53,6 +53,8 @@ public final class MarketStore {
     private static final String ENGINE_RUN_CURSOR = "engine_run_cursor_start";
     private static final String ENGINE_RUN_SLICE = "engine_run_slice";
     private static final String MANUAL_VINTED_RECOVERY = "manual_vinted_recovery";
+    private static final String OPENED_VINTED_DEAL = "opened_vinted_deal";
+    private static final String CATALOG_HEALTH_PREFIX = "catalog_health:";
 
     public static final class Job {
         public long id, listingId, gameId, displayGameId, nextAttemptAt, processingStartedAt;
@@ -76,6 +78,13 @@ public final class MarketStore {
         public long listingId,until;
         public String signature="",title="";
         public boolean active(long now){return listingId>0&&until>now;}
+    }
+
+    /** Short-lived exact identity when the user opens Vinted from a Ludo card. */
+    public static final class OpenedVintedDeal {
+        public long listingId,until;
+        public String signature="",itemId="",url="";
+        public boolean active(long now){return !TextUtils.isEmpty(signature)&&until>now;}
     }
 
     public static final class OperationalEpochSummary {
@@ -148,6 +157,31 @@ public final class MarketStore {
         if(listingId>0)changed=db.delete("queue_controls","name=? AND value=?",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId)});
         else changed=db.delete("queue_controls","name=?",new String[]{MANUAL_VINTED_RECOVERY});
         if(changed>0)setDiagnosticState("manual_vinted_recovery",0,"state=IDLE;clearedListing="+listingId);
+    }
+
+    public void beginOpenedVintedDeal(String signature,String itemId,String url,long ttlMs){
+        if(TextUtils.isEmpty(signature))return;long now=System.currentTimeMillis(),until=now+Math.max(60_000L,ttlMs);long listingId=listingIdForSignature(signature);
+        try{JSONObject o=new JSONObject();o.put("until",until);o.put("signature",safe(signature));o.put("itemId",safe(itemId));o.put("url",safe(url));
+            ContentValues v=new ContentValues();v.put("name",OPENED_VINTED_DEAL);v.put("value",listingId);v.put("updated_at",now);v.put("text_value",o.toString());
+            helper.getWritableDatabase().insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+            setDiagnosticState("opened_vinted_deal",1,"state=ACTIVE;listing="+listingId+";signature="+safe(signature)+";until="+until);
+        }catch(Exception ignored){}
+    }
+
+    public OpenedVintedDeal activeOpenedVintedDeal(long now){
+        OpenedVintedDeal out=new OpenedVintedDeal();
+        try(Cursor cur=helper.getReadableDatabase().rawQuery("SELECT value,text_value FROM queue_controls WHERE name=? LIMIT 1",new String[]{OPENED_VINTED_DEAL})){
+            if(!cur.moveToFirst())return out;out.listingId=cur.getLong(0);JSONObject o=new JSONObject(cur.isNull(1)?"{}":cur.getString(1));out.until=o.optLong("until",0L);out.signature=o.optString("signature","");out.itemId=o.optString("itemId","");out.url=o.optString("url","");
+        }catch(Exception ignored){return new OpenedVintedDeal();}
+        if(!out.active(now)){clearOpenedVintedDeal();return new OpenedVintedDeal();}return out;
+    }
+
+    public void clearOpenedVintedDeal(){
+        if(helper.getWritableDatabase().delete("queue_controls","name=?",new String[]{OPENED_VINTED_DEAL})>0)setDiagnosticState("opened_vinted_deal",0,"state=IDLE");
+    }
+
+    public void recordCatalogHealthAttempt(String signature,String detail){
+        if(TextUtils.isEmpty(signature))return;long now=System.currentTimeMillis();ContentValues v=new ContentValues();v.put("name",CATALOG_HEALTH_PREFIX+signature);v.put("value",1);v.put("updated_at",now);v.put("text_value",safe(detail));helper.getWritableDatabase().insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
     }
 
     /** One-time UX cut-over. Old incomplete observations are removed from the active product so the
@@ -1209,6 +1243,18 @@ public final class MarketStore {
     public void markSold(long listingId) {
         ContentValues v = new ContentValues(); v.put("lifecycle", "SOLD"); v.put("last_seen", System.currentTimeMillis());
         helper.getWritableDatabase().update("market_listings", v, "id=?", new String[]{String.valueOf(listingId)});
+    }
+
+    public void markSoldBySignature(String signature){
+        if(TextUtils.isEmpty(signature))return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        db.beginTransaction();try{
+            ContentValues v=new ContentValues();v.put("lifecycle","SOLD");v.put("last_seen",now);
+            db.update("market_listings",v,"legacy_signature=? OR temp_fingerprint=?",new String[]{signature,signature});
+            ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("progress",100);done.put("updated_at",now);done.put("processing_started_at",0);done.put("last_error","articolo venduto/non più disponibile");
+            db.update("processing_jobs",done,"listing_id IN (SELECT id FROM market_listings WHERE legacy_signature=? OR temp_fingerprint=?) AND state IN (?,?,?)",new String[]{signature,signature,PENDING,PROCESSING,FAILED_RETRYABLE});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        helper.invalidateActiveObservationSessionCache();notifyQueueChanged();
     }
 
     public void applyBggMetadata(BggMetadata m) {
