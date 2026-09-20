@@ -1346,7 +1346,7 @@ public final class MarketStore {
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=expireOverdueEngineWork(now);
+        int changed=reopenTechnicalBggReviewsForExactIndex(now)+expireOverdueEngineWork(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -1406,6 +1406,30 @@ public final class MarketStore {
         } finally { db.endTransaction(); }
         if(changed>0)notifyQueueChanged();
         return changed;
+    }
+
+    /** 5.12.22 cut-over: 5.12.21 proved that the old O(31k) exact matcher could hit its
+     * CPU budget and incorrectly create human review. Those rows are technical debt, not ambiguity.
+     * Reopen only timeout/error reviews once so the compact exact index can evaluate them again. */
+    public int reopenTechnicalBggReviewsForExactIndex(long now){
+        final String marker="bgg_exact_index_v4_cutover";
+        SQLiteDatabase db=helper.getWritableDatabase();
+        try(Cursor done=db.rawQuery("SELECT 1 FROM queue_controls WHERE name=? LIMIT 1",new String[]{marker})){if(done.moveToFirst())return 0;}
+        String technical="database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND ("+
+                "filter_reason LIKE 'Ricerca BGG %oltre il budget%' OR filter_reason LIKE 'Errore match locale:%' OR filter_reason LIKE 'Errore tecnico match locale:%')";
+        int reopened=0;db.beginTransaction();try{
+            ContentValues g=new ContentValues();g.put("match_state","BGG_MATCH_REQUIRED");g.put("filter_reason","Riaperto da indice BGG esatto 5.12.22");g.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);
+            reopened=db.update("games",g,technical,null);
+            if(reopened>0){
+                ContentValues l=new ContentValues();l.put("match_state","BGG_MATCH_REQUIRED");l.put("manual_review_required",0);l.putNull("manual_review_reason");l.put("last_error","");
+                db.update("market_listings",l,"game_id IN (SELECT id FROM games WHERE filter_reason='Riaperto da indice BGG esatto 5.12.22') AND lifecycle='ACTIVE'",null);
+                db.execSQL("UPDATE market_listings SET enrichment_state=CASE WHEN vinted_url IS NOT NULL AND vinted_url<>'' THEN 'CORE_COMPLETE' ELSE 'LOCAL_ONLY' END WHERE game_id IN (SELECT id FROM games WHERE filter_reason='Riaperto da indice BGG esatto 5.12.22') AND lifecycle='ACTIVE'");
+            }
+            ContentValues q=new ContentValues();q.put("name",marker);q.put("value",reopened);q.put("updated_at",now);q.put("text_value","build=bgg-exact-index-v4;reopened="+reopened);db.insertWithOnConflict("queue_controls",null,q,SQLiteDatabase.CONFLICT_REPLACE);
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(reopened>0){setDiagnosticState("bgg_exact_index_cutover",reopened,"build=bgg-exact-index-v4;reopened="+reopened);notifyQueueChanged();}
+        return reopened;
     }
 
     /** Close head-of-line debt once the product SLA is over. The raw observation and price
@@ -2148,6 +2172,15 @@ public final class MarketStore {
     }
 
     public int vintedReviewCount(){long epoch=engineEpochStart();try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND COALESCE(manual_review_required,0)=1 AND last_seen>=?",new String[]{String.valueOf(epoch)})){return c.moveToFirst()?c.getInt(0):0;}}
+    public String currentReviewBreakdown(){
+        long epoch=engineEpochStart();SQLiteDatabase db=helper.getReadableDatabase();
+        int vinted=0,explicit=0,variant=0,other=0,bgg=0,bggTechnical=0,bggOther=0;
+        String vsql="SELECT COUNT(*),SUM(CASE WHEN EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY')) THEN 1 ELSE 0 END),SUM(CASE WHEN l.match_state='BGG_VARIANT_REVIEW' THEN 1 ELSE 0 END) FROM market_listings l WHERE l.lifecycle='ACTIVE' AND COALESCE(l.manual_review_required,0)=1 AND l.last_seen>=?";
+        try(Cursor c=db.rawQuery(vsql,new String[]{String.valueOf(epoch)})){if(c.moveToFirst()){vinted=c.getInt(0);explicit=c.isNull(1)?0:c.getInt(1);variant=c.isNull(2)?0:c.getInt(2);other=Math.max(0,vinted-Math.min(vinted,explicit+variant));}}
+        String bsql="SELECT COUNT(*),SUM(CASE WHEN filter_reason LIKE 'Ricerca BGG %oltre il budget%' OR filter_reason LIKE 'Errore%match locale:%' THEN 1 ELSE 0 END) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND last_seen>=?";
+        try(Cursor c=db.rawQuery(bsql,new String[]{String.valueOf(epoch)})){if(c.moveToFirst()){bgg=c.getInt(0);bggTechnical=c.isNull(1)?0:c.getInt(1);bggOther=Math.max(0,bgg-bggTechnical);}}
+        return "build=review-breakdown-v1;vinted="+vinted+";explicit="+explicit+";variant="+variant+";other="+other+";bgg="+bgg+";bggTechnical="+bggTechnical+";bggOther="+bggOther;
+    }
     public List<GameRecord> bggMatchReviewGames(int limit){List<GameRecord> out=new ArrayList<>();long epoch=engineEpochStart();String sql="SELECT id,bgg_id,provisional_key,canonical_name,original_name,alternate_names,year,description,thumbnail_url,image_url,min_players,max_players,playtime,min_age,weight,rating,voters,bgg_rank,categories,mechanics,designers,artists,publishers,families,expansions,base_games,bgg_url,match_state,match_confidence,first_seen,last_seen,metadata_updated_at FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND last_seen>=? ORDER BY last_seen DESC LIMIT ?";try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(epoch),String.valueOf(Math.max(1,limit))})){while(c.moveToNext())out.add(readGameBase(c));}return out;}
 
     /** Durable human-review inbox. A row remains here even if the user opens it or an automatic

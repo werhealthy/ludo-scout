@@ -110,7 +110,7 @@ checks=[
      "slaRemainingMs=" in radar and "reviewPct=" in radar and "engineSla={" in radar),
     ("build invariants preserved",
      "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build and
-     "versionName '5.12.21-product-ux-turnaround'" in build),
+     "versionName '5.12." in build),
 ]
 for name,ok in checks:
     print(("PASS " if ok else "FAIL ")+name)

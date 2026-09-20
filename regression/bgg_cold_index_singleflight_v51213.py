@@ -26,7 +26,7 @@ checks = [
     ("local id lookup remains O1 after load", ".get(bggId)" in client[client.index("public Game localById"):client.index("public Integer localMarketReferenceCents")]),
     ("matcher single-flight guard exists", "BGG_IDENTITY_RUNNING" in runner and "compareAndSet(false,true)" in match and "finally{BGG_IDENTITY_RUNNING.set(false);}" in match),
     ("busy matcher reports rather than duplicates", "state=BUSY" in match and "singleFlight=true" in match),
-    ("completed matcher reports cold-index telemetry", "build=bgg-local-match-v3" in match and "localIndexSummary()" in match),
+    ("completed matcher reports cold-index telemetry", ("build=bgg-local-match-v3" in match or "build=bgg-local-match-v4" in match) and "localIndexSummary()" in match),
     ("local index summary exposes load cost", "loadMs=" in client and "exactScans=" in client and "exactCacheHits=" in client),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]

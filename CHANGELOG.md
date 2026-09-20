@@ -7,6 +7,17 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.22 — Compact BGG exact index and no technical timeout review
+- First field diagnostic after 5.12.21 confirmed Motore now closes cleanly at the product SLA: no active/waiting run remained and five unresolved ordinary rows were expired at the 10-minute ceiling, with no current-install crash/ANR/memory exit.
+- The same run exposed 29 exact BGG scans and 29 exact-scan timeouts; those technical timeouts were being written as BGG review.
+- Replaced repeated 31k-game exact scans with a compact primitive hash index built once with the queue-process catalog; candidate hash collisions are verified against original names/aliases before acceptance.
+- Excluded one-time catalog/index bootstrap time from the per-query fuzzy safety timer.
+- BGG matcher timeouts and technical exceptions no longer create human review; they are automatically quarantined from trusted surfaces and retained in diagnostics.
+- Added a one-time recovery for 5.12.21 timeout/error review rows so they are reopened under the new exact-index path instead of remaining permanent review debt.
+- Added `reviewBreakdown` diagnostics and timestamp/build metadata for `lastClassifierBlock`, preventing stale pre-update classifier evidence from being mistaken for current behavior.
+- Added `regression/bgg_exact_index_no_timeout_review_v51222.py` and wired it into PR/beta CI.
+- No schema migration, request-rate increase, signing, applicationId or CI versionCode-strategy change.
+
 ## 5.12.21 — Product UX turnaround: 10-minute Motore SLA and trusted results
 - Added a hard 10-minute ownership ceiling for ordinary Motore runs. Incomplete automatic rows are parked reversibly so one difficult listing cannot hold later scrolls for hours.
 - Automatic Vinted misses and unresolved automatic BGG variants no longer become routine manual-review work. Explicit Hunt/manual requests keep the recovery path; ordinary ambiguity is auto-excluded.

@@ -29,7 +29,7 @@ public final class QueueJobRunner {
     public static int matchBggIdentities(Context context,MarketStore market,BggSearchClient matcher,int limit){
         if(market==null||matcher==null||market.isBggPaused())return 0;
         if(!BGG_IDENTITY_RUNNING.compareAndSet(false,true)){
-            market.setDiagnosticState("bgg_local_match",0,"build=bgg-local-match-v3;state=BUSY;singleFlight=true;"+matcher.localIndexSummary());
+            market.setDiagnosticState("bgg_local_match",0,"build=bgg-local-match-v4;state=BUSY;singleFlight=true;"+matcher.localIndexSummary());
             return 0;
         }
         long batchStarted=android.os.SystemClock.elapsedRealtime();
@@ -87,8 +87,9 @@ public final class QueueJobRunner {
 
                 if(chosen!=null&&!searchTimedOut){market.assignAutoBggMatch(g.id,chosen,confidence);matched++;}
                 else if(searchTimedOut){
-                    timedOut++;reviewDecisions++;int changed=market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason);
-                    if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;
+                    // A CPU/index timeout is a technical failure, not an ambiguity the user can
+                    // meaningfully resolve. Keep it out of review and out of trusted surfaces.
+                    timedOut++;market.autoQuarantineGame(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason);quarantined++;
                 }else {
                     BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.unresolvedTitle(g.name,fuzzyCandidates,sawAmbiguousExact);
                     if(gate.action==BoardGameIntakeGate.Action.REVIEW){
@@ -99,14 +100,16 @@ public final class QueueJobRunner {
                 }
                 handled++;market.touchLaneHeartbeat("bgg");
             }catch(Throwable t){
-                reviewDecisions++;int changed=market.markBggMatchReview(g.id,"Errore match locale: "+safe(t));
-                if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;handled++;
+                // Infrastructure/parser faults must not become human review work. Preserve the raw
+                // observation, quarantine the provisional identity and surface the fault in diagnostics.
+                market.autoQuarantineGame(g.id,"Errore tecnico match locale: "+safe(t));quarantined++;handled++;
+                market.setDiagnosticState("bgg_match_technical_drop",1,"game="+g.id+";name="+g.name+";error="+safe(t));
             }
         }
         long elapsed=android.os.SystemClock.elapsedRealtime()-batchStarted;
         int remainingRequired=market.bggMatchRequiredCount();
         market.setDiagnosticState("bgg_local_match",handled,
-                "build=bgg-local-match-v3;state=DONE;singleFlight=true;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
+                "build=bgg-local-match-v4;state=DONE;singleFlight=true;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
                         ";reviewDecisions="+reviewDecisions+";reviewWrites="+reviewWrites+";reviewWriteMisses="+reviewWriteMisses+
                         ";quarantined="+quarantined+";timedOut="+timedOut+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
         return handled;
