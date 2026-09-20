@@ -12,6 +12,8 @@ build = (ROOT / "app/build.gradle").read_text(encoding="utf-8")
 checks = [
     ("manual identities excluded", "a.source='MANUAL_BGG'" in market and "d.verification_state='USER_CONFIRMED'" in market),
     ("per-game one-shot marker", 'BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:"' in market and "queue_controls q" in market),
+    ("user-confirmed rows excluded from pending metrics", market.count("d.verification_state='USER_CONFIRMED'") >= 3),
+    ("mixed games stay review in persistent accounting", 'q.put("value","VERIFIED".equals(state)?1:2)' in market),
     ("zero-network exact-only revalidation", "localExactCandidates" in reval and "localCandidates(" not in reval and "searchFast(" not in reval),
     ("weak evidence becomes review", "plausibile ma non esatto/univoco" in reval and "manual_review_required" in market),
     ("review preserves historical identity", "flagHistoricalBggReview" in market and "db.delete" not in market[market.index("public void flagHistoricalBggReview"):market.index("public void completeHistoricalBggRevalidation")]),
