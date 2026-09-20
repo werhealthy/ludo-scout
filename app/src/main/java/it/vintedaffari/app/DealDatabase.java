@@ -76,7 +76,9 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public static boolean engineAutomaticDone(ObservationSession s,long now){
         if(s==null)return true;
         if(now-s.endAt<ENGINE_SESSION_GAP_MS)return false;
-        return engineContentSettled(s);
+        // A run may hand ownership to the next scroll after its workload-aware target, but timeout
+        // is never a correctness decision: unresolved rows are preserved/deferred, never hidden.
+        return engineContentSettled(s)||engineSlaExpired(s,now);
     }
 
     private static void createOverrides(SQLiteDatabase db){db.execSQL("CREATE TABLE IF NOT EXISTS listing_overrides(signature TEXT PRIMARY KEY,item_id TEXT,payload TEXT,excluded INTEGER NOT NULL DEFAULT 0,reason TEXT)");}
