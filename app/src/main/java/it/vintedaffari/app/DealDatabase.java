@@ -36,6 +36,15 @@ public final class DealDatabase extends SQLiteOpenHelper {
 
     public static final long ENGINE_SESSION_GAP_MS=3L*60_000L;private static final long ACTIVE_RUN_CACHE_MS=1_500L;private ObservationSession cachedActiveRun=null;private long cachedActiveRunAt=0L;
 
+    /** Product-facing cut-over. Raw observations stay in SQLite, but Motore only treats rows at or
+     * after this timestamp as current/history. Stored in queue_controls so every process sees the
+     * same epoch without relying on multi-process SharedPreferences caches. */
+    public synchronized long engineEpochStart(){
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT value FROM queue_controls WHERE name='engine_epoch_start' LIMIT 1",null)){return c.moveToFirst()?Math.max(0L,c.getLong(0)):0L;}
+        catch(Throwable ignored){return 0L;}
+    }
+    private long clampEngineStart(long start){return Math.max(start,engineEpochStart());}
+
     /** A run owns the automatic pipeline until all valid rows are either ready or explicitly
      * waiting for human review. Newer scrolls may already be captured/classified locally, but they
      * remain waiting and do not consume the ordinary backlog Vinted lane. */
@@ -113,7 +122,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public synchronized int countPendingObservationsSince(long since){Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*) FROM observations WHERE observed_at>=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS'",new String[]{String.valueOf(since)});int n=c.moveToFirst()?c.getInt(0):0;c.close();return n;}
     /** UX timeline: clusters observation bursts into human sessions separated by >=3 minutes. */
     public synchronized List<ObservationSession> recentObservationSessions(long since,int limit){
-        List<ObservationSession> out=new ArrayList<>(); if(limit<=0)return out;
+        List<ObservationSession> out=new ArrayList<>(); if(limit<=0)return out;since=clampEngineStart(since);
         final long gap=ENGINE_SESSION_GAP_MS; ObservationSession current=null; long previous=-1L; Set<String> unique=null,pending=null,stateSeen=null;
         try(Cursor c=getReadableDatabase().rawQuery("SELECT observed_at,signature,analysis_status,verification_state FROM observations WHERE observed_at>=? ORDER BY observed_at DESC LIMIT 2400",new String[]{String.valueOf(since)})){
             while(c.moveToNext()){long at=c.getLong(0);String sig=c.getString(1);boolean isPending="pending".equals(c.getString(2))&&"PENDING_ANALYSIS".equals(c.getString(3));
@@ -128,7 +137,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         return out;
     }
     public synchronized Set<String> observationSignatures(long startAt,long endAt){
-        Set<String> out=new HashSet<>();try(Cursor c=getReadableDatabase().rawQuery("SELECT DISTINCT signature FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(startAt),String.valueOf(endAt)})){while(c.moveToNext()){String sig=c.getString(0);if(sig!=null&&!sig.isEmpty())out.add(sig);}}return out;
+        Set<String> out=new HashSet<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;try(Cursor c=getReadableDatabase().rawQuery("SELECT DISTINCT signature FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(startAt),String.valueOf(endAt)})){while(c.moveToNext()){String sig=c.getString(0);if(sig!=null&&!sig.isEmpty())out.add(sig);}}return out;
     }
 
     /** Engine-facing run metrics. A card is considered ready when its BGG identity and exact Vinted
@@ -136,6 +145,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
      * metadata such as publication time may remain unavailable after best-effort enrichment without
      * keeping the whole scroll permanently "unfinished". */
     private int[] engineRangeCounts(long startAt,long endAt){
+        startAt=clampEngineStart(startAt);if(endAt<startAt)return new int[5];
         String eligible="l.id IS NOT NULL AND l.lifecycle='ACTIVE' AND g.id IS NOT NULL AND g.database_visible=1 AND g.rating>=6.0";
         String bgg=eligible+" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'";
         String vinted=bgg+" AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''";
@@ -152,7 +162,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         int[] out=new int[5];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<5;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
     }
 
-    private void fillEngineCounts(ObservationSession s){if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=? AND analysis_status='pending'",new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst())s.analysisPendingListings=c.getInt(0);}s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings)+s.analysisPendingListings;}
+    private void fillEngineCounts(ObservationSession s){if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS'",new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst())s.analysisPendingListings=c.getInt(0);}s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings)+s.analysisPendingListings;}
 
     public synchronized ObservationSession latestObservationSession(){List<ObservationSession> x=recentObservationSessions(System.currentTimeMillis()-7L*24L*60L*60_000L,1);return x.isEmpty()?null:x.get(0);}
 
@@ -181,7 +191,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized List<ObservationSession> observationSessionsBetween(long startAt,long endAt,int limit){
-        List<ObservationSession> out=new ArrayList<>();if(limit<=0)return out;final long gap=ENGINE_SESSION_GAP_MS;ObservationSession current=null;long previous=-1L;Set<String> unique=null;
+        List<ObservationSession> out=new ArrayList<>();if(limit<=0)return out;startAt=clampEngineStart(startAt);if(endAt<startAt)return out;final long gap=ENGINE_SESSION_GAP_MS;ObservationSession current=null;long previous=-1L;Set<String> unique=null;
         try(Cursor c=getReadableDatabase().rawQuery("SELECT observed_at,signature FROM observations WHERE observed_at>=? AND observed_at<=? ORDER BY observed_at DESC LIMIT 4000",new String[]{String.valueOf(startAt),String.valueOf(endAt)})){
             while(c.moveToNext()){long at=c.getLong(0);String sig=c.getString(1);if(current==null||(previous>0&&previous-at>=gap)){if(current!=null){current.uniqueListings=unique.size();fillEngineCounts(current);out.add(current);if(out.size()>=limit)break;}current=new ObservationSession(at);unique=new HashSet<>();}
                 current.startAt=Math.min(current.startAt,at);current.endAt=Math.max(current.endAt,at);current.observations++;if(sig!=null)unique.add(sig);previous=at;}
@@ -191,12 +201,12 @@ public final class DealDatabase extends SQLiteOpenHelper {
 
     public synchronized List<ObservationDay> recentObservationDays(int days){
         List<ObservationDay> out=new ArrayList<>();Calendar cal=Calendar.getInstance();cal.set(Calendar.HOUR_OF_DAY,0);cal.set(Calendar.MINUTE,0);cal.set(Calendar.SECOND,0);cal.set(Calendar.MILLISECOND,0);
-        for(int i=0;i<Math.max(1,days);i++){long start=cal.getTimeInMillis(),end=start+24L*60L*60_000L-1;int observations=0,unique=0;try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*),COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(start),String.valueOf(end)})){if(c.moveToFirst()){observations=c.getInt(0);unique=c.getInt(1);}}if(observations>0){ObservationDay d=new ObservationDay(start,end);d.observations=observations;d.uniqueListings=unique;List<ObservationSession> sessions=observationSessionsBetween(start,end,100);d.sessions=sessions.size();int[] n=engineRangeCounts(start,end);d.validListings=n[0];d.bggMatchedListings=n[1];d.vintedLinkedListings=n[2];d.completeListings=n[3];d.reviewListings=n[4];out.add(d);}cal.add(Calendar.DAY_OF_YEAR,-1);}
+        long epoch=engineEpochStart();for(int i=0;i<Math.max(1,days);i++){long dayStart=cal.getTimeInMillis(),end=dayStart+24L*60L*60_000L-1;if(epoch>0&&end<epoch){cal.add(Calendar.DAY_OF_YEAR,-1);continue;}long start=Math.max(dayStart,epoch);int observations=0,unique=0;try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*),COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(start),String.valueOf(end)})){if(c.moveToFirst()){observations=c.getInt(0);unique=c.getInt(1);}}if(observations>0){ObservationDay d=new ObservationDay(start,end);d.observations=observations;d.uniqueListings=unique;List<ObservationSession> sessions=observationSessionsBetween(start,end,100);d.sessions=sessions.size();int[] n=engineRangeCounts(start,end);d.validListings=n[0];d.bggMatchedListings=n[1];d.vintedLinkedListings=n[2];d.completeListings=n[3];d.reviewListings=n[4];out.add(d);}cal.add(Calendar.DAY_OF_YEAR,-1);}
         return out;
     }
 
     public synchronized List<EngineRunItem> engineRunItems(long startAt,long endAt,String filter,int limit){
-        List<EngineRunItem> out=new ArrayList<>();String mode=filter==null?"all":filter;
+        List<EngineRunItem> out=new ArrayList<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;String mode=filter==null?"all":filter;
         String sql="SELECT l.id,COALESCE(l.game_id,0),COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),"+
                 "COALESCE(l.vinted_title,''),COALESCE(g.canonical_name,''),COALESCE(g.bgg_id,''),"+
                 "COALESCE(l.image_url,''),COALESCE(l.enrichment_state,''),COALESCE(l.match_state,''),COALESCE(g.match_state,''),"+
@@ -221,7 +231,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized Set<String> observationReadySignatures(long startAt,long endAt){
-        Set<String> out=new HashSet<>();String sql="SELECT DISTINCT o.signature FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=6.0 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' AND l.enrichment_state='COMPLETE' AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.enrichment_state<>'NEEDS_REVIEW' AND g.match_state<>'BGG_MATCH_REVIEW' AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){while(c.moveToNext()){String sig=c.getString(0);if(sig!=null&&!sig.isEmpty())out.add(sig);}}return out;
+        Set<String> out=new HashSet<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;String sql="SELECT DISTINCT o.signature FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=6.0 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' AND l.enrichment_state='COMPLETE' AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.enrichment_state<>'NEEDS_REVIEW' AND g.match_state<>'BGG_MATCH_REVIEW' AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){while(c.moveToNext()){String sig=c.getString(0);if(sig!=null&&!sig.isEmpty())out.add(sig);}}return out;
     }
     public synchronized int countNeedsVerification(){return countDeals("verify");}
     /** Lightweight summary for the Activity screen: COUNT in SQL, never materialize 4x500 DealRecord objects on Main. */
