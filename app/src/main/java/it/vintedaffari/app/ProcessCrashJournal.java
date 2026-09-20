@@ -31,40 +31,49 @@ public final class ProcessCrashJournal {
         final String process=safeProcess(Application.getProcessName());
         final Thread.UncaughtExceptionHandler previous=Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((thread,error)->{
-            try{record(app,process,thread,error);}catch(Throwable ignored){}
+            try{record(app,process,thread,error,"UNCAUGHT");}catch(Throwable ignored){}
             if(previous!=null)previous.uncaughtException(thread,error);
         });
     }
 
-    private static void record(Context context,String process,Thread thread,Throwable error)throws Exception{
+    public static void recordHandled(Context context,String phase,Throwable error){
+        if(context==null||error==null)return;
+        try{record(context.getApplicationContext(),safeProcess(Application.getProcessName()),Thread.currentThread(),error,TextUtils.isEmpty(phase)?"HANDLED":phase);}catch(Throwable ignored){}
+    }
+
+    private static void record(Context context,String process,Thread thread,Throwable error,String phase)throws Exception{
         File dir=new File(context.getFilesDir(),"process_crash_journal");if(!dir.exists())dir.mkdirs();
         File out=new File(dir,"crash-"+process+".txt");
         StringWriter sw=new StringWriter();if(error!=null)error.printStackTrace(new PrintWriter(sw));
         String stack=sw.toString();if(stack.length()>7000)stack=stack.substring(0,7000);
+        Throwable root=error;while(root!=null&&root.getCause()!=null&&root.getCause()!=root)root=root.getCause();
         String body="at="+System.currentTimeMillis()+"\nprocess="+safe(Application.getProcessName())+"\nthread="+safe(thread==null?"":thread.getName())+
-                "\nerror="+safe(error==null?"":error.getClass().getName()+": "+String.valueOf(error.getMessage()))+"\nstack="+stack;
+                "\nphase="+safe(phase)+"\nerror="+safe(error==null?"":error.getClass().getName()+": "+String.valueOf(error.getMessage()))+
+                "\nroot="+safe(root==null?"":root.getClass().getName()+": "+String.valueOf(root.getMessage()))+"\nstack="+stack;
         try(FileOutputStream fos=new FileOutputStream(out,false)){fos.write(body.getBytes(StandardCharsets.UTF_8));fos.flush();try{fos.getFD().sync();}catch(Throwable ignored){}}
     }
 
     public static String fileSummary(Context context){
         try{
             File dir=new File(context.getFilesDir(),"process_crash_journal");File[] files=dir.listFiles((d,n)->n.startsWith("crash-")&&n.endsWith(".txt"));
-            if(files==null||files.length==0)return "build=process-crash-v1;count=0";
-            long latestAt=0;String latestProcess="",latestError="";int count=0;
+            if(files==null||files.length==0)return "build=process-crash-v2;count=0";
+            long latestAt=0;String latestProcess="",latestError="",latestRoot="",latestPhase="";int count=0;
             for(File f:files){
-                long at=0;String process="",error="";
+                long at=0;String process="",error="",root="",phase="";
                 try(BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(f),StandardCharsets.UTF_8))){
                     String line;while((line=r.readLine())!=null){
                         if(line.startsWith("at="))try{at=Long.parseLong(line.substring(3));}catch(Throwable ignored){}
                         else if(line.startsWith("process="))process=line.substring(8);
+                        else if(line.startsWith("phase="))phase=line.substring(6);
                         else if(line.startsWith("error="))error=line.substring(6);
-                        if(at>0&&!TextUtils.isEmpty(process)&&!TextUtils.isEmpty(error))break;
+                        else if(line.startsWith("root="))root=line.substring(5);
+                        if(at>0&&!TextUtils.isEmpty(process)&&!TextUtils.isEmpty(error)&&!TextUtils.isEmpty(root))break;
                     }
                 }catch(Throwable ignored){}
-                if(at>0){count++;if(at>latestAt){latestAt=at;latestProcess=process;latestError=error;}}
+                if(at>0){count++;if(at>latestAt){latestAt=at;latestProcess=process;latestError=error;latestRoot=root;latestPhase=phase;}}
             }
-            return "build=process-crash-v1;count="+count+";latestAt="+latestAt+";latestProcess="+clean(latestProcess)+";latest="+clean(latestError);
-        }catch(Throwable t){return "build=process-crash-v1;error="+clean(String.valueOf(t));}
+            return "build=process-crash-v2;count="+count+";latestAt="+latestAt+";latestProcess="+clean(latestProcess)+";phase="+clean(latestPhase)+";latest="+clean(latestError)+";root="+clean(latestRoot);
+        }catch(Throwable t){return "build=process-crash-v2;error="+clean(String.valueOf(t));}
     }
 
     public static String systemExitSummary(Context context){
