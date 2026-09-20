@@ -81,6 +81,10 @@ jobs:
         run: python3 regression/bgg_cold_index_singleflight_v51213.py
       - name: Run BGG version-affinity regression
         run: python3 regression/bgg_version_affinity_v51214.py
+      - name: Run executable SQLite BGG state-machine integration
+        run: python3 regression/bgg_sqlite_state_machine_v51215.py
+      - name: Run multi-process crash diagnostics regression
+        run: python3 regression/process_crash_diagnostics_v51215.py
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
