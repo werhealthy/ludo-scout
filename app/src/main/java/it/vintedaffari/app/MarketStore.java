@@ -1557,9 +1557,17 @@ public final class MarketStore {
         return new MarketReferenceStats(n,median,min>0?min:null);
     }
 
-    /** Backward-compatible benchmark accessor. Vinted takes over only with at least three comparable
-     * listings; otherwise BGG remains the fallback in refreshLegacyDealBenchmarks. */
-    public Integer localVintedReferenceCents(String bggId,String excludeSignature,String languageCode){MarketReferenceStats s=localVintedReferenceStats(bggId,excludeSignature,languageCode);return s.count>=3?s.typicalCents:null;}
+    /** A small local sample is evidence, not a full market takeover. With 3-7 comparable
+     * listings, shrink the local median toward the previous/BGG reference. From 8 onward the
+     * Vinted median is mature enough to stand on its own. */
+    private static Integer resolveVintedReference(MarketReferenceStats s,Integer priorCents){
+        if(s==null||s.count<3||s.typicalCents==null||s.typicalCents<=0)return null;
+        if(s.count>=8||priorCents==null||priorCents<=0)return s.typicalCents;
+        final int priorWeight=5;
+        return (int)Math.round((s.count*(double)s.typicalCents+priorWeight*(double)priorCents)/(s.count+priorWeight));
+    }
+    public Integer localVintedReferenceCents(String bggId,String excludeSignature,String languageCode){MarketReferenceStats s=localVintedReferenceStats(bggId,excludeSignature,languageCode);return s.count>=8?s.typicalCents:null;}
+    public Integer localVintedReferenceCents(String bggId,String excludeSignature,String languageCode,Integer priorCents){return resolveVintedReference(localVintedReferenceStats(bggId,excludeSignature,languageCode),priorCents);}
 
     public Integer localVintedMinCents(String bggId,String excludeSignature,String languageCode){MarketReferenceStats s=localVintedReferenceStats(bggId,excludeSignature,languageCode);return s.minCents;}
 
@@ -1580,16 +1588,24 @@ public final class MarketStore {
         if(TextUtils.isEmpty(bggId))return 0;
         SQLiteDatabase read=helper.getReadableDatabase();
         List<String> sigs=new ArrayList<>();List<ContentValues> values=new ArrayList<>();
-        String sql="SELECT signature,language_code,item_price_cents,protected_price_cents,total_cents,shipping_verified_cents,tier,tier_label FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE'";
-        try(Cursor c=read.rawQuery(sql,new String[]{bggId})){
-            while(c.moveToNext()){
-                String sig=c.getString(0),lang=c.getString(1);MarketReferenceStats stats=localVintedReferenceStats(bggId,sig,lang);
-                if(stats.count<3||stats.typicalCents==null||stats.typicalCents<=0)continue;
-                int item=c.getInt(2);Integer protectedC=c.isNull(3)?null:c.getInt(3),totalC=c.isNull(4)?null:c.getInt(4),shipping=c.isNull(5)?null:c.getInt(5);
-                int effective;if(shipping!=null){int base=protectedC!=null?protectedC:item;effective=base+shipping;}else if(totalC!=null&&totalC>0)effective=totalC;else if(protectedC!=null&&protectedC>0)effective=protectedC;else effective=item;
-                double discount=(stats.typicalCents-effective)*100.0/stats.typicalCents;String tier=c.getString(6),label=c.getString(7);
-                if(!"verify".equals(tier)){if(effective<=Math.floor(stats.typicalCents*.80)){tier="hot";label="Offertona";}else if(effective<stats.typicalCents){tier="good";label="Buon prezzo";}else{tier="normal";label="Prezzo di mercato";}}
-                ContentValues v=new ContentValues();v.put("benchmark_cents",stats.typicalCents);v.putNull("offer_cents");v.put("discount",discount);v.put("tier",tier);v.put("tier_label",label);sigs.add(sig);values.add(v);
+        String sql="SELECT signature,language_code,item_price_cents,protected_price_cents,total_cents,shipping_verified_cents,tier,tier_label,benchmark_cents,shipping_cents FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE'";
+        try(Cursor cursor=read.rawQuery(sql,new String[]{bggId})){
+            while(cursor.moveToNext()){
+                String sig=cursor.getString(0),lang=cursor.getString(1);MarketReferenceStats stats=localVintedReferenceStats(bggId,sig,lang);
+                Integer prior=cursor.isNull(8)?null:cursor.getInt(8);Integer reference=resolveVintedReference(stats,prior);
+                if(reference==null||reference<=0)continue;
+                int item=cursor.getInt(2);Integer protectedC=cursor.isNull(3)?null:cursor.getInt(3),totalC=cursor.isNull(4)?null:cursor.getInt(4),shippingVerified=cursor.isNull(5)?null:cursor.getInt(5),shippingEstimated=cursor.isNull(9)?null:cursor.getInt(9);
+                int effective;if(shippingVerified!=null){int base=protectedC!=null?protectedC:item+PurchaseMath.vintedFee(item);effective=base+shippingVerified;}else if(totalC!=null&&totalC>0)effective=totalC;else if(protectedC!=null&&protectedC>0)effective=protectedC;else effective=item;
+                Integer shipping=shippingVerified!=null?shippingVerified:shippingEstimated;
+                DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(item,effective,reference,null,null,shipping);
+                double discount=(reference-effective)*100.0/reference;String tier=cursor.getString(6),label=cursor.getString(7);
+                ContentValues v=new ContentValues();v.put("benchmark_cents",reference);v.put("discount",discount);
+                if(evaluation.suggestedOfferCents==null)v.putNull("offer_cents");else v.put("offer_cents",evaluation.suggestedOfferCents);
+                if(!"verify".equals(tier)){
+                    if(evaluation.visible()){v.put("tier",evaluation.storageTier());v.put("tier_label",evaluation.label);}
+                    else{v.put("lifecycle","REMOVED");v.put("tier","filtered");v.put("tier_label","");v.put("verification_state","PRICE_FILTERED");v.put("verification_reason","Prezzo automaticamente escluso dopo aggiornamento del mercato locale");}
+                }
+                sigs.add(sig);values.add(v);
             }
         }
         if(values.isEmpty())return 0;SQLiteDatabase db=helper.getWritableDatabase();int changed=0;db.beginTransaction();try{for(int i=0;i<values.size();i++)changed+=db.update("deals",values.get(i),"signature=?",new String[]{sigs.get(i)});db.setTransactionSuccessful();}finally{db.endTransaction();}
@@ -1606,46 +1622,46 @@ public final class MarketStore {
 
     public void updateLegacyListingLanguage(String signature,String languageCode){if(TextUtils.isEmpty(signature))return;ContentValues v=new ContentValues();if(TextUtils.isEmpty(languageCode))v.putNull("language_code");else v.put("language_code",languageCode.trim().toUpperCase(Locale.ROOT));helper.getWritableDatabase().update("market_listings",v,"temp_fingerprint=? OR legacy_signature=?",new String[]{signature,signature});}
 
-    /** Rebuild current deal benchmarks from source data instead of trusting the historical value
-     * captured when a card was first analysed. Priority: another valid local Vinted listing, then
-     * the bundled low used-market BGG reference. Retail/new prices are intentionally excluded. */
+    /** Rebuild current deal benchmarks from source data instead of trusting a stale historical tier.
+     * Mature local Vinted evidence wins; small local samples are blended with the existing/BGG prior.
+     * Retail/new prices are intentionally excluded from the deal decision. */
     public int refreshLegacyDealBenchmarks(BggSearchClient bgg){
         if(bgg==null)return 0;
         List<DealRecord> deals=helper.getDeals("all_with_review",5000);
         List<String> signatures=new ArrayList<>();
         List<ContentValues> updates=new ArrayList<>();
-        // Compute against the readable store first. Do not hold a write transaction while scanning
-        // thousands of rows: that was enough to make tab changes stutter on large databases.
         for(DealRecord d:deals){
             if(d==null||TextUtils.isEmpty(d.signature)||TextUtils.isEmpty(d.bggId))continue;
-            Integer ref=localVintedReferenceCents(d.bggId,d.signature,d.languageCode);
             boolean languageDependent=!TextUtils.isEmpty(d.languageCode)&&d.languageCode.toUpperCase(Locale.ROOT).contains("DEP");
-            if(ref==null||ref<=0){BggMarketStats live=bggMarketStats(d.bggId);if(!languageDependent&&live.count>=2&&live.fresh(System.currentTimeMillis()))ref=live.typicalCents;}
+            BggMarketStats live=bggMarketStats(d.bggId);
+            Integer prior=(!languageDependent&&live.count>=2&&live.fresh(System.currentTimeMillis())&&live.typicalCents!=null&&live.typicalCents>0)?live.typicalCents:d.benchmarkCents;
+            MarketReferenceStats local=localVintedReferenceStats(d.bggId,d.signature,d.languageCode);
+            Integer ref=resolveVintedReference(local,prior);
+            if(ref==null||ref<=0)ref=prior;
             if(ref==null||ref<=0)ref=bgg.localMarketReferenceCents(d.bggId);
             Integer newBenchmark=(ref==null||ref<=0)?null:ref;
-            Integer newOffer=null;
-            Double newDiscount=null;
-            String newTier=d.tier,newTierLabel=d.tierLabel;
+            Integer total=effectiveLegacyTotal(d);
+            Integer shipping=d.shippingVerifiedCents!=null?d.shippingVerifiedCents:d.shippingCents;
+            Integer newOffer=null;Double newDiscount=null;String newTier=d.tier,newTierLabel=d.tierLabel;boolean filter=false;
             if(newBenchmark==null){
-                if(!"verify".equals(d.tier)){newTier="normal";newTierLabel="Senza riferimento usato";}
-            }else{
-                Integer total=effectiveLegacyTotal(d);
-                if(total!=null){
-                    newDiscount=(newBenchmark-total)*100.0/newBenchmark;
-                    if(!"verify".equals(d.tier)){
-                        if(total<=Math.floor(newBenchmark*.80)){newTier="hot";newTierLabel="Offertona";}
-                        else if(total<newBenchmark){newTier="good";newTierLabel="Buon prezzo";}
-                        else{newTier="normal";newTierLabel="Prezzo di mercato";}
-                    }
+                if(!"verify".equals(d.tier)){newTier="insufficient";newTierLabel="Pochi dati";}
+            }else if(total!=null){
+                newDiscount=(newBenchmark-total)*100.0/newBenchmark;
+                DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(d.itemPriceCents,total,newBenchmark,null,null,shipping);
+                newOffer=evaluation.suggestedOfferCents;
+                if(!"verify".equals(d.tier)){
+                    if(evaluation.visible()){newTier=evaluation.storageTier();newTierLabel=evaluation.label;}
+                    else{newTier="filtered";newTierLabel="";filter=true;}
                 }
             }
-            if(sameInt(d.benchmarkCents,newBenchmark)&&sameInt(d.offerCents,newOffer)&&sameDouble(d.discount,newDiscount)&&Objects.equals(d.tier,newTier)&&Objects.equals(d.tierLabel,newTierLabel))continue;
+            if(sameInt(d.benchmarkCents,newBenchmark)&&sameInt(d.offerCents,newOffer)&&sameDouble(d.discount,newDiscount)&&Objects.equals(d.tier,newTier)&&Objects.equals(d.tierLabel,newTierLabel)&&!filter)continue;
             ContentValues v=new ContentValues();
             if(newBenchmark==null)v.putNull("benchmark_cents");else v.put("benchmark_cents",newBenchmark);
-            v.putNull("offer_cents");
+            if(newOffer==null)v.putNull("offer_cents");else v.put("offer_cents",newOffer);
             if(newDiscount==null)v.putNull("discount");else v.put("discount",newDiscount);
             if(!Objects.equals(d.tier,newTier))v.put("tier",newTier);
             if(!Objects.equals(d.tierLabel,newTierLabel))v.put("tier_label",newTierLabel);
+            if(filter){v.put("lifecycle","REMOVED");v.put("verification_state","PRICE_FILTERED");v.put("verification_reason","Prezzo automaticamente escluso dopo ricalcolo del mercato");}
             signatures.add(d.signature);updates.add(v);
         }
         if(updates.isEmpty()){reclassifyAutomaticVintedJobs();return 0;}
