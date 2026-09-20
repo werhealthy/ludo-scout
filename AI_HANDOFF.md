@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.15-crash-journal-ci-integration`
-- versionCode: `129`
+- Baseline version: `5.12.16-engine-epoch-progress-stability`
+- versionCode: `130`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,17 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.16 Motore epoch + progress semantics + queue startup stability
+- Product reset after real-device evidence: the old Motore timeline/review inbox mixed multiple historical iterations with the current job. A new durable `engine_epoch_start` in SQLite scopes Motore sessions/history/review to the new cycle while retaining all raw observations, prices, matched identities and market history.
+- One-time operational cut-over archives old automatic processing jobs (explicit `HUNT_PRIORITY` work is preserved), clears inherited listing review flags, archives legacy deal review states, and hides unresolved provisional BGG review rows as `EPOCH_ARCHIVED_REVIEW`. No observations or price history are deleted.
+- If an archived ambiguous provisional title appears again after the cut-over, `upsertProvisionalGame()` revives it as fresh `BGG_MATCH_REQUIRED` work instead of inheriting the old review forever.
+- Fixed a core run-lifecycle bug: `fillEngineCounts()` previously counted every `analysis_status='pending'` row as still pending, including `BLOCKED_CLASSIFIER` observations that are intentionally never analyzed. It now counts only `verification_state='PENDING_ANALYSIS'`, matching the session builder and allowing completed runs to close.
+- Motore hero is progress-first (`elaborati / totale`, ready, ambiguous, remaining) instead of centering the number of games found. Ambiguous cases are explicitly optional and do not represent blocked automatic work.
+- `QueueKeepAliveService` startup is phase-guarded. Resolver/BGG/reconcile/recovery/sweep/lane failures are journaled instead of escaping through Android Service startup and causing a crash loop; critical foreground/database failures stop the service cleanly.
+- Crash journal v2 records handled phase plus deepest root cause. Diagnostics add `engineEpoch={...}` for the current product cycle.
+- Regression: `regression/engine_epoch_progress_stability_v51216.py` executes a SQLite fixture for epoch cut-over/pending-count semantics and statically guards UI/startup invariants.
+- No signing/applicationId/network-rate/CI-versionCode strategy changes.
 
 ## 5.12.15 Crash diagnostics + executable SQLite integration
 - Strategy change after repeated Pixel iterations: the device is no longer the primary debugger for BGG state-machine correctness. Pixel Test 9 showed the affinity fix worked (`requiredPure=0`, `reviewLegacy=0`, `bggMatchRequired=0`) and historical revalidation progressed from 73 to 55 pending.
