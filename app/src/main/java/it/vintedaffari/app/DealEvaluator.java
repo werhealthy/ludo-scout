@@ -113,6 +113,10 @@ public final class DealEvaluator {
         Integer suggestedOffer = shippingCents != null && shippingCents >= 0
                 ? PurchaseMath.maxItemForTotal(goodCeiling, shippingCents)
                 : offerCents;
+        if (suggestedOffer != null && shippingCents != null) {
+            int step = itemCents < 1000 ? 10 : 50;
+            suggestedOffer = Math.max(step, (suggestedOffer / step) * step);
+        }
         Integer plausibleOfferTotal = offerTotal(suggestedOffer, shippingCents);
         if ((plausibleOfferTotal == null || plausibleOfferTotal <= 0) && suggestedOffer != null
                 && suggestedOffer.equals(offerCents)) {
@@ -120,7 +124,7 @@ public final class DealEvaluator {
         }
         if (suggestedOffer != null && suggestedOffer > 0 && suggestedOffer < itemCents) {
             double cut = (itemCents - suggestedOffer) / (double) itemCents;
-            if (cut >= 0.05 && cut <= 0.18 && plausibleOfferTotal != null && plausibleOfferTotal <= goodCeiling) {
+            if (cut >= 0.05 && cut <= 0.15 && plausibleOfferTotal != null && plausibleOfferTotal <= goodCeiling) {
                 return new Evaluation(Decision.OFFER, "Prova un’offerta",
                         "A " + money(suggestedOffer) + " diventerebbe un buon prezzo",
                         suggestedOffer, currentTotalCents, benchmark);
