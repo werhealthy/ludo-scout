@@ -86,6 +86,13 @@ public final class MainActivity extends Activity {
             long cutoff=System.currentTimeMillis();
             int archived=marketStore.archiveAutomaticReviewDebtBefore(cutoff);
             p.edit().putBoolean("v51221ReviewTurnaroundApplied",true).putLong("v51221ReviewTurnaroundAt",cutoff).putInt("v51221ReviewTurnaroundArchived",archived).apply();
+            if(!p.getBoolean("v51221ProductNoiseSweepApplied",false))maintenanceIo.execute(()->{
+                try{
+                    int hidden=marketStore.autoHideStrongNonGameListings();
+                    getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putBoolean("v51221ProductNoiseSweepApplied",true).putInt("v51221ProductNoiseSweepHidden",hidden).apply();
+                    runOnUiThread(()->{if(!isDestroyed()&&"discover".equals(tab))scheduleRender(80);});
+                }catch(Throwable x){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("v51221ProductNoiseSweepError",String.valueOf(x)).apply();}
+            });
         }catch(Throwable t){
             getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("v51221ReviewTurnaroundError",String.valueOf(t)).apply();
         }
