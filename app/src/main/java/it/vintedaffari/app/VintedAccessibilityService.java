@@ -49,8 +49,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private static final String VINTED_PACKAGE = "fr.vinted";
     private static final String PREFS_DIAG = "va_v3_diag";
     private static final long SCAN_DEBOUNCE_MS = 70;
-    private static final long REANALYZE_SAME_CARD_MS = 45_000;
-    private static final long RESIGHT_SAME_CARD_MS = 4_000;
+    // Accessibility can emit the same visible Compose cards repeatedly on focus/window changes.
+    // Keep a generous in-process guard so returning to Vinted does not manufacture another Motore job
+    // from the exact same title/brand/price rows. A changed price changes the signature and is fresh.
+    private static final long REANALYZE_SAME_CARD_MS = 10 * 60_000L;
+    private static final long RESIGHT_SAME_CARD_MS = 10 * 60_000L;
     private static final Pattern VINTED_ABSOLUTE_ITEM=Pattern.compile("https?://(?:www\\.)?vinted\\.[^\\s/]+/items/(\\d{5,})(?:-[^\\s,;]*)?",Pattern.CASE_INSENSITIVE);
     private static final Pattern VINTED_RELATIVE_ITEM=Pattern.compile("(?:^|[^A-Za-z0-9])/?items/(\\d{5,})(?:[-/?#][^\\s,;]*)?",Pattern.CASE_INSENSITIVE);
 
@@ -330,18 +333,24 @@ public final class VintedAccessibilityService extends AccessibilityService {
             }
 
             if (listingNow.allowPriceModel) {
-                pendingForAnalysis.put(sig, card);
-                if (pendingForAnalysis.size() > 500) {
-                    String first = pendingForAnalysis.keySet().iterator().next();
-                    pendingForAnalysis.remove(first);
-                }
-
                 Long lastAnalyzed = recentlyAnalyzed.get(sig);
-                if (engine != null && engine.isReady() &&
-                        (lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS)) {
-                    freshForAnalysis.add(card);
-                    recentlyAnalyzed.put(sig, now);
-                }
+                boolean analysisDue=lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS;
+                if(analysisDue){
+                    if(engine != null && engine.isReady() && !analysisBatchInFlight){
+                        freshForAnalysis.add(card);
+                        recentlyAnalyzed.put(sig, now);
+                        pendingForAnalysis.remove(sig);
+                    }else{
+                        // Queue only genuinely due work. Previously every re-render entered this map
+                        // and continuePersistentAnalysis() could immediately re-analyse it despite the
+                        // REANALYZE guard, amplifying repeated Accessibility events.
+                        pendingForAnalysis.put(sig, card);
+                        if (pendingForAnalysis.size() > 500) {
+                            String first = pendingForAnalysis.keySet().iterator().next();
+                            pendingForAnalysis.remove(first);
+                        }
+                    }
+                }else pendingForAnalysis.remove(sig);
             }
 
             if (!card.rawDescription.isEmpty()) {
@@ -1242,14 +1251,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String priceRefreshSummary=priceRefresh.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-priceRefresh.updatedAt)+", "+priceRefresh.detail);
         String bggIdentityTrustSummary=marketDiag.bggIdentityTrustSummary();
         String bggMatchBreakdownSummary=marketDiag.bggMatchRequiredBreakdown();
+        long engineEpochForExit=db.engineEpochStart();
         String processCrashSummary=ProcessCrashJournal.fileSummary(context);
-        String systemExitSummary=ProcessCrashJournal.systemExitSummary(context);
+        String systemExitSummary=ProcessCrashJournal.systemExitSummary(context,engineEpochForExit);
         MarketStore.RuntimeStatus bggLocalMatch=marketDiag.diagnosticState("bgg_local_match");
         String bggLocalMatchSummary=bggLocalMatch.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggLocalMatch.updatedAt)+", "+bggLocalMatch.detail);
         MarketStore.RuntimeStatus bggReviewWrite=marketDiag.diagnosticState("bgg_match_review_write");
         String bggReviewWriteSummary=bggReviewWrite.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggReviewWrite.updatedAt)+", "+bggReviewWrite.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
-        long engineEpochStart=db.engineEpochStart();
+        long engineEpochStart=engineEpochForExit;
         String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
         String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
         db.close();

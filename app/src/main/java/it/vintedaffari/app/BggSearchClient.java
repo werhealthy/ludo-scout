@@ -4,13 +4,16 @@ public final class BggSearchClient {
  public static final class Edition{public String id,name,imageUrl,publisher,languages;public Integer year;public String label(){return (name==null?"Edizione":name)+(year==null?"":" · "+year)+(TextUtils.isEmpty(publisher)?"":" · "+publisher)+(TextUtils.isEmpty(languages)?"":" · "+languages);}}
  public static final class Game {public String id,name,imageUrl,type,categories,editionName,editionId;public Integer year,playtime,minPlayers,maxPlayers,rank,voters,qualityScore,marketUsedMedianCents,marketUsedMinCents,marketUsedCount;public Double rating,geekRating,weight;public boolean local;public String notice;public int searchScore;public final List<String> aliases=new ArrayList<>();public final List<Edition> editions=new ArrayList<>();@Override public String toString(){return name+(year==null?"":" ("+year+")")+("boardgameexpansion".equals(type)?" · Espansione":"");}}
  public interface Callback{void ok(List<Game> games);void error(String e);}
- private final ExecutorService exec=Executors.newSingleThreadExecutor();private final ExecutorService directExec=Executors.newSingleThreadExecutor();private final Context context;private volatile Map<String,Integer> localPriceRefs,localNewPriceRefs;private volatile Map<String,Game> localByIdIndex;private volatile List<Game> localCatalogIndex;private volatile long localCatalogLoadMs;private volatile int localExactScans,localExactCacheHits;
+ private static final long QUEUE_SEARCH_BUDGET_MS=2_500L;
+ private final ExecutorService exec=Executors.newSingleThreadExecutor();private final ExecutorService directExec=Executors.newSingleThreadExecutor();private final Context context;private volatile Map<String,Integer> localPriceRefs,localNewPriceRefs;private volatile Map<String,Game> localByIdIndex;private volatile List<Game> localCatalogIndex;private volatile long localCatalogLoadMs;private volatile int localExactScans,localExactCacheHits,localExactTimeouts,localFuzzyTimeouts;private volatile boolean queueSearchTimedOut=false;
  private final Map<String,List<Game>> fastCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(32,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>24;}});
  private final Map<String,List<Game>> queueFuzzyCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(40,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>32;}});
  private final Map<String,List<Game>> queueExactCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(72,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>64;}});
  public BggSearchClient(Context c){context=c.getApplicationContext();}
  public void warmup(){exec.execute(()->{try{priceRefs();}catch(Exception ignored){}});}
  public void shutdown(){fastCache.clear();queueFuzzyCache.clear();queueExactCache.clear();localByIdIndex=null;localCatalogIndex=null;exec.shutdownNow();directExec.shutdownNow();}
+ public void resetQueueSearchBudget(){queueSearchTimedOut=false;}
+ public boolean queueSearchTimedOut(){return queueSearchTimedOut;}
  public boolean configured(){return !TextUtils.isEmpty(BuildConfig.BGG_TOKEN)&&!"PASTE_YOUR_BGG_TOKEN_HERE".equals(BuildConfig.BGG_TOKEN);}
 
  // These compact indexes are fixed application resources, not dynamic assets. Keeping them in
@@ -46,19 +49,22 @@ public final class BggSearchClient {
  public List<Game> localCandidatesIndexed(String query){
   String key=normalize(query);if(key.isEmpty())return Collections.emptyList();
   List<Game> cached=queueFuzzyCache.get(key);if(cached!=null)return copySearchResults(cached);
+  long started=android.os.SystemClock.elapsedRealtime();
   try{
    ensureCatalogIndex();List<Game> catalog=localCatalogIndex;if(catalog==null||catalog.isEmpty())return Collections.emptyList();
    BggManualSearchRanking.Query rankedQuery=BggManualSearchRanking.prepare(query);
-   PriorityQueue<RankedLocal> top=new PriorityQueue<>(16,(a,b)->{int c=Integer.compare(a.score,b.score);if(c!=0)return c;return Integer.compare(rankValue(b.game),rankValue(a.game));});
+   PriorityQueue<RankedLocal> top=new PriorityQueue<>(16,(a,b)->{int cc=Integer.compare(a.score,b.score);if(cc!=0)return cc;return Integer.compare(rankValue(b.game),rankValue(a.game));});
+   int scanned=0;
    for(Game g:catalog){
+    if((++scanned&63)==0&&android.os.SystemClock.elapsedRealtime()-started>QUEUE_SEARCH_BUDGET_MS){queueSearchTimedOut=true;localFuzzyTimeouts++;return Collections.emptyList();}
     int score=BggManualSearchRanking.score(rankedQuery,g.name,false);
     for(String alias:g.aliases)score=Math.max(score,BggManualSearchRanking.score(rankedQuery,alias,true));
     if(score<320)continue;score+=BggManualSearchRanking.popularityBoost(g.rank,g.voters);
-    RankedLocal r=new RankedLocal(g,score);
-    if(top.size()<16)top.add(r);else if(compareRankedBestFirst(r,top.peek())<0){top.poll();top.add(r);}
+    RankedLocal rr=new RankedLocal(g,score);
+    if(top.size()<16)top.add(rr);else if(compareRankedBestFirst(rr,top.peek())<0){top.poll();top.add(rr);}
    }
    ArrayList<RankedLocal> ranked=new ArrayList<>(top);ranked.sort(BggSearchClient::compareRankedBestFirst);
-   ArrayList<Game> out=new ArrayList<>(ranked.size());for(RankedLocal r:ranked){Game g=copySearchGame(r.game);g.searchScore=r.score;out.add(g);}
+   ArrayList<Game> out=new ArrayList<>(ranked.size());for(RankedLocal rr:ranked){Game g=copySearchGame(rr.game);g.searchScore=rr.score;out.add(g);}
    queueFuzzyCache.put(key,copySearchResults(out));return out;
   }catch(Exception e){return Collections.emptyList();}
  }
@@ -68,10 +74,12 @@ public final class BggSearchClient {
  public List<Game> localExactCandidates(String query){
   String key=normalize(query);if(key.isEmpty())return Collections.emptyList();
   List<Game> cached=queueExactCache.get(key);if(cached!=null){localExactCacheHits++;return copySearchResults(cached);}
+  long started=android.os.SystemClock.elapsedRealtime();
   try{
    ensureCatalogIndex();List<Game> catalog=localCatalogIndex;if(catalog==null)return Collections.emptyList();
-   ArrayList<Game> hit=new ArrayList<>();localExactScans++;
+   ArrayList<Game> hit=new ArrayList<>();localExactScans++;int scanned=0;
    for(Game g:catalog){
+    if((++scanned&63)==0&&android.os.SystemClock.elapsedRealtime()-started>QUEUE_SEARCH_BUDGET_MS){queueSearchTimedOut=true;localExactTimeouts++;return Collections.emptyList();}
     boolean match=key.equals(normalize(g.name));
     if(!match)for(String alias:g.aliases)if(key.equals(normalize(alias))){match=true;break;}
     if(match)hit.add(copySearchGame(g));
@@ -92,7 +100,7 @@ public final class BggSearchClient {
    localCatalogIndex=Collections.unmodifiableList(catalog);localByIdIndex=Collections.unmodifiableMap(byId);localCatalogLoadMs=android.os.SystemClock.elapsedRealtime()-started;
   }
  }
- public String localIndexSummary(){List<Game> c=localCatalogIndex;return "build=bgg-local-index-v3;loaded="+(c!=null)+";games="+(c==null?0:c.size())+";loadMs="+localCatalogLoadMs+";exactScans="+localExactScans+";exactCacheHits="+localExactCacheHits+";exactCacheSize="+queueExactCache.size()+";fuzzyCacheSize="+queueFuzzyCache.size();}
+ public String localIndexSummary(){List<Game> c=localCatalogIndex;return "build=bgg-local-index-v3;loaded="+(c!=null)+";games="+(c==null?0:c.size())+";loadMs="+localCatalogLoadMs+";exactScans="+localExactScans+";exactCacheHits="+localExactCacheHits+";exactTimeouts="+localExactTimeouts+";fuzzyTimeouts="+localFuzzyTimeouts+";searchBudgetMs="+QUEUE_SEARCH_BUDGET_MS+";exactCacheSize="+queueExactCache.size()+";fuzzyCacheSize="+queueFuzzyCache.size();}
  private static final class RankedLocal{final Game game;final int score;RankedLocal(Game game,int score){this.game=game;this.score=score;}}
  private static int rankValue(Game g){return g==null||g.rank==null||g.rank<=0?Integer.MAX_VALUE:g.rank;}
  private static int compareRankedBestFirst(RankedLocal a,RankedLocal b){int c=Integer.compare(b.score,a.score);if(c!=0)return c;return Integer.compare(rankValue(a.game),rankValue(b.game));}

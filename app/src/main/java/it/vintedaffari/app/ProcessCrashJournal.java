@@ -45,13 +45,20 @@ public final class ProcessCrashJournal {
         File dir=new File(context.getFilesDir(),"process_crash_journal");if(!dir.exists())dir.mkdirs();
         boolean uncaught="UNCAUGHT".equals(phase);
         File out=uncaught?new File(dir,"crash-"+process+".txt"):new File(dir,"handled-"+process+".txt");
-        StringWriter sw=new StringWriter();if(error!=null)error.printStackTrace(new PrintWriter(sw));
-        String stack=sw.toString();if(stack.length()>7000)stack=stack.substring(0,7000);
         Throwable root=error;while(root!=null&&root.getCause()!=null&&root.getCause()!=root)root=root.getCause();
-        String body="at="+System.currentTimeMillis()+"\nprocess="+safe(Application.getProcessName())+"\nthread="+safe(thread==null?"":thread.getName())+
+        // Persist a small header before formatting the stack. If the fatal error is OOM/heap pressure,
+        // StringWriter/stack formatting may itself fail; the timestamp/process/root still survives.
+        String header="at="+System.currentTimeMillis()+"\nprocess="+safe(Application.getProcessName())+"\nthread="+safe(thread==null?"":thread.getName())+
                 "\nphase="+safe(phase)+"\nerror="+safe(error==null?"":error.getClass().getName()+": "+String.valueOf(error.getMessage()))+
-                "\nroot="+safe(root==null?"":root.getClass().getName()+": "+String.valueOf(root.getMessage()))+"\nstack="+stack;
-        try(FileOutputStream fos=new FileOutputStream(out,false)){fos.write(body.getBytes(StandardCharsets.UTF_8));fos.flush();try{fos.getFD().sync();}catch(Throwable ignored){}}
+                "\nroot="+safe(root==null?"":root.getClass().getName()+": "+String.valueOf(root.getMessage()));
+        try(FileOutputStream fos=new FileOutputStream(out,false)){
+            fos.write(header.getBytes(StandardCharsets.UTF_8));fos.flush();try{fos.getFD().sync();}catch(Throwable ignored){}
+            try{
+                StringWriter sw=new StringWriter();if(error!=null)error.printStackTrace(new PrintWriter(sw));
+                String stack=sw.toString();if(stack.length()>7000)stack=stack.substring(0,7000);
+                fos.write(("\nstack="+stack).getBytes(StandardCharsets.UTF_8));fos.flush();try{fos.getFD().sync();}catch(Throwable ignored){}
+            }catch(Throwable ignored){}
+        }
     }
 
     public static String fileSummary(Context context){
@@ -77,13 +84,21 @@ public final class ProcessCrashJournal {
         }catch(Throwable t){return "build=process-crash-v2;error="+clean(String.valueOf(t));}
     }
 
-    public static String systemExitSummary(Context context){
-        if(Build.VERSION.SDK_INT<30)return "build=system-exit-v1;unsupportedApi="+Build.VERSION.SDK_INT;
+    public static String systemExitSummary(Context context){return systemExitSummary(context,0L);}
+
+    /** Android exit history is UID-wide and can include WebView sandbox processes. Product stability
+     * only cares about Ludo's default/:ui/:radar processes, and the epoch boundary lets diagnostics
+     * distinguish fresh failures from historical noise. */
+    public static String systemExitSummary(Context context,long since){
+        if(Build.VERSION.SDK_INT<30)return "build=system-exit-v2;unsupportedApi="+Build.VERSION.SDK_INT;
         try{
             ActivityManager am=(ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
-            List<ApplicationExitInfo> exits=am==null?null:am.getHistoricalProcessExitReasons(null,0,16);
-            long now=System.currentTimeMillis(),day=24L*60L*60_000L,latestAt=0;int crash24=0,anr24=0,lowMem24=0,other24=0;String process="",reason="",description="";
+            List<ApplicationExitInfo> exits=am==null?null:am.getHistoricalProcessExitReasons(null,0,32);
+            long now=System.currentTimeMillis(),day=24L*60L*60_000L,latestAt=0;int crash24=0,anr24=0,lowMem24=0,other24=0,crashSince=0,anrSince=0,lowMemSince=0,otherSince=0;
+            long latestPss=0,latestRss=0;int latestImportance=0,latestStatus=0;String process="",reason="",description="";StringBuilder recent=new StringBuilder();int recentCount=0;
+            String pkg=context.getPackageName();
             if(exits!=null)for(ApplicationExitInfo e:exits){
+                String pn=e.getProcessName();if(TextUtils.isEmpty(pn)||!(pn.equals(pkg)||pn.startsWith(pkg+":")))continue;
                 long at=e.getTimestamp();int why=e.getReason();
                 if(now-at<=day){
                     if(why==ApplicationExitInfo.REASON_CRASH||why==ApplicationExitInfo.REASON_CRASH_NATIVE)crash24++;
@@ -91,11 +106,20 @@ public final class ProcessCrashJournal {
                     else if(why==ApplicationExitInfo.REASON_LOW_MEMORY||why==ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE)lowMem24++;
                     else other24++;
                 }
-                if(at>latestAt){latestAt=at;process=e.getProcessName();reason=reasonName(why);description=e.getDescription();}
+                if(since<=0||at>=since){
+                    if(why==ApplicationExitInfo.REASON_CRASH||why==ApplicationExitInfo.REASON_CRASH_NATIVE)crashSince++;
+                    else if(why==ApplicationExitInfo.REASON_ANR)anrSince++;
+                    else if(why==ApplicationExitInfo.REASON_LOW_MEMORY||why==ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE)lowMemSince++;
+                    else otherSince++;
+                }
+                if(at>latestAt){latestAt=at;process=pn;reason=reasonName(why);description=e.getDescription();latestPss=e.getPss();latestRss=e.getRss();latestImportance=e.getImportance();latestStatus=e.getStatus();}
+                if(recentCount<6){if(recent.length()>0)recent.append("|");recent.append(at).append(",").append(clean(pn)).append(",").append(reasonName(why)).append(",pss=").append(e.getPss()).append(",rss=").append(e.getRss());recentCount++;}
             }
-            return "build=system-exit-v1;latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
-                    ";crash24h="+crash24+";anr24h="+anr24+";memory24h="+lowMem24+";other24h="+other24;
-        }catch(Throwable t){return "build=system-exit-v1;error="+clean(String.valueOf(t));}
+            return "build=system-exit-v2;since="+Math.max(0L,since)+";latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
+                    ";latestPssKb="+latestPss+";latestRssKb="+latestRss+";latestImportance="+latestImportance+";latestStatus="+latestStatus+
+                    ";crashSince="+crashSince+";anrSince="+anrSince+";memorySince="+lowMemSince+";otherSince="+otherSince+
+                    ";crash24h="+crash24+";anr24h="+anr24+";memory24h="+lowMem24+";other24h="+other24+";recent="+cleanLong(recent.toString(),900);
+        }catch(Throwable t){return "build=system-exit-v2;error="+clean(String.valueOf(t));}
     }
 
     private static String reasonName(int r){
@@ -119,4 +143,5 @@ public final class ProcessCrashJournal {
     private static String safeProcess(String s){String x=TextUtils.isEmpty(s)?"unknown":s.replaceAll("[^A-Za-z0-9._-]","_");return x.length()>80?x.substring(0,80):x;}
     private static String safe(String s){return s==null?"":s.replace('\n',' ').replace('\r',' ');}
     private static String clean(String s){String x=safe(s);return x.length()>180?x.substring(0,180):x;}
+    private static String cleanLong(String s,int max){String x=safe(s);return x.length()>max?x.substring(0,max):x;}
 }

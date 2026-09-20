@@ -34,7 +34,9 @@ public final class DealDatabase extends SQLiteOpenHelper {
         public boolean bggReady,vintedReady,complete,review;
     }
 
-    public static final long ENGINE_SESSION_GAP_MS=3L*60_000L;private static final long ACTIVE_RUN_CACHE_MS=1_500L;private ObservationSession cachedActiveRun=null;private long cachedActiveRunAt=0L;
+    public static final long ENGINE_SESSION_GAP_MS=3L*60_000L;
+    public static final long ENGINE_DUPLICATE_SIGHTING_MS=10L*60_000L;
+    private static final long ACTIVE_RUN_CACHE_MS=1_500L;private ObservationSession cachedActiveRun=null;private long cachedActiveRunAt=0L;
 
     /** Product-facing cut-over. Raw observations stay in SQLite, but Motore only treats rows at or
      * after this timestamp as current/history. Stored in queue_controls so every process sees the
@@ -90,7 +92,14 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
     private static void safeAlter(SQLiteDatabase db,String sql){try{db.execSQL(sql);}catch(Exception ignored){}}
 
-    public synchronized void recordSighting(VintedCard card,ListingClassifier.Result listing,long now){if(card==null)return;cachedActiveRunAt=0L;ContentValues v=new ContentValues();v.put("signature",signature(card));v.put("observed_at",now);v.put("vinted_title",card.title);v.put("brand",card.brand);v.put("item_condition",card.condition);v.put("item_price_cents",cents(card.itemPrice));put(v,"protected_price_cents",card.protectedPrice==null?null:cents(card.protectedPrice));put(v,"favorites",card.favorites);v.put("analysis_status","pending");if(listing!=null){v.put("listing_type",listing.type.name());v.put("verification_state",listing.allowPriceModel?"PENDING_ANALYSIS":"BLOCKED_CLASSIFIER");v.put("verification_reason",listing.reason);}getWritableDatabase().insert("observations",null,v);}
+    public synchronized void recordSighting(VintedCard card,ListingClassifier.Result listing,long now){
+        if(card==null)return;
+        String sig=signature(card);long cutoff=Math.max(0L,now-ENGINE_DUPLICATE_SIGHTING_MS);
+        // Persisted dedupe survives :radar process restarts. Re-rendering the same visible Vinted
+        // card must not extend the Motore acquisition window or inflate its card count.
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT 1 FROM observations WHERE signature=? AND observed_at>=? LIMIT 1",new String[]{sig,String.valueOf(cutoff)})){if(c.moveToFirst())return;}
+        cachedActiveRunAt=0L;ContentValues v=new ContentValues();v.put("signature",sig);v.put("observed_at",now);v.put("vinted_title",card.title);v.put("brand",card.brand);v.put("item_condition",card.condition);v.put("item_price_cents",cents(card.itemPrice));put(v,"protected_price_cents",card.protectedPrice==null?null:cents(card.protectedPrice));put(v,"favorites",card.favorites);v.put("analysis_status","pending");if(listing!=null){v.put("listing_type",listing.type.name());v.put("verification_state",listing.allowPriceModel?"PENDING_ANALYSIS":"BLOCKED_CLASSIFIER");v.put("verification_reason",listing.reason);}getWritableDatabase().insert("observations",null,v);
+    }
     public synchronized void recordBlocked(VintedCard c,ListingClassifier.Result l,long n){recordSighting(c,l,n);}
     public synchronized void record(VintedCard card,GameAnalysis a,ListingClassifier.Result listing,long now){if(card==null||a==null)return;String sig=signature(card);boolean anomaly=ListingClassifier.isExtremePriceAnomaly(a);String verify=anomaly?"PRICE_ANOMALY":(!"matched".equals(a.status)?"MATCH_UNCERTAIN":"OK");String reason=anomaly?"Prezzo totale anomalo: verifica espansione/accessorio/annuncio incompleto.":null;if(listing!=null&&listing.type==ListingClassifier.Type.EXPANSION&&"OK".equals(verify)){verify="EXPANSION_CHECK";reason="Espansione: verifica benchmark della stessa edizione.";}SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{ContentValues obs=commonValues(card,a,listing,verify,reason);int changed=db.update("observations",obs,"id=(SELECT id FROM observations WHERE signature=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS' ORDER BY observed_at DESC LIMIT 1)",new String[]{sig});if(changed==0){obs.put("signature",sig);obs.put("observed_at",now);db.insert("observations",null,obs);}boolean feed=isFeedDeal(a)&&"OK".equals(verify),review="PRICE_ANOMALY".equals(verify)||"EXPANSION_CHECK".equals(verify);if(feed||review)upsertDeal(db,sig,card,a,listing,verify,reason,now,review?"verify":a.tier);db.setTransactionSuccessful();}finally{db.endTransaction();}}
     public synchronized DealRecord recordSellerItem(SellerBundleScanner.SellerItem item,String seller,VintedCard card,GameAnalysis analysis){

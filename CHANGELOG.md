@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.17 — Acquisition dedupe and crash stability
+- Fixed Motore card-count inflation caused by repeated Accessibility renders of the same visible Vinted cards. Same title/brand/price sightings and re-analysis are suppressed for 10 minutes, with the observation dedupe persisted in SQLite so it survives `:radar` restarts.
+- Motore now reports unique Vinted cards in the hero, job detail header and daily chronology; raw observation events remain available only in diagnostics.
+- Hardened crash journaling so the minimal crash header is flushed before stack formatting, improving evidence retention when the fatal condition is memory pressure.
+- System exit-history diagnostics now ignore WebView sandbox processes, scope fresh crash/ANR/memory counts to the current engine epoch, and expose Ludo-process PSS/RSS plus a compact recent-exit history.
+- Added a hard 2.5 s budget to queue-process local BGG exact/fuzzy scans. An incomplete timed-out scan cannot produce an automatic match; it becomes optional review instead.
+- Added `regression/engine_acquisition_crash_stability_v51217.py` and wired it into PR and beta CI.
+- No schema migration, request-rate, signing, applicationId or CI versionCode-strategy changes.
+
 ## 5.12.16 — Motore epoch, progress semantics, queue startup stability
 - Added a non-destructive Motore operational epoch so old timeline/review debt no longer appears as current work; observations, prices and authoritative matched data remain stored.
 - Old automatic queue jobs are completed at cut-over while explicit Hunt work is preserved. Legacy review flags and unresolved provisional BGG review rows are archived from the active workflow.
