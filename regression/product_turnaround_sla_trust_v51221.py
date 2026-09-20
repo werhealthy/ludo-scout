@@ -78,8 +78,13 @@ checks=[
      '"HUNT_PRIORITY".equals(job.source)' in market and '"MANUAL_PRIORITY".equals(job.source)' in market),
     ("optional deep metadata cannot block Motore readiness",
      "l.enrichment_state IN ('COMPLETE','CORE_COMPLETE')" in deal and "j.job_type<>'VINTED_DEEP_ENRICHMENT'" in deal),
+    ("deep metadata failure only excludes a genuinely pending BGG variant",
+     "isBggVariantPending(job.listingId)" in runner and "if(!market.isBggVariantPending(job.listingId)){market.completeJob(job);return;}" in runner),
     ("old automatic review debt has a non-destructive cutover",
      "archiveAutomaticReviewDebtBefore" in market and "v51221ReviewTurnaroundApplied" in ui and "EPOCH_ARCHIVED_REVIEW" in market),
+    ("existing accessory/non-game pollution is re-swept without blocking UI startup",
+     "autoHideStrongNonGameListings" in market and "ListingClassifier.classify(card)" in market and
+     "v51221ProductNoiseSweepApplied" in ui and "maintenanceIo.execute" in ui),
     ("video-game platform signals are filtered before BGG",
      '"ps5"' in classifier and '"nintendo switch"' in classifier and '"xbox series"' in classifier and
      '"ps5"' in gate and '"nintendo switch"' in gate),
