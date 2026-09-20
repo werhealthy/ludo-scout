@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.17-acquisition-crash-stability`
-- versionCode: `131`
+- Baseline version: `5.12.18-default-process-anr-stability`
+- versionCode: `132`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,18 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.18 Default-process ANR + engine readiness stability
+
+- Pixel validation of 5.12.17 confirmed the acquisition/card-count fix: the old run now renders 20 unique Vinted cards instead of the 66 raw Accessibility observations. The new scroll is present as one waiting run, so dedupe is no longer the dominant defect.
+- The same validation exposed a fresh post-install default-process ANR 47.8 s after PACKAGE_UPDATED: `No response to onStartJob for ... SystemJobService`, with RSS about 537 MiB. This is current 5.12.17 evidence, not historical noise.
+- `QueueKeepAliveService` previously executed database initialization, reconcile/sweep, onStartCommand maintenance and the recurring 8 s queue/notification pulse on the Android service main thread. WorkManager's `SystemJobService` shares that looper, so a long/locked queue DB phase could prevent `onStartJob` from being serviced and produce exactly the observed ANR.
+- The foreground service now keeps only channel creation + immediate `startForeground()` on main. Database/queue initialization and recurring supervisor maintenance run on one serialized `ludo-queue-supervisor` executor. `onStartCommand` is DB-free and only requests a single-flight supervisor pass.
+- WorkManager recovery now exits before opening the app database when the foreground queue is already RUNNING or STARTING, reducing duplicate startup graphs and SQLite contention in the default process.
+- The 5.12.17 debug also showed `engineReady=false` while the previous run still had 7 `PENDING_ANALYSIS` rows. `JsGameEngine` now uses a bounded single-flight readiness watchdog (45 × 2 s) instead of relying on a single cold-WebView `onPageFinished` verification.
+- System exit diagnostics are upgraded to `system-exit-v3`: the latest Ludo exit can include a bounded main-thread ANR trace snippet from `ApplicationExitInfo.getTraceInputStream()`, so any remaining ANR can be attributed without another blind patch cycle.
+- Regression: `regression/default_process_anr_stability_v51218.py` statically guarantees DB-free Service lifecycle callbacks, serialized supervisor ownership, WorkManager startup stand-down, bounded ANR trace capture and the engine readiness watchdog.
+- No schema migration, no signing/applicationId/network-rate/CI-versionCode strategy changes.
 
 ## 5.12.17 Acquisition dedupe + crash stability
 
