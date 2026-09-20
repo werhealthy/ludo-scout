@@ -87,16 +87,21 @@ public final class ProcessCrashJournal {
     public static String systemExitSummary(Context context){return systemExitSummary(context,0L);}
 
     /** Android exit history is UID-wide and can include WebView sandbox processes. Product stability
-     * only cares about Ludo's default/:ui/:radar processes, and the epoch boundary lets diagnostics
-     * distinguish fresh failures from historical noise. */
+     * only cares about Ludo's default/:ui/:radar processes. In addition to the engine epoch, keep a
+     * current-install boundary from PACKAGE_UPDATED so a just-installed beta can be judged directly. */
     public static String systemExitSummary(Context context,long since){
-        if(Build.VERSION.SDK_INT<30)return "build=system-exit-v2;unsupportedApi="+Build.VERSION.SDK_INT;
+        if(Build.VERSION.SDK_INT<30)return "build=system-exit-v3;unsupportedApi="+Build.VERSION.SDK_INT;
         try{
             ActivityManager am=(ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
             List<ApplicationExitInfo> exits=am==null?null:am.getHistoricalProcessExitReasons(null,0,32);
-            long now=System.currentTimeMillis(),day=24L*60L*60_000L,latestAt=0;int crash24=0,anr24=0,lowMem24=0,other24=0,crashSince=0,anrSince=0,lowMemSince=0,otherSince=0;
+            String pkg=context.getPackageName();long installBoundary=0L;
+            if(exits!=null)for(ApplicationExitInfo e:exits){
+                String pn=e.getProcessName();if(TextUtils.isEmpty(pn)||!(pn.equals(pkg)||pn.startsWith(pkg+":")))continue;
+                if(e.getReason()==ApplicationExitInfo.REASON_PACKAGE_UPDATED)installBoundary=Math.max(installBoundary,e.getTimestamp());
+            }
+            long currentBoundary=installBoundary>0?installBoundary:Math.max(0L,since);
+            long now=System.currentTimeMillis(),day=24L*60L*60_000L,latestAt=0;int crash24=0,anr24=0,lowMem24=0,other24=0,crashSince=0,anrSince=0,lowMemSince=0,otherSince=0,crashInstall=0,anrInstall=0,lowMemInstall=0,otherInstall=0;
             long latestPss=0,latestRss=0;int latestImportance=0,latestStatus=0;String process="",reason="",description="";StringBuilder recent=new StringBuilder();int recentCount=0;
-            String pkg=context.getPackageName();
             if(exits!=null)for(ApplicationExitInfo e:exits){
                 String pn=e.getProcessName();if(TextUtils.isEmpty(pn)||!(pn.equals(pkg)||pn.startsWith(pkg+":")))continue;
                 long at=e.getTimestamp();int why=e.getReason();
@@ -112,14 +117,21 @@ public final class ProcessCrashJournal {
                     else if(why==ApplicationExitInfo.REASON_LOW_MEMORY||why==ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE)lowMemSince++;
                     else otherSince++;
                 }
+                if(at>currentBoundary){
+                    if(why==ApplicationExitInfo.REASON_CRASH||why==ApplicationExitInfo.REASON_CRASH_NATIVE)crashInstall++;
+                    else if(why==ApplicationExitInfo.REASON_ANR)anrInstall++;
+                    else if(why==ApplicationExitInfo.REASON_LOW_MEMORY||why==ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE)lowMemInstall++;
+                    else otherInstall++;
+                }
                 if(at>latestAt){latestAt=at;process=pn;reason=reasonName(why);description=e.getDescription();latestPss=e.getPss();latestRss=e.getRss();latestImportance=e.getImportance();latestStatus=e.getStatus();}
                 if(recentCount<6){if(recent.length()>0)recent.append("|");recent.append(at).append(",").append(clean(pn)).append(",").append(reasonName(why)).append(",pss=").append(e.getPss()).append(",rss=").append(e.getRss());recentCount++;}
             }
-            return "build=system-exit-v2;since="+Math.max(0L,since)+";latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
+            return "build=system-exit-v3;since="+Math.max(0L,since)+";installBoundary="+installBoundary+";latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
                     ";latestPssKb="+latestPss+";latestRssKb="+latestRss+";latestImportance="+latestImportance+";latestStatus="+latestStatus+
+                    ";crashAfterInstall="+crashInstall+";anrAfterInstall="+anrInstall+";memoryAfterInstall="+lowMemInstall+";otherAfterInstall="+otherInstall+
                     ";crashSince="+crashSince+";anrSince="+anrSince+";memorySince="+lowMemSince+";otherSince="+otherSince+
                     ";crash24h="+crash24+";anr24h="+anr24+";memory24h="+lowMem24+";other24h="+other24+";recent="+cleanLong(recent.toString(),900);
-        }catch(Throwable t){return "build=system-exit-v2;error="+clean(String.valueOf(t));}
+        }catch(Throwable t){return "build=system-exit-v3;error="+clean(String.valueOf(t));}
     }
 
     private static String reasonName(int r){
