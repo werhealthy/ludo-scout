@@ -1647,7 +1647,11 @@ public final class MarketStore {
     /** Materialise only one small same-game batch. A canonical game query can then be shared by
      * VintedPublicSession's cache across several listings, while LIVE/HUNT/MANUAL priorities still preempt. */
     public int promoteDeferredVintedBatch(int limit){
-        int wanted=Math.max(1,Math.min(8,limit));SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();int queued=0;db.beginTransaction();
+        long now=System.currentTimeMillis();
+        // Enforce the price gate immediately before remote work is materialised, not only on the
+        // slower reconciliation pulse.
+        filterClearlyOverpricedAutomaticListings(now);
+        int wanted=Math.max(1,Math.min(8,limit));SQLiteDatabase db=helper.getWritableDatabase();int queued=0;db.beginTransaction();
         try{
             if(activeRunCoreVintedCount()>=8){db.setTransactionSuccessful();return 0;}
             DealDatabase.ObservationSession activeRun=helper.activeObservationSession();
