@@ -1280,6 +1280,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String priceRefreshSummary=priceRefresh.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-priceRefresh.updatedAt)+", "+priceRefresh.detail);
         String bggIdentityTrustSummary=marketDiag.bggIdentityTrustSummary();
         String bggMatchBreakdownSummary=marketDiag.bggMatchRequiredBreakdown();
+        String reviewBreakdownSummary=marketDiag.currentReviewBreakdown();
         long engineEpochForExit=db.engineEpochStart();
         String processCrashSummary=ProcessCrashJournal.fileSummary(context);
         String systemExitSummary=ProcessCrashJournal.systemExitSummary(context,engineEpochForExit);
@@ -1418,6 +1419,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
                 "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+
                 "bggMatchBreakdown={"+bggMatchBreakdownSummary+"}\n"+
+                "reviewBreakdown={"+reviewBreakdownSummary+"}\n"+
                 "bggHistoricalRevalidation={"+marketDiag.historicalBggRevalidationSummary()+"}\n"+
                 "bggLocalMatch={"+bggLocalMatchSummary+"}\n"+
                 "bggReviewWrite={"+bggReviewWriteSummary+"}\n"+
