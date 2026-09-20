@@ -19,7 +19,7 @@ checks = [
     ("id and exact indexes built in one catalog pass", "Map<String,Game> byId" in exact and "byId.put(g.id,g)" in exact and "addExact(exact" in exact),
     ("single compressed catalog open during index build", exact.count("openSearchIndex()") == 1),
     ("id index cleared on shutdown", "localByIdIndex=null" in client),
-    ("beta version bumped", "5.12.8-bgg-local-index-performance" in build),
+    ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
 
 failed = [name for name, ok in checks if not ok]
