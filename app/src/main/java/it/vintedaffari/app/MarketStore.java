@@ -578,9 +578,16 @@ public final class MarketStore {
 
     public List<VintedCard> pendingAnalysisCards(int limit) {
         List<VintedCard> out = new ArrayList<>();
+        DealDatabase.ObservationSession active=helper.activeObservationSession();
+        String runFilter=active==null?"":" AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN " +
+                "(SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
         String sql = "SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text " +
-                "FROM market_listings WHERE enrichment_state='PENDING_ANALYSIS' ORDER BY last_seen DESC LIMIT ?";
-        try (Cursor c = helper.getReadableDatabase().rawQuery(sql, new String[]{String.valueOf(Math.max(1, limit))})) {
+                "FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS'" + runFilter +
+                " ORDER BY last_seen DESC LIMIT ?";
+        java.util.ArrayList<String> args=new java.util.ArrayList<>();
+        if(active!=null){args.add(String.valueOf(active.startAt));args.add(String.valueOf(active.endAt));}
+        args.add(String.valueOf(Math.max(1, limit)));
+        try (Cursor c = helper.getReadableDatabase().rawQuery(sql, args.toArray(new String[0]))) {
             while (c.moveToNext()) {
                 double price = c.getInt(3) / 100.0;
                 Double protectedPrice = c.isNull(4) ? null : c.getInt(4) / 100.0;
