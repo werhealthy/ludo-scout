@@ -578,9 +578,23 @@ public final class MarketStore {
 
     public List<VintedCard> pendingAnalysisCards(int limit) {
         List<VintedCard> out = new ArrayList<>();
-        String sql = "SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text " +
-                "FROM market_listings WHERE enrichment_state='PENDING_ANALYSIS' ORDER BY last_seen DESC LIMIT ?";
-        try (Cursor c = helper.getReadableDatabase().rawQuery(sql, new String[]{String.valueOf(Math.max(1, limit))})) {
+        DealDatabase.ObservationSession active=helper.activeObservationSession();
+        String base = "SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text " +
+                "FROM market_listings WHERE enrichment_state='PENDING_ANALYSIS'";
+        String sql;
+        String[] args;
+        if(active!=null){
+            // Motore is serial by product contract: the oldest unfinished scroll owns automatic
+            // classification. Captured later scrolls remain waiting until this run is settled.
+            sql=base+" AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN " +
+                    "(SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) " +
+                    "ORDER BY last_seen DESC LIMIT ?";
+            args=new String[]{String.valueOf(active.startAt),String.valueOf(active.endAt),String.valueOf(Math.max(1,limit))};
+        }else{
+            sql=base+" ORDER BY last_seen DESC LIMIT ?";
+            args=new String[]{String.valueOf(Math.max(1,limit))};
+        }
+        try (Cursor c = helper.getReadableDatabase().rawQuery(sql, args)) {
             while (c.moveToNext()) {
                 double price = c.getInt(3) / 100.0;
                 Double protectedPrice = c.isNull(4) ? null : c.getInt(4) / 100.0;
