@@ -104,13 +104,15 @@ public final class DealEvaluator {
             }
         }
 
-        Integer suggestedOffer = offerCents;
-        Integer plausibleOfferTotal = afterOfferCents;
-        if ((suggestedOffer == null || suggestedOffer <= 0) && shippingCents != null && shippingCents >= 0) {
-            suggestedOffer = PurchaseMath.maxItemForTotal(goodCeiling, shippingCents);
-            plausibleOfferTotal = offerTotal(suggestedOffer, shippingCents);
-        } else if ((plausibleOfferTotal == null || plausibleOfferTotal <= 0) && suggestedOffer != null && suggestedOffer > 0) {
-            plausibleOfferTotal = offerTotal(suggestedOffer, shippingCents);
+        // Prefer the price that mathematically makes the purchase good. Legacy engine offers are
+        // only a fallback when shipping is not known well enough to solve the target total.
+        Integer suggestedOffer = shippingCents != null && shippingCents >= 0
+                ? PurchaseMath.maxItemForTotal(goodCeiling, shippingCents)
+                : offerCents;
+        Integer plausibleOfferTotal = offerTotal(suggestedOffer, shippingCents);
+        if ((plausibleOfferTotal == null || plausibleOfferTotal <= 0) && suggestedOffer != null
+                && suggestedOffer.equals(offerCents)) {
+            plausibleOfferTotal = afterOfferCents;
         }
         if (suggestedOffer != null && suggestedOffer > 0 && suggestedOffer < itemCents) {
             double cut = (itemCents - suggestedOffer) / (double) itemCents;
