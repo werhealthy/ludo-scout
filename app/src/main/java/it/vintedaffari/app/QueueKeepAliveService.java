@@ -86,7 +86,7 @@ public final class QueueKeepAliveService extends Service {
             Log.e(TAG,"foreground startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:foreground",t);stopSelf();return;
         }
         try{
-            db=new DealDatabase(this);market=new MarketStore(this,db);market.touchProcessorHeartbeat();
+            db=new DealDatabase(this);market=new MarketStore(this,db);market.startOperationalEpochIfMissing();market.touchProcessorHeartbeat();
         }catch(Throwable t){
             Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);stopSelf();return;
         }
