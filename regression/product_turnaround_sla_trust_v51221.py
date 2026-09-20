@@ -14,17 +14,15 @@ radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.ja
 ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
-# Product SLA model: after capture settles, incomplete ordinary work may own Motore for at most 10 min.
+# Product timing model: ten minutes is a target for small scrolls, never a correctness cutoff.
 GAP=3*60_000
-SLA=10*60_000
 def engine_done(end_at, now, analysis_pending, valid, ready, review):
     if now-end_at < GAP:
         return False
-    settled=analysis_pending==0 and (valid==0 or ready+review>=valid)
-    return settled or now-end_at >= SLA
+    return analysis_pending==0 and (valid==0 or ready+review>=valid)
 
 assert not engine_done(100_000, 100_000+9*60_000, 0, 7, 3, 3)
-assert engine_done(100_000, 100_000+10*60_000, 0, 7, 3, 3)
+assert not engine_done(100_000, 100_000+60*60_000, 0, 7, 3, 3)
 assert engine_done(100_000, 100_000+4*60_000, 0, 7, 4, 3)
 
 # Trusted-home model: a hot deal is not enough. Identity, product type and canonical completion
@@ -67,10 +65,10 @@ AND EXISTS(
 assert trusted==[("trusted",)], trusted
 
 checks=[
-    ("Motore hard SLA is ten minutes",
-     "ENGINE_RUN_SLA_MS=10L*60_000L" in deal and "engineSlaExpired" in deal and "engineContentSettled" in deal),
-    ("expired ordinary work is parked, not allowed to block",
-     "expireOverdueEngineWork(now)" in market and "Motore SLA 10 minuti" in market and "AUTO_EXCLUDED" in market),
+    ("Motore timing is adaptive with a ten-minute small-scroll target",
+     "ENGINE_RUN_TARGET_MIN_MS=10L*60_000L" in deal and "ENGINE_RUN_REMOTE_UNIT_MS=55_000L" in deal and "engineTargetMs" in deal),
+    ("elapsed time is telemetry, never an automatic exclusion reason",
+     "observeEngineTiming(now)" in market and "nonDestructive=true" in market and "Motore SLA 10 minuti" not in market),
     ("ordinary Vinted ambiguity is not a manual task",
      "settleAutomaticAmbiguity" in runner and "autoExcludeJob(job,reason)" in runner and
      "isExplicitUserPriority(job)" in runner),
@@ -106,8 +104,8 @@ checks=[
      "wantsCandidate(Context context,String bggId,Integer totalCents)" in hunt and
      "recordHuntCandidate" in deal and "promoteLegacyListingForHunt" in radar and
      'db.getDeals("trusted_any_price",800)' in ui),
-    ("diagnostics expose SLA age and review rate",
-     "slaRemainingMs=" in radar and "reviewPct=" in radar and "engineSla={" in radar),
+    ("diagnostics expose adaptive timing and review rate",
+     "targetMs=" in radar and "targetRemainingMs=" in radar and "timingNonDestructive=true" in radar and "reviewPct=" in radar and "engineSla={" in radar),
     ("build invariants preserved",
      "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build and
      "versionName '5.12." in build),
