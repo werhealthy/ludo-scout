@@ -473,12 +473,24 @@ public final class MarketStore {
         try {
             Long listingId = listingIdForCard(db,card);
             if (listingId == null) { db.setTransactionSuccessful(); return; }
+            String listingLifecycle=scalarString(db,"SELECT lifecycle FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)});
+            // Analyses can finish after a classifier/quarantine decision. Never let stale async work
+            // resurrect an inactive listing or overwrite its terminal state.
+            if(!TextUtils.isEmpty(listingLifecycle)&&!"ACTIVE".equals(listingLifecycle)){db.setTransactionSuccessful();return;}
             Long oldGameId = scalarLong(db, "SELECT game_id FROM market_listings WHERE id=?", new String[]{String.valueOf(listingId)});
             long gameId; String matchState;
             if ("matched".equals(analysis.status) && !TextUtils.isEmpty(analysis.bggId)) {
                 gameId = upsertMatchedGame(db, analysis, card.title, now); matchState = "MATCHED";
             } else {
-                gameId = upsertProvisionalGame(db, card.title, "BGG_MATCH_REQUIRED", analysis.matchConfidence, now); matchState = "BGG_MATCH_REQUIRED";
+                gameId = upsertProvisionalGame(db, card.title, "BGG_MATCH_REQUIRED", analysis.matchConfidence, now);
+                String persisted=scalarString(db,"SELECT match_state FROM games WHERE id=?",new String[]{String.valueOf(gameId)});
+                matchState=TextUtils.isEmpty(persisted)?"BGG_MATCH_REQUIRED":persisted;
+                if("AUTO_QUARANTINED".equals(matchState)){
+                    ContentValues q=new ContentValues();q.put("lifecycle","AUTO_FILTERED");q.put("enrichment_state","AUTO_FILTERED");q.put("match_state","AUTO_FILTERED_NON_GAME");
+                    q.put("last_error",safe(scalarString(db,"SELECT filter_reason FROM games WHERE id=?",new String[]{String.valueOf(gameId)})));
+                    db.update("market_listings",q,"id=?",new String[]{String.valueOf(listingId)});
+                    db.setTransactionSuccessful();return;
+                }
             }
             boolean hasUrl=!TextUtils.isEmpty(scalarString(db,"SELECT vinted_url FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)}));
             boolean liveResolve=shouldAutoResolveVinted(analysis)&&!hasUrl;
@@ -1903,7 +1915,18 @@ public final class MarketStore {
         notifyQueueChanged();return count;
     }
 
-    public void markBggMatchReview(long gameId,String reason){if(gameId<=0)return;ContentValues v=new ContentValues();v.put("match_state","BGG_MATCH_REVIEW");v.put("filter_reason",safe(reason));v.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);helper.getWritableDatabase().update("games",v,"id=? AND (bgg_id IS NULL OR bgg_id='')",new String[]{String.valueOf(gameId)});notifyQueueChanged();}
+    public void markBggMatchReview(long gameId,String reason){
+        if(gameId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();int changed=0;db.beginTransaction();try{
+            ContentValues v=new ContentValues();v.put("match_state","BGG_MATCH_REVIEW");v.put("filter_reason",safe(reason));v.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);
+            changed=db.update("games",v,"id=? AND (bgg_id IS NULL OR bgg_id='')",new String[]{String.valueOf(gameId)});
+            if(changed>0){
+                ContentValues l=new ContentValues();l.put("match_state","BGG_MATCH_REVIEW");l.put("last_error",safe(reason));
+                db.update("market_listings",l,"game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(gameId)});
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0)notifyQueueChanged();
+    }
     public int bggMatchReviewCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW'",null)){return c.moveToFirst()?c.getInt(0):0;}}
 
     /** Strong, deterministic cleanup for old provisional rows created before the capture filters were
@@ -2353,7 +2376,22 @@ public final class MarketStore {
         if(id==null){ContentValues v=new ContentValues();v.put("bgg_id",a.bggId);String name=!TextUtils.isEmpty(a.gameName)?a.gameName:observedTitle;v.put("canonical_name",safe(name));v.put("normalized_name",normalize(name));put(v,"rating",a.averageRating);put(v,"voters",a.voters);put(v,"bgg_rank",a.rank);v.put("bgg_url","https://boardgamegeek.com/boardgame/"+a.bggId);v.put("match_state","MATCHED");put(v,"match_confidence",a.matchConfidence);v.put("first_seen",now);v.put("last_seen",now);id=db.insertOrThrow("games",null,v);}else{ContentValues v=new ContentValues();if(!TextUtils.isEmpty(a.gameName)){v.put("canonical_name",a.gameName);v.put("normalized_name",normalize(a.gameName));}put(v,"rating",a.averageRating);put(v,"voters",a.voters);put(v,"bgg_rank",a.rank);put(v,"match_confidence",a.matchConfidence);v.put("match_state","MATCHED");v.put("last_seen",now);v.put("database_visible",1);v.putNull("filter_reason");db.update("games",v,"id=?",new String[]{String.valueOf(id)});}return id;
     }
 
-    private long upsertProvisionalGame(SQLiteDatabase db,String title,String state,Double confidence,long now){String key=normalize(title);if(key.isEmpty())key="unknown-"+now;Long id=scalarLong(db,"SELECT id FROM games WHERE provisional_key=?",new String[]{key});if(id==null){ContentValues v=new ContentValues();v.put("provisional_key",key);v.put("canonical_name",safe(title));v.put("normalized_name",key);v.put("match_state",state);put(v,"match_confidence",confidence);v.put("first_seen",now);v.put("last_seen",now);id=db.insertOrThrow("games",null,v);}else{ContentValues v=new ContentValues();v.put("last_seen",now);v.put("match_state",state);put(v,"match_confidence",confidence);v.put("database_visible",1);v.putNull("filter_reason");db.update("games",v,"id=?",new String[]{String.valueOf(id)});}return id;}
+    private long upsertProvisionalGame(SQLiteDatabase db,String title,String state,Double confidence,long now){
+        String key=normalize(title);if(key.isEmpty())key="unknown-"+now;Long id=null;String currentState="";
+        try(Cursor c=db.rawQuery("SELECT id,COALESCE(match_state,'') FROM games WHERE provisional_key=? LIMIT 1",new String[]{key})){if(c.moveToFirst()){id=c.getLong(0);currentState=c.getString(1);}}
+        if(id==null){
+            ContentValues v=new ContentValues();v.put("provisional_key",key);v.put("canonical_name",safe(title));v.put("normalized_name",key);v.put("match_state",state);put(v,"match_confidence",confidence);v.put("first_seen",now);v.put("last_seen",now);id=db.insertOrThrow("games",null,v);
+        }else{
+            ContentValues v=new ContentValues();v.put("last_seen",now);put(v,"match_confidence",confidence);
+            // Only unresolved states may be refreshed by another analysis pass. REVIEW and
+            // AUTO_QUARANTINED are decisions made by a later/stronger stage and must be monotonic.
+            if(TextUtils.isEmpty(currentState)||"PENDING_ANALYSIS".equals(currentState)||"BGG_MATCH_REQUIRED".equals(currentState)){
+                v.put("match_state",state);v.put("database_visible",1);v.putNull("filter_reason");
+            }
+            db.update("games",v,"id=?",new String[]{String.valueOf(id)});
+        }
+        return id;
+    }
 
     private void deleteOrphanProvisional(SQLiteDatabase db,long gameId){try(Cursor c=db.rawQuery("SELECT bgg_id,provisional_key,(SELECT COUNT(*) FROM market_listings WHERE game_id=games.id) FROM games WHERE id=?",new String[]{String.valueOf(gameId)})){if(c.moveToFirst()&&TextUtils.isEmpty(c.getString(0))&&!TextUtils.isEmpty(c.getString(1))&&c.getInt(2)==0){db.delete("game_aliases","game_id=?",new String[]{String.valueOf(gameId)});db.delete("games","id=?",new String[]{String.valueOf(gameId)});}}}
 
