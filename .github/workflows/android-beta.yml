@@ -23,8 +23,11 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Validate Android SDK
+        run: |
+          test -n "$ANDROID_HOME" || (echo "ANDROID_HOME is not set" && exit 1)
+          test -d "$ANDROID_HOME" || (echo "Android SDK directory not found: $ANDROID_HOME" && exit 1)
+          echo "Using Android SDK at $ANDROID_HOME"
 
       - name: Validate required secrets
         env:
@@ -44,7 +47,10 @@ jobs:
 
       - name: Show signing certificate fingerprint
         run: |
-          keytool -list -v             -keystore "$HOME/.android/debug.keystore"             -storepass android             | grep -E 'Alias name:|SHA256:' || true
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            | grep -E 'Alias name:|SHA256:' || true
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
