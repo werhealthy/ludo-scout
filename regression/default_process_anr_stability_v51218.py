@@ -5,6 +5,7 @@ ROOT=Path(__file__).resolve().parents[1]
 service=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueKeepAliveService.java").read_text(encoding="utf-8")
 crash=(ROOT/"app/src/main/java/it/vintedaffari/app/ProcessCrashJournal.java").read_text(encoding="utf-8")
 engine=(ROOT/"app/src/main/java/it/vintedaffari/app/JsGameEngine.java").read_text(encoding="utf-8")
+worker=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueDrainWorker.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
 oncreate=service[service.index("@Override public void onCreate()"):service.index("private void initializeOffMainThread")]
@@ -26,6 +27,8 @@ checks=[
      "market.touchProcessorHeartbeat()" in supervisor and "market.reconcileQueue()" in supervisor and "maybeNotifyNextRunComplete" in supervisor),
     ("supervisor is single-flight",
      "AtomicBoolean supervisorPassQueued" in service and "compareAndSet(false,true)" in service and "supervisorPassQueued.set(false)" in service),
+    ("WorkManager recovery stands down during foreground startup",
+     "isRunningOrStarting()" in service and "QueueKeepAliveService.isRunningOrStarting()" in worker and worker.index("QueueKeepAliveService.isRunningOrStarting()") < worker.index("new DealDatabase(context)")),
     ("ANR diagnostics capture bounded main-thread trace",
      "getTraceInputStream()" in crash and "latestMainTrace=" in crash and "mainTraceSnippet" in crash and "scanned++<1200" in crash),
     ("cold WebView engine readiness retries are bounded",
