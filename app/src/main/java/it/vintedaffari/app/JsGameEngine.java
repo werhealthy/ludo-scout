@@ -37,6 +37,7 @@ public final class JsGameEngine {
     private boolean ready = false;
     private boolean attached = false;
     private ReadyListener readyListener;
+    private boolean verifyInFlight = false;
     private int verifyAttempts = 0;
     private static final int MAX_VERIFY_ATTEMPTS = 45;
     private static final long VERIFY_RETRY_MS = 2_000L;
@@ -110,11 +111,13 @@ public final class JsGameEngine {
     }
 
     private void verifyEngine() {
-        if (webView == null || ready) return;
+        if (webView == null || ready || verifyInFlight) return;
+        verifyInFlight=true;
         final WebView current=webView;
         final int attempt=++verifyAttempts;
         String js = "(() => JSON.stringify({ready:!!globalThis.VintedAffariAndroidBridge?.ready,gameCount:globalThis.VintedAffariAndroidBridge?.gameCount||0}))()";
         current.evaluateJavascript(js, value -> {
+            verifyInFlight=false;
             if(current!=webView||ready)return;
             try {
                 String decoded = decodeJavascriptString(value);
@@ -192,6 +195,7 @@ public final class JsGameEngine {
 
     public void destroy() {
         ready = false;
+        verifyInFlight = false;
         verifyAttempts = MAX_VERIFY_ATTEMPTS;
         if (webView == null) return;
         try {
