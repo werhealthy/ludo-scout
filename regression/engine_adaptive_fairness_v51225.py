@@ -19,10 +19,10 @@ def target(core_work,valid=0,settled=False):
         remote=max(0,valid)
     return max(MIN,BASE+remote*UNIT)
 
-def eta(core_pending,analysis_pending=0,unresolved=0):
-    if core_pending<=0 and analysis_pending<=0 and unresolved<=0:
+def eta(core_pending,core_remaining=0,analysis_pending=0,unresolved=0):
+    if core_pending<=0 and core_remaining<=0 and analysis_pending<=0 and unresolved<=0:
         return 0
-    remote=max(0,core_pending)*UNIT
+    remote=max(max(0,core_pending),max(0,core_remaining))*UNIT
     local=60_000 if analysis_pending>0 or (remote==0 and unresolved>0) else 0
     return remote+local
 
@@ -34,6 +34,7 @@ assert target(20)==1_160_000
 assert target(50)==2_810_000
 assert target(100)==5_560_000
 assert eta(10)==550_000
+assert eta(0,3)==165_000
 assert eta(2)<eta(10)
 
 # Fairness model: a run only yields after a service slice and only when another run waits.
@@ -68,8 +69,8 @@ checks=[
      "coreWorkListings" in deal and "corePendingListings" in deal and
      "int remote=Math.max(s.coreWorkListings,s.corePendingListings)" in deal and
      "ENGINE_RUN_TARGET_BASE_MS=60_000L" in deal),
-    ("live ETA shrinks with remaining core candidates",
-     "public static long engineEtaMs" in deal and "s.corePendingListings" in deal),
+    ("live ETA includes parked and materialised remaining core candidates",
+     "public static long engineEtaMs" in deal and "s.corePendingListings" in deal and "s.coreRemainingListings" in deal),
     ("time alone cannot complete a run",
      "engineSlaExpired" not in auto and "engineContentSettled(s)" in auto),
     ("fairness is a lane yield, never a correctness decision",
@@ -92,7 +93,7 @@ checks=[
      "verifiche online ancora necessarie" in ui and "In pausa · riprenderà" in ui and
      "il Motore ruota tra i job senza scartare card" in ui),
     ("diagnostics expose ETA, core work and fairness",
-     "etaMs=" in radar and "corePending=" in radar and "engineFairness={" in radar),
+     "etaMs=" in radar and "corePending=" in radar and "coreRemaining=" in radar and "engineFairness={" in radar),
     ("build identity and CI versionCode strategy stay unchanged",
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
