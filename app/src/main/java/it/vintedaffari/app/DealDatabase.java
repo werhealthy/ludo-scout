@@ -150,9 +150,9 @@ public final class DealDatabase extends SQLiteOpenHelper {
                     " AND COALESCE(listing_type,'') IN ('BASE_GAME','EXPANSION','GAME')"+
                     " AND EXISTS (SELECT 1 FROM market_listings l JOIN games g ON g.id=l.game_id WHERE "+
                     "(l.legacy_signature=deals.signature OR (deals.vinted_item_id IS NOT NULL AND l.vinted_item_id=deals.vinted_item_id)) "+
-                    "AND l.lifecycle='ACTIVE' AND l.enrichment_state='COMPLETE' AND l.match_state='MATCHED' "+
+                    "AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' "+
                     "AND COALESCE(l.manual_review_required,0)=0 AND g.match_state='MATCHED' AND g.bgg_id=deals.bgg_id "+
-                    "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')))";
+                    "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.job_type<>'VINTED_DEEP_ENRICHMENT' AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')))";
         }
         a.add(String.valueOf(Math.max(1,limit)));
         Cursor c=getReadableDatabase().rawQuery("SELECT "+COLS+" FROM deals WHERE "+where+" ORDER BY last_seen DESC LIMIT ?",a.toArray(new String[0]));
@@ -205,7 +205,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         String bgg=eligible+" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'";
         String vinted=bgg+" AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''";
         String attention="("+eligible+" AND (COALESCE(l.manual_review_required,0)=1 OR l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' OR g.match_state='BGG_MATCH_REVIEW' OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')))";
-        String ready=vinted+" AND l.enrichment_state='COMPLETE' AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
+        String ready=vinted+" AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.job_type<>'VINTED_DEEP_ENRICHMENT' AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
         String sql="SELECT COUNT(DISTINCT CASE WHEN "+eligible+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+bgg+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+vinted+" THEN l.id END),"+
