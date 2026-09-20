@@ -5,4 +5,5 @@ public final class PurchaseMath {
  public static int vintedFee(int itemCents){if(itemCents<0)throw new IllegalArgumentException("Prezzo negativo");return Math.addExact(70,(int)Math.round(itemCents*0.05));}
  public static Integer total(Integer item,Integer shipping,Integer fee){if(item==null||shipping==null||fee==null)return null;return Math.addExact(Math.addExact(item,shipping),fee);}
  public static int estimatedTotal(int itemCents,int shippingCents){if(itemCents<0||shippingCents<0)throw new IllegalArgumentException("Importo negativo");return Math.addExact(Math.addExact(itemCents,shippingCents),vintedFee(itemCents));}
+ public static Integer maxItemForTotal(int targetTotalCents,int shippingCents){if(targetTotalCents<=0||shippingCents<0)return null;int lo=0,hi=Math.max(0,targetTotalCents-shippingCents);while(lo<hi){int mid=lo+(hi-lo+1)/2;if(estimatedTotal(mid,shippingCents)<=targetTotalCents)lo=mid;else hi=mid-1;}return estimatedTotal(lo,shippingCents)<=targetTotalCents?lo:null;}
 }
