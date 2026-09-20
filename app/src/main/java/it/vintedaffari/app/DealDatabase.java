@@ -19,7 +19,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         public int observations,uniqueListings,pendingListings,analysisPendingListings,validListings,bggMatchedListings,vintedLinkedListings,completeListings,reviewListings,heldListings;
         /** Core Vinted identity work is the expensive remote part of a run. coreWorkListings is
          * stable enough for the run target; corePendingListings drives the live ETA. */
-        public int coreWorkListings,corePendingListings;
+        public int coreWorkListings,corePendingListings,coreRemainingListings;
         ObservationSession(long at){startAt=endAt=at;}
     }
     public static final class ObservationDay {
@@ -84,7 +84,9 @@ public final class DealDatabase extends SQLiteOpenHelper {
      * candidates settle. Local BGG/classifier work gets a small bounded allowance. */
     public static long engineEtaMs(ObservationSession s){
         if(s==null||engineContentSettled(s))return 0L;
-        long remote=(long)Math.max(0,s.corePendingListings)*ENGINE_RUN_REMOTE_UNIT_MS;
+        // A parked current-run link is still paced Vinted work; ETA must not collapse to the local
+        // one-minute fallback merely because its durable job has not been materialised yet.
+        long remote=(long)Math.max(Math.max(0,s.corePendingListings),Math.max(0,s.coreRemainingListings))*ENGINE_RUN_REMOTE_UNIT_MS;
         long local=s.analysisPendingListings>0?ENGINE_RUN_LOCAL_ETA_MS:0L;
         int unresolved=Math.max(0,s.validListings-s.completeListings-s.reviewListings-s.heldListings);
         if(remote==0&&unresolved>0)local=Math.max(local,ENGINE_RUN_LOCAL_ETA_MS);
@@ -233,7 +235,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
      * metadata such as publication time may remain unavailable after best-effort enrichment without
      * keeping the whole scroll permanently "unfinished". */
     private int[] engineRangeCounts(long startAt,long endAt){
-        startAt=clampEngineStart(startAt);if(endAt<startAt)return new int[6];
+        startAt=clampEngineStart(startAt);if(endAt<startAt)return new int[7];
         String eligible="l.id IS NOT NULL AND l.lifecycle='ACTIVE' AND l.enrichment_state NOT IN ('AUTO_EXCLUDED','AUTO_FILTERED') AND g.id IS NOT NULL AND g.database_visible=1 AND g.rating>=6.0";
         String bgg=eligible+" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'";
         String vinted=bgg+" AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''";
@@ -242,20 +244,24 @@ public final class DealDatabase extends SQLiteOpenHelper {
         String attention="("+eligible+" AND (COALESCE(l.manual_review_required,0)=1 OR (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id=''))))";
         String trustHold="("+eligible+" AND NOT "+attention+" AND (l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')))";
         String ready=vinted+" AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT "+trustHold+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.job_type<>'VINTED_DEEP_ENRICHMENT' AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
+        // Product truth, independent from queue materialisation: a BGG-ready listing whose exact
+        // Vinted id/url is still missing remains remote work even while temporarily DEFERRED_LINK.
+        String coreRemaining=bgg+" AND NOT "+attention+" AND NOT "+trustHold+" AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='')";
         String sql="SELECT COUNT(DISTINCT CASE WHEN "+eligible+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+bgg+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+vinted+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+ready+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+attention+" THEN l.id END),"+
-                "COUNT(DISTINCT CASE WHEN "+trustHold+" THEN l.id END) "+
+                "COUNT(DISTINCT CASE WHEN "+trustHold+" THEN l.id END),"+
+                "COUNT(DISTINCT CASE WHEN "+coreRemaining+" THEN l.id END) "+
                 "FROM observations o LEFT JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
                 "LEFT JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature "+
                 "WHERE o.observed_at>=? AND o.observed_at<=?";
-        int[] out=new int[6];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<6;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
+        int[] out=new int[7];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<7;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
     }
 
     private void fillEngineCounts(ObservationSession s){
-        if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];s.heldListings=n[5];
+        if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];s.heldListings=n[5];s.coreRemainingListings=n[6];
         // Raw observation rows are historical telemetry and older builds could leave duplicate
         // PENDING_ANALYSIS rows behind for one signature. Product progress must follow the current
         // canonical listing state, otherwise an already-analysed card can keep an old job alive.
