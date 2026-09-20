@@ -11,14 +11,14 @@ build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 MIN=10*60_000
 BASE=60_000
 UNIT=55_000
-def target(valid):
-    return max(MIN,BASE+max(0,valid)*UNIT)
+def target(remote):
+    return max(MIN,BASE+max(0,remote)*UNIT)
 
 assert target(0)==10*60_000
 assert target(5)==10*60_000
-assert target(10)==850_000
-assert target(20)==1_400_000
-assert target(100)==5_800_000
+assert target(10)==610_000
+assert target(20)==1_160_000
+assert target(100)==5_560_000
 
 auto_start=deal.index("public static boolean engineAutomaticDone")
 auto_end=deal.index("private static void createOverrides",auto_start)
@@ -32,8 +32,8 @@ checks=[
     ("timing scales with core remote workload", "ENGINE_RUN_TARGET_BASE_MS=60_000L" in deal and "ENGINE_RUN_REMOTE_UNIT_MS=55_000L" in deal and "coreWorkListings" in deal and "engineTargetMs" in deal),
     ("time alone cannot complete a run", "engineSlaExpired" not in auto and "engineContentSettled(s)" in auto),
     ("timing observer is non-destructive", "AUTO_FILTERED" not in observe and "USER_HIDDEN" not in observe and "nonDestructive=true" in observe),
-    ("diagnostics expose target instead of fixed cutoff", "targetMs=" in radar and "targetRemainingMs=" in radar and "timingNonDestructive=true" in radar),
-    ("UI calls timing an estimate", "circa "+mins+" min" in ui and "engineEtaMs(run)" in ui),
+    ("diagnostics expose adaptive target", "targetMs=" in radar and "etaMs=" in radar and "timingNonDestructive=true" in radar),
+    ("UI calls timing an estimate", '" candidati da verificare online · circa "+mins+" min"' in ui and "engineEtaMs(run)" in ui),
     ("UI no longer promises a ten-minute hard cutoff", "chiusura entro" not in ui and "non può bloccarli oltre 10 minuti" not in ui),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
