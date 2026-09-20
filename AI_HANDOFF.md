@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.14-bgg-version-affinity-fix`
-- versionCode: `128`
+- Baseline version: `5.12.15-crash-journal-ci-integration`
+- versionCode: `129`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,16 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.15 Crash diagnostics + executable SQLite integration
+- Strategy change after repeated Pixel iterations: the device is no longer the primary debugger for BGG state-machine correctness. Pixel Test 9 showed the affinity fix worked (`requiredPure=0`, `reviewLegacy=0`, `bggMatchRequired=0`) and historical revalidation progressed from 73 to 55 pending.
+- User also reported Android crash notifications every 1-2 minutes. Existing `lastCrashAt` was insufficient because `MainActivity` is in `:ui` while the queue runs in the default process and Accessibility runs in `:radar`; only the UI process installed the legacy crash handler.
+- Added `LudoScoutApp` + `ProcessCrashJournal` installed in every app process. Uncaught Java crashes are journaled to one bounded synchronous file per process, avoiding multi-process SharedPreferences cache ambiguity.
+- On Android 11+ diagnostics also query `ActivityManager.getHistoricalProcessExitReasons()` and summarize recent `CRASH`, `ANR`, memory-related and other exits with the affected process name. This catches system-observed deaths that never reached the Java uncaught handler.
+- Added diagnostics `processCrashJournal={...}` and `systemExitHistory={...}`.
+- Added `regression/bgg_sqlite_state_machine_v51215.py`, an executable sqlite3 integration test that reproduces the old TEXT-vs-INTEGER affinity trap, verifies the cast fix, and runs current/historical candidate sets through their drain transitions.
+- Added `regression/process_crash_diagnostics_v51215.py` and wired both new checks into PR and beta CI.
+- No schema/data reset, network-rate change, signing/applicationId change, or CI versionCode-strategy change.
 
 ## 5.12.14 BGG algorithm-version numeric affinity
 - Pixel Test 8 proved cold-start performance is fixed: shared catalog load 767 ms, full local batch 185 ms, single-flight active, no review write misses. Yet `remainingRequired=3` persisted after three successful review writes.
