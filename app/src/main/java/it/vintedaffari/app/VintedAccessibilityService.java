@@ -67,6 +67,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private final LinkedHashMap<String,List<String>> pendingSellerRails = new LinkedHashMap<>();
     /** Diagnostic-only dedupe for the Accessibility identity probe. This never determines listing identity. */
     private final LinkedHashSet<String> accessibilityIdentityProbeSeen = new LinkedHashSet<>();
+    private String lastBundleExploreIntent = "";
+    private int bundleExploreHintsThisIntent = 0;
 
     private JsGameEngine engine;
     private DealDatabase database;
@@ -283,6 +285,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 if(TextUtils.isEmpty(currentProductDeal.sellerId)&&!railSignatures.isEmpty()){pendingSellerRails.put(currentProductDeal.signature,railSignatures);while(pendingSellerRails.size()>120){String first=pendingSellerRails.keySet().iterator().next();pendingSellerRails.remove(first);}}
                 while(contextualSellerHints.size()>600){String first=contextualSellerHints.keySet().iterator().next();contextualSellerHints.remove(first);}
                 if(!railSignatures.isEmpty())diag().edit().putInt("bundleAccessibilitySnapshot",railSignatures.size()).putString("bundleStrategy",TextUtils.isEmpty(currentProductDeal.sellerId)?"accessibility-seller-rail-pending":"accessibility-seller-rail").apply();
+                BundleExploration.State explore=BundleExploration.current(this);
+                if(explore!=null&&explore.matches(currentProductDeal)){
+                    String exploreKey=explore.sourceSignature+"|"+explore.expiresAt;
+                    if(!exploreKey.equals(lastBundleExploreIntent)){
+                        lastBundleExploreIntent=exploreKey;bundleExploreHintsThisIntent=hinted;
+                        diag().edit().putBoolean("bundleExploreActive",true).putString("bundleExploreSource",currentProductDeal.signature).putString("bundleExploreSeller",currentProductDeal.sellerId==null?"":currentProductDeal.sellerId).putInt("bundleExploreRailHints",hinted).putLong("bundleExploreSeenAt",System.currentTimeMillis()).apply();
+                        final DealRecord exploreSource=currentProductDeal;handler.postDelayed(()->maybeScanBundles(exploreSource,true),180L);
+                    }
+                }
             }
         }
 
@@ -292,6 +303,18 @@ public final class VintedAccessibilityService extends AccessibilityService {
         // rails must not become new catalog games just because they are visible on the same page.
         if (product == null) collectCards(root, discovered);
         else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
+        BundleExploration.State sellerExplore=BundleExploration.current(this);
+        if(product==null&&sellerExplore!=null&&sellerExplore.canTagVisibleSellerCards()&&!TextUtils.isEmpty(sellerExplore.sellerId)){
+            int tagged=0;
+            for(VintedCard card:discovered){
+                if(bundleExploreHintsThisIntent>=40)break;
+                String sig=DealDatabase.signature(card);
+                contextualSellerHints.put(sig,new String[]{sellerExplore.sellerId,null});
+                bundleExploreHintsThisIntent++;tagged++;
+            }
+            while(contextualSellerHints.size()>600){String first=contextualSellerHints.keySet().iterator().next();contextualSellerHints.remove(first);}
+            if(tagged>0)diag().edit().putBoolean("bundleExploreActive",true).putString("bundleStrategy","explicit-seller-exploration").putInt("bundleExploreVisibleHints",bundleExploreHintsThisIntent).apply();
+        }
         p.edit()
                 .putInt("lastCardsParsed", discovered.size())
                 .putLong("cardsParsedTotal", p.getLong("cardsParsedTotal", 0) + discovered.size())
