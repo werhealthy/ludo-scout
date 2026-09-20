@@ -30,6 +30,9 @@ public final class QueueDrainWorker extends Worker {
     @NonNull @Override public Result doWork() {
         Context context = getApplicationContext();
         QueueWorkScheduler.ensureRecovery(context);
+        // A freshly started foreground owner is already taking responsibility for the queue.
+        // Do not race its SQLite/reconcile bootstrap from WorkManager during process cold start.
+        if(QueueKeepAliveService.isStarting())return Result.success();
         DealDatabase db = new DealDatabase(context);
         MarketStore market = new MarketStore(context, db);
         // WorkManager is recovery, but a living Service process is not enough evidence that its
