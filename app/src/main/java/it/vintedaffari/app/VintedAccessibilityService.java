@@ -333,18 +333,24 @@ public final class VintedAccessibilityService extends AccessibilityService {
             }
 
             if (listingNow.allowPriceModel) {
-                pendingForAnalysis.put(sig, card);
-                if (pendingForAnalysis.size() > 500) {
-                    String first = pendingForAnalysis.keySet().iterator().next();
-                    pendingForAnalysis.remove(first);
-                }
-
                 Long lastAnalyzed = recentlyAnalyzed.get(sig);
-                if (engine != null && engine.isReady() &&
-                        (lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS)) {
-                    freshForAnalysis.add(card);
-                    recentlyAnalyzed.put(sig, now);
-                }
+                boolean analysisDue=lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS;
+                if(analysisDue){
+                    if(engine != null && engine.isReady() && !analysisBatchInFlight){
+                        freshForAnalysis.add(card);
+                        recentlyAnalyzed.put(sig, now);
+                        pendingForAnalysis.remove(sig);
+                    }else{
+                        // Queue only genuinely due work. Previously every re-render entered this map
+                        // and continuePersistentAnalysis() could immediately re-analyse it despite the
+                        // REANALYZE guard, amplifying repeated Accessibility events.
+                        pendingForAnalysis.put(sig, card);
+                        if (pendingForAnalysis.size() > 500) {
+                            String first = pendingForAnalysis.keySet().iterator().next();
+                            pendingForAnalysis.remove(first);
+                        }
+                    }
+                }else pendingForAnalysis.remove(sig);
             }
 
             if (!card.rawDescription.isEmpty()) {
