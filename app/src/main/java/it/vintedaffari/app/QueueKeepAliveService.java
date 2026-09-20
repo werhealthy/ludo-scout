@@ -33,7 +33,7 @@ public final class QueueKeepAliveService extends Service {
     private static final long ENGINE_RUN_IDLE_MS=3L*60_000L;
     private static final long IDLE_SLEEP_MS=4_000L;
     private static final long LANE_STALE_MS=35_000L;
-    private static volatile boolean RUNNING=false;
+    private static volatile boolean RUNNING=false,STARTING=false;
 
     private final Handler main=new Handler(Looper.getMainLooper());
     private final ExecutorService supervisorExecutor=Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,"ludo-queue-supervisor");t.setDaemon(false);return t;});
@@ -86,6 +86,7 @@ public final class QueueKeepAliveService extends Service {
     }
 
     public static boolean isRunning(){return RUNNING;}
+    public static boolean isRunningOrStarting(){return RUNNING||STARTING;}
 
     public static void ensureRunning(Context context){
         if(context==null)return;
@@ -103,6 +104,7 @@ public final class QueueKeepAliveService extends Service {
         }catch(Throwable t){
             Log.e(TAG,"foreground startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:foreground",t);stopSelf();return;
         }
+        STARTING=true;
         supervisorExecutor.execute(this::initializeOffMainThread);
     }
 
@@ -111,7 +113,7 @@ public final class QueueKeepAliveService extends Service {
         try{
             db=new DealDatabase(this);market=new MarketStore(this,db);market.startOperationalEpochIfMissing();market.touchProcessorHeartbeat();
         }catch(Throwable t){
-            Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);main.post(this::stopSelf);return;
+            STARTING=false;Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);main.post(this::stopSelf);return;
         }
         if(destroyed)return;
         try{resolver=new AutoLinkResolver(this);}catch(Throwable t){Log.w(TAG,"resolver init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:resolver",t);}
@@ -122,7 +124,7 @@ public final class QueueKeepAliveService extends Service {
         try{QueueJobRunner.sweepMissing(this,market);}catch(Throwable t){Log.w(TAG,"sweep startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:sweep",t);}
         try{sessionStartRemaining=market.jobSummary().active();lastRemaining=sessionStartRemaining;lastProgressAt=System.currentTimeMillis();}catch(Throwable t){ProcessCrashJournal.recordHandled(this,"queue:onCreate:summary",t);}
         if(destroyed)return;
-        alive=true;RUNNING=true;
+        alive=true;STARTING=false;RUNNING=true;
         try{superviseLanes(true);}catch(Throwable t){Log.e(TAG,"lane startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:lanes",t);}
         main.post(notificationPulse);
     }
@@ -284,6 +286,6 @@ public final class QueueKeepAliveService extends Service {
     private Notification baseNotification(String text,int max,int progress,boolean indeterminate){NotificationCompat.Builder b=builder().setContentTitle("Ludo Scout").setContentText(text).setOngoing(true).setOnlyAlertOnce(true).setSilent(true);if(max>0||indeterminate)b.setProgress(Math.max(1,max),Math.max(0,progress),indeterminate);return b.build();}
     private NotificationCompat.Builder builder(){Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);PendingIntent pi=PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);return new NotificationCompat.Builder(this,CHANNEL).setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pi).setCategory(NotificationCompat.CATEGORY_PROGRESS);}
 
-    @Override public void onDestroy(){destroyed=true;alive=false;RUNNING=false;main.removeCallbacks(notificationPulse);supervisorPassQueued.set(false);try{supervisorExecutor.shutdownNow();}catch(Throwable ignored){}try{if(vintedFuture!=null)vintedFuture.cancel(true);}catch(Throwable ignored){}try{if(bggFuture!=null)bggFuture.cancel(true);}catch(Throwable ignored){}try{if(vintedExecutor!=null)vintedExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggExecutor!=null)bggExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggMatcher!=null)bggMatcher.shutdown();}catch(Throwable ignored){}try{if(db!=null)db.close();}catch(Throwable ignored){}super.onDestroy();}
+    @Override public void onDestroy(){destroyed=true;alive=false;STARTING=false;RUNNING=false;main.removeCallbacks(notificationPulse);supervisorPassQueued.set(false);try{supervisorExecutor.shutdownNow();}catch(Throwable ignored){}try{if(vintedFuture!=null)vintedFuture.cancel(true);}catch(Throwable ignored){}try{if(bggFuture!=null)bggFuture.cancel(true);}catch(Throwable ignored){}try{if(vintedExecutor!=null)vintedExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggExecutor!=null)bggExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggMatcher!=null)bggMatcher.shutdown();}catch(Throwable ignored){}try{if(db!=null)db.close();}catch(Throwable ignored){}super.onDestroy();}
     @Override public IBinder onBind(Intent intent){return null;}
 }
