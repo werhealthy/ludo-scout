@@ -7,6 +7,20 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.21 — Product UX turnaround: 10-minute Motore SLA and trusted results
+- Added a hard 10-minute ownership ceiling for ordinary Motore runs. Incomplete automatic rows are parked reversibly so one difficult listing cannot hold later scrolls for hours.
+- Automatic Vinted misses and unresolved automatic BGG variants no longer become routine manual-review work. Explicit Hunt/manual requests keep the recovery path; ordinary ambiguity is auto-excluded.
+- Optional deep Vinted metadata no longer blocks a card whose BGG and exact Vinted identity are already complete.
+- Added a one-time non-destructive cleanup for automatic review debt created by older builds while preserving explicit Hunt/manual intent.
+- Tightened the BGG review band and added conservative seller-title suffix normalization for obvious descriptive titles.
+- Added explicit videogame/platform exclusions and narrowed accessory/component detection so words such as “tessere” or “dadi” in a full-game description do not cause false component filtering.
+- Scopri and companion recommendations now use trusted-only results: fully matched identity, no review and no open core job. Hunts use the same trust checks without requiring resale-tier pricing.
+- Motore cards now open the standard product detail instead of a special two-button modal. The product detail exposes the unified BGG/Vinted/correction actions, including “Gioco sbagliato”.
+- Hunts can promote exact watched games even when the price is merely average; an explicit max price is still respected.
+- Diagnostics add current-run age, SLA time remaining, review percentage and SLA-expiry telemetry.
+- Added `regression/product_turnaround_sla_trust_v51221.py` and wired it into PR/beta CI.
+- No schema migration, request-rate, signing, applicationId or CI versionCode-strategy changes.
+
 ## 5.12.20 — Engine runtime cross-process telemetry
 - Pixel validation of 5.12.19 showed no current-install crash/ANR/memory exits and confirmed the stale Motore analysis-pending count is fixed.
 - Replaced process-local engine/service readiness diagnostics with authoritative SQLite-backed `queue_controls` state so `:ui` cannot report a stale `:radar` SharedPreferences cache.

@@ -20,6 +20,11 @@ public final class BggTitleNormalizer {
         if (!base.isEmpty()) out.add(base);
         String stripped = stripMarketplaceNoise(base);
         if (!stripped.isEmpty()) out.add(stripped);
+        String lead=descriptiveLead(raw);
+        if(!lead.isEmpty()){
+            String cleanLead=clean(lead);if(!cleanLead.isEmpty())out.add(cleanLead);
+            String compact=stripMarketplaceNoise(cleanLead);if(!compact.isEmpty())out.add(compact);
+        }
         return new ArrayList<>(out);
     }
 
@@ -31,6 +36,22 @@ public final class BggTitleNormalizer {
                 .replaceAll("[^a-z0-9]+", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    /** Sellers often write "Fyfe – gioco astratto di piazzamento tessere (...)". The
+     * descriptive suffix is useful for product typing but harmful to identity matching. Only split
+     * when the suffix itself looks descriptive, never on an arbitrary subtitle dash. */
+    private static String descriptiveLead(String raw){
+        if(raw==null)return "";
+        String[] separators={" – "," — "," - "};
+        int cut=-1;
+        for(String sep:separators){int i=raw.indexOf(sep);if(i>1&&(cut<0||i<cut))cut=i;}
+        if(cut<0)return "";
+        String suffix=clean(raw.substring(cut+1));
+        boolean descriptive=suffix.contains("gioco ")||suffix.contains(" gioco")||suffix.contains("board game")||
+                suffix.contains("edizione")||suffix.contains("versione")||suffix.contains("marca ")||
+                suffix.contains("condizioni")||suffix.contains("completo")||suffix.contains("sigillato");
+        return descriptive?raw.substring(0,cut).trim():"";
     }
 
     public static String stripMarketplaceNoise(String raw) {

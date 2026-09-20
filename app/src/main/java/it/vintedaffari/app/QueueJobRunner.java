@@ -303,9 +303,13 @@ public final class QueueJobRunner {
         // Deep metadata is optional: once the core id/url is known it must never clog the user-visible
         // queue. Two deterministic misses are enough; keep the core listing and stop retrying.
         if(MarketStore.JOB_VINTED_DEEP.equals(job.type)&&isDeterministicMiss(reason)&&job.attempt>=2){
+            if(!market.isBggVariantPending(job.listingId)){market.completeJob(job);return;}
             String variantReason="Pagina Vinted non ha fornito abbastanza testo per confermare la variante BGG";
-            if(market.flagPendingBggVariantReview(job.listingId,variantReason)&&candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.flagBggVariantReview(candidate.signature,variantReason);
-            market.completeJob(job);return;
+            if(market.hasExplicitUserPriorityHistory(job.listingId)){
+                if(market.flagPendingBggVariantReview(job.listingId,variantReason)&&candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.flagBggVariantReview(candidate.signature,variantReason);
+                market.completeJob(job);
+            }else market.autoExcludeJob(job,variantReason);
+            return;
         }
 
         // Eventual background linking must never create a giant human review queue. A real remote
@@ -313,8 +317,8 @@ public final class QueueJobRunner {
         // go back to the deferred pool for a later fresh attempt.
         if("DEFERRED_LINK".equals(job.source) && isDeterministicMiss(reason)){
             if(market.listingBelongsToActiveRun(job.listingId)){
-                if(job.attempt>=2){market.needsReview(job,reason);return;}
-                market.retryJob(job,reason,System.currentTimeMillis()+5L*60_000L);return;
+                if(job.attempt>=2){settleAutomaticAmbiguity(market,job,reason);return;}
+                market.retryJob(job,reason,System.currentTimeMillis()+2L*60_000L);return;
             }
             market.deferBackgroundLink(job,reason,System.currentTimeMillis()+24L*60*60_000L);return;
         }
@@ -322,13 +326,13 @@ public final class QueueJobRunner {
         // A 404 on the actual public item page is actionable information, not a network retry loop.
         // Surface it immediately so the user can archive the stale listing or explicitly retry it.
         if(MarketStore.JOB_VINTED.equals(job.type)&&isGoneVintedPage(reason)){
-            market.needsReview(job,reason);return;
+            settleAutomaticAmbiguity(market,job,reason);return;
         }
 
         // A core search that repeatedly returns equally plausible candidates is not a network outage.
         // Give fresh data one second chance, then surface it as a manual-review case.
         if (isDeterministicMiss(reason) && job.attempt >= 2) {
-            market.needsReview(job, reason);
+            settleAutomaticAmbiguity(market,job,reason);
             return;
         }
 
@@ -337,18 +341,22 @@ public final class QueueJobRunner {
             next = Math.max(VintedPublicSession.nextAllowedAt(context), resolver.nextAllowedAt(candidate));
             if (next <= System.currentTimeMillis()) next = System.currentTimeMillis() + 60_000L;
         } else if (isDeterministicMiss(reason)) {
-            next = System.currentTimeMillis() + 5 * 60_000L;
+            next = System.currentTimeMillis() + 2 * 60_000L;
         } else if (job.attempt >= 6) {
-            // Six unsuccessful full searches is enough evidence that automatic matching is not
-            // making progress. Keep the listing/history, stop burning network, let a later fresh
-            // sighting reopen the deduplicated job automatically.
-            market.needsReview(job, reason);
+            // Repeated automatic failure is not a request for user labour. Explicit Hunt/manual
+            // intent can still ask for help; ordinary discovery is parked quietly.
+            settleAutomaticAmbiguity(market,job,reason);
             return;
         } else {
             long base = Math.min(6 * 60 * 60_000L, 10 * 60_000L * (1L << Math.min(5, Math.max(0, job.attempt - 1))));
             next = System.currentTimeMillis() + base;
         }
         market.retryJob(job, reason, next);
+    }
+
+    private static void settleAutomaticAmbiguity(MarketStore market,MarketStore.Job job,String reason){
+        if(MarketStore.isExplicitUserPriority(job))market.needsReview(job,reason);
+        else market.autoExcludeJob(job,reason);
     }
 
     private static boolean isGoneVintedPage(String reason){return reason!=null&&reason.toLowerCase(java.util.Locale.ROOT).contains("pagina vinted non disponibile (404)");}

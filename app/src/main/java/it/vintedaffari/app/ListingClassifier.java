@@ -20,13 +20,25 @@ public final class ListingClassifier {
             "scatola vuota", "scatole vuote", "solo scatola", "solo box", "empty box", "box only"
     };
     private static final String[] ACCESSORY = {
-            "raccoglitore", "organizer", "organiser", "inserto", "insert", "playmat", "tappetino",
-            "porta carte", "portacarte", "divisori", "sleeves", "bustine", "accessori", "accessorio",
-            "upgrade kit", "token holder", "dice tray", "porta dadi"
+            "raccoglitore", "raccoglitori", "organizer", "organiser", "inserto", "insert", "inserti", "inserts",
+            "playmat", "tappetino", "porta carte", "portacarte", "divisori", "sleeves", "bustine",
+            "deck box", "porta mazzo", "accessori", "accessorio", "upgrade kit", "token holder",
+            "dice tray", "porta dadi", "porta token", "porta segnalini"
     };
+    /** Component nouns alone are normal board-game descriptions ("piazzamento tessere", "dadi",
+     * "miniature"). Only phrases that explicitly say the listing contains separate/replacement
+     * components are strong enough to auto-filter. */
     private static final String[] COMPONENTS = {
-            "token", "segnalini", "pedine", "miniature", "ricambi", "componenti", "solo carte",
-            "carte promo", "promo cards", "manuale", "regolamento", "dadi", "meeple", "tiles", "tessere"
+            "ricambi", "componenti separati", "pezzi di ricambio", "solo componenti", "solo carte",
+            "solo token", "solo segnalini", "solo pedine", "solo miniature", "solo dadi", "solo meeple",
+            "solo tiles", "solo tessere", "set di token", "set token", "set di segnalini", "set segnalini",
+            "tessere ricambio", "token ricambio", "pedine ricambio", "dadi ricambio",
+            "carte promo", "promo cards", "manuale di ricambio", "regolamento di ricambio"
+    };
+    private static final String[] VIDEO_GAME = {
+            "videogioco", "videogame", "video game", "playstation 5", "playstation 4", "playstation 3",
+            "ps5", "ps4", "ps3", "xbox one", "xbox series", "xbox 360", "nintendo switch",
+            "switch lite", "nintendo 3ds", "nintendo ds", "wii u", "per ps5", "per ps4", "per xbox"
     };
     private static final String[] EXPANSION = {
             "espansione", "expansion", "estensione", "add on", "addon", "scenario pack", "campaign expansion"
@@ -56,7 +68,7 @@ public final class ListingClassifier {
         // Strong category exclusions run before accessory/component classification: a Warhammer
         // miniature or a book containing the word "manuale" must be dropped, not stored as a
         // board-game accessory that later becomes another review.
-        if (BoardGameIntakeGate.isStrongNonGameText(card == null ? "" : card.title, card == null ? "" : card.rawDescription) || containsAny(title, NON_GAME) || containsWord(title,"cd")) return new Result(Type.NON_GAME, "Segnali forti di categoria non ludica.", false);
+        if (BoardGameIntakeGate.isStrongNonGameText(card == null ? "" : card.title, card == null ? "" : card.rawDescription) || containsAny(title, NON_GAME) || containsAny(t, VIDEO_GAME) || containsWord(title,"cd")) return new Result(Type.NON_GAME, "Segnali forti di categoria non ludica o videogioco.", false);
         // Product decision: Warhammer marketplace results are overwhelmingly miniatures/parts for
         // this workflow. Treat the brand/name as a strong exclusion signal so it never fills BGG
         // review with modelling products. A future explicit allow-list can re-enable specific games.
