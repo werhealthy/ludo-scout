@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ludo Scout</string>
+    <string name="accessibility_service_description">Ludo Scout osserva localmente le card Vinted visibili, le confronta con BGG e salva solo le opportunità interessanti. Nessun overlay su Vinted.</string>
+</resources>

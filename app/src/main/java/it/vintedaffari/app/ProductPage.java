@@ -1,0 +1,35 @@
+package it.vintedaffari.app;
+
+import android.graphics.Rect;
+
+public final class ProductPage {
+    public String title = "";
+    public String condition = "";
+    public String brand = "";
+    public String publishedLabel = "";
+    public String sellerName = "";
+    /** Structured text exposed by the Vinted product page (description/category/language hints). */
+    public String detailsText = "";
+    public double itemPrice = 0;
+    public Double protectedPrice = null;
+    public Integer favorites = null;
+    public boolean sold = false;
+    public Double shippingPrice = null;
+    public int imageCount = 0;
+    public Rect contentBounds = new Rect();
+    public Rect imageBounds = new Rect();
+    public Rect summaryBounds = new Rect();
+    public Rect priceBounds = new Rect();
+
+    public boolean isValid() {
+        return title != null && !title.trim().isEmpty() && (itemPrice > 0 || sold);
+    }
+
+    public VintedCard asCard() {
+        Rect b = !contentBounds.isEmpty() ? contentBounds : (!imageBounds.isEmpty() ? imageBounds : new Rect(0, 0, 1080, 1800));
+        String raw=title + ", brand: " + brand + ", condizioni: " + condition;
+        if(detailsText!=null&&!detailsText.trim().isEmpty())raw += ", dettagli: " + detailsText.trim();
+        return new VintedCard(title, brand, condition, itemPrice, protectedPrice, favorites,
+                b, raw, sellerName);
+    }
+}

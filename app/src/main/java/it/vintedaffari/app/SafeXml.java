@@ -1,0 +1,6 @@
+package it.vintedaffari.app;
+import java.io.*;import java.nio.charset.StandardCharsets;import java.util.Locale;import javax.xml.parsers.*;import org.w3c.dom.Document;import org.xml.sax.*;
+/** Portable Android DOM parsing without implementation-specific SAX feature names. */
+public final class SafeXml {
+ public static Document parse(InputStream in)throws Exception{ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(bytes.size()+n>8*1024*1024)throw new IOException("Risposta BGG troppo grande");bytes.write(buffer,0,n);}String xml=new String(bytes.toByteArray(),StandardCharsets.UTF_8);if(xml.startsWith("\ufeff"))xml=xml.substring(1);String upper=xml.toUpperCase(Locale.ROOT);if(upper.contains("<!DOCTYPE")||upper.contains("<!ENTITY")||xml.indexOf('\u0000')>=0)throw new SAXException("Formato XML non consentito");DocumentBuilderFactory factory=DocumentBuilderFactory.newInstance();factory.setExpandEntityReferences(false);DocumentBuilder builder=factory.newDocumentBuilder();builder.setEntityResolver((publicId,systemId)->{throw new SAXException("Entità esterne non consentite");});return builder.parse(new InputSource(new StringReader(xml)));}
+}

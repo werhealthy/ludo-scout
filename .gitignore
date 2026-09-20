@@ -1,0 +1,32 @@
+# Gradle / Android build output
+.gradle/
+build/
+app/build/
+*.apk
+*.aab
+
+# Android Studio / local machine
+.idea/
+*.iml
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Secrets / signing material
+secrets.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
+# Keep the Gradle wrapper committed
+!gradle/wrapper/gradle-wrapper.jar
