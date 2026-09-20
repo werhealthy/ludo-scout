@@ -7,6 +7,14 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.5 — BGG identity provenance firewall
+- Stopped seller-authored Vinted aliases from acting as authoritative learned BGG identities in the zero-network matcher.
+- Kept Vinted titles as non-authoritative evidence while limiting identity shortcuts to BGG primary/original/alternate aliases, curated BGG aliases, canonical auto-match names and explicit manual BGG choices.
+- Bumped the BGG match algorithm version to 4 so older unresolved review cases can be reconsidered under the stricter trust rule.
+- Added a read-only contamination audit (`bggIdentityTrust`) including the count of seller aliases and already-matched games that remain candidates for a later controlled revalidation pass.
+- Added `regression/bgg_identity_provenance_v5125.py` and wired it into Android beta CI.
+- Existing matched rows are preserved in this step: no destructive reset and no schema migration. Signing, applicationId, CI versionCode strategy and Vinted request pacing are unchanged.
+
 ## 5.12.4 — Performance stability
 - Android beta CI now runs on pushes to `beta` as well as manual dispatch, so a merged beta commit is built, signature-checked and distributed automatically.
 - Paginated Motore run inspector to 24 rows per page and removed per-row Deal/MarketListing lookups used only for thumbnails.
