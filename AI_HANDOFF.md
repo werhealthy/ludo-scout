@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.6-historical-bgg-revalidation`
-- versionCode: `120`
+- Baseline version: `5.12.7-revalidation-accounting`
+- versionCode: `121`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -82,6 +82,7 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Progress is persisted in `queue_controls` with `bgg_revalidation_v1:<gameId>` markers. This makes the pass one-shot and restart-safe; it cannot repeat automatically for the same game.
 - The BGG foreground lane advances only 2 historical games per loop; WorkManager recovery advances 4, preserving current-run responsiveness. No network calls are made by the audit.
 - Diagnostics expose `bggHistoricalRevalidation={processed, verifiedGames, reviewGames, pending}`; `bggIdentityTrust.matchedToRevalidate` now counts only unprocessed eligible games.
+- 5.12.7 tightens accounting: legacy `USER_CONFIRMED` games are excluded from pending metrics as well as from execution, and any game with at least one flagged listing remains counted in `reviewGames` even when another listing independently verifies the canonical BGG identity.
 - Static regression guard: `regression/historical_bgg_revalidation_v5126.py`.
 - No schema migration, no data deletion/reset, no signing/applicationId/versionCode-strategy change, and no Vinted request-rate change.
 
