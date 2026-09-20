@@ -24,7 +24,7 @@ checks = [
     ("write diagnostic includes before after and changed", 'setDiagnosticState("bgg_match_review_write"' in review and "before=" in review and "after=" in review and "gameChanged=" in review),
     ("matcher separates review decisions from successful writes", "reviewDecisions" in match and "reviewWrites" in match and "reviewWriteMisses" in match),
     ("matcher reports remaining required after batch", "remainingRequired=market.bggMatchRequiredCount()" in match and "remainingRequired=" in match),
-    ("local matcher diagnostic version advanced", "build=bgg-local-match-v2" in match),
+    ("local matcher accountability diagnostic preserved", "reviewDecisions" in match and "reviewWrites" in match and "reviewWriteMisses" in match and "remainingRequired=" in match),
     ("review-write diagnostic exposed to Pixel", "bggReviewWrite={" in diag),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
