@@ -7,14 +7,14 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.24-adaptive-engine-timing`
-- versionCode: `138`
+- Baseline version: `5.12.25-adaptive-engine-fairness`
+- versionCode: `139`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
 - Gradle wrapper: 8.9
 - Android Gradle Plugin: 8.7.3
-- Current development stage: product turnaround. The core contract is scroll → trustworthy output in minutes; 10 minutes is the hard Motore ceiling for ordinary work.
+- Current development stage: product turnaround. The core contract is scroll → trustworthy output in minutes. Ten minutes is a small-scroll target and, under contention, a fairness service slice; it is never a correctness deadline.
 
 ## Git workflow
 - Repository: `werhealthy/ludo-scout` (private)
@@ -34,8 +34,9 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Prefer local filtering, caching, batching and snapshot reuse before public-page requests.
 - BGG rating below 6 is filtered before ordinary Vinted linking where possible.
 - Exact Vinted identity and exact BGG identity are separate facts.
-- One ordinary scroll/run owns the automatic Vinted/BGG backlog lane at a time, but no ordinary run may own it beyond 10 minutes after its last captured card.
-- Newer ordinary scrolls are captured and advance automatically when the current run settles or hits the 10-minute ceiling.
+- Elapsed time alone must never classify, hide, exclude, complete or discard a listing. Correctness comes only from matching/classification/trust state.
+- Motore timing is workload-aware: the target uses core Vinted identity work, while the live ETA uses core candidates still pending. Raw card count is only a temporary conservative fallback before jobs are materialised.
+- One ordinary run owns the automatic Vinted/BGG lane at a time. If another unfinished scroll is waiting, the owner yields after a 10-minute service slice; unfinished listings remain intact and the run resumes in round-robin continuation. With no competing run, it simply keeps working past ten minutes.
 - LIVE_DEAL, HUNT_PRIORITY and explicit manual work can preempt ordinary backlog work.
 - Manual review is reserved for explicit Hunt/manual intent and truly narrow BGG ambiguity. Ordinary automatic misses are reversibly auto-excluded instead of becoming user work.
 - A ready card requires confirmed BGG, exact Vinted item/url, core identity enrichment, no open review and no open core automatic job. Optional deep metadata must not block readiness.
@@ -105,6 +106,17 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.25 Adaptive Motore fairness
+
+- 5.12.24 removed the destructive timeout but still let the oldest unfinished run own the ordinary lane indefinitely. A very large scroll could therefore protect its own cards correctly while still delaying every later scroll.
+- Timing now follows the expensive work that actually matters: core Vinted identity candidates. The product target is `max(10 min, ~1 min local/setup + core-work × 55 s)`; the live ETA uses only core candidates still pending and shrinks as they settle.
+- Ten minutes is also the fairness service slice only when another unfinished scroll exists. After one slice the current run yields the automatic lane to the next unfinished run; after later runs settle or yield, earlier unfinished work resumes. Yield never changes listing/job correctness state.
+- HUNT_PRIORITY and MANUAL_PRIORITY continue to preempt ordinary ownership. Optional deep Vinted metadata still does not block card readiness.
+- Motore now exposes remaining online verifications and realistic ETA. Historical run rows distinguish `In attesa` from `In pausa · riprenderà`, and the overview explains that jobs rotate without discarding cards.
+- Diagnostics add `engineFairness`, `etaMs`, `coreWork` and `corePending`; timing stays explicitly `nonDestructive=true`.
+- Regressions: updated `engine_adaptive_timing_v51224.py` plus new `engine_adaptive_fairness_v51225.py`, including non-destructive yield, priority preservation and trusted-only Home guards.
+- No schema migration, request-rate increase, signing/applicationId/Firebase/CI-versionCode-strategy change.
 
 ## 5.12.24 Adaptive Motore timing
 
