@@ -77,8 +77,8 @@ public final class MarketStore {
     }
 
     public static final class MarketReferenceStats {
-        public final int count; public final Integer typicalCents,minCents;
-        MarketReferenceStats(int count,Integer typicalCents,Integer minCents){this.count=count;this.typicalCents=typicalCents;this.minCents=minCents;}
+        public final int count; public final Integer typicalCents,q25Cents,q75Cents,minCents;
+        MarketReferenceStats(int count,Integer typicalCents,Integer q25Cents,Integer q75Cents,Integer minCents){this.count=count;this.typicalCents=typicalCents;this.q25Cents=q25Cents;this.q75Cents=q75Cents;this.minCents=minCents;}
     }
 
     public static final class BggMarketStats {
@@ -1546,15 +1546,19 @@ public final class MarketStore {
      * main market reference; a single anomalously low row can no longer manufacture a fake discount.
      * Text-dependent games compare only Italian observations for the Italian scouting workflow. */
     public MarketReferenceStats localVintedReferenceStats(String bggId,String excludeSignature,String languageCode){
-        if(TextUtils.isEmpty(bggId))return new MarketReferenceStats(0,null,null);String lc=languageCode==null?"":languageCode.trim().toUpperCase(Locale.ROOT);
+        if(TextUtils.isEmpty(bggId))return new MarketReferenceStats(0,null,null,null,null);String lc=languageCode==null?"":languageCode.trim().toUpperCase(Locale.ROOT);
         StringBuilder where=new StringBuilder(" FROM market_listings l JOIN games g ON g.id=l.game_id WHERE g.bgg_id=? AND l.lifecycle='ACTIVE' AND l.match_state='MATCHED' AND l.current_price_cents>0");
         ArrayList<String> args=new ArrayList<>();args.add(bggId);
         if(!TextUtils.isEmpty(excludeSignature)){where.append(" AND COALESCE(l.legacy_signature,l.temp_fingerprint)<>?");args.add(excludeSignature);}
         if(lc.contains("DEP")){where.append(" AND UPPER(COALESCE(l.language_code,'')) LIKE 'IT%'");}
         else if(!lc.contains("IND")){String code=lc.contains("|")?lc.substring(0,lc.indexOf('|')):lc;if(code.matches("IT|EN|FR|DE|ES|NL|PT")){where.append(" AND UPPER(COALESCE(l.language_code,'')) LIKE ?");args.add(code+"%");}}
-        SQLiteDatabase db=helper.getReadableDatabase();int n=0,min=0;try(Cursor c=db.rawQuery("SELECT COUNT(*),MIN(l.current_price_cents)"+where,args.toArray(new String[0]))){if(c.moveToFirst()){n=c.getInt(0);if(!c.isNull(1))min=c.getInt(1);}}
-        if(n==0)return new MarketReferenceStats(0,null,null);int offset=(n-1)/2;Integer median=null;try(Cursor c=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT "+(n%2==0?"2":"1")+" OFFSET "+offset,args.toArray(new String[0]))){if(c.moveToFirst()){int a=c.getInt(0);if(n%2==0&&c.moveToNext())median=(a+c.getInt(0))/2;else median=a;}}
-        return new MarketReferenceStats(n,median,min>0?min:null);
+        SQLiteDatabase db=helper.getReadableDatabase();int n=0,min=0;try(Cursor cursor=db.rawQuery("SELECT COUNT(*),MIN(l.current_price_cents)"+where,args.toArray(new String[0]))){if(cursor.moveToFirst()){n=cursor.getInt(0);if(!cursor.isNull(1))min=cursor.getInt(1);}}
+        if(n==0)return new MarketReferenceStats(0,null,null,null,null);
+        int offset=(n-1)/2;Integer median=null;try(Cursor cursor=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT "+(n%2==0?"2":"1")+" OFFSET "+offset,args.toArray(new String[0]))){if(cursor.moveToFirst()){int a=cursor.getInt(0);if(n%2==0&&cursor.moveToNext())median=(a+cursor.getInt(0))/2;else median=a;}}
+        int q25Offset=(int)Math.floor((n-1)*0.25),q75Offset=(int)Math.ceil((n-1)*0.75);Integer q25=null,q75=null;
+        try(Cursor cursor=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT 1 OFFSET "+q25Offset,args.toArray(new String[0]))){if(cursor.moveToFirst())q25=cursor.getInt(0);}
+        try(Cursor cursor=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT 1 OFFSET "+q75Offset,args.toArray(new String[0]))){if(cursor.moveToFirst())q75=cursor.getInt(0);}
+        return new MarketReferenceStats(n,median,q25,q75,min>0?min:null);
     }
 
     /** A small local sample is evidence, not a full market takeover. With 3-7 comparable
@@ -1597,7 +1601,7 @@ public final class MarketStore {
                 int item=cursor.getInt(2);Integer protectedC=cursor.isNull(3)?null:cursor.getInt(3),totalC=cursor.isNull(4)?null:cursor.getInt(4),shippingVerified=cursor.isNull(5)?null:cursor.getInt(5),shippingEstimated=cursor.isNull(9)?null:cursor.getInt(9);
                 int effective;if(shippingVerified!=null){int base=protectedC!=null?protectedC:item+PurchaseMath.vintedFee(item);effective=base+shippingVerified;}else if(totalC!=null&&totalC>0)effective=totalC;else if(protectedC!=null&&protectedC>0)effective=protectedC;else effective=item;
                 Integer shipping=shippingVerified!=null?shippingVerified:shippingEstimated;
-                DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(item,effective,reference,null,null,shipping);
+                boolean allowGreat=stats.count>=8;DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(item,effective,reference,allowGreat?stats.q25Cents:null,allowGreat,null,null,shipping);
                 double discount=(reference-effective)*100.0/reference;String tier=cursor.getString(6),label=cursor.getString(7);
                 ContentValues v=new ContentValues();v.put("benchmark_cents",reference);v.put("discount",discount);
                 if(evaluation.suggestedOfferCents==null)v.putNull("offer_cents");else v.put("offer_cents",evaluation.suggestedOfferCents);
@@ -1647,7 +1651,7 @@ public final class MarketStore {
                 if(!"verify".equals(d.tier)){newTier="insufficient";newTierLabel="Pochi dati";}
             }else if(total!=null){
                 newDiscount=(newBenchmark-total)*100.0/newBenchmark;
-                DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(d.itemPriceCents,total,newBenchmark,null,null,shipping);
+                boolean allowGreat=local.count>=8||"hot".equals(d.tier);Integer lowerBand=local.count>=8?local.q25Cents:null;DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(d.itemPriceCents,total,newBenchmark,lowerBand,allowGreat,null,null,shipping);
                 newOffer=evaluation.suggestedOfferCents;
                 if(!"verify".equals(d.tier)){
                     if(evaluation.visible()){newTier=evaluation.storageTier();newTierLabel=evaluation.label;}
