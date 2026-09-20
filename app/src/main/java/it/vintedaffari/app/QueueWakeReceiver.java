@@ -22,7 +22,7 @@ public final class QueueWakeReceiver extends BroadcastReceiver {
         // BroadcastReceiver.onReceive because JobService callbacks share this process main thread.
         if (QueueWorkScheduler.ACTION_NOW.equals(action)) QueueKeepAliveService.ensureRunning(app);
 
-        final PendingResult pending=goAsync();
+        final BroadcastReceiver.PendingResult pending=goAsync();
         try{
             WAKE_EXEC.execute(()->{
                 try{
