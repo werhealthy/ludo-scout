@@ -78,19 +78,35 @@ public final class QueueKeepAliveService extends Service {
     }
 
     @Override public void onCreate(){
-        super.onCreate();createChannel();startForeground(NOTIFICATION_ID,baseNotification("Avvio…",0,0,true));
-        db=new DealDatabase(this);market=new MarketStore(this,db);market.touchProcessorHeartbeat();
-        try{resolver=new AutoLinkResolver(this);}catch(Throwable t){Log.w(TAG,"resolver init",t);}
-        try{bgg=new BggEnricher(this,db,market);bggMatcher=new BggSearchClient(this);}catch(Throwable t){Log.w(TAG,"bgg init",t);}
-        market.resetStaleProcessingOlderThan(15*60_000L);market.reconcileQueue();lastReconcileAt=System.currentTimeMillis();
-        QueueWorkScheduler.ensureRecovery(this);QueueJobRunner.sweepMissing(this,market);
-        try{sessionStartRemaining=market.jobSummary().active();lastRemaining=sessionStartRemaining;lastProgressAt=System.currentTimeMillis();}catch(Throwable ignored){}
-        alive=true;RUNNING=true;superviseLanes(true);main.post(notificationPulse);
+        super.onCreate();
+        try{
+            createChannel();
+            startForeground(NOTIFICATION_ID,baseNotification("Avvio…",0,0,true));
+        }catch(Throwable t){
+            Log.e(TAG,"foreground startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:foreground",t);stopSelf();return;
+        }
+        try{
+            db=new DealDatabase(this);market=new MarketStore(this,db);market.touchProcessorHeartbeat();
+        }catch(Throwable t){
+            Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);stopSelf();return;
+        }
+        try{resolver=new AutoLinkResolver(this);}catch(Throwable t){Log.w(TAG,"resolver init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:resolver",t);}
+        try{bgg=new BggEnricher(this,db,market);bggMatcher=new BggSearchClient(this);}catch(Throwable t){Log.w(TAG,"bgg init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:bgg",t);}
+        try{market.resetStaleProcessingOlderThan(15*60_000L);market.reconcileQueue();lastReconcileAt=System.currentTimeMillis();}
+        catch(Throwable t){Log.e(TAG,"queue reconcile startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:reconcile",t);}
+        try{QueueWorkScheduler.ensureRecovery(this);}catch(Throwable t){Log.w(TAG,"recovery scheduler startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:recovery",t);}
+        try{QueueJobRunner.sweepMissing(this,market);}catch(Throwable t){Log.w(TAG,"sweep startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:sweep",t);}
+        try{sessionStartRemaining=market.jobSummary().active();lastRemaining=sessionStartRemaining;lastProgressAt=System.currentTimeMillis();}catch(Throwable t){ProcessCrashJournal.recordHandled(this,"queue:onCreate:summary",t);}
+        alive=true;RUNNING=true;
+        try{superviseLanes(true);}catch(Throwable t){Log.e(TAG,"lane startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:lanes",t);}
+        main.post(notificationPulse);
     }
 
     @Override public int onStartCommand(Intent intent,int flags,int startId){
-        if(market!=null){market.touchProcessorHeartbeat();QueueJobRunner.sweepMissing(this,market);}
-        superviseLanes(true);return START_STICKY;
+        if(!alive||market==null)return START_NOT_STICKY;
+        try{market.touchProcessorHeartbeat();QueueJobRunner.sweepMissing(this,market);}catch(Throwable t){Log.w(TAG,"start command maintenance failed",t);ProcessCrashJournal.recordHandled(this,"queue:onStartCommand:maintenance",t);}
+        try{superviseLanes(true);}catch(Throwable t){Log.e(TAG,"start command lanes failed",t);ProcessCrashJournal.recordHandled(this,"queue:onStartCommand:lanes",t);}
+        return START_STICKY;
     }
 
     private synchronized void superviseLanes(boolean userWake){
