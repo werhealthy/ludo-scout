@@ -18,8 +18,8 @@ checks = [
     ("weak evidence becomes review", "plausibile ma non esatto/univoco" in reval and "manual_review_required" in market),
     ("review preserves historical identity", "flagHistoricalBggReview" in market and "db.delete" not in market[market.index("public void flagHistoricalBggReview"):market.index("public void completeHistoricalBggRevalidation")]),
     ("legacy feed blocked on review", 'verification_state","MATCH_UNCERTAIN"' in market),
-    ("bounded service slice", "BggHistoricalRevalidator.runSlice(market,bggMatcher,2)" in service),
-    ("recovery worker advances audit", "BggHistoricalRevalidator.runSlice(market,bggMatcher,4)" in worker),
+    ("bounded historical slices", "Math.min(32,limit)" in reval and "BggHistoricalRevalidator.runSlice(market,bggMatcher,24)" in service),
+    ("recovery worker advances audit only after current BGG", "market.bggMatchRequiredCount()==0&&market.runnableBggDueCount(now)==0" in worker and "BggHistoricalRevalidator.runSlice(market,bggMatcher,Math.min(24,MAX_ITEMS-processed))" in worker),
     ("diagnostics expose revalidation", "bggHistoricalRevalidation={" in diag),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
