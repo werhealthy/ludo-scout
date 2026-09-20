@@ -90,12 +90,12 @@ public final class ProcessCrashJournal {
      * only cares about Ludo's default/:ui/:radar processes, and the epoch boundary lets diagnostics
      * distinguish fresh failures from historical noise. */
     public static String systemExitSummary(Context context,long since){
-        if(Build.VERSION.SDK_INT<30)return "build=system-exit-v2;unsupportedApi="+Build.VERSION.SDK_INT;
+        if(Build.VERSION.SDK_INT<30)return "build=system-exit-v3;unsupportedApi="+Build.VERSION.SDK_INT;
         try{
             ActivityManager am=(ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
             List<ApplicationExitInfo> exits=am==null?null:am.getHistoricalProcessExitReasons(null,0,32);
             long now=System.currentTimeMillis(),day=24L*60L*60_000L,latestAt=0;int crash24=0,anr24=0,lowMem24=0,other24=0,crashSince=0,anrSince=0,lowMemSince=0,otherSince=0;
-            long latestPss=0,latestRss=0;int latestImportance=0,latestStatus=0;String process="",reason="",description="";StringBuilder recent=new StringBuilder();int recentCount=0;
+            long latestPss=0,latestRss=0;int latestImportance=0,latestStatus=0;String process="",reason="",description="";ApplicationExitInfo latestExit=null;StringBuilder recent=new StringBuilder();int recentCount=0;
             String pkg=context.getPackageName();
             if(exits!=null)for(ApplicationExitInfo e:exits){
                 String pn=e.getProcessName();if(TextUtils.isEmpty(pn)||!(pn.equals(pkg)||pn.startsWith(pkg+":")))continue;
@@ -112,14 +112,29 @@ public final class ProcessCrashJournal {
                     else if(why==ApplicationExitInfo.REASON_LOW_MEMORY||why==ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE)lowMemSince++;
                     else otherSince++;
                 }
-                if(at>latestAt){latestAt=at;process=pn;reason=reasonName(why);description=e.getDescription();latestPss=e.getPss();latestRss=e.getRss();latestImportance=e.getImportance();latestStatus=e.getStatus();}
+                if(at>latestAt){latestAt=at;process=pn;reason=reasonName(why);description=e.getDescription();latestPss=e.getPss();latestRss=e.getRss();latestImportance=e.getImportance();latestStatus=e.getStatus();latestExit=e;}
                 if(recentCount<6){if(recent.length()>0)recent.append("|");recent.append(at).append(",").append(clean(pn)).append(",").append(reasonName(why)).append(",pss=").append(e.getPss()).append(",rss=").append(e.getRss());recentCount++;}
             }
-            return "build=system-exit-v2;since="+Math.max(0L,since)+";latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
+            String trace=latestExit==null?"":mainTraceSnippet(latestExit);
+            return "build=system-exit-v3;since="+Math.max(0L,since)+";latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
                     ";latestPssKb="+latestPss+";latestRssKb="+latestRss+";latestImportance="+latestImportance+";latestStatus="+latestStatus+
                     ";crashSince="+crashSince+";anrSince="+anrSince+";memorySince="+lowMemSince+";otherSince="+otherSince+
-                    ";crash24h="+crash24+";anr24h="+anr24+";memory24h="+lowMem24+";other24h="+other24+";recent="+cleanLong(recent.toString(),900);
-        }catch(Throwable t){return "build=system-exit-v2;error="+clean(String.valueOf(t));}
+                    ";crash24h="+crash24+";anr24h="+anr24+";memory24h="+lowMem24+";other24h="+other24+";recent="+cleanLong(recent.toString(),900)+";latestMainTrace="+cleanLong(trace,1400);
+        }catch(Throwable t){return "build=system-exit-v3;error="+clean(String.valueOf(t));}
+    }
+
+    private static String mainTraceSnippet(ApplicationExitInfo exit){
+        if(exit==null||Build.VERSION.SDK_INT<30)return "";
+        try(java.io.InputStream in=exit.getTraceInputStream()){
+            if(in==null)return "";
+            BufferedReader r=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8));
+            StringBuilder out=new StringBuilder();String line;boolean capture=false;int captured=0,scanned=0;
+            while((line=r.readLine())!=null&&scanned++<1200){
+                if(!capture&&(line.startsWith("\"main\"")||line.contains(" \"main\" "))){capture=true;}
+                if(capture){if(out.length()>0)out.append(" | ");out.append(line.trim());if(++captured>=16)break;}
+            }
+            return out.toString();
+        }catch(Throwable ignored){return "";}
     }
 
     private static String reasonName(int r){
