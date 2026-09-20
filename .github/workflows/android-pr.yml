@@ -49,6 +49,8 @@ jobs:
         run: python3 regression/bgg_review_write_accountability_v51212.py
       - name: Run BGG cold-index single-flight regression
         run: python3 regression/bgg_cold_index_singleflight_v51213.py
+      - name: Run BGG version-affinity regression
+        run: python3 regression/bgg_version_affinity_v51214.py
 
       - name: Compile debug Java
         run: |
