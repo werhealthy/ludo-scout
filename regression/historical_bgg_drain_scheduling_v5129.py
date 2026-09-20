@@ -25,7 +25,7 @@ checks = [
     ("per-game broadcasts suppressed in bulk", "independentlyVerified,false" in reval and "notifyHistoricalBggRevalidationChanged()" in reval),
     ("one coalesced notification API exists", "public void notifyHistoricalBggRevalidationChanged(){notifyQueueChanged();}" in market),
     ("pending count matches executable active listings", "public int historicalBggRevalidationPendingCount()" in market and "l.lifecycle='ACTIVE'" in market[market.index("public int historicalBggRevalidationPendingCount()"):market.index("public String historicalBggRevalidationSummary()")]),
-    ("beta version bumped", "5.12.9-bgg-historical-drain" in build),
+    ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
 
 failed = [name for name, ok in checks if not ok]
