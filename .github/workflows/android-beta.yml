@@ -63,6 +63,8 @@ jobs:
 
       - name: Run performance stability regression
         run: python3 regression/performance_stability_v5124.py
+      - name: Run BGG identity provenance regression
+        run: python3 regression/bgg_identity_provenance_v5125.py
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
