@@ -420,7 +420,7 @@ private void renderDatabase(){
     private String dealScoreLabel(int score){return score>=92?"Occasione rarissima":score>=82?"Ottimo prezzo":score>=68?"Buon prezzo":score<=25?"Caro rispetto allo storico":"Prezzo normale";}
     private String dateShort(long when){if(when<=0)return"n/d";return android.text.format.DateFormat.format("dd/MM/yy",when).toString();}
     private String cleanBggDescription(String d){if(TextUtils.isEmpty(d))return"";String s=android.text.Html.fromHtml(d,android.text.Html.FROM_HTML_MODE_LEGACY).toString().replaceAll("\\n{3,}","\\n\\n").trim();return s.length()>1800?s.substring(0,1800)+"…":s;}
-    private void openMarketListing(MarketListingRecord l){if(l==null||TextUtils.isEmpty(l.url)){Toast.makeText(this,"Link Vinted ancora in arricchimento.",Toast.LENGTH_SHORT).show();return;}try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(l.url)));}catch(Exception e){Toast.makeText(this,"Impossibile aprire Vinted.",Toast.LENGTH_SHORT).show();}}
+    private void openMarketListing(MarketListingRecord l){if(l==null||TextUtils.isEmpty(l.url)){Toast.makeText(this,"Link Vinted ancora in arricchimento.",Toast.LENGTH_SHORT).show();return;}String sig=marketStore.signatureForListing(l.id);marketStore.beginOpenedVintedTarget(l.id,sig,l.title,2L*60_000L);try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(l.url)));}catch(Exception e){marketStore.clearOpenedVintedTarget(l.id);Toast.makeText(this,"Impossibile aprire Vinted.",Toast.LENGTH_SHORT).show();}}
 
     private DealRecord representativeDealForGame(GameRecord game){
         if(game==null||game.id<=0)return null;List<MarketListingRecord> rows=marketStore.listingsForGame(game.id,false,8);if(rows==null||rows.isEmpty())return null;MarketListingRecord chosen=rows.get(0);
