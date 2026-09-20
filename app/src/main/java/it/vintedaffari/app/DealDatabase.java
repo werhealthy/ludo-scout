@@ -233,7 +233,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
      * metadata such as publication time may remain unavailable after best-effort enrichment without
      * keeping the whole scroll permanently "unfinished". */
     private int[] engineRangeCounts(long startAt,long endAt){
-        startAt=clampEngineStart(startAt);if(endAt<startAt)return new int[5];
+        startAt=clampEngineStart(startAt);if(endAt<startAt)return new int[6];
         String eligible="l.id IS NOT NULL AND l.lifecycle='ACTIVE' AND l.enrichment_state NOT IN ('AUTO_EXCLUDED','AUTO_FILTERED') AND g.id IS NOT NULL AND g.database_visible=1 AND g.rating>=6.0";
         String bgg=eligible+" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'";
         String vinted=bgg+" AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''";
