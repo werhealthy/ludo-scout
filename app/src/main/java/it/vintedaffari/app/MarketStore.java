@@ -31,7 +31,7 @@ import java.util.Set;
  * Game -> Listing -> PriceObservation model and the persistent enrichment queue.
  */
 public final class MarketStore {
-    public static final int BGG_MATCH_ALGORITHM_VERSION = 3;
+    public static final int BGG_MATCH_ALGORITHM_VERSION = 4;
     private final Map<String,Boolean> collisionRiskMemo=new HashMap<>();
     public static final String JOB_VINTED = "VINTED_ENRICHMENT";
     /** Low-priority second phase: the listing URL/id is already known, only optional seller/photo/time metadata remains. */
@@ -1684,7 +1684,23 @@ public final class MarketStore {
 
     /** A title already confirmed by the user/app becomes local knowledge. Only a unique BGG id is
      * returned; collisions remain reviewable rather than being guessed. */
-    public String learnedBggIdForTitle(String raw){String key=normalize(raw);if(TextUtils.isEmpty(key))return null;String sql="SELECT DISTINCT g.bgg_id FROM game_aliases a JOIN games g ON g.id=a.game_id WHERE a.normalized_alias=? AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' UNION SELECT DISTINCT bgg_id FROM games WHERE normalized_name=? AND database_visible=1 AND bgg_id IS NOT NULL AND bgg_id<>'' LIMIT 2";String found=null;try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{key,key})){while(c.moveToNext()){String id=c.getString(0);if(TextUtils.isEmpty(id))continue;if(found!=null&&!found.equals(id))return null;found=id;}}return found;}
+    /** Reuses only authoritative identity evidence. Seller-authored Vinted titles remain useful
+     * for search/display, but they can never bootstrap another automatic BGG match by themselves. */
+    public String learnedBggIdForTitle(String raw){
+        String key=normalize(raw);if(TextUtils.isEmpty(key))return null;
+        String sql="SELECT DISTINCT g.bgg_id FROM game_aliases a JOIN games g ON g.id=a.game_id WHERE a.normalized_alias=? AND a.source IN ('BGG_PRIMARY','BGG_ORIGINAL','BGG_ALTERNATE','BGG_ALIAS','AUTO_LOCAL_BGG','MANUAL_BGG') AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' UNION SELECT DISTINCT bgg_id FROM games WHERE normalized_name=? AND database_visible=1 AND bgg_id IS NOT NULL AND bgg_id<>'' LIMIT 2";
+        String found=null;try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{key,key})){while(c.moveToNext()){String id=c.getString(0);if(TextUtils.isEmpty(id))continue;if(found!=null&&!found.equals(id))return null;found=id;}}return found;
+    }
+
+    /** Read-only contamination audit. A v3-and-older matched game is intentionally not mutated here:
+     * the next task can revalidate it with stronger evidence instead of destructively resetting data. */
+    public String bggIdentityTrustSummary(){
+        SQLiteDatabase db=helper.getReadableDatabase();long sellerAliases=0,sellerOnlyAliases=0,matchedToRevalidate=0;
+        try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM game_aliases a JOIN games g ON g.id=a.game_id WHERE a.source IN ('VINTED','VINTED_VARIANT') AND g.bgg_id IS NOT NULL AND g.bgg_id<>''",null)){if(c.moveToFirst())sellerAliases=c.getLong(0);}catch(Throwable ignored){}
+        try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM game_aliases a JOIN games g ON g.id=a.game_id WHERE a.source IN ('VINTED','VINTED_VARIANT') AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND a.normalized_alias<>g.normalized_name AND NOT EXISTS(SELECT 1 FROM game_aliases t WHERE t.game_id=a.game_id AND t.normalized_alias=a.normalized_alias AND t.source IN ('BGG_PRIMARY','BGG_ORIGINAL','BGG_ALTERNATE','BGG_ALIAS','AUTO_LOCAL_BGG','MANUAL_BGG'))",null)){if(c.moveToFirst())sellerOnlyAliases=c.getLong(0);}catch(Throwable ignored){}
+        try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM games WHERE database_visible=1 AND bgg_id IS NOT NULL AND bgg_id<>'' AND match_state='MATCHED' AND COALESCE(match_algorithm_version,0)<?",new String[]{String.valueOf(BGG_MATCH_ALGORITHM_VERSION)})){if(c.moveToFirst())matchedToRevalidate=c.getLong(0);}catch(Throwable ignored){}
+        return "build=bgg-provenance-v1; algorithm="+BGG_MATCH_ALGORITHM_VERSION+"; sellerAliases="+sellerAliases+"; sellerOnlyAliases="+sellerOnlyAliases+"; matchedToRevalidate="+matchedToRevalidate;
+    }
 
 
     /** Hide one unresolved observation before it can become a human BGG review. The raw row is
