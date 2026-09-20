@@ -43,6 +43,8 @@ jobs:
         run: python3 regression/historical_bgg_drain_scheduling_v5129.py
       - name: Run BGG fuzzy-index performance regression
         run: python3 regression/bgg_fuzzy_index_performance_v51210.py
+      - name: Run BGG state monotonicity regression
+        run: python3 regression/bgg_state_monotonicity_v51211.py
 
       - name: Compile debug Java
         run: |
