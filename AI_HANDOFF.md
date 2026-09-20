@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.7-revalidation-accounting`
-- versionCode: `121`
+- Baseline version: `5.12.8-bgg-local-index-performance`
+- versionCode: `122`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -85,6 +85,15 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - 5.12.7 tightens accounting: legacy `USER_CONFIRMED` games are excluded from pending metrics as well as from execution, and any game with at least one flagged listing remains counted in `reviewGames` even when another listing independently verifies the canonical BGG identity.
 - Static regression guard: `regression/historical_bgg_revalidation_v5126.py`.
 - No schema migration, no data deletion/reset, no signing/applicationId/versionCode-strategy change, and no Vinted request-rate change.
+
+## 5.12.8 BGG local index performance
+- Pixel Test 2 showed historical BGG revalidation advancing only 20 games in 8 minutes even though the audit is zero-network.
+- Root cause: `BggSearchClient.localById()` reopened, decompressed and linearly scanned the full ~31k-game gzip search index for every historical game; `localExactCandidates()` then maintained a separate exact-name index.
+- `localById()` now shares the same one-time queue-process catalog load used by the exact-name/alias matcher. That single pass builds both `normalized title/alias -> candidates` and `BGG id -> game`; subsequent ID lookups are O(1) and do not reopen the gzip file.
+- The retained id map reuses the same `Game` objects already held by the exact index, adding map references rather than duplicating the full catalog objects. It is cleared on `shutdown()`.
+- Historical audit scheduling remains deliberately bounded (2 games/service loop, 4/recovery worker); this change removes wasted CPU/I/O instead of increasing network rate or priority.
+- Regression: `regression/bgg_local_index_performance_v5128.py` protects against restoring per-ID full catalog scans.
+- No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
 
 ## Known UX direction
 The next major phase is a full Motore redesign. Avoid treating all information as equal cards.
