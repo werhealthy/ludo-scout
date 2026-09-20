@@ -43,7 +43,8 @@ public final class ProcessCrashJournal {
 
     private static void record(Context context,String process,Thread thread,Throwable error,String phase)throws Exception{
         File dir=new File(context.getFilesDir(),"process_crash_journal");if(!dir.exists())dir.mkdirs();
-        File out=new File(dir,"crash-"+process+".txt");
+        boolean uncaught="UNCAUGHT".equals(phase);
+        File out=uncaught?new File(dir,"crash-"+process+".txt"):new File(dir,"handled-"+process+".txt");
         StringWriter sw=new StringWriter();if(error!=null)error.printStackTrace(new PrintWriter(sw));
         String stack=sw.toString();if(stack.length()>7000)stack=stack.substring(0,7000);
         Throwable root=error;while(root!=null&&root.getCause()!=null&&root.getCause()!=root)root=root.getCause();
@@ -55,9 +56,9 @@ public final class ProcessCrashJournal {
 
     public static String fileSummary(Context context){
         try{
-            File dir=new File(context.getFilesDir(),"process_crash_journal");File[] files=dir.listFiles((d,n)->n.startsWith("crash-")&&n.endsWith(".txt"));
+            File dir=new File(context.getFilesDir(),"process_crash_journal");File[] files=dir.listFiles((d,n)->(n.startsWith("crash-")||n.startsWith("handled-"))&&n.endsWith(".txt"));
             if(files==null||files.length==0)return "build=process-crash-v2;count=0";
-            long latestAt=0;String latestProcess="",latestError="",latestRoot="",latestPhase="";int count=0;
+            long latestAt=0;String latestProcess="",latestError="",latestRoot="",latestPhase="",latestKind="";int count=0;
             for(File f:files){
                 long at=0;String process="",error="",root="",phase="";
                 try(BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(f),StandardCharsets.UTF_8))){
@@ -70,9 +71,9 @@ public final class ProcessCrashJournal {
                         if(at>0&&!TextUtils.isEmpty(process)&&!TextUtils.isEmpty(error)&&!TextUtils.isEmpty(root))break;
                     }
                 }catch(Throwable ignored){}
-                if(at>0){count++;if(at>latestAt){latestAt=at;latestProcess=process;latestError=error;latestRoot=root;latestPhase=phase;}}
+                if(at>0){count++;if(at>latestAt){latestAt=at;latestProcess=process;latestError=error;latestRoot=root;latestPhase=phase;latestKind=f.getName().startsWith("crash-")?"UNCAUGHT":"HANDLED";}}
             }
-            return "build=process-crash-v2;count="+count+";latestAt="+latestAt+";latestProcess="+clean(latestProcess)+";phase="+clean(latestPhase)+";latest="+clean(latestError)+";root="+clean(latestRoot);
+            return "build=process-crash-v2;count="+count+";latestAt="+latestAt+";latestProcess="+clean(latestProcess)+";kind="+latestKind+";phase="+clean(latestPhase)+";latest="+clean(latestError)+";root="+clean(latestRoot);
         }catch(Throwable t){return "build=process-crash-v2;error="+clean(String.valueOf(t));}
     }
 
