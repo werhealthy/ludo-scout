@@ -1966,7 +1966,7 @@ public final class MarketStore {
     public String historicalBggRevalidationSummary(){
         SQLiteDatabase db=helper.getReadableDatabase();long verified=0,review=0,processed=0;int pending=historicalBggRevalidationPendingCount();
         try(Cursor c=db.rawQuery("SELECT COUNT(*),SUM(CASE WHEN value=1 THEN 1 ELSE 0 END),SUM(CASE WHEN value=2 THEN 1 ELSE 0 END) FROM queue_controls WHERE name LIKE '"+BGG_REVALIDATION_PREFIX+"%'",null)){if(c.moveToFirst()){processed=c.getLong(0);verified=c.isNull(1)?0:c.getLong(1);review=c.isNull(2)?0:c.getLong(2);}}catch(Throwable ignored){}
-        return "build=bgg-historical-revalidation-v2; processed="+processed+"; verifiedGames="+verified+"; reviewGames="+review+"; pending="+pending;
+        return "build=bgg-historical-revalidation-v3; processed="+processed+"; verifiedGames="+verified+"; heldGames="+review+"; pending="+pending;
     }
 
     /** Reuses only authoritative identity evidence. Seller-authored Vinted titles remain useful
