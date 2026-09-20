@@ -58,15 +58,8 @@ public final class DealEvaluator {
             return insufficient(null, null);
         }
         int item = Math.max(0, (int) Math.round(card.itemPrice * 100.0));
-        Evaluation result = evaluate(item, analysis.totalCents, analysis.benchmarkCents,
-                analysis.offerCents, analysis.afterOfferCents, analysis.shippingCents);
-        // The embedded BGG model knows whether its sample is strong enough for the strongest badge.
-        // Preserve that confidence gate while Java becomes the single product decision layer.
-        if (result.decision == Decision.GREAT_BUY && !"hot".equals(analysis.tier)) {
-            return new Evaluation(Decision.GOOD_PRICE, "Buon prezzo", result.reason,
-                    result.suggestedOfferCents, result.currentTotalCents, result.benchmarkCents);
-        }
-        return result;
+        return evaluate(item, analysis.totalCents, analysis.benchmarkCents, analysis.marketQ25Cents,
+                analysis.marketAllowHot, analysis.offerCents, analysis.afterOfferCents, analysis.shippingCents);
     }
 
     public static Evaluation evaluate(DealRecord deal) {
@@ -74,11 +67,20 @@ public final class DealEvaluator {
         Integer currentTotal = effectiveTotal(deal);
         Integer shipping = deal.shippingVerifiedCents != null ? deal.shippingVerifiedCents : deal.shippingCents;
         Integer offerTotal = offerTotal(deal.offerCents, shipping);
-        return evaluate(Math.max(0, deal.itemPriceCents), currentTotal, deal.benchmarkCents,
-                deal.offerCents, offerTotal, shipping);
+        // DealRecord does not yet persist quartiles, so only a previously validated hot row may
+        // retain the strongest category. Recalculation paths with fresh market stats pass Q25.
+        return evaluate(Math.max(0, deal.itemPriceCents), currentTotal, deal.benchmarkCents, null,
+                "hot".equals(deal.tier), deal.offerCents, offerTotal, shipping);
     }
 
     public static Evaluation evaluate(int itemCents, Integer currentTotalCents, Integer benchmarkCents,
+                                      Integer offerCents, Integer afterOfferCents, Integer shippingCents) {
+        return evaluate(itemCents, currentTotalCents, benchmarkCents, null, false,
+                offerCents, afterOfferCents, shippingCents);
+    }
+
+    public static Evaluation evaluate(int itemCents, Integer currentTotalCents, Integer benchmarkCents,
+                                      Integer lowerQuartileCents, boolean allowGreat,
                                       Integer offerCents, Integer afterOfferCents, Integer shippingCents) {
         if (benchmarkCents == null || benchmarkCents <= 0 || itemCents <= 0) {
             return insufficient(currentTotalCents, benchmarkCents);
@@ -92,7 +94,9 @@ public final class DealEvaluator {
         int fairItemCeiling = benchmark + smallMargin;
 
         if (currentTotalCents != null && currentTotalCents > 0) {
-            if (currentTotalCents <= greatCeiling && itemCents <= goodCeiling) {
+            int greatItemCeiling = lowerQuartileCents != null && lowerQuartileCents > 0
+                    ? Math.min(lowerQuartileCents, goodCeiling) : goodCeiling;
+            if (allowGreat && currentTotalCents <= greatCeiling && itemCents <= greatItemCeiling) {
                 return new Evaluation(Decision.GREAT_BUY, "Offertona",
                         euroBelow(benchmark - currentTotalCents) + " sotto l'usato tipico",
                         null, currentTotalCents, benchmark);
