@@ -725,10 +725,11 @@ public final class MarketStore {
         SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();int queued=0;
         db.beginTransaction();
         String sql="SELECT l.id,l.game_id FROM market_listings l WHERE l.lifecycle='ACTIVE' " +
-                "AND l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') " +
+                "AND (l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') OR " +
+                "((l.vinted_url IS NOT NULL AND l.vinted_url<>'') AND ((l.published_label IS NULL OR l.published_label='') OR (l.seller_id IS NULL OR l.seller_id='')))) " +
                 "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') " +
                 "AND (j.listing_id=l.id OR (l.game_id IS NOT NULL AND j.game_id=l.game_id))) " +
-                "ORDER BY l.last_seen DESC LIMIT ?";
+                "ORDER BY CASE WHEN (l.published_label IS NULL OR l.published_label='' OR l.seller_id IS NULL OR l.seller_id='') THEN 0 ELSE 1 END,l.last_seen DESC LIMIT ?";
         try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(Math.max(1,limit))})){
             while(c.moveToNext()){
                 long listingId=c.getLong(0);String type=listingVintedJobType(db,listingId);
@@ -745,7 +746,8 @@ public final class MarketStore {
     /** Number of incomplete active listings that are not already covered by an active job. */
     public int unqueuedIncompleteCount() {
         String sql="SELECT COUNT(*) FROM market_listings l WHERE l.lifecycle='ACTIVE' " +
-                "AND l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') " +
+                "AND (l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') OR " +
+                "((l.vinted_url IS NOT NULL AND l.vinted_url<>'') AND ((l.published_label IS NULL OR l.published_label='') OR (l.seller_id IS NULL OR l.seller_id='')))) " +
                 "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') " +
                 "AND (j.listing_id=l.id OR (l.game_id IS NOT NULL AND j.game_id=l.game_id)))";
         try(Cursor c=helper.getReadableDatabase().rawQuery(sql,null)){return c.moveToFirst()?c.getInt(0):0;}
@@ -1872,7 +1874,7 @@ public final class MarketStore {
     }
 
     public int incompleteListingCount() {
-        try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE')",null)){return c.moveToFirst()?c.getInt(0):0;}
+        try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND (enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') OR ((vinted_url IS NOT NULL AND vinted_url<>'') AND ((published_label IS NULL OR published_label='') OR (seller_id IS NULL OR seller_id=''))))",null)){return c.moveToFirst()?c.getInt(0):0;}
     }
 
     public int pendingAnalysisCount() {
