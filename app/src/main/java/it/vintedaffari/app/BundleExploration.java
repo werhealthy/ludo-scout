@@ -17,13 +17,19 @@ public final class BundleExploration {
         public final String sourceSignature;
         public final String itemId;
         public final String sellerId;
+        public final long startedAt;
         public final long expiresAt;
 
-        State(String sourceSignature, String itemId, String sellerId, long expiresAt) {
+        State(String sourceSignature, String itemId, String sellerId, long startedAt, long expiresAt) {
             this.sourceSignature = sourceSignature;
             this.itemId = itemId;
             this.sellerId = sellerId;
+            this.startedAt = startedAt;
             this.expiresAt = expiresAt;
+        }
+
+        public boolean canTagVisibleSellerCards() {
+            return !TextUtils.isEmpty(sellerId) && System.currentTimeMillis() - startedAt <= 3 * 60_000L;
         }
 
         public boolean matches(DealRecord deal) {
@@ -56,7 +62,7 @@ public final class BundleExploration {
             return null;
         }
         return new State(p.getString("source_signature", ""), p.getString("item_id", ""),
-                p.getString("seller_id", ""), expires);
+                p.getString("seller_id", ""), p.getLong("started_at", 0L), expires);
     }
 
     public static void clear(Context context) {
