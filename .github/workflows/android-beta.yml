@@ -59,8 +59,12 @@ jobs:
         env:
           BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
           ANDROID_DEBUG_KEYSTORE: ${{ runner.temp }}/ludo-debug.keystore
+          # 1,000,000 + GitHub's monotonically increasing run number.
+          # This stays safely above the historical local versionCode 118.
+          LUDO_VERSION_CODE: ${{ 1000000 + github.run_number }}
         run: |
           cp "$HOME/.android/debug.keystore" "$ANDROID_DEBUG_KEYSTORE"
+          echo "Building beta versionCode=$LUDO_VERSION_CODE"
           ./gradlew --no-daemon clean assembleDebug
 
       - name: Verify built APK signing certificate
