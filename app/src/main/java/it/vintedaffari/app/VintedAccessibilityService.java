@@ -159,6 +159,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
         QueueWorkScheduler.schedule(this);
         database = new DealDatabase(getApplicationContext());
         marketStore = new MarketStore(getApplicationContext(),database);
+        long serviceConnectedAt=System.currentTimeMillis();
+        marketStore.setDiagnosticState("radar_service",1,"build="+BuildConfig.VERSION_NAME+";state=CONNECTED;at="+serviceConnectedAt);
+        marketStore.setDiagnosticState("engine_runtime",0,"build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=CONNECTING;serviceConnectedAt="+serviceConnectedAt);
         marketStore.resetStaleProcessingOlderThan(15 * 60_000L);
         linkResolver = new AutoLinkResolver(getApplicationContext());
         bggEnricher = new BggEnricher(getApplicationContext(), database, marketStore);
@@ -200,12 +203,21 @@ public final class VintedAccessibilityService extends AccessibilityService {
         WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         engine = new JsGameEngine(getApplicationContext(), wm);
         engine.start(new JsGameEngine.ReadyListener() {
+            @Override public void onState(String state,String detail) {
+                if(marketStore!=null){
+                    String payload="build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state="+safeDiag(state)+";"+safeDiag(detail);
+                    marketStore.setDiagnosticState("engine_runtime",0,payload);
+                }
+            }
+
             @Override public void onReady(int gameCount) {
                 diag().edit()
                         .putBoolean("engineReady", true)
                         .putInt("engineGames", gameCount)
                         .putString("lastError", "")
                         .apply();
+                if(marketStore!=null)marketStore.setDiagnosticState("engine_runtime",Math.max(1,gameCount),
+                        "build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=READY;games="+gameCount);
                 // Persisted MarketStore state owns classifier ordering. Clear stale RAM hints
                 // so a newer waiting scroll cannot jump ahead of the oldest active Motore run.
                 pendingForAnalysis.clear();
@@ -222,6 +234,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
             @Override public void onError(String message) {
                 String safe = message == null ? "errore motore" : message;
                 diag().edit().putBoolean("engineReady", false).putString("lastError", safe).apply();
+                if(marketStore!=null)marketStore.setDiagnosticState("engine_runtime",-1,
+                        "build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=ERROR;message="+safeDiag(safe));
                 Log.e(TAG, safe);
             }
         });
@@ -1226,6 +1240,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private static String firstLine(String s){if(s==null)return"";int n=s.indexOf('\n');String x=n>=0?s.substring(0,n):s;return x.length()>240?x.substring(0,240):x;}
+    private static String safeDiag(String s){if(s==null)return"";String x=s.replace('\n',' ').replace('\r',' ').replace(';',',');return x.length()>320?x.substring(0,320):x;}
 
     public static String diagnostics(Context context) {
         DealDatabase db = new DealDatabase(context);
@@ -1252,6 +1267,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
         MarketStore.RuntimeStatus a11yCross=marketDiag.diagnosticState("a11y_probe");
         long a11yCrossAgeMs=a11yCross.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-a11yCross.updatedAt);
         String a11yCrossPayload=TextUtils.isEmpty(a11yCross.detail)?"":a11yCross.detail;
+        MarketStore.RuntimeStatus radarService=marketDiag.diagnosticState("radar_service");
+        long radarServiceAgeMs=radarService.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-radarService.updatedAt);
+        MarketStore.RuntimeStatus engineRuntime=marketDiag.diagnosticState("engine_runtime");
+        long engineRuntimeAgeMs=engineRuntime.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-engineRuntime.updatedAt);
+        String engineRuntimePayload=TextUtils.isEmpty(engineRuntime.detail)?"":engineRuntime.detail;
         MarketStore.RuntimeStatus priceRefresh=marketDiag.diagnosticState("verified_price_refresh");
         String priceRefreshSummary=priceRefresh.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-priceRefresh.updatedAt)+", "+priceRefresh.detail);
         String bggIdentityTrustSummary=marketDiag.bggIdentityTrustSummary();
@@ -1279,11 +1299,16 @@ public final class VintedAccessibilityService extends AccessibilityService {
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
         SharedPreferences p = context.getSharedPreferences(PREFS_DIAG, MODE_PRIVATE);
+        boolean serviceConnectedAuthoritative=radarService.updatedAt>0?radarService.value==1:p.getBoolean("serviceConnected",false);
+        boolean engineReadyAuthoritative=engineRuntime.updatedAt>0?engineRuntime.value>0:p.getBoolean("engineReady",false);
+        int engineGamesAuthoritative=engineRuntime.value>0?(int)Math.min(Integer.MAX_VALUE,engineRuntime.value):p.getInt("engineGames",0);
         return "LUDO SCOUT V5 — RADAR + BUNDLE\n" +
                 "mode=observer-only (no visual overlays)\n" +
-                "serviceConnected=" + p.getBoolean("serviceConnected", false) + "\n" +
-                "engineReady=" + p.getBoolean("engineReady", false) + "\n" +
-                "engineGames=" + p.getInt("engineGames", 0) + "\n" +
+                "serviceConnected=" + serviceConnectedAuthoritative + "\n" +
+                "engineReady=" + engineReadyAuthoritative + "\n" +
+                "engineGames=" + engineGamesAuthoritative + "\n" +
+                "engineRuntime={authoritative="+(engineRuntime.updatedAt>0)+", ageMs="+engineRuntimeAgeMs+", value="+engineRuntime.value+", payload="+engineRuntimePayload+"}\n" +
+                "radarService={authoritative="+(radarService.updatedAt>0)+", ageMs="+radarServiceAgeMs+", value="+radarService.value+", payload="+radarService.detail+"}\n" +
                 "vintedEvents=" + p.getLong("vintedEvents", 0) + "\n" +
                 "scans=" + p.getLong("scans", 0) + "\n" +
                 "lastRoot=" + p.getString("lastRoot", "") + "\n" +
@@ -1430,7 +1455,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
     @Override public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         if(retryRegistered)try{unregisterReceiver(retryReceiver);}catch(Exception ignored){}
-        diag().edit().putBoolean("serviceConnected", false).apply();
+        diag().edit().putBoolean("serviceConnected", false).putBoolean("engineReady",false).apply();
+        if(marketStore!=null){
+            marketStore.setDiagnosticState("radar_service",0,"build="+BuildConfig.VERSION_NAME+";state=DISCONNECTED;at="+System.currentTimeMillis());
+            marketStore.setDiagnosticState("engine_runtime",0,"build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=STOPPED");
+        }
         if (engine != null) engine.destroy();
         if (database != null) database.close();
         if (bundleScanner != null) bundleScanner.close();

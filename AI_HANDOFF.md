@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.19-queue-single-owner-engine-order`
-- versionCode: `133`
+- Baseline version: `5.12.20-engine-runtime-cross-process`
+- versionCode: `134`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,16 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.20 Engine runtime cross-process telemetry
+
+- Pixel validation of 5.12.19 passed the two targeted correctness/stability checks: current-install `crashAfterInstall=0; anrAfterInstall=0; memoryAfterInstall=0`, and the stale old-run `analysisPending=7` collapsed to canonical `analysisPending=0`.
+- The remaining `engineReady=false` line was not trustworthy because it was written in the Accessibility `:radar` process and read in `:ui` through process-local SharedPreferences caching. This build makes runtime state authoritative through the existing SQLite `queue_controls` diagnostics channel.
+- `radar_service` and `engine_runtime` are written from `:radar` and read from any process. Top-level diagnostics now derive `serviceConnected`, `engineReady` and `engineGames` from SQLite whenever an authoritative row exists.
+- `JsGameEngine` emits bounded bootstrap stages (create/attach/page finished/verify/ready/timeout) and captures WebView console errors. Verify snapshots expose `document.readyState`, bridge presence, catalog presence and catalog game count.
+- Bootstrap diagnostic writes are sampled (attempts 1, 2, then every 10th) so the new observability does not create SQLite write pressure.
+- Regression: `regression/engine_runtime_cross_process_v51220.py` models the exact stale-SharedPreferences case and guarantees SQLite wins.
+- No queue semantics, schema migration, signing/applicationId/network-rate/CI-versionCode strategy changes.
 
 ## 5.12.19 Queue single-owner + current-run engine ordering
 

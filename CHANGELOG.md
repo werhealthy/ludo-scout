@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.20 — Engine runtime cross-process telemetry
+- Pixel validation of 5.12.19 showed no current-install crash/ANR/memory exits and confirmed the stale Motore analysis-pending count is fixed.
+- Replaced process-local engine/service readiness diagnostics with authoritative SQLite-backed `queue_controls` state so `:ui` cannot report a stale `:radar` SharedPreferences cache.
+- Top-level diagnostics now derive `serviceConnected`, `engineReady` and `engineGames` from cross-process runtime state when available.
+- Added bounded JsGameEngine bootstrap tracing: WebView creation/attach/page completion, sampled verify snapshots, ready/timeout state and JavaScript console errors.
+- Verify snapshots report document readiness plus bridge/catalog presence and catalog game count, making the next Pixel result sufficient to distinguish a real engine failure from stale telemetry.
+- Added `regression/engine_runtime_cross_process_v51220.py` and wired it into PR/beta CI.
+- No queue semantics, database schema, signing, applicationId, request-rate or CI versionCode-strategy changes.
+
 ## 5.12.19 — Queue single owner and Motore analysis ordering
 - ACTION_NOW now starts only the foreground queue owner and no longer also enqueues one-shot WorkManager work.
 - QueueDrainWorker stands down before opening SQLite whenever the foreground queue is starting or running; WorkManager is recovery-only.
