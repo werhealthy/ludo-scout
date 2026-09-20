@@ -7,6 +7,17 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.23 — Review truth, bounded fuzzy BGG and idle queue cleanup
+- Pixel validation of 5.12.22 confirmed the exact-title BGG path is fixed: exact lookup produced zero timeouts, BGG review was zero and the current install had zero crash/ANR/memory exits.
+- Replaced full-catalog fuzzy rescoring with a compact token-postings index and a bounded candidate pool selected from rare query tokens.
+- Historical BGG revalidation no longer creates Motore human-review work. Existing historical review flags are cleared once while the corresponding legacy deals remain `MATCH_UNCERTAIN` and excluded from trusted surfaces.
+- Review diagnostics now distinguish explicit/manual, BGG variant, historical inbox debt, historical held debt, other Vinted review, BGG technical and BGG genuine review.
+- Fixed idle Vinted queue truth: runnable counts and next-due timing now use the same source gate as the actual job claimer.
+- Ordinary Vinted jobs left materialized after Motore becomes idle are parked back into deferred state, and the maintenance sweep no longer recreates ordinary network jobs while no scroll owns them.
+- Added diagnostics for historical-review cleanup, idle-job parking, token-index load time and fuzzy candidate counts.
+- Added `regression/review_fuzzy_queue_truth_v51223.py` and wired it into PR/beta CI.
+- No schema migration, request-rate increase, signing, applicationId or CI versionCode-strategy change.
+
 ## 5.12.22 — Compact BGG exact index and no technical timeout review
 - First field diagnostic after 5.12.21 confirmed Motore now closes cleanly at the product SLA: no active/waiting run remained and five unresolved ordinary rows were expired at the 10-minute ceiling, with no current-install crash/ANR/memory exit.
 - The same run exposed 29 exact BGG scans and 29 exact-scan timeouts; those technical timeouts were being written as BGG review.
