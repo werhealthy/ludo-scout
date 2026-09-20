@@ -22,8 +22,8 @@ public final class QueueJobRunner {
     private static final String TAG = "LudoBackground";
     private QueueJobRunner() {}
 
-    /** Zero-network BGG identity stage. It first reuses aliases Ludo Scout has already learned,
-     * then tries conservative title cleanup, exact BGG aliases and finally high-confidence fuzzy
+    /** Zero-network BGG identity stage. It first reuses only authoritative BGG/manual aliases,
+     * never seller-authored Vinted aliases, then tries conservative title cleanup, exact BGG aliases and finally high-confidence fuzzy
      * ranking. Reviews from older matcher versions are eligible once; true ambiguities do not loop. */
     public static int matchBggIdentities(Context context,MarketStore market,BggSearchClient matcher,int limit){
         if(market==null||matcher==null||market.isBggPaused())return 0;
@@ -37,7 +37,7 @@ public final class QueueJobRunner {
                 List<String> variants=BggTitleNormalizer.variants(g.name);
                 if(variants.isEmpty())variants=java.util.Collections.singletonList(g.name);
 
-                // 1) Local memory: a unique alias previously confirmed by the user/app is strongest.
+                // 1) Local memory: only authoritative BGG/manual provenance may shortcut identity.
                 for(String q:variants){
                     String learned=market.learnedBggIdForTitle(q);
                     if(TextUtils.isEmpty(learned))continue;
