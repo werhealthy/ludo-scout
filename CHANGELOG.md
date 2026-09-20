@@ -7,6 +7,16 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.6 — Historical BGG revalidation
+- Added a restart-safe, zero-network one-shot audit for pre-v4 automatic BGG identities after Pixel diagnostics reported 143 historical `MATCHED` games still needing revalidation.
+- Manual/user-confirmed identities are excluded from automatic audit.
+- Historical seller titles must resolve exactly and uniquely to the stored BGG id to preserve automatic trust; weaker, conflicting, ambiguous, accessory, bundle and non-game evidence is moved to persistent review instead of being guessed.
+- Revalidation never deletes or silently reassigns historical BGG ids. It flags individual listings, preserving recovery and allowing later manual/authoritative correction.
+- Legacy deal rows associated with flagged listings become `MATCH_UNCERTAIN`, keeping suspect historical identities out of the ready/deal path.
+- Added durable per-game `bgg_revalidation_v1:<gameId>` markers so the audit is one-shot even across process restarts.
+- Added `bggHistoricalRevalidation` diagnostics and `regression/historical_bgg_revalidation_v5126.py`; both PR validation and Android beta CI run the guard.
+- No schema migration/reset and no Vinted request-rate, signing, applicationId or CI versionCode strategy changes.
+
 ## 5.12.5 — BGG identity provenance firewall
 - Stopped seller-authored Vinted aliases from acting as authoritative learned BGG identities in the zero-network matcher.
 - Kept Vinted titles as non-authoritative evidence while limiting identity shortcuts to BGG primary/original/alternate aliases, curated BGG aliases, canonical auto-match names and explicit manual BGG choices.

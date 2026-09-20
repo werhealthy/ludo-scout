@@ -54,6 +54,7 @@ public final class QueueDrainWorker extends Worker {
         int processed = 0;
 
         QueueJobRunner.sweepMissing(context, market);
+        BggHistoricalRevalidator.runSlice(market,bggMatcher,4);
 
         try {
             while (!isStopped() && processed < MAX_ITEMS && System.currentTimeMillis() - started < MAX_RUN_MS) {

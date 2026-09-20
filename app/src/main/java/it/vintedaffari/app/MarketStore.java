@@ -48,6 +48,7 @@ public final class MarketStore {
     private static final String KEY_VINTED_PAUSED = "vinted_paused";
     private static final String KEY_BGG_PAUSED = "bgg_paused";
     public static final String HISTORICAL_SOURCE = "LEGACY_V9";
+    private static final String BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:";
 
     public static final class Job {
         public long id, listingId, gameId, displayGameId, nextAttemptAt, processingStartedAt;
@@ -69,6 +70,18 @@ public final class MarketStore {
         public int jobsRemoved,observationsRemoved,listingsArchived,dealsArchived,gamesHidden,snapshotsCleared;
         public int totalRemoved(){return jobsRemoved+listingsArchived+dealsArchived;}
         @Override public String toString(){return "jobs="+jobsRemoved+", observations="+observationsRemoved+", listings="+listingsArchived+", deals="+dealsArchived+", gamesHidden="+gamesHidden+", snapshots="+snapshotsCleared;}
+    }
+
+    public static final class HistoricalBggListing {
+        public long id;
+        public int priceCents;
+        public String title="",brand="",condition="",observedText="",signature="";
+    }
+
+    public static final class HistoricalBggCandidate {
+        public long gameId;
+        public String bggId="",canonicalName="";
+        public final List<HistoricalBggListing> listings=new ArrayList<>();
     }
 
     public static final class PricePoint {
@@ -1684,6 +1697,54 @@ public final class MarketStore {
 
     /** A title already confirmed by the user/app becomes local knowledge. Only a unique BGG id is
      * returned; collisions remain reviewable rather than being guessed. */
+    /** Returns old automatic matches that have not yet passed the v1 historical audit.
+     * Explicit MANUAL_BGG / USER_CONFIRMED identities are never touched by automatic revalidation. */
+    public List<HistoricalBggCandidate> historicalBggRevalidationCandidates(int limit){
+        List<HistoricalBggCandidate> out=new ArrayList<>();SQLiteDatabase db=helper.getReadableDatabase();
+        String sql="SELECT g.id,g.bgg_id,g.canonical_name FROM games g WHERE g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(g.match_algorithm_version,0)<? "+
+                "AND NOT EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.source='MANUAL_BGG') "+
+                "AND NOT EXISTS(SELECT 1 FROM market_listings l LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) WHERE l.game_id=g.id AND d.verification_state='USER_CONFIRMED') "+
+                "AND EXISTS(SELECT 1 FROM market_listings l WHERE l.game_id=g.id AND l.lifecycle='ACTIVE') "+
+                "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='"+BGG_REVALIDATION_PREFIX+"'||g.id) ORDER BY g.last_seen DESC LIMIT ?";
+        try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(BGG_MATCH_ALGORITHM_VERSION),String.valueOf(Math.max(1,limit))})){
+            while(c.moveToNext()){
+                HistoricalBggCandidate g=new HistoricalBggCandidate();g.gameId=c.getLong(0);g.bggId=safe(c.getString(1));g.canonicalName=safe(c.getString(2));
+                try(Cursor l=db.rawQuery("SELECT id,COALESCE(vinted_title,''),COALESCE(brand,''),COALESCE(item_condition,''),current_price_cents,COALESCE(observed_text,''),COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE game_id=? AND lifecycle='ACTIVE' ORDER BY last_seen DESC",new String[]{String.valueOf(g.gameId)})){
+                    while(l.moveToNext()){HistoricalBggListing x=new HistoricalBggListing();x.id=l.getLong(0);x.title=safe(l.getString(1));x.brand=safe(l.getString(2));x.condition=safe(l.getString(3));x.priceCents=l.getInt(4);x.observedText=safe(l.getString(5));x.signature=safe(l.getString(6));g.listings.add(x);}
+                }
+                if(!g.listings.isEmpty())out.add(g);
+            }
+        }
+        return out;
+    }
+
+    /** Historical audit is deliberately non-destructive: the old BGG id stays visible for review,
+     * while the listing is removed from the ready/deal path until a human or later authoritative
+     * resolver confirms it. */
+    public void flagHistoricalBggReview(long listingId,String reason){
+        if(listingId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();String why=safe(reason);
+        ContentValues l=new ContentValues();l.put("manual_review_required",1);l.put("manual_review_reason",why);db.update("market_listings",l,"id=?",new String[]{String.valueOf(listingId)});
+        String sig=scalarString(db,"SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)});
+        if(!TextUtils.isEmpty(sig)){ContentValues d=new ContentValues();d.put("verification_state","MATCH_UNCERTAIN");d.put("verification_reason",why);db.update("deals",d,"signature=?",new String[]{sig});}
+    }
+
+    public void completeHistoricalBggRevalidation(long gameId,String state,String detail,boolean independentlyVerified){
+        if(gameId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        db.beginTransaction();try{
+            ContentValues q=new ContentValues();q.put("name",BGG_REVALIDATION_PREFIX+gameId);q.put("value",independentlyVerified?1:2);q.put("updated_at",now);q.put("text_value",safe(state)+"|"+safe(detail));db.insertWithOnConflict("queue_controls",null,q,SQLiteDatabase.CONFLICT_REPLACE);
+            if(independentlyVerified){ContentValues g=new ContentValues();g.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);db.update("games",g,"id=?",new String[]{String.valueOf(gameId)});}
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        notifyQueueChanged();
+    }
+
+    public String historicalBggRevalidationSummary(){
+        SQLiteDatabase db=helper.getReadableDatabase();long verified=0,review=0,processed=0,pending=0;
+        try(Cursor c=db.rawQuery("SELECT COUNT(*),SUM(CASE WHEN value=1 THEN 1 ELSE 0 END),SUM(CASE WHEN value=2 THEN 1 ELSE 0 END) FROM queue_controls WHERE name LIKE '"+BGG_REVALIDATION_PREFIX+"%'",null)){if(c.moveToFirst()){processed=c.getLong(0);verified=c.isNull(1)?0:c.getLong(1);review=c.isNull(2)?0:c.getLong(2);}}catch(Throwable ignored){}
+        try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM games g WHERE g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(g.match_algorithm_version,0)<? AND NOT EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.source='MANUAL_BGG') AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='"+BGG_REVALIDATION_PREFIX+"'||g.id)",new String[]{String.valueOf(BGG_MATCH_ALGORITHM_VERSION)})){if(c.moveToFirst())pending=c.getLong(0);}catch(Throwable ignored){}
+        return "build=bgg-historical-revalidation-v1; processed="+processed+"; verifiedGames="+verified+"; reviewGames="+review+"; pending="+pending;
+    }
+
     /** Reuses only authoritative identity evidence. Seller-authored Vinted titles remain useful
      * for search/display, but they can never bootstrap another automatic BGG match by themselves. */
     public String learnedBggIdForTitle(String raw){
@@ -1698,7 +1759,7 @@ public final class MarketStore {
         SQLiteDatabase db=helper.getReadableDatabase();long sellerAliases=0,sellerOnlyAliases=0,matchedToRevalidate=0;
         try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM game_aliases a JOIN games g ON g.id=a.game_id WHERE a.source IN ('VINTED','VINTED_VARIANT') AND g.bgg_id IS NOT NULL AND g.bgg_id<>''",null)){if(c.moveToFirst())sellerAliases=c.getLong(0);}catch(Throwable ignored){}
         try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM game_aliases a JOIN games g ON g.id=a.game_id WHERE a.source IN ('VINTED','VINTED_VARIANT') AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND a.normalized_alias<>g.normalized_name AND NOT EXISTS(SELECT 1 FROM game_aliases t WHERE t.game_id=a.game_id AND t.normalized_alias=a.normalized_alias AND t.source IN ('BGG_PRIMARY','BGG_ORIGINAL','BGG_ALTERNATE','BGG_ALIAS','AUTO_LOCAL_BGG','MANUAL_BGG'))",null)){if(c.moveToFirst())sellerOnlyAliases=c.getLong(0);}catch(Throwable ignored){}
-        try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM games WHERE database_visible=1 AND bgg_id IS NOT NULL AND bgg_id<>'' AND match_state='MATCHED' AND COALESCE(match_algorithm_version,0)<?",new String[]{String.valueOf(BGG_MATCH_ALGORITHM_VERSION)})){if(c.moveToFirst())matchedToRevalidate=c.getLong(0);}catch(Throwable ignored){}
+        try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM games g WHERE g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(g.match_algorithm_version,0)<? AND NOT EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.source='MANUAL_BGG') AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='"+BGG_REVALIDATION_PREFIX+"'||g.id)",new String[]{String.valueOf(BGG_MATCH_ALGORITHM_VERSION)})){if(c.moveToFirst())matchedToRevalidate=c.getLong(0);}catch(Throwable ignored){}
         return "build=bgg-provenance-v1; algorithm="+BGG_MATCH_ALGORITHM_VERSION+"; sellerAliases="+sellerAliases+"; sellerOnlyAliases="+sellerOnlyAliases+"; matchedToRevalidate="+matchedToRevalidate;
     }
 

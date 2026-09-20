@@ -155,6 +155,11 @@ public final class QueueKeepAliveService extends Service {
             try{
                 long now=System.currentTimeMillis();market.touchLaneHeartbeat("bgg");
                 if(market.isBggPaused()){market.setLaneStatus("bgg","PAUSED","Database in pausa",0L);sleep(2_000L);continue;}
+                // Historical revalidation is zero-network and one-shot per game. Keep the
+                // slice tiny so current-run BGG work remains responsive.
+                int historical=BggHistoricalRevalidator.runSlice(market,bggMatcher,2);
+                if(historical>0){market.setLaneStatus("bgg","REVALIDATING",historical+" identità storiche controllate",0L);market.touchLaneHeartbeat("bgg");}
+
                 // Fairness: identity matching is zero-network and must not sit behind a large
                 // enrichment backlog. Do a small bounded slice on every loop, then still give
                 // enrichment its turn in the same iteration.
