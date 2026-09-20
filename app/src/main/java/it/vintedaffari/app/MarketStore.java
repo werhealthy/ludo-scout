@@ -53,6 +53,7 @@ public final class MarketStore {
     private static final String ENGINE_RUN_CURSOR = "engine_run_cursor_start";
     private static final String ENGINE_RUN_SLICE = "engine_run_slice";
     private static final String MANUAL_VINTED_RECOVERY = "manual_vinted_recovery";
+    private static final String OPENED_VINTED_TARGET = "opened_vinted_target";
 
     public static final class Job {
         public long id, listingId, gameId, displayGameId, nextAttemptAt, processingStartedAt;
@@ -148,6 +149,36 @@ public final class MarketStore {
         if(listingId>0)changed=db.delete("queue_controls","name=? AND value=?",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId)});
         else changed=db.delete("queue_controls","name=?",new String[]{MANUAL_VINTED_RECOVERY});
         if(changed>0)setDiagnosticState("manual_vinted_recovery",0,"state=IDLE;clearedListing="+listingId);
+    }
+
+    /** Exact outbound provenance. Unlike manual search recovery, this is set only when Ludo itself
+     * opens a known /items/... URL, so the first product page can be reconciled to the exact card. */
+    public void beginOpenedVintedTarget(long listingId,String signature,String title,long ttlMs){
+        if(listingId<=0)return;long now=System.currentTimeMillis(),until=now+Math.max(30_000L,ttlMs);
+        try{JSONObject o=new JSONObject();o.put("until",until);o.put("signature",safe(signature));o.put("title",safe(title));
+            ContentValues v=new ContentValues();v.put("name",OPENED_VINTED_TARGET);v.put("value",listingId);v.put("updated_at",now);v.put("text_value",o.toString());
+            helper.getWritableDatabase().insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+            setDiagnosticState("opened_vinted_target",1,"state=ACTIVE;listing="+listingId+";until="+until);
+        }catch(Exception ignored){}
+    }
+    public ManualVintedRecovery activeOpenedVintedTarget(long now){
+        ManualVintedRecovery out=new ManualVintedRecovery();
+        try(Cursor cur=helper.getReadableDatabase().rawQuery("SELECT value,text_value FROM queue_controls WHERE name=? LIMIT 1",new String[]{OPENED_VINTED_TARGET})){
+            if(!cur.moveToFirst())return out;out.listingId=cur.getLong(0);JSONObject o=new JSONObject(cur.isNull(1)?"{}":cur.getString(1));out.until=o.optLong("until",0L);out.signature=o.optString("signature","");out.title=o.optString("title","");
+        }catch(Exception ignored){return new ManualVintedRecovery();}
+        if(!out.active(now)){clearOpenedVintedTarget(out.listingId);return new ManualVintedRecovery();}return out;
+    }
+    public void clearOpenedVintedTarget(long listingId){
+        SQLiteDatabase db=helper.getWritableDatabase();int changed=listingId>0?db.delete("queue_controls","name=? AND value=?",new String[]{OPENED_VINTED_TARGET,String.valueOf(listingId)}):db.delete("queue_controls","name=?",new String[]{OPENED_VINTED_TARGET});
+        if(changed>0)setDiagnosticState("opened_vinted_target",0,"state=IDLE;clearedListing="+listingId);
+    }
+    public boolean updateExactProductMetadata(long listingId,String sellerName,String publishedLabel,Integer priceCents,Integer protectedPriceCents){
+        if(listingId<=0)return false;SQLiteDatabase db=helper.getWritableDatabase();ContentValues v=new ContentValues();
+        if(!TextUtils.isEmpty(sellerName))v.put("seller_name",sellerName.trim());
+        if(!TextUtils.isEmpty(publishedLabel))v.put("published_label",publishedLabel.trim());
+        if(v.size()>0){v.put("enriched_at",System.currentTimeMillis());db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});}
+        boolean priceChanged=priceCents!=null&&priceCents>0&&updateVerifiedCurrentPrice(listingId,priceCents,protectedPriceCents);
+        return v.size()>0||priceChanged;
     }
 
     /** One-time UX cut-over. Old incomplete observations are removed from the active product so the
