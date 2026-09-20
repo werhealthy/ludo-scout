@@ -1292,6 +1292,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String engineSlaSummary=engineSla.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-engineSla.updatedAt)+", "+engineSla.detail);
         MarketStore.RuntimeStatus bggExactCutover=marketDiag.diagnosticState("bgg_exact_index_cutover");
         String bggExactCutoverSummary=bggExactCutover.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggExactCutover.updatedAt)+", "+bggExactCutover.detail);
+        MarketStore.RuntimeStatus historicalReviewCutover=marketDiag.diagnosticState("historical_review_cutover");
+        String historicalReviewCutoverSummary=historicalReviewCutover.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-historicalReviewCutover.updatedAt)+", "+historicalReviewCutover.detail);
+        MarketStore.RuntimeStatus vintedIdleParking=marketDiag.diagnosticState("vinted_idle_parking");
+        String vintedIdleParkingSummary=vintedIdleParking.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-vintedIdleParking.updatedAt)+", "+vintedIdleParking.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
         long engineEpochStart=engineEpochForExit;long engineDiagNow=System.currentTimeMillis();
         String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
@@ -1415,6 +1419,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
                 "bggExactIndexCutover={"+bggExactCutoverSummary+"}\n"+
+                "historicalReviewCutover={"+historicalReviewCutoverSummary+"}\n"+
+                "vintedIdleParking={"+vintedIdleParkingSummary+"}\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
                 "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+

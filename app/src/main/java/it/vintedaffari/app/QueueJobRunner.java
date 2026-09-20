@@ -199,8 +199,14 @@ public final class QueueJobRunner {
             // Local inference is intentionally independent from the Vinted HTTP gate.
             market.inferDeferredLanguages(120);
             if(now-last>=30*60_000L){
-                int canonical=market.enqueueIncompleteListingsBackground(120);
-                int legacy=market.enqueueMissingLegacyDeals();
+                // Ordinary missing-link work exists to complete the current scroll, not to create an
+                // invisible permanent backlog while Motore is idle. LIVE/HUNT/MANUAL enqueue their
+                // own priority jobs and are unaffected.
+                int canonical=0,legacy=0;
+                if(market.hasActiveObservationRun()){
+                    canonical=market.enqueueIncompleteListingsBackground(120);
+                    legacy=market.enqueueMissingLegacyDeals();
+                }
                 auto.edit().putLong("last_missing_sweep",now).putInt("last_missing_scheduled",canonical+legacy).apply();
             }
         } catch(Throwable t){ Log.d(TAG,"automatic missing-data sweep skipped",t); }

@@ -1343,10 +1343,46 @@ public final class MarketStore {
 
     /** Keeps the durable queue live by removing work that can no longer make progress.
      * This is intentionally idempotent and cheap enough to run at service startup/pulses. */
+    public boolean hasActiveObservationRun(){return helper.activeObservationSession()!=null;}
+
+    /** Historical audit rows created before 5.12.23 may still carry the old manual-review flag.
+     * Clear only that known reason family; trust gating on deals remains MATCH_UNCERTAIN. */
+    public int clearHistoricalManualReviewDebt(long now){
+        final String marker="historical_review_nonblocking_v1";SQLiteDatabase db=helper.getWritableDatabase();
+        try(Cursor x=db.rawQuery("SELECT 1 FROM queue_controls WHERE name=? LIMIT 1",new String[]{marker})){if(x.moveToFirst())return 0;}
+        int changed;db.beginTransaction();try{
+            ContentValues l=new ContentValues();l.put("manual_review_required",0);l.putNull("manual_review_reason");
+            changed=db.update("market_listings",l,"COALESCE(manual_review_required,0)=1 AND manual_review_reason LIKE 'Rivalidazione BGG storica:%'",null);
+            ContentValues q=new ContentValues();q.put("name",marker);q.put("value",changed);q.put("updated_at",now);q.put("text_value","build=historical-review-nonblocking-v1;cleared="+changed);db.insertWithOnConflict("queue_controls",null,q,SQLiteDatabase.CONFLICT_REPLACE);
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0)setDiagnosticState("historical_review_cutover",changed,"build=historical-review-nonblocking-v1;cleared="+changed);
+        return changed;
+    }
+
+    /** No ordinary background Vinted job should remain materialised when there is no scroll owning
+     * it. Return those rows to the deferred/local pool; LIVE/HUNT/MANUAL and historical work are
+     * intentionally excluded. */
+    public int parkIdleOrdinaryVintedJobs(long now){
+        if(helper.activeObservationSession()!=null)return 0;SQLiteDatabase db=helper.getWritableDatabase();int changed=0;
+        String automatic="job_type IN (?,?) AND state IN (?,?) AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL',?)";
+        db.beginTransaction();try{
+            ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);done.put("progress",100);done.put("processing_started_at",0);done.put("last_error","parked: nessuno scroll attivo");
+            changed=db.update("processing_jobs",done,automatic,new String[]{JOB_VINTED,JOB_VINTED_DEEP,PENDING,FAILED_RETRYABLE,HISTORICAL_SOURCE});
+            if(changed>0){
+                ContentValues deferred=new ContentValues();deferred.put("enrichment_state","DEFERRED_LINK");deferred.put("deferred_retry_at",now+24L*60*60_000L);deferred.put("last_error","In attesa di un nuovo scroll");
+                db.update("market_listings",deferred,"lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='') AND id IN (SELECT listing_id FROM processing_jobs WHERE last_error='parked: nessuno scroll attivo')",null);
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0)setDiagnosticState("vinted_idle_parking",changed,"build=vinted-idle-parking-v1;parked="+changed);
+        return changed;
+    }
+
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=reopenTechnicalBggReviewsForExactIndex(now)+expireOverdueEngineWork(now);
+        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+expireOverdueEngineWork(now)+parkIdleOrdinaryVintedJobs(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -1611,7 +1647,7 @@ public final class MarketStore {
         if(isVintedPaused())return 0;
         SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?"":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT COUNT(*) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
         java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);a.add(String.valueOf(now));if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
@@ -1636,7 +1672,7 @@ public final class MarketStore {
         if(isVintedPaused())return 0L;
         long now=System.currentTimeMillis();SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?"":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT MIN(j.next_attempt_at) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
         java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
@@ -1892,7 +1928,9 @@ public final class MarketStore {
      * resolver confirms it. */
     public void flagHistoricalBggReview(long listingId,String reason){
         if(listingId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();String why=safe(reason);
-        ContentValues l=new ContentValues();l.put("manual_review_required",1);l.put("manual_review_reason",why);db.update("market_listings",l,"id=?",new String[]{String.valueOf(listingId)});
+        // Historical identity debt is useful for trust gating, but it is not a current user task.
+        // Keep it out of the Motore review inbox while preserving the uncertainty on the deal.
+        ContentValues l=new ContentValues();l.put("manual_review_required",0);l.putNull("manual_review_reason");l.put("last_error",why);db.update("market_listings",l,"id=?",new String[]{String.valueOf(listingId)});
         String sig=scalarString(db,"SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)});
         if(!TextUtils.isEmpty(sig)){ContentValues d=new ContentValues();d.put("verification_state","MATCH_UNCERTAIN");d.put("verification_reason",why);db.update("deals",d,"signature=?",new String[]{sig});}
     }
@@ -1928,7 +1966,7 @@ public final class MarketStore {
     public String historicalBggRevalidationSummary(){
         SQLiteDatabase db=helper.getReadableDatabase();long verified=0,review=0,processed=0;int pending=historicalBggRevalidationPendingCount();
         try(Cursor c=db.rawQuery("SELECT COUNT(*),SUM(CASE WHEN value=1 THEN 1 ELSE 0 END),SUM(CASE WHEN value=2 THEN 1 ELSE 0 END) FROM queue_controls WHERE name LIKE '"+BGG_REVALIDATION_PREFIX+"%'",null)){if(c.moveToFirst()){processed=c.getLong(0);verified=c.isNull(1)?0:c.getLong(1);review=c.isNull(2)?0:c.getLong(2);}}catch(Throwable ignored){}
-        return "build=bgg-historical-revalidation-v2; processed="+processed+"; verifiedGames="+verified+"; reviewGames="+review+"; pending="+pending;
+        return "build=bgg-historical-revalidation-v3; processed="+processed+"; verifiedGames="+verified+"; heldGames="+review+"; pending="+pending;
     }
 
     /** Reuses only authoritative identity evidence. Seller-authored Vinted titles remain useful
@@ -2174,12 +2212,13 @@ public final class MarketStore {
     public int vintedReviewCount(){long epoch=engineEpochStart();try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND COALESCE(manual_review_required,0)=1 AND last_seen>=?",new String[]{String.valueOf(epoch)})){return c.moveToFirst()?c.getInt(0):0;}}
     public String currentReviewBreakdown(){
         long epoch=engineEpochStart();SQLiteDatabase db=helper.getReadableDatabase();
-        int vinted=0,explicit=0,variant=0,other=0,bgg=0,bggTechnical=0,bggOther=0;
-        String vsql="SELECT COUNT(*),SUM(CASE WHEN EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY')) THEN 1 ELSE 0 END),SUM(CASE WHEN l.match_state='BGG_VARIANT_REVIEW' THEN 1 ELSE 0 END) FROM market_listings l WHERE l.lifecycle='ACTIVE' AND COALESCE(l.manual_review_required,0)=1 AND l.last_seen>=?";
-        try(Cursor c=db.rawQuery(vsql,new String[]{String.valueOf(epoch)})){if(c.moveToFirst()){vinted=c.getInt(0);explicit=c.isNull(1)?0:c.getInt(1);variant=c.isNull(2)?0:c.getInt(2);other=Math.max(0,vinted-Math.min(vinted,explicit+variant));}}
+        int vinted=0,explicit=0,variant=0,historicalInbox=0,other=0,bgg=0,bggTechnical=0,bggOther=0,historicalHeld=0;
+        String vsql="SELECT COUNT(*),SUM(CASE WHEN EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY')) THEN 1 ELSE 0 END),SUM(CASE WHEN l.match_state='BGG_VARIANT_REVIEW' THEN 1 ELSE 0 END),SUM(CASE WHEN l.manual_review_reason LIKE 'Rivalidazione BGG storica:%' THEN 1 ELSE 0 END) FROM market_listings l WHERE l.lifecycle='ACTIVE' AND COALESCE(l.manual_review_required,0)=1 AND l.last_seen>=?";
+        try(Cursor c=db.rawQuery(vsql,new String[]{String.valueOf(epoch)})){if(c.moveToFirst()){vinted=c.getInt(0);explicit=c.isNull(1)?0:c.getInt(1);variant=c.isNull(2)?0:c.getInt(2);historicalInbox=c.isNull(3)?0:c.getInt(3);other=Math.max(0,vinted-Math.min(vinted,explicit+variant+historicalInbox));}}
+        try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM market_listings l LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) WHERE l.lifecycle='ACTIVE' AND COALESCE(l.manual_review_required,0)=0 AND d.verification_state='MATCH_UNCERTAIN' AND d.verification_reason LIKE 'Rivalidazione BGG storica:%' AND l.last_seen>=?",new String[]{String.valueOf(epoch)})){if(c.moveToFirst())historicalHeld=c.getInt(0);}
         String bsql="SELECT COUNT(*),SUM(CASE WHEN filter_reason LIKE 'Ricerca BGG %oltre il budget%' OR filter_reason LIKE 'Errore%match locale:%' THEN 1 ELSE 0 END) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND last_seen>=?";
         try(Cursor c=db.rawQuery(bsql,new String[]{String.valueOf(epoch)})){if(c.moveToFirst()){bgg=c.getInt(0);bggTechnical=c.isNull(1)?0:c.getInt(1);bggOther=Math.max(0,bgg-bggTechnical);}}
-        return "build=review-breakdown-v1;vinted="+vinted+";explicit="+explicit+";variant="+variant+";other="+other+";bgg="+bgg+";bggTechnical="+bggTechnical+";bggOther="+bggOther;
+        return "build=review-breakdown-v2;vinted="+vinted+";explicit="+explicit+";variant="+variant+";historicalInbox="+historicalInbox+";historicalHeld="+historicalHeld+";other="+other+";bgg="+bgg+";bggTechnical="+bggTechnical+";bggOther="+bggOther;
     }
     public List<GameRecord> bggMatchReviewGames(int limit){List<GameRecord> out=new ArrayList<>();long epoch=engineEpochStart();String sql="SELECT id,bgg_id,provisional_key,canonical_name,original_name,alternate_names,year,description,thumbnail_url,image_url,min_players,max_players,playtime,min_age,weight,rating,voters,bgg_rank,categories,mechanics,designers,artists,publishers,families,expansions,base_games,bgg_url,match_state,match_confidence,first_seen,last_seen,metadata_updated_at FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND last_seen>=? ORDER BY last_seen DESC LIMIT ?";try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(epoch),String.valueOf(Math.max(1,limit))})){while(c.moveToNext())out.add(readGameBase(c));}return out;}
 

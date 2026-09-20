@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.22-bgg-exact-index`
-- versionCode: `136`
+- Baseline version: `5.12.23-review-fuzzy-queue-truth`
+- versionCode: `137`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -77,12 +77,12 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Pixel Test 1 on 5.12.5 measured 2,247 seller aliases, 1,886 seller-only aliases and 143 pre-v4 `MATCHED` games eligible for audit. This justified controlled revalidation rather than a blanket data reset.
 - `BggHistoricalRevalidator` is a zero-network, one-shot-per-game audit for old automatic matches. Explicit `MANUAL_BGG` and legacy `USER_CONFIRMED` identities are excluded.
 - Historical identity is preserved. A listing is independently verified only when its seller title, after conservative marketplace cleanup, resolves exactly and uniquely to the stored BGG id in the bundled local BGG index.
-- Non-game/accessory/component/empty-box/bundle cases, conflicting exact BGG identities, ambiguous aliases and merely fuzzy/plausible titles become persistent listing review. No row or BGG id is deleted or silently reassigned.
-- Review also marks any legacy deal `MATCH_UNCERTAIN`, preventing an unverified historical identity from remaining in the ready/deal path.
+- Non-game/accessory/component/empty-box/bundle cases, conflicting exact BGG identities, ambiguous aliases and merely fuzzy/plausible titles are held out of trusted product surfaces. Historical audit uncertainty is not a current human-review task. No row or BGG id is deleted or silently reassigned.
+- Historical holds mark the legacy deal `MATCH_UNCERTAIN`, preventing an unverified identity from remaining in the ready/deal path while keeping Motore review nonblocking.
 - Progress is persisted in `queue_controls` with `bgg_revalidation_v1:<gameId>` markers. This makes the pass one-shot and restart-safe; it cannot repeat automatically for the same game.
 - The BGG foreground lane advances only 2 historical games per loop; WorkManager recovery advances 4, preserving current-run responsiveness. No network calls are made by the audit.
-- Diagnostics expose `bggHistoricalRevalidation={processed, verifiedGames, reviewGames, pending}`; `bggIdentityTrust.matchedToRevalidate` now counts only unprocessed eligible games.
-- 5.12.7 tightens accounting: legacy `USER_CONFIRMED` games are excluded from pending metrics as well as from execution, and any game with at least one flagged listing remains counted in `reviewGames` even when another listing independently verifies the canonical BGG identity.
+- Diagnostics expose `bggHistoricalRevalidation={processed, verifiedGames, heldGames, pending}`; `bggIdentityTrust.matchedToRevalidate` counts only unprocessed eligible games.
+- 5.12.7 tightens accounting: legacy `USER_CONFIRMED` games are excluded from pending metrics as well as from execution, and any game with at least one flagged listing remains counted in the historical held set even when another listing independently verifies the canonical BGG identity.
 - Static regression guard: `regression/historical_bgg_revalidation_v5126.py`.
 - No schema migration, no data deletion/reset, no signing/applicationId/versionCode-strategy change, and no Vinted request-rate change.
 
@@ -105,6 +105,22 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.23 Review/fuzzy/queue truth
+
+- Pixel validation of 5.12.22 confirmed the exact BGG fix: `exactTimeouts=0`, `bggReview=0`, `bggTechnical=0`, and no crash/ANR/memory exit after the current install.
+- The same diagnostic exposed three deterministic follow-ups:
+  - fuzzy BGG still scanned too broadly (`fuzzyTimeouts=14`; latest 3/3 fuzzy attempts timed out and were quarantined);
+  - 15 Vinted review rows were all non-explicit/non-variant, traced to historical BGG revalidation still setting `manual_review_required`;
+  - `queueRunnable=33` disagreed with the Vinted lane saying no job was claimable because idle diagnostics and claim logic used different source gates.
+- Queue-process fuzzy BGG matching now builds a compact primitive token-postings index lazily. Each query ranks at most a bounded candidate pool gathered from its rarest tokens instead of rescoring all 31k games.
+- Historical BGG revalidation remains a trust firewall but no longer creates human review. Existing historical manual-review flags are cleared once; affected deals remain `MATCH_UNCERTAIN` and therefore stay out of trusted Home/Scopri.
+- Idle ordinary Vinted jobs are parked back into the deferred pool. The 30-minute maintenance sweep no longer materializes ordinary network work when no Motore run is active.
+- `runnableVintedDueCount()` and `nextRunnableVintedDueAt()` now use the same idle source policy as the real claimer: only LIVE/HUNT/MANUAL work is runnable without an active scroll.
+- Review diagnostics v2 separate explicit, variant, historical inbox debt, historical held debt, other Vinted review, BGG technical and BGG genuine review.
+- Additional diagnostics expose historical-review cleanup and idle-job parking.
+- Regression: `regression/review_fuzzy_queue_truth_v51223.py`.
+- No schema migration, request-rate increase, signing/applicationId/CI-versionCode-strategy change.
 
 ## 5.12.22 BGG exact-index turnaround follow-up
 

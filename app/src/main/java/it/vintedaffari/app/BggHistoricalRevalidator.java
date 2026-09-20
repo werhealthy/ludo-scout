@@ -10,11 +10,11 @@ import java.util.List;
  *
  * It never deletes or silently reassigns an identity. A listing is considered independently
  * verified only when its seller title, after conservative marketplace cleanup, resolves exactly
- * and uniquely to the already stored BGG id in the bundled BGG index. Everything weaker becomes
- * persistent review instead of being guessed.
+ * and uniquely to the already stored BGG id in the bundled BGG index. Everything weaker is held
+ * out of trusted product surfaces without becoming a human task.
  */
 public final class BggHistoricalRevalidator {
-    public static final String BUILD="bgg-historical-revalidation-v2";
+    public static final String BUILD="bgg-historical-revalidation-v3";
 
     private BggHistoricalRevalidator(){}
 
@@ -26,7 +26,7 @@ public final class BggHistoricalRevalidator {
             return 0;
         }
 
-        int processed=0,verifiedGames=0,reviewGames=0,reviewListings=0;
+        int processed=0,verifiedGames=0,heldGames=0,heldListings=0;
         for(MarketStore.HistoricalBggCandidate candidate:games){
             if(candidate==null||candidate.gameId<=0||TextUtils.isEmpty(candidate.bggId))continue;
             int supported=0,review=0;
@@ -35,10 +35,10 @@ public final class BggHistoricalRevalidator {
             if(expected==null){
                 for(MarketStore.HistoricalBggListing listing:candidate.listings){
                     market.flagHistoricalBggReview(listing.id,"Rivalidazione BGG storica: ID "+candidate.bggId+" non presente nell'indice locale corrente.");
-                    review++;reviewListings++;
+                    review++;heldListings++;
                 }
                 market.completeHistoricalBggRevalidation(candidate.gameId,"REVIEW_NO_LOCAL_BGG","listings="+candidate.listings.size(),false,false);
-                reviewGames++;processed++;continue;
+                heldGames++;processed++;continue;
             }
 
             for(MarketStore.HistoricalBggListing listing:candidate.listings){
@@ -46,7 +46,7 @@ public final class BggHistoricalRevalidator {
                 if(e.verified)supported++;
                 else{
                     market.flagHistoricalBggReview(listing.id,e.reason);
-                    review++;reviewListings++;
+                    review++;heldListings++;
                 }
             }
 
@@ -55,14 +55,14 @@ public final class BggHistoricalRevalidator {
             market.completeHistoricalBggRevalidation(candidate.gameId,state,
                     "bgg="+candidate.bggId+"; supported="+supported+"; review="+review+"; listings="+candidate.listings.size(),
                     independentlyVerified,false);
-            if(review>0)reviewGames++;else verifiedGames++;
+            if(review>0)heldGames++;else verifiedGames++;
             processed++;
         }
 
         if(processed>0)market.notifyHistoricalBggRevalidationChanged();
         market.setDiagnosticState("bgg_historical_revalidation",1,
                 "state=RUNNING;build="+BUILD+";slice="+processed+";verifiedGames="+verifiedGames+
-                        ";reviewGames="+reviewGames+";reviewListings="+reviewListings+";"+market.historicalBggRevalidationSummary());
+                        ";heldGames="+heldGames+";heldListings="+heldListings+";"+market.historicalBggRevalidationSummary());
         return processed;
     }
 
