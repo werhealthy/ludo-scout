@@ -109,7 +109,7 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## 5.12.11 BGG state monotonicity
 - Pixel Test 5 proved the fuzzy performance fix: 3 current fuzzy matches completed in 122 ms. However, all 3 were reported as moved to review while `bggMatchRequired` stayed at 3 and the historical audit remained blocked at 73 pending.
 - Root cause: `applyAnalysis()`/`upsertProvisionalGame()` could overwrite a later BGG decision. Re-analysis of an existing provisional title unconditionally reset the game to `BGG_MATCH_REQUIRED`, made it visible, cleared its filter reason, and wrote the listing back to `BGG_MATCH_REQUIRED`.
-- BGG identity states are now monotonic: only unresolved states (`PENDING_ANALYSIS`/`BGG_MATCH_REQUIRED`) may be refreshed by another analysis pass. `BGG_MATCH_REVIEW` and `AUTO_QUARANTINED` cannot be downgraded by stale or repeated analysis.
+- BGG identity states are now monotonic: only unresolved states (`PENDING_ANALYSIS`/`BGG_MATCH_REQUIRED`) may be refreshed by another analysis pass. `BGG_MATCH_REVIEW` and `AUTO_QUARANTINED` cannot be downgraded by stale or repeated analysis, including a late `status=matched` result from an older analysis batch.
 - `markBggMatchReview()` now updates the canonical game and active linked listings transactionally, so UI/listing state cannot diverge from the game state.
 - `applyAnalysis()` ignores inactive listings and refilters stale work that points at an already quarantined game.
 - `reconcileQueue()` idempotently repairs legacy cross-table drift: active listings linked to review games become `BGG_MATCH_REVIEW`; active listings linked to `AUTO_QUARANTINED` games are returned to `AUTO_FILTERED`.
