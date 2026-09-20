@@ -439,13 +439,16 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     }
                     database.record(card, ga, analyzedListing, t);
                     if(marketStore!=null){marketStore.applyAnalysis(card,ga,analyzedListing,t);if(localRef!=null&&ga!=null&&!TextUtils.isEmpty(ga.bggId))marketStore.refreshLocalVintedBenchmarksForBgg(ga.bggId);}
+                    boolean huntCandidate=ga!=null&&"matched".equals(ga.status)&&!TextUtils.isEmpty(ga.bggId)
+                            &&HuntDatabase.wantsCandidate(getApplicationContext(),ga.bggId,ga.totalCents);
+                    if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);
                     DealRecord stored=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                     String[] sellerHint=contextualSellerHints.remove(DealDatabase.signature(card));
                     if(stored!=null&&sellerHint!=null&&sellerHint.length>0&&!TextUtils.isEmpty(sellerHint[0])){
                         database.applySellerHint(stored.signature,sellerHint[0],sellerHint.length>1?sellerHint[1]:null);
                         stored=database.findBySignature(stored.signature);bundleDatabase.increment("accessibilitySellerHints");rebuildLocalBundlesForSeller(stored);maybeScanBundles(stored);
                     }
-                    if(stored!=null){boolean huntHit=HuntDatabase.evaluateAndNotify(getApplicationContext(),ga,stored);if(huntHit&&marketStore!=null)marketStore.promoteLegacyListingForHunt(stored.signature);DealAlertNotifier.evaluateAndNotify(getApplicationContext(),stored);}
+                    if(stored!=null){boolean huntHit=HuntDatabase.evaluateAndNotify(getApplicationContext(),ga,stored);if((huntCandidate||huntHit)&&marketStore!=null)marketStore.promoteLegacyListingForHunt(stored.signature);DealAlertNotifier.evaluateAndNotify(getApplicationContext(),stored);}
                     // applyAnalysis already enqueues BGG/Vinted durable jobs. :radar only observes
                     // and produces work; the queue process owns network consumption and can batch BGG.
                     maybeResolveLink(card);
