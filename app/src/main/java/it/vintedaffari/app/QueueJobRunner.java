@@ -303,6 +303,7 @@ public final class QueueJobRunner {
         // Deep metadata is optional: once the core id/url is known it must never clog the user-visible
         // queue. Two deterministic misses are enough; keep the core listing and stop retrying.
         if(MarketStore.JOB_VINTED_DEEP.equals(job.type)&&isDeterministicMiss(reason)&&job.attempt>=2){
+            if(!market.isBggVariantPending(job.listingId)){market.completeJob(job);return;}
             String variantReason="Pagina Vinted non ha fornito abbastanza testo per confermare la variante BGG";
             if(market.hasExplicitUserPriorityHistory(job.listingId)){
                 if(market.flagPendingBggVariantReview(job.listingId,variantReason)&&candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.flagBggVariantReview(candidate.signature,variantReason);
