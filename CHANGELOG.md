@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.11 — BGG state monotonicity
+- Fixed a state-race exposed by Pixel Test 5: repeated/stale analysis could reset a game already moved to BGG review back to `BGG_MATCH_REQUIRED`, which permanently blocked historical revalidation behind the same three current titles.
+- Provisional re-analysis may now refresh only unresolved states. `BGG_MATCH_REVIEW` and `AUTO_QUARANTINED` are monotonic and cannot be silently reopened.
+- `markBggMatchReview()` now updates canonical game state and active linked listing state in one SQLite transaction.
+- Stale analysis results no longer mutate inactive listings; a listing tied to an already quarantined game is refiltered rather than resurrected.
+- `reconcileQueue()` repairs legacy game/listing drift for review and auto-quarantine states without deleting records.
+- Added `regression/bgg_state_monotonicity_v51211.py` and wired it into PR validation and Android beta CI.
+- No schema/data reset, no Vinted/BGG rate change, and no signing/applicationId/CI versionCode-strategy change.
+
 ## 5.12.10 — BGG fuzzy index performance
 - Fixed the remaining local BGG matcher full-scan path: queue fuzzy matching no longer reopens/decompresses/scans the ~31k-game gzip catalog once per query.
 - Added a queue-only in-memory fuzzy scorer over the catalog objects already retained by exact/id indexes, with a bounded top-16 heap and 32-query LRU cache.
