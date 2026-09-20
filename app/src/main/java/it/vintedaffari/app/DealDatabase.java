@@ -17,6 +17,9 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public static final class ObservationSession {
         public long startAt,endAt;
         public int observations,uniqueListings,pendingListings,analysisPendingListings,validListings,bggMatchedListings,vintedLinkedListings,completeListings,reviewListings;
+        /** Core Vinted identity work is the expensive remote part of a run. coreWorkListings is
+         * stable enough for the run target; corePendingListings drives the live ETA. */
+        public int coreWorkListings,corePendingListings;
         ObservationSession(long at){startAt=endAt=at;}
     }
     public static final class ObservationDay {
@@ -39,8 +42,14 @@ public final class DealDatabase extends SQLiteOpenHelper {
      * Vinted public pages are deliberately paced at roughly one request every 55 seconds, so larger
      * runs need a workload-aware estimate. Timing must never classify, hide or discard a listing. */
     public static final long ENGINE_RUN_TARGET_MIN_MS=10L*60_000L;
-    public static final long ENGINE_RUN_TARGET_BASE_MS=5L*60_000L;
+    /** One minute of local/setup allowance plus the measured public-page pacing for each core
+     * candidate. The ten-minute floor keeps small-run expectations stable without becoming a cutoff. */
+    public static final long ENGINE_RUN_TARGET_BASE_MS=60_000L;
     public static final long ENGINE_RUN_REMOTE_UNIT_MS=55_000L;
+    /** Fairness is deliberately separate from correctness. A run may yield this lane after one
+     * service slice only when another unfinished scroll is waiting; its listings remain intact. */
+    public static final long ENGINE_RUN_FAIRNESS_SLICE_MS=10L*60_000L;
+    public static final long ENGINE_RUN_LOCAL_ETA_MS=60_000L;
     /** Legacy alias kept for older regression/diagnostic callers; do not use as a fixed deadline. */
     public static final long ENGINE_RUN_SLA_MS=ENGINE_RUN_TARGET_MIN_MS;
     public static final long ENGINE_DUPLICATE_SIGHTING_MS=10L*60_000L;
@@ -65,9 +74,21 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
     public static long engineTargetMs(ObservationSession s){
         if(s==null)return ENGINE_RUN_TARGET_MIN_MS;
-        int eligible=Math.max(0,s.validListings);
-        long workload=ENGINE_RUN_TARGET_BASE_MS+(long)eligible*ENGINE_RUN_REMOTE_UNIT_MS;
+        int remote=Math.max(s.coreWorkListings,s.corePendingListings);
+        // Before durable jobs are materialised, valid listings are the conservative fallback.
+        if(remote<=0&&!engineContentSettled(s))remote=Math.max(0,s.validListings);
+        long workload=ENGINE_RUN_TARGET_BASE_MS+(long)remote*ENGINE_RUN_REMOTE_UNIT_MS;
         return Math.max(ENGINE_RUN_TARGET_MIN_MS,workload);
+    }
+    /** Live remaining-time estimate. Unlike engineTargetMs this intentionally shrinks as remote
+     * candidates settle. Local BGG/classifier work gets a small bounded allowance. */
+    public static long engineEtaMs(ObservationSession s){
+        if(s==null||engineContentSettled(s))return 0L;
+        long remote=(long)Math.max(0,s.corePendingListings)*ENGINE_RUN_REMOTE_UNIT_MS;
+        long local=s.analysisPendingListings>0?ENGINE_RUN_LOCAL_ETA_MS:0L;
+        int unresolved=Math.max(0,s.validListings-s.completeListings-s.reviewListings);
+        if(remote==0&&unresolved>0)local=Math.max(local,ENGINE_RUN_LOCAL_ETA_MS);
+        return remote+local;
     }
     /** Timing target only. This can drive ETA/diagnostics but never automatic correctness decisions. */
     public static boolean engineSlaExpired(ObservationSession s,long now){
@@ -237,33 +258,64 @@ public final class DealDatabase extends SQLiteOpenHelper {
         String pendingSql="SELECT COUNT(DISTINCT l.id) FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
                 "WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND l.enrichment_state='PENDING_ANALYSIS'";
         try(Cursor c=getReadableDatabase().rawQuery(pendingSql,new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst())s.analysisPendingListings=c.getInt(0);}
+        String coreSql="SELECT COUNT(DISTINCT l.id),COUNT(DISTINCT CASE WHEN j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') THEN l.id END) "+
+                "FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
+                "JOIN processing_jobs j ON j.listing_id=l.id AND j.job_type=? WHERE o.observed_at>=? AND o.observed_at<=?";
+        try(Cursor c=getReadableDatabase().rawQuery(coreSql,new String[]{MarketStore.JOB_VINTED,String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst()){s.coreWorkListings=c.getInt(0);s.corePendingListings=c.getInt(1);}}
         s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings)+s.analysisPendingListings;
     }
 
     public synchronized ObservationSession latestObservationSession(){List<ObservationSession> x=recentObservationSessions(System.currentTimeMillis()-7L*24L*60L*60_000L,1);return x.isEmpty()?null:x.get(0);}
 
-    /** Oldest unfinished run wins. This prevents a fresh scroll from replacing an older job that is
-     * still linking its valid listings. Completed runs never block a new one; manual-review rows are
-     * considered automatic work finished but remain persistently visible in the review inbox. */
+    private synchronized long engineRunCursorStart(){
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT value FROM queue_controls WHERE name='engine_run_cursor_start' LIMIT 1",null)){return c.moveToFirst()?Math.max(0L,c.getLong(0)):0L;}
+        catch(Throwable ignored){return 0L;}
+    }
+    public synchronized void invalidateActiveObservationSessionCache(){cachedActiveRun=null;cachedActiveRunAt=0L;}
+
+    /** Fair round-robin ownership. Without a cursor, the oldest unfinished run wins. When MarketStore
+     * yields a large run, the cursor points at exactly one next unfinished run; after that run settles
+     * the selection naturally wraps to the oldest unfinished work. No listing is reclassified here. */
     public synchronized ObservationSession activeObservationSession(){
         long now=System.currentTimeMillis();
         if(cachedActiveRunAt>0&&now-cachedActiveRunAt<ACTIVE_RUN_CACHE_MS)return cachedActiveRun;
-        List<ObservationSession> sessions=recentObservationSessions(now-7L*24L*60L*60_000L,80);ObservationSession active=null;
-        for(int i=sessions.size()-1;i>=0;i--){ObservationSession candidate=sessions.get(i);if(!engineAutomaticDone(candidate,now)){active=candidate;break;}}
+        List<ObservationSession> sessions=recentObservationSessions(now-7L*24L*60L*60_000L,80);ObservationSession oldest=null,cursorRun=null;
+        long cursorStart=engineRunCursorStart();
+        for(int i=sessions.size()-1;i>=0;i--){
+            ObservationSession candidate=sessions.get(i);if(engineAutomaticDone(candidate,now))continue;
+            if(oldest==null)oldest=candidate;
+            if(cursorStart>0&&candidate.startAt==cursorStart)cursorRun=candidate;
+        }
+        ObservationSession active=cursorRun!=null?cursorRun:oldest;
         cachedActiveRun=active;cachedActiveRunAt=now;return active;
     }
 
-    public synchronized int waitingObservationSessionCount(){
-        ObservationSession active=activeObservationSession();if(active==null)return 0;
-        int sessions=0;long previous=-1L;
-        try(Cursor c=getReadableDatabase().rawQuery("SELECT observed_at FROM observations WHERE observed_at>? ORDER BY observed_at ASC",new String[]{String.valueOf(active.endAt)})){
-            while(c.moveToNext()){long at=c.getLong(0);if(previous<0||at-previous>=ENGINE_SESSION_GAP_MS)sessions++;previous=at;}
+    /** Next unfinished run in chronological round-robin order, wrapping after the newest run. */
+    public synchronized ObservationSession nextUnfinishedObservationSessionAfter(long currentStart,long now){
+        List<ObservationSession> sessions=recentObservationSessions(now-7L*24L*60L*60_000L,80);ObservationSession next=null,wrap=null;
+        for(ObservationSession candidate:sessions){
+            if(candidate.startAt==currentStart||engineAutomaticDone(candidate,now))continue;
+            if(wrap==null||candidate.startAt<wrap.startAt)wrap=candidate;
+            if(candidate.startAt>currentStart&&(next==null||candidate.startAt<next.startAt))next=candidate;
         }
-        return sessions;
+        return next!=null?next:wrap;
+    }
+
+    public synchronized int waitingObservationSessionCount(){
+        long now=System.currentTimeMillis();ObservationSession active=activeObservationSession();if(active==null)return 0;int count=0;
+        for(ObservationSession candidate:recentObservationSessions(now-7L*24L*60L*60_000L,80))
+            if(candidate.startAt!=active.startAt&&!engineAutomaticDone(candidate,now))count++;
+        return count;
     }
 
     public synchronized boolean isObservationSessionWaiting(ObservationSession session){
-        if(session==null)return false;ObservationSession active=activeObservationSession();return active!=null&&session.startAt>active.startAt;
+        if(session==null)return false;long now=System.currentTimeMillis();ObservationSession active=activeObservationSession();
+        return active!=null&&session.startAt!=active.startAt&&!engineAutomaticDone(session,now);
+    }
+
+    public synchronized boolean isObservationSessionDeferred(ObservationSession session){
+        if(session==null)return false;long now=System.currentTimeMillis();ObservationSession active=activeObservationSession();
+        return active!=null&&session.startAt<active.startAt&&!engineAutomaticDone(session,now);
     }
 
     public synchronized List<ObservationSession> observationSessionsBetween(long startAt,long endAt,int limit){
