@@ -9,7 +9,7 @@ apply_start = market.index("public void applyAnalysis")
 apply_end = market.index("private static boolean shouldAutoResolveVinted", apply_start)
 apply_block = market[apply_start:apply_end]
 
-review_start = market.index("public void markBggMatchReview")
+review_start = market.index("markBggMatchReview(long gameId")
 review_end = market.index("public int bggMatchReviewCount", review_start)
 review_block = market[review_start:review_end]
 

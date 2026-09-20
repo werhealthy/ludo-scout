@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.11-bgg-state-monotonicity`
-- versionCode: `125`
+- Baseline version: `5.12.12-bgg-review-write-accountability`
+- versionCode: `126`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,15 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.12 BGG review-write accountability
+- Pixel Test 6 still showed `handled=3`, `review=3`, but `bggMatchRequired=3` and `bggMatchReview=15` unchanged. Fuzzy matching itself was fast (63 ms), so the remaining uncertainty is the persistence transition itself.
+- `markBggMatchReview()` now reads the canonical game row inside the same SQLite write transaction, refuses to overwrite a concurrently authoritative BGG identity, updates by exact game id, and returns the actual canonical-row write count.
+- Queue matcher diagnostics now separate `reviewDecisions`, successful `reviewWrites`, and `reviewWriteMisses`, then re-read and report `remainingRequired` after the batch.
+- A dedicated `bggReviewWrite={...}` diagnostic records game id, before/after state, current BGG id, visibility, changed game/listing row counts and reason. This turns the remaining Pixel test from inference into direct evidence.
+- Linked active listings still transition to `BGG_MATCH_REVIEW`/`NEEDS_REVIEW` in the same transaction as the canonical game row.
+- Regression: `regression/bgg_review_write_accountability_v51212.py`; PR and beta CI run it.
+- No data reset/schema/network-rate/signing/applicationId/versionCode-strategy changes.
 
 ## 5.12.11 BGG state monotonicity
 - Pixel Test 5 proved the fuzzy performance fix: 3 current fuzzy matches completed in 122 ms. However, all 3 were reported as moved to review while `bggMatchRequired` stayed at 3 and the historical audit remained blocked at 73 pending.

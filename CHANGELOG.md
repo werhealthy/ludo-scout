@@ -7,6 +7,14 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.12 — BGG review-write accountability
+- Added transactional, directly observable accounting for the three provisional BGG rows that still appeared stuck after the state-monotonicity fix.
+- `markBggMatchReview()` now validates the current row inside its write transaction, protects a concurrent authoritative match, returns the actual write count, and keeps linked listing review state in the same transaction.
+- `bggLocalMatch` now distinguishes review decisions from successful writes and reports remaining required identities after each batch.
+- Added `bggReviewWrite` diagnostics with before/after state, BGG id, visibility and changed-row counts.
+- Added `regression/bgg_review_write_accountability_v51212.py` and wired it into PR and beta CI.
+- No schema/data reset, request-rate, signing, applicationId or CI versionCode-strategy changes.
+
 ## 5.12.11 — BGG state monotonicity
 - Fixed a state-race exposed by Pixel Test 5: repeated/stale analysis could reset a game already moved to BGG review back to `BGG_MATCH_REQUIRED`, which permanently blocked historical revalidation behind the same three current titles.
 - Provisional re-analysis may now refresh only unresolved states. `BGG_MATCH_REVIEW` and `AUTO_QUARANTINED` are monotonic and cannot be silently reopened, even by a late `status=matched` analysis result.
