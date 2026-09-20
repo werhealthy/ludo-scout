@@ -1273,6 +1273,15 @@ public final class MarketStore {
             ContentValues noBgg=new ContentValues();noBgg.put("state",COMPLETE);noBgg.put("next_attempt_at",0);noBgg.put("updated_at",now);noBgg.put("progress",100);noBgg.put("last_error","BGG match necessario; enrichment rinviato");noBgg.put("processing_started_at",0);
             changed+=db.update("processing_jobs",noBgg,"job_type=? AND state IN (?,?,?) AND (game_id IS NULL OR game_id NOT IN (SELECT id FROM games WHERE bgg_id IS NOT NULL AND bgg_id<>''))",new String[]{JOB_BGG,PENDING,FAILED_RETRYABLE,PROCESSING});
 
+            // Repair cross-table state drift caused by older async analyses. Game identity state is
+            // authoritative: review stays review, and automatic quarantine stays filtered.
+            ContentValues reviewListing=new ContentValues();reviewListing.put("match_state","BGG_MATCH_REVIEW");
+            changed+=db.update("market_listings",reviewListing,
+                    "lifecycle='ACTIVE' AND match_state<>'BGG_MATCH_REVIEW' AND game_id IN (SELECT id FROM games WHERE match_state='BGG_MATCH_REVIEW' AND (bgg_id IS NULL OR bgg_id=''))",null);
+            ContentValues quarantinedListing=new ContentValues();quarantinedListing.put("lifecycle","AUTO_FILTERED");quarantinedListing.put("enrichment_state","AUTO_FILTERED");quarantinedListing.put("match_state","AUTO_FILTERED_NON_GAME");
+            changed+=db.update("market_listings",quarantinedListing,
+                    "lifecycle='ACTIVE' AND game_id IN (SELECT id FROM games WHERE match_state='AUTO_QUARANTINED')",null);
+
             ContentValues archive=new ContentValues();archive.put("lifecycle","UNKNOWN");archive.put("enrichment_state","HISTORICAL_PARTIAL");
             changed+=db.update("market_listings",archive,
                     "lifecycle='ACTIVE' AND id IN (SELECT listing_id FROM processing_jobs WHERE source=? AND job_type=? AND listing_id IS NOT NULL) AND (vinted_item_id IS NULL OR vinted_item_id='') AND (vinted_url IS NULL OR vinted_url='')",
