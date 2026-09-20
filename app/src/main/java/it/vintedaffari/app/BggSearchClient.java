@@ -4,12 +4,13 @@ public final class BggSearchClient {
  public static final class Edition{public String id,name,imageUrl,publisher,languages;public Integer year;public String label(){return (name==null?"Edizione":name)+(year==null?"":" · "+year)+(TextUtils.isEmpty(publisher)?"":" · "+publisher)+(TextUtils.isEmpty(languages)?"":" · "+languages);}}
  public static final class Game {public String id,name,imageUrl,type,categories,editionName,editionId;public Integer year,playtime,minPlayers,maxPlayers,rank,voters,qualityScore,marketUsedMedianCents,marketUsedMinCents,marketUsedCount;public Double rating,geekRating,weight;public boolean local;public String notice;public int searchScore;public final List<String> aliases=new ArrayList<>();public final List<Edition> editions=new ArrayList<>();@Override public String toString(){return name+(year==null?"":" ("+year+")")+("boardgameexpansion".equals(type)?" · Espansione":"");}}
  public interface Callback{void ok(List<Game> games);void error(String e);}
- private final ExecutorService exec=Executors.newSingleThreadExecutor();private final ExecutorService directExec=Executors.newSingleThreadExecutor();private final Context context;private volatile Map<String,Integer> localPriceRefs,localNewPriceRefs;private volatile Map<String,List<Game>> localExactIndex;private volatile Map<String,Game> localByIdIndex;private volatile List<Game> localCatalogIndex;
+ private final ExecutorService exec=Executors.newSingleThreadExecutor();private final ExecutorService directExec=Executors.newSingleThreadExecutor();private final Context context;private volatile Map<String,Integer> localPriceRefs,localNewPriceRefs;private volatile Map<String,Game> localByIdIndex;private volatile List<Game> localCatalogIndex;private volatile long localCatalogLoadMs;private volatile int localExactScans,localExactCacheHits;
  private final Map<String,List<Game>> fastCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(32,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>24;}});
  private final Map<String,List<Game>> queueFuzzyCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(40,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>32;}});
+ private final Map<String,List<Game>> queueExactCache=Collections.synchronizedMap(new LinkedHashMap<String,List<Game>>(72,.75f,true){@Override protected boolean removeEldestEntry(Map.Entry<String,List<Game>> eldest){return size()>64;}});
  public BggSearchClient(Context c){context=c.getApplicationContext();}
  public void warmup(){exec.execute(()->{try{priceRefs();}catch(Exception ignored){}});}
- public void shutdown(){fastCache.clear();queueFuzzyCache.clear();localExactIndex=null;localByIdIndex=null;localCatalogIndex=null;exec.shutdownNow();directExec.shutdownNow();}
+ public void shutdown(){fastCache.clear();queueFuzzyCache.clear();queueExactCache.clear();localByIdIndex=null;localCatalogIndex=null;exec.shutdownNow();directExec.shutdownNow();}
  public boolean configured(){return !TextUtils.isEmpty(BuildConfig.BGG_TOKEN)&&!"PASTE_YOUR_BGG_TOKEN_HERE".equals(BuildConfig.BGG_TOKEN);}
 
  // These compact indexes are fixed application resources, not dynamic assets. Keeping them in
@@ -46,7 +47,7 @@ public final class BggSearchClient {
   String key=normalize(query);if(key.isEmpty())return Collections.emptyList();
   List<Game> cached=queueFuzzyCache.get(key);if(cached!=null)return copySearchResults(cached);
   try{
-   exactIndex();List<Game> catalog=localCatalogIndex;if(catalog==null||catalog.isEmpty())return Collections.emptyList();
+   ensureCatalogIndex();List<Game> catalog=localCatalogIndex;if(catalog==null||catalog.isEmpty())return Collections.emptyList();
    BggManualSearchRanking.Query rankedQuery=BggManualSearchRanking.prepare(query);
    PriorityQueue<RankedLocal> top=new PriorityQueue<>(16,(a,b)->{int c=Integer.compare(a.score,b.score);if(c!=0)return c;return Integer.compare(rankValue(b.game),rankValue(a.game));});
    for(Game g:catalog){
@@ -61,35 +62,48 @@ public final class BggSearchClient {
    queueFuzzyCache.put(key,copySearchResults(out));return out;
   }catch(Exception e){return Collections.emptyList();}
  }
- /** Exact/alias lookup for the background identity matcher. The compact 1.7 MB TSV is indexed only
-  * in the queue process, never in the UI/WebView process. */
- public List<Game> localExactCandidates(String query){String key=normalize(query);if(key.isEmpty())return Collections.emptyList();try{List<Game> hit=exactIndex().get(key);return hit==null?Collections.emptyList():new ArrayList<>(hit);}catch(Exception e){return Collections.emptyList();}}
- /** Builds the queue-process exact-name and id indexes in one pass over the compressed 31k-game
-  * catalog. Historical revalidation previously reopened and rescanned the full gzip file once per
-  * game via localById(), turning a zero-network audit into O(N_games * N_catalog) CPU/I/O work. */
- private Map<String,List<Game>> exactIndex()throws Exception{
-  Map<String,List<Game>> ready=localExactIndex;if(ready!=null&&localByIdIndex!=null&&localCatalogIndex!=null)return ready;
-  synchronized(this){
-   if(localExactIndex!=null&&localByIdIndex!=null&&localCatalogIndex!=null)return localExactIndex;
-   Map<String,List<Game>> exact=new HashMap<>();Map<String,Game> byId=new HashMap<>(40000);ArrayList<Game> catalog=new ArrayList<>(32000);
-   try(BufferedReader reader=new BufferedReader(new InputStreamReader(new java.util.zip.GZIPInputStream(openSearchIndex()),java.nio.charset.StandardCharsets.UTF_8),64*1024)){
-    String line;while((line=reader.readLine())!=null){String[] c=line.split("\t",-1);if(c.length<8)continue;Game g=fromIndex(c);if(TextUtils.isEmpty(g.id)||TextUtils.isEmpty(g.name))continue;byId.put(g.id,g);catalog.add(g);addExact(exact,normalize(g.name),g);if(!c[7].isEmpty())for(String alias:c[7].split("\u001f"))addExact(exact,normalize(alias),g);}
+ /** Exact/alias lookup for the long-lived background matcher. Exact results are cached
+  * lazily instead of retaining a global alias->games HashMap. This keeps cold-start CPU/heap bounded
+  * while preserving one catalog parse and O(1) id lookup. */
+ public List<Game> localExactCandidates(String query){
+  String key=normalize(query);if(key.isEmpty())return Collections.emptyList();
+  List<Game> cached=queueExactCache.get(key);if(cached!=null){localExactCacheHits++;return copySearchResults(cached);}
+  try{
+   ensureCatalogIndex();List<Game> catalog=localCatalogIndex;if(catalog==null)return Collections.emptyList();
+   ArrayList<Game> hit=new ArrayList<>();localExactScans++;
+   for(Game g:catalog){
+    boolean match=key.equals(normalize(g.name));
+    if(!match)for(String alias:g.aliases)if(key.equals(normalize(alias))){match=true;break;}
+    if(match)hit.add(copySearchGame(g));
    }
-   localCatalogIndex=Collections.unmodifiableList(catalog);localByIdIndex=Collections.unmodifiableMap(byId);localExactIndex=exact;return exact;
+   queueExactCache.put(key,copySearchResults(hit));return hit;
+  }catch(Exception e){return Collections.emptyList();}
+ }
+ /** Builds only the shared queue-process catalog and BGG-id index in one gzip pass. Exact alias
+  * lookup is lazy/cached, avoiding the large all-alias HashMap that dominated cold starts. */
+ private void ensureCatalogIndex()throws Exception{
+  if(localByIdIndex!=null&&localCatalogIndex!=null)return;
+  synchronized(this){
+   if(localByIdIndex!=null&&localCatalogIndex!=null)return;
+   long started=android.os.SystemClock.elapsedRealtime();Map<String,Game> byId=new HashMap<>(40000);ArrayList<Game> catalog=new ArrayList<>(32000);
+   try(BufferedReader reader=new BufferedReader(new InputStreamReader(new java.util.zip.GZIPInputStream(openSearchIndex()),java.nio.charset.StandardCharsets.UTF_8),64*1024)){
+    String line;while((line=reader.readLine())!=null){String[] c=line.split("\t",-1);if(c.length<8)continue;Game g=fromIndex(c);if(TextUtils.isEmpty(g.id)||TextUtils.isEmpty(g.name))continue;byId.put(g.id,g);catalog.add(g);}
+   }
+   localCatalogIndex=Collections.unmodifiableList(catalog);localByIdIndex=Collections.unmodifiableMap(byId);localCatalogLoadMs=android.os.SystemClock.elapsedRealtime()-started;
   }
  }
+ public String localIndexSummary(){List<Game> c=localCatalogIndex;return "build=bgg-local-index-v3;loaded="+(c!=null)+";games="+(c==null?0:c.size())+";loadMs="+localCatalogLoadMs+";exactScans="+localExactScans+";exactCacheHits="+localExactCacheHits+";exactCacheSize="+queueExactCache.size()+";fuzzyCacheSize="+queueFuzzyCache.size();}
  private static final class RankedLocal{final Game game;final int score;RankedLocal(Game game,int score){this.game=game;this.score=score;}}
  private static int rankValue(Game g){return g==null||g.rank==null||g.rank<=0?Integer.MAX_VALUE:g.rank;}
  private static int compareRankedBestFirst(RankedLocal a,RankedLocal b){int c=Integer.compare(b.score,a.score);if(c!=0)return c;return Integer.compare(rankValue(a.game),rankValue(b.game));}
  private static Game copySearchGame(Game x){Game g=new Game();if(x==null)return g;g.id=x.id;g.name=x.name;g.imageUrl=x.imageUrl;g.type=x.type;g.categories=x.categories;g.editionName=x.editionName;g.editionId=x.editionId;g.year=x.year;g.playtime=x.playtime;g.minPlayers=x.minPlayers;g.maxPlayers=x.maxPlayers;g.rank=x.rank;g.voters=x.voters;g.qualityScore=x.qualityScore;g.marketUsedMedianCents=x.marketUsedMedianCents;g.marketUsedMinCents=x.marketUsedMinCents;g.marketUsedCount=x.marketUsedCount;g.rating=x.rating;g.geekRating=x.geekRating;g.weight=x.weight;g.local=x.local;g.notice=x.notice;g.searchScore=x.searchScore;g.aliases.addAll(x.aliases);g.editions.addAll(x.editions);return g;}
  private static List<Game> copySearchResults(List<Game> src){ArrayList<Game> out=new ArrayList<>(src==null?0:src.size());if(src!=null)for(Game g:src)out.add(copySearchGame(g));return out;}
- private static void addExact(Map<String,List<Game>> map,String key,Game g){if(TextUtils.isEmpty(key)||g==null)return;List<Game> list=map.get(key);if(list==null){list=new ArrayList<>();map.put(key,list);}for(Game x:list)if(g.id.equals(x.id))return;list.add(g);}
  private static String normalize(String s){return java.text.Normalizer.normalize(s==null?"":s,java.text.Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim().replaceAll("\\s+"," ");}
  private static Game fromIndex(String[] c){Game g=new Game();g.local=true;g.id=c[0];g.name=c[1];g.year=parseInt(c[2]);g.rank=parseInt(c[3]);g.voters=parseInt(c[4]);g.rating=parseDouble(c[5]);g.geekRating=parseDouble(c[6]);g.qualityScore=QualityComposite.score(g.rank,g.geekRating,g.rating,g.voters);g.type="boardgame";if(c.length>7&&!c[7].isEmpty())for(String alias:c[7].split("\u001f"))if(!TextUtils.isEmpty(alias)&&!g.aliases.contains(alias))g.aliases.add(alias);return g;}
  private static Integer parseInt(String s){try{return TextUtils.isEmpty(s)?null:Integer.valueOf(s);}catch(Exception e){return null;}}
  private static Double parseDouble(String s){try{return TextUtils.isEmpty(s)?null:Double.valueOf(s);}catch(Exception e){return null;}}
 
- public Game localById(String bggId){if(TextUtils.isEmpty(bggId))return null;try{Map<String,Game> byId=localByIdIndex;if(byId==null){exactIndex();byId=localByIdIndex;}return byId==null?null:byId.get(bggId);}catch(Exception ignored){return null;}}
+ public Game localById(String bggId){if(TextUtils.isEmpty(bggId))return null;try{Map<String,Game> byId=localByIdIndex;if(byId==null){ensureCatalogIndex();byId=localByIdIndex;}return byId==null?null:byId.get(bggId);}catch(Exception ignored){return null;}}
  public Integer localMarketReferenceCents(String bggId){if(TextUtils.isEmpty(bggId))return null;try{return priceRefs().get(bggId);}catch(Exception ignored){return null;}}
  public Integer localNewMarketCents(String bggId){if(TextUtils.isEmpty(bggId))return null;try{return newPriceRefs().get(bggId);}catch(Exception ignored){return null;}}
  private Map<String,Integer> priceRefs()throws Exception{Map<String,Integer> ready=localPriceRefs;if(ready!=null)return ready;Map<String,Integer> map=new HashMap<>();try(BufferedReader reader=new BufferedReader(new InputStreamReader(new java.util.zip.GZIPInputStream(openPriceIndex()),java.nio.charset.StandardCharsets.UTF_8),32*1024)){String line;while((line=reader.readLine())!=null){String[] c=line.split("\t",-1);if(c.length<2)continue;try{int low=Integer.parseInt(c[1]);if(low>0)map.put(c[0],low);}catch(Exception ignored){}}}localPriceRefs=Collections.unmodifiableMap(map);return localPriceRefs;}
