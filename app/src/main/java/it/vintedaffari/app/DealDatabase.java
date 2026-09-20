@@ -266,6 +266,17 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
                 "JOIN processing_jobs j ON j.listing_id=l.id AND j.job_type=? WHERE o.observed_at>=? AND o.observed_at<=?";
         try(Cursor c=getReadableDatabase().rawQuery(coreSql,new String[]{MarketStore.JOB_VINTED,String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst()){s.coreWorkListings=c.getInt(0);s.corePendingListings=c.getInt(1);}}
+        // Durable jobs are deliberately materialised in small batches. ETA must still count an
+        // eligible exact-BGG listing that needs its exact Vinted identity while it is DEFERRED_LINK,
+        // otherwise the UI claims "local work" or one minute even though public-page work remains.
+        String missingCoreSql="SELECT COUNT(DISTINCT l.id) FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
+                "JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature "+
+                "WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND l.enrichment_state NOT IN ('AUTO_EXCLUDED','AUTO_FILTERED','NEEDS_REVIEW') "+
+                "AND g.database_visible=1 AND g.rating>=6.0 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
+                "AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='') "+
+                "AND COALESCE(l.manual_review_required,0)=0 AND l.match_state<>'BGG_VARIANT_REVIEW' "+
+                "AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')";
+        try(Cursor c=getReadableDatabase().rawQuery(missingCoreSql,new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst())s.corePendingListings=Math.max(s.corePendingListings,c.getInt(0));}
         s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings-s.heldListings)+s.analysisPendingListings;
     }
 
@@ -393,6 +404,25 @@ public final class DealDatabase extends SQLiteOpenHelper {
 
     public synchronized void resolveListing(String title,int price,String url,Integer shipping,long now){ContentValues v=new ContentValues();if(url!=null&&!url.trim().isEmpty())v.put("vinted_url",url.trim());v.put("resolved_at",now);if(shipping!=null){v.put("shipping_verified_cents",shipping);v.put("shipping_cents",shipping);}getWritableDatabase().update("deals",v,"LOWER(vinted_title)=LOWER(?) AND item_price_cents=?",new String[]{title==null?"":title,String.valueOf(price)});}
     public synchronized void updateProductContext(String title,int price,Integer shipping,String published,long now){ContentValues v=new ContentValues();v.put("resolved_at",now);if(published!=null&&!published.trim().isEmpty())v.put("published_label",published.trim());if(shipping!=null){v.put("shipping_verified_cents",shipping);v.put("shipping_cents",shipping);}getWritableDatabase().update("deals",v,"LOWER(vinted_title)=LOWER(?) AND item_price_cents=?",new String[]{title==null?"":title,String.valueOf(price)});}
+
+    /** Product-page context when Ludo itself opened an exact Catalog row. This avoids relying on
+     * title/price text that can disappear or change on sold listings. */
+    public synchronized void updateProductContextForSignature(String signature,Integer shipping,String published,long now){
+        if(signature==null||signature.isEmpty())return;ContentValues v=new ContentValues();v.put("resolved_at",now);
+        if(published!=null&&!published.trim().isEmpty())v.put("published_label",published.trim());
+        if(shipping!=null){v.put("shipping_verified_cents",shipping);v.put("shipping_cents",shipping);}
+        getWritableDatabase().update("deals",v,"signature=?",new String[]{signature});
+    }
+
+    /** One old linked Catalog row at a time. Successful checks refresh resolved_at; failed checks
+     * are separately paced through queue_controls so an unreadable page cannot monopolize upkeep. */
+    public synchronized DealRecord nextCatalogHealthCandidate(long successCutoff,long attemptCutoff){
+        String sql="SELECT "+COLS+" FROM deals WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' "+
+                "AND (resolved_at IS NULL OR resolved_at<?) "+
+                "AND COALESCE((SELECT q.updated_at FROM queue_controls q WHERE q.name='catalog_health:'||deals.signature),0)<? "+
+                "ORDER BY COALESCE(resolved_at,0) ASC,last_seen ASC LIMIT 1";
+        try(Cursor cur=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(successCutoff),String.valueOf(attemptCutoff)})){return cur.moveToFirst()?readDeal(cur):null;}
+    }
     /** Update the display/current price from an exact Vinted item page without rewriting the
      * historical observations that originally created this deal. Derived deal fields are recomputed
      * when possible; stale buyer-protection/total values are cleared after a price change. */
