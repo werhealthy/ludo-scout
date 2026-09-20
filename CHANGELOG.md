@@ -7,6 +7,16 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.16 — Motore epoch, progress semantics, queue startup stability
+- Added a non-destructive Motore operational epoch so old timeline/review debt no longer appears as current work; observations, prices and authoritative matched data remain stored.
+- Old automatic queue jobs are completed at cut-over while explicit Hunt work is preserved. Legacy review flags and unresolved provisional BGG review rows are archived from the active workflow.
+- Fresh sightings can revive an archived provisional BGG title and re-evaluate it with current logic.
+- Fixed stuck jobs caused by counting BLOCKED_CLASSIFIER observations as analysis still pending.
+- Reworked Motore around job progress instead of games found; ambiguous cases are optional and non-blocking.
+- Hardened QueueKeepAliveService startup against crash loops and extended crash diagnostics with startup phase plus root cause.
+- Added engineEpoch diagnostics and regression/engine_epoch_progress_stability_v51216.py.
+- No raw observation deletion, network-rate change, signing/applicationId change, or CI versionCode-strategy change.
+
 ## 5.12.15 — Crash diagnostics + executable SQLite integration
 - Added application-wide crash journaling so UI, radar and queue/default processes are all covered instead of only MainActivity.
 - Added Android system exit-history diagnostics on API 30+ to identify actual process deaths as CRASH, ANR, memory-related or other exit reasons.
