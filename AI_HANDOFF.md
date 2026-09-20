@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.5-bgg-identity-provenance`
-- versionCode: `119`
+- Baseline version: `5.12.6-historical-bgg-revalidation`
+- versionCode: `120`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -72,6 +72,18 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Existing `MATCHED` identities are intentionally not rewritten or deleted by this task. Diagnostics now expose `bggIdentityTrust={... matchedToRevalidate=...}` so the next correctness task can target historical revalidation without an indiscriminate reset.
 - Static regression guard: `regression/bgg_identity_provenance_v5125.py`; Android beta CI runs it before the Android build.
 - No database/schema migration, no signing/applicationId/versionCode-strategy change, and no request-rate change.
+
+## 5.12.6 Historical BGG revalidation
+- Pixel Test 1 on 5.12.5 measured 2,247 seller aliases, 1,886 seller-only aliases and 143 pre-v4 `MATCHED` games eligible for audit. This justified controlled revalidation rather than a blanket data reset.
+- `BggHistoricalRevalidator` is a zero-network, one-shot-per-game audit for old automatic matches. Explicit `MANUAL_BGG` and legacy `USER_CONFIRMED` identities are excluded.
+- Historical identity is preserved. A listing is independently verified only when its seller title, after conservative marketplace cleanup, resolves exactly and uniquely to the stored BGG id in the bundled local BGG index.
+- Non-game/accessory/component/empty-box/bundle cases, conflicting exact BGG identities, ambiguous aliases and merely fuzzy/plausible titles become persistent listing review. No row or BGG id is deleted or silently reassigned.
+- Review also marks any legacy deal `MATCH_UNCERTAIN`, preventing an unverified historical identity from remaining in the ready/deal path.
+- Progress is persisted in `queue_controls` with `bgg_revalidation_v1:<gameId>` markers. This makes the pass one-shot and restart-safe; it cannot repeat automatically for the same game.
+- The BGG foreground lane advances only 2 historical games per loop; WorkManager recovery advances 4, preserving current-run responsiveness. No network calls are made by the audit.
+- Diagnostics expose `bggHistoricalRevalidation={processed, verifiedGames, reviewGames, pending}`; `bggIdentityTrust.matchedToRevalidate` now counts only unprocessed eligible games.
+- Static regression guard: `regression/historical_bgg_revalidation_v5126.py`.
+- No schema migration, no data deletion/reset, no signing/applicationId/versionCode-strategy change, and no Vinted request-rate change.
 
 ## Known UX direction
 The next major phase is a full Motore redesign. Avoid treating all information as equal cards.
