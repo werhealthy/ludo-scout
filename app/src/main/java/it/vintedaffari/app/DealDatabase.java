@@ -34,7 +34,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         public boolean bggReady,vintedReady,complete,review;
     }
 
-    public static final long ENGINE_SESSION_GAP_MS=3L*60_000L;
+    public static final long ENGINE_SESSION_GAP_MS=3L*60_000L;private static final long ACTIVE_RUN_CACHE_MS=1_500L;private ObservationSession cachedActiveRun=null;private long cachedActiveRunAt=0L;
 
     /** A run owns the automatic pipeline until all valid rows are either ready or explicitly
      * waiting for human review. Newer scrolls may already be captured/classified locally, but they
@@ -81,7 +81,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
     private static void safeAlter(SQLiteDatabase db,String sql){try{db.execSQL(sql);}catch(Exception ignored){}}
 
-    public synchronized void recordSighting(VintedCard card,ListingClassifier.Result listing,long now){if(card==null)return;ContentValues v=new ContentValues();v.put("signature",signature(card));v.put("observed_at",now);v.put("vinted_title",card.title);v.put("brand",card.brand);v.put("item_condition",card.condition);v.put("item_price_cents",cents(card.itemPrice));put(v,"protected_price_cents",card.protectedPrice==null?null:cents(card.protectedPrice));put(v,"favorites",card.favorites);v.put("analysis_status","pending");if(listing!=null){v.put("listing_type",listing.type.name());v.put("verification_state",listing.allowPriceModel?"PENDING_ANALYSIS":"BLOCKED_CLASSIFIER");v.put("verification_reason",listing.reason);}getWritableDatabase().insert("observations",null,v);}
+    public synchronized void recordSighting(VintedCard card,ListingClassifier.Result listing,long now){if(card==null)return;cachedActiveRunAt=0L;ContentValues v=new ContentValues();v.put("signature",signature(card));v.put("observed_at",now);v.put("vinted_title",card.title);v.put("brand",card.brand);v.put("item_condition",card.condition);v.put("item_price_cents",cents(card.itemPrice));put(v,"protected_price_cents",card.protectedPrice==null?null:cents(card.protectedPrice));put(v,"favorites",card.favorites);v.put("analysis_status","pending");if(listing!=null){v.put("listing_type",listing.type.name());v.put("verification_state",listing.allowPriceModel?"PENDING_ANALYSIS":"BLOCKED_CLASSIFIER");v.put("verification_reason",listing.reason);}getWritableDatabase().insert("observations",null,v);}
     public synchronized void recordBlocked(VintedCard c,ListingClassifier.Result l,long n){recordSighting(c,l,n);}
     public synchronized void record(VintedCard card,GameAnalysis a,ListingClassifier.Result listing,long now){if(card==null||a==null)return;String sig=signature(card);boolean anomaly=ListingClassifier.isExtremePriceAnomaly(a);String verify=anomaly?"PRICE_ANOMALY":(!"matched".equals(a.status)?"MATCH_UNCERTAIN":"OK");String reason=anomaly?"Prezzo totale anomalo: verifica espansione/accessorio/annuncio incompleto.":null;if(listing!=null&&listing.type==ListingClassifier.Type.EXPANSION&&"OK".equals(verify)){verify="EXPANSION_CHECK";reason="Espansione: verifica benchmark della stessa edizione.";}SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{ContentValues obs=commonValues(card,a,listing,verify,reason);int changed=db.update("observations",obs,"id=(SELECT id FROM observations WHERE signature=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS' ORDER BY observed_at DESC LIMIT 1)",new String[]{sig});if(changed==0){obs.put("signature",sig);obs.put("observed_at",now);db.insert("observations",null,obs);}boolean feed=isFeedDeal(a)&&"OK".equals(verify),review="PRICE_ANOMALY".equals(verify)||"EXPANSION_CHECK".equals(verify);if(feed||review)upsertDeal(db,sig,card,a,listing,verify,reason,now,review?"verify":a.tier);db.setTransactionSuccessful();}finally{db.endTransaction();}}
     public synchronized DealRecord recordSellerItem(SellerBundleScanner.SellerItem item,String seller,VintedCard card,GameAnalysis analysis){
@@ -160,15 +160,20 @@ public final class DealDatabase extends SQLiteOpenHelper {
      * still linking its valid listings. Completed runs never block a new one; manual-review rows are
      * considered automatic work finished but remain persistently visible in the review inbox. */
     public synchronized ObservationSession activeObservationSession(){
-        long now=System.currentTimeMillis();List<ObservationSession> sessions=recentObservationSessions(now-7L*24L*60L*60_000L,80);
-        for(int i=sessions.size()-1;i>=0;i--){ObservationSession s=sessions.get(i);if(!engineAutomaticDone(s,now))return s;}
-        return null;
+        long now=System.currentTimeMillis();
+        if(cachedActiveRunAt>0&&now-cachedActiveRunAt<ACTIVE_RUN_CACHE_MS)return cachedActiveRun;
+        List<ObservationSession> sessions=recentObservationSessions(now-7L*24L*60L*60_000L,80);ObservationSession active=null;
+        for(int i=sessions.size()-1;i>=0;i--){ObservationSession candidate=sessions.get(i);if(!engineAutomaticDone(candidate,now)){active=candidate;break;}}
+        cachedActiveRun=active;cachedActiveRunAt=now;return active;
     }
 
     public synchronized int waitingObservationSessionCount(){
-        long now=System.currentTimeMillis();List<ObservationSession> sessions=recentObservationSessions(now-7L*24L*60L*60_000L,80);ObservationSession active=null;
-        for(int i=sessions.size()-1;i>=0;i--){ObservationSession s=sessions.get(i);if(!engineAutomaticDone(s,now)){active=s;break;}}
-        if(active==null)return 0;int n=0;for(ObservationSession s:sessions)if(s.startAt>active.startAt)n++;return n;
+        ObservationSession active=activeObservationSession();if(active==null)return 0;
+        int sessions=0;long previous=-1L;
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT observed_at FROM observations WHERE observed_at>? ORDER BY observed_at ASC",new String[]{String.valueOf(active.endAt)})){
+            while(c.moveToNext()){long at=c.getLong(0);if(previous<0||at-previous>=ENGINE_SESSION_GAP_MS)sessions++;previous=at;}
+        }
+        return sessions;
     }
 
     public synchronized boolean isObservationSessionWaiting(ObservationSession session){

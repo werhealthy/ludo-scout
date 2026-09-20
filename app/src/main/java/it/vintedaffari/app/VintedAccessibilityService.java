@@ -79,7 +79,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private BundleDatabase bundleDatabase;
     private SellerBundleScanner bundleScanner;
     private boolean scanScheduled = false;
-    private volatile long lastVintedEventAt=0L;
+    private volatile long lastVintedEventAt=0L;private long pendingVintedEventDiag=0L,lastVintedEventDiagFlushAt=0L;
     private boolean retryRegistered = false;
     private volatile boolean manualMetadataRefresh=false;
     private volatile String manualRefreshTargetSignature=null;
@@ -228,14 +228,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
         CharSequence pkg = event.getPackageName();
         if (pkg == null || !VINTED_PACKAGE.contentEquals(pkg)) return;
 
-        SharedPreferences p = diag();
-        p.edit()
-                .putLong("vintedEvents", p.getLong("vintedEvents", 0) + 1)
-                .putLong("lastEventAt", System.currentTimeMillis())
-                .putInt("lastEventType", event.getEventType())
-                .apply();
+        long eventNow=System.currentTimeMillis();pendingVintedEventDiag++;
+        if(lastVintedEventDiagFlushAt==0L||eventNow-lastVintedEventDiagFlushAt>=2_000L||pendingVintedEventDiag>=64L){
+            SharedPreferences p=diag();long delta=pendingVintedEventDiag;pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
+            p.edit().putLong("vintedEvents",p.getLong("vintedEvents",0)+delta).putLong("lastEventAt",eventNow).putInt("lastEventType",event.getEventType()).apply();
+        }
 
-        int type = event.getEventType();lastVintedEventAt=System.currentTimeMillis();
+        int type = event.getEventType();lastVintedEventAt=eventNow;
         if (type == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
                 type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
                 type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
@@ -925,10 +924,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
             if(card!=null&&!containsSignature(out,card)){
                 out.add(card);
                 String signature=DealDatabase.signature(card);
-                String probeKey=signature+"|"+Integer.toHexString(card.rawDescription==null?0:card.rawDescription.hashCode());
-                boolean uniqueProbeCard=accessibilityIdentityProbeSeen.add(probeKey);
-                if(accessibilityIdentityProbeSeen.size()>1200){String first=accessibilityIdentityProbeSeen.iterator().next();accessibilityIdentityProbeSeen.remove(first);}
-                String[] identity=explicitVintedIdentityHint(node,uniqueProbeCard);
+                // Test 1 conclusively found no usable ID in Vinted's Compose semantics. Keep only a
+                // cheap opportunistic explicit-URL check; the old 96-node diagnostic probe was
+                // production overhead and could make scrolling visibly heavy.
+                String[] identity=explicitVintedIdentityHintFast(node);
                 if(identity!=null)contextualVintedIdentityHints.put(signature,identity);
             } else if(card==null&&candidate.length()<700)diag().edit().putString("lastUnparsedCardSample",truncate(candidate,600)).apply();
         }
@@ -951,6 +950,37 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if("url_span".equals(source))ed.putLong("a11yIdsFromUrlSpan",p.getLong("a11yIdsFromUrlSpan",0L)+1L);
         else ed.putLong("a11yIdsFromOtherExplicitField",p.getLong("a11yIdsFromOtherExplicitField",0L)+1L);
         ed.apply();
+    }
+
+    /** Production fast path: accept only a literal Vinted item URL/ID already exposed in a
+     * small nearby accessibility surface. No Compose extra-data requests and no diagnostic tree
+     * walk. This preserves the conservative opportunistic shortcut without paying Test-1 costs. */
+    private String[] explicitVintedIdentityHintFast(AccessibilityNodeInfo root){
+        if(root==null)return null;
+        java.util.ArrayDeque<AccessibilityNodeInfo> q=new java.util.ArrayDeque<>();q.add(root);int seen=0;
+        while(!q.isEmpty()&&seen++<12){
+            AccessibilityNodeInfo n=q.removeFirst();String[] h=identityFromNodeFast(n,"");if(h!=null)return h;
+            if(seen<=4)for(int i=0;i<n.getChildCount()&&i<6;i++){AccessibilityNodeInfo c=n.getChild(i);if(c!=null)q.addLast(c);}
+        }
+        AccessibilityNodeInfo parent=null;try{parent=root.getParent();}catch(Throwable ignored){}
+        for(int depth=0;parent!=null&&depth<2;depth++){
+            String[] h=identityFromNodeFast(parent,"ancestor_");if(h!=null)return h;
+            AccessibilityNodeInfo next=null;try{next=parent.getParent();}catch(Throwable ignored){}parent=next;
+        }
+        return null;
+    }
+
+    private String[] identityFromNodeFast(AccessibilityNodeInfo n,String sourcePrefix){
+        if(n==null)return null;IdentityProbeStats stats=new IdentityProbeStats();String[] h=identityFromSpans(n,stats);
+        if(h!=null&&sourcePrefix.length()>0)h[2]=sourcePrefix+h[2];
+        if(h==null)h=identityFromValue(n.getText(),sourcePrefix+"text");
+        if(h==null)h=identityFromValue(n.getContentDescription(),sourcePrefix+"content_description");
+        if(h==null)h=identityFromValue(n.getViewIdResourceName(),sourcePrefix+"view_id_resource_name");
+        if(h==null&&Build.VERSION.SDK_INT>=33)try{h=identityFromValue(n.getUniqueId(),sourcePrefix+"unique_id");}catch(Throwable ignored){}
+        if(h==null)try{h=identityFromValue(n.getHintText(),sourcePrefix+"hint_text");}catch(Throwable ignored){}
+        if(h==null&&Build.VERSION.SDK_INT>=28)try{h=identityFromValue(n.getTooltipText(),sourcePrefix+"tooltip_text");}catch(Throwable ignored){}
+        if(h==null&&Build.VERSION.SDK_INT>=30)try{h=identityFromValue(n.getStateDescription(),sourcePrefix+"state_description");}catch(Throwable ignored){}
+        return h;
     }
 
     /** Look for an explicit /items/<id> token already present in the Accessibility subtree.
@@ -1327,7 +1357,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "publishedMetadataResolved="+p.getLong("publishedMetadataResolved",0)+"\n"+
                 "lastPublishedLabel="+p.getString("lastPublishedLabel","")+"\n"+
                 "a11yProbeCrossProcess={authoritative=true, ageMs="+a11yCrossAgeMs+", writes="+a11yCross.value+", payload="+a11yCrossPayload+"}\n"+
-                "a11yIdentityProbe={build="+BuildConfig.VERSION_NAME+", probe=1d-local-cache, uniqueCards="+p.getLong("a11yProbeUniqueCards",0)+", runs="+p.getLong("a11yProbeRuns",0)+", nodes="+p.getLong("a11yProbeNodes",0)+", ancestorNodes="+p.getLong("a11yProbeAncestorNodes",0)+", spannedTextNodes="+p.getLong("a11yProbeSpannedTextNodes",0)+", urlSpans="+p.getLong("a11yProbeUrlSpans",0)+", clickableSpans="+p.getLong("a11yProbeClickableSpans",0)+", actionLabels="+p.getLong("a11yProbeActionLabels",0)+", extraKeys="+p.getLong("a11yProbeExtraKeys",0)+", availableExtraKeys="+p.getLong("a11yProbeAvailableExtraKeys",0)+", extraRefresh="+p.getLong("a11yProbeExtraRefreshHits",0)+"/"+p.getLong("a11yProbeExtraRefreshRequests",0)+", ancestorExplicitHits="+p.getLong("a11yProbeAncestorExplicitHits",0)+"}\n"+
+                "a11yIdentityProbe={build="+BuildConfig.VERSION_NAME+", probe=fast-explicit-only; historical1dUniqueCards="+p.getLong("a11yProbeUniqueCards",0)+", runs="+p.getLong("a11yProbeRuns",0)+", nodes="+p.getLong("a11yProbeNodes",0)+", ancestorNodes="+p.getLong("a11yProbeAncestorNodes",0)+", spannedTextNodes="+p.getLong("a11yProbeSpannedTextNodes",0)+", urlSpans="+p.getLong("a11yProbeUrlSpans",0)+", clickableSpans="+p.getLong("a11yProbeClickableSpans",0)+", actionLabels="+p.getLong("a11yProbeActionLabels",0)+", extraKeys="+p.getLong("a11yProbeExtraKeys",0)+", availableExtraKeys="+p.getLong("a11yProbeAvailableExtraKeys",0)+", extraRefresh="+p.getLong("a11yProbeExtraRefreshHits",0)+"/"+p.getLong("a11yProbeExtraRefreshRequests",0)+", ancestorExplicitHits="+p.getLong("a11yProbeAncestorExplicitHits",0)+"}\n"+
                 "a11yIdentityResult={idsTotal="+p.getLong("vintedIdsCapturedFromAccessibility",0)+", idsFromUrlSpan="+p.getLong("a11yIdsFromUrlSpan",0)+", idsFromOtherExplicitField="+p.getLong("a11yIdsFromOtherExplicitField",0)+", lastSource="+p.getString("a11yIdentityLastSource","")+", lastProbeCaptureSource="+p.getString("a11yProbeLastCaptureSource","")+"}\n"+
                 "a11yProbeLastUrlSpan="+p.getString("a11yProbeLastUrlSpan","")+"\n"+
                 "a11yProbeLastAvailableExtra="+p.getString("a11yProbeLastAvailableExtra","")+"\n"+
