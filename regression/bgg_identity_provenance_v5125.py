@@ -25,7 +25,7 @@ checks = [
     ("seller Vinted aliases excluded from authoritative lookup", "'VINTED'" not in learned and "VINTED_VARIANT" not in learned),
     ("seller aliases remain stored as non-authoritative evidence", 'addAlias(db, gameId, card.title, "VINTED")' in market and '"VINTED_VARIANT"' in market),
     ("queue uses provenance-aware learned lookup", "market.learnedBggIdForTitle(q)" in queue),
-    ("historical matched identities are auditable", "matchedToRevalidate" in market and "COALESCE(match_algorithm_version,0)<?" in market),
+    ("historical matched identities are auditable", "matchedToRevalidate" in market and "COALESCE(g.match_algorithm_version,0)<CAST(? AS INTEGER)" in market),
     ("diagnostics expose trust audit", "bggIdentityTrust={" in a11y and "bggIdentityTrustSummary" in a11y),
 ]
 

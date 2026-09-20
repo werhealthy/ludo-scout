@@ -1442,7 +1442,7 @@ public final class MarketStore {
     /** Visible games that cannot enter the BGG enrichment lane until their identity is confirmed. */
     public int bggMatchRequiredCount() {
         DealDatabase.ObservationSession run=helper.activeObservationSession();String runExtra=run==null?"":" AND EXISTS (SELECT 1 FROM market_listings l WHERE l.game_id=games.id AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
-        String sql="SELECT COUNT(*) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND (match_state='BGG_MATCH_REQUIRED' OR (match_state='BGG_MATCH_REVIEW' AND COALESCE(match_algorithm_version,0)<?))"+runExtra;
+        String sql="SELECT COUNT(*) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND (match_state='BGG_MATCH_REQUIRED' OR (match_state='BGG_MATCH_REVIEW' AND COALESCE(match_algorithm_version,0)<CAST(? AS INTEGER)))"+runExtra;
         java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(String.valueOf(BGG_MATCH_ALGORITHM_VERSION));if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
         try(Cursor c=helper.getReadableDatabase().rawQuery(sql,a.toArray(new String[0]))){return c.moveToFirst()?c.getInt(0):0;}
     }
@@ -1725,7 +1725,7 @@ public final class MarketStore {
 
     /** Small batches of provisional games for local, zero-network BGG identity matching. Old review
      * rows are retried once whenever the matcher algorithm version advances. */
-    public List<GameRecord> provisionalGamesForMatching(int limit){List<GameRecord> out=new ArrayList<>();DealDatabase.ObservationSession run=helper.activeObservationSession();String runExtra=run==null?"":" AND EXISTS (SELECT 1 FROM market_listings l WHERE l.game_id=games.id AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";String sql="SELECT id,bgg_id,provisional_key,canonical_name,original_name,alternate_names,year,description,thumbnail_url,image_url,min_players,max_players,playtime,min_age,weight,rating,voters,bgg_rank,categories,mechanics,designers,artists,publishers,families,expansions,base_games,bgg_url,match_state,match_confidence,first_seen,last_seen,metadata_updated_at FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND (match_state='BGG_MATCH_REQUIRED' OR (match_state='BGG_MATCH_REVIEW' AND COALESCE(match_algorithm_version,0)<?))"+runExtra+" ORDER BY CASE WHEN match_state='BGG_MATCH_REQUIRED' THEN 0 ELSE 1 END,last_seen DESC LIMIT ?";java.util.ArrayList<String>a=new java.util.ArrayList<>();a.add(String.valueOf(BGG_MATCH_ALGORITHM_VERSION));if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}a.add(String.valueOf(Math.max(1,limit)));try(Cursor c=helper.getReadableDatabase().rawQuery(sql,a.toArray(new String[0]))){while(c.moveToNext())out.add(readGameBase(c));}return out;}
+    public List<GameRecord> provisionalGamesForMatching(int limit){List<GameRecord> out=new ArrayList<>();DealDatabase.ObservationSession run=helper.activeObservationSession();String runExtra=run==null?"":" AND EXISTS (SELECT 1 FROM market_listings l WHERE l.game_id=games.id AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";String sql="SELECT id,bgg_id,provisional_key,canonical_name,original_name,alternate_names,year,description,thumbnail_url,image_url,min_players,max_players,playtime,min_age,weight,rating,voters,bgg_rank,categories,mechanics,designers,artists,publishers,families,expansions,base_games,bgg_url,match_state,match_confidence,first_seen,last_seen,metadata_updated_at FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND (match_state='BGG_MATCH_REQUIRED' OR (match_state='BGG_MATCH_REVIEW' AND COALESCE(match_algorithm_version,0)<CAST(? AS INTEGER)))"+runExtra+" ORDER BY CASE WHEN match_state='BGG_MATCH_REQUIRED' THEN 0 ELSE 1 END,last_seen DESC LIMIT ?";java.util.ArrayList<String>a=new java.util.ArrayList<>();a.add(String.valueOf(BGG_MATCH_ALGORITHM_VERSION));if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}a.add(String.valueOf(Math.max(1,limit)));try(Cursor c=helper.getReadableDatabase().rawQuery(sql,a.toArray(new String[0]))){while(c.moveToNext())out.add(readGameBase(c));}return out;}
 
     /** A title already confirmed by the user/app becomes local knowledge. Only a unique BGG id is
      * returned; collisions remain reviewable rather than being guessed. */
@@ -1733,7 +1733,7 @@ public final class MarketStore {
      * Explicit MANUAL_BGG / USER_CONFIRMED identities are never touched by automatic revalidation. */
     public List<HistoricalBggCandidate> historicalBggRevalidationCandidates(int limit){
         List<HistoricalBggCandidate> out=new ArrayList<>();SQLiteDatabase db=helper.getReadableDatabase();
-        String sql="SELECT g.id,g.bgg_id,g.canonical_name FROM games g WHERE g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(g.match_algorithm_version,0)<? "+
+        String sql="SELECT g.id,g.bgg_id,g.canonical_name FROM games g WHERE g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(g.match_algorithm_version,0)<CAST(? AS INTEGER) "+
                 "AND NOT EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.source='MANUAL_BGG') "+
                 "AND NOT EXISTS(SELECT 1 FROM market_listings l LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) WHERE l.game_id=g.id AND d.verification_state='USER_CONFIRMED') "+
                 "AND EXISTS(SELECT 1 FROM market_listings l WHERE l.game_id=g.id AND l.lifecycle='ACTIVE') "+
@@ -1780,7 +1780,7 @@ public final class MarketStore {
 
     public int historicalBggRevalidationPendingCount(){
         SQLiteDatabase db=helper.getReadableDatabase();
-        String sql="SELECT COUNT(*) FROM games g WHERE g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(g.match_algorithm_version,0)<? "+
+        String sql="SELECT COUNT(*) FROM games g WHERE g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(g.match_algorithm_version,0)<CAST(? AS INTEGER) "+
                 "AND NOT EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.source='MANUAL_BGG') "+
                 "AND NOT EXISTS(SELECT 1 FROM market_listings l LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) WHERE l.game_id=g.id AND d.verification_state='USER_CONFIRMED') "+
                 "AND EXISTS(SELECT 1 FROM market_listings l WHERE l.game_id=g.id AND l.lifecycle='ACTIVE') "+
@@ -1961,6 +1961,13 @@ public final class MarketStore {
         if(changed>0)notifyQueueChanged();return changed;
     }
     public int bggMatchReviewCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW'",null)){return c.moveToFirst()?c.getInt(0):0;}}
+    public String bggMatchRequiredBreakdown(){
+        DealDatabase.ObservationSession run=helper.activeObservationSession();String runExtra=run==null?"":" AND EXISTS (SELECT 1 FROM market_listings l WHERE l.game_id=games.id AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String sql="SELECT SUM(CASE WHEN match_state='BGG_MATCH_REQUIRED' THEN 1 ELSE 0 END),SUM(CASE WHEN match_state='BGG_MATCH_REVIEW' AND COALESCE(match_algorithm_version,0)<CAST(? AS INTEGER) THEN 1 ELSE 0 END),SUM(CASE WHEN match_state='BGG_MATCH_REVIEW' AND COALESCE(match_algorithm_version,0)>=CAST(? AS INTEGER) THEN 1 ELSE 0 END) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='')"+runExtra;
+        java.util.ArrayList<String>a=new java.util.ArrayList<>();a.add(String.valueOf(BGG_MATCH_ALGORITHM_VERSION));a.add(String.valueOf(BGG_MATCH_ALGORITHM_VERSION));if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
+        try(Cursor c=helper.getReadableDatabase().rawQuery(sql,a.toArray(new String[0]))){if(c.moveToFirst())return "build=bgg-match-breakdown-v1;requiredPure="+(c.isNull(0)?0:c.getInt(0))+";reviewLegacy="+(c.isNull(1)?0:c.getInt(1))+";reviewCurrent="+(c.isNull(2)?0:c.getInt(2))+";algorithm="+BGG_MATCH_ALGORITHM_VERSION;}catch(Throwable ignored){}
+        return "build=bgg-match-breakdown-v1;requiredPure=-1;reviewLegacy=-1;reviewCurrent=-1;algorithm="+BGG_MATCH_ALGORITHM_VERSION;
+    }
 
     /** Strong, deterministic cleanup for old provisional rows created before the capture filters were
      * tightened. It is intentionally limited to unconfirmed BGG rows: confirmed board games are never

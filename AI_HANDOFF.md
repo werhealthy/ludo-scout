@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.13-bgg-cold-index-singleflight`
-- versionCode: `127`
+- Baseline version: `5.12.14-bgg-version-affinity-fix`
+- versionCode: `128`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,14 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.14 BGG algorithm-version numeric affinity
+- Pixel Test 8 proved cold-start performance is fixed: shared catalog load 767 ms, full local batch 185 ms, single-flight active, no review write misses. Yet `remainingRequired=3` persisted after three successful review writes.
+- Root cause: Android `rawQuery` selection arguments are strings while queries compared them against `COALESCE(match_algorithm_version,0)`. In SQLite, `COALESCE(...)` is an expression with no column affinity, so numeric stored values can be compared by storage class against the TEXT parameter instead of numerically. This made already-current review rows continue to satisfy the legacy `< ?` predicate.
+- Every BGG algorithm-version comparison now explicitly uses `CAST(? AS INTEGER)`: current match-required count, current candidate selection, historical candidate selection and historical pending count.
+- Added `bggMatchBreakdown={requiredPure,reviewLegacy,reviewCurrent,algorithm}` diagnostics to distinguish unresolved current work from already-current human-review work.
+- Regression: `regression/bgg_version_affinity_v51214.py`; wired into PR and beta CI.
+- No schema/data reset, network-rate change, signing/applicationId change, or CI versionCode-strategy change.
 
 ## 5.12.13 BGG cold-index + single-flight
 - Pixel Test 7 proved review persistence itself works: `bggReviewWrite` showed `BGG_MATCH_REVIEW -> BGG_MATCH_REVIEW`, `gameChanged=1`, `listingChanged=1`. The fresh write appeared ~12 s old while `bggLocalMatch` was still the stale v1 summary from ~172 s earlier, showing the new batch had not completed.
