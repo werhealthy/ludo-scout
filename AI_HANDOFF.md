@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.21-product-ux-turnaround`
-- versionCode: `135`
+- Baseline version: `5.12.22-bgg-exact-index`
+- versionCode: `136`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,19 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.22 BGG exact-index turnaround follow-up
+
+- First 5.12.21 Pixel validation confirms the product-level SLA works: Motore was IDLE with no waiting run, while `engineSla` reported five ordinary rows expired at the 10-minute ceiling; current-install crash/ANR/memory counts remained zero.
+- The same diagnostic exposed the next bottleneck precisely: `bggLocalMatch` had `exactScans=29` and `exactTimeouts=29`; the matcher was turning its own CPU safety timeout into `BGG_MATCH_REVIEW`. This created review for infrastructure latency rather than genuine ambiguity.
+- Exact BGG lookup now uses a compact primitive hash index built alongside the 31k-game catalog. It avoids normalizing/scanning all titles and aliases on every query while retaining collision verification against the original strings.
+- Cold catalog/index creation is excluded from the per-query fuzzy scan timer. The one-time bootstrap cost may be a few seconds but cannot manufacture a timeout-review decision.
+- BGG exact/fuzzy technical timeouts and matcher exceptions no longer become human review. The provisional game is automatically quarantined from trusted surfaces and the technical fault remains diagnostic.
+- Existing 5.12.21 BGG review rows whose reason is specifically a local-match timeout/error are reopened once, not discarded, so the new exact index gets a clean chance to resolve them.
+- Review telemetry now includes `reviewBreakdown` (Vinted explicit/variant/other and BGG technical/other) so the next Pixel cycle can distinguish real ambiguity from system debt.
+- Classifier-block diagnostics now include timestamp + build. This is important because the previous cumulative `lastClassifierBlock` could survive an app update and make an old Fyfe false-positive look current.
+- Regression: `regression/bgg_exact_index_no_timeout_review_v51222.py`.
+- No schema migration, request-rate increase, signing/applicationId/CI-versionCode-strategy change.
 
 ## 5.12.21 Product UX turnaround — 10-minute SLA, trust, low-review pipeline
 
