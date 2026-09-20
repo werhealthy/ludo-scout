@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.10-bgg-fuzzy-index-performance`
-- versionCode: `124`
+- Baseline version: `5.12.11-bgg-state-monotonicity`
+- versionCode: `125`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,17 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.11 BGG state monotonicity
+- Pixel Test 5 proved the fuzzy performance fix: 3 current fuzzy matches completed in 122 ms. However, all 3 were reported as moved to review while `bggMatchRequired` stayed at 3 and the historical audit remained blocked at 73 pending.
+- Root cause: `applyAnalysis()`/`upsertProvisionalGame()` could overwrite a later BGG decision. Re-analysis of an existing provisional title unconditionally reset the game to `BGG_MATCH_REQUIRED`, made it visible, cleared its filter reason, and wrote the listing back to `BGG_MATCH_REQUIRED`.
+- BGG identity states are now monotonic: only unresolved states (`PENDING_ANALYSIS`/`BGG_MATCH_REQUIRED`) may be refreshed by another analysis pass. `BGG_MATCH_REVIEW` and `AUTO_QUARANTINED` cannot be downgraded by stale or repeated analysis.
+- `markBggMatchReview()` now updates the canonical game and active linked listings transactionally, so UI/listing state cannot diverge from the game state.
+- `applyAnalysis()` ignores inactive listings and refilters stale work that points at an already quarantined game.
+- `reconcileQueue()` idempotently repairs legacy cross-table drift: active listings linked to review games become `BGG_MATCH_REVIEW`; active listings linked to `AUTO_QUARANTINED` games are returned to `AUTO_FILTERED`.
+- This is not a data reset and deletes nothing. It preserves existing review/quarantine decisions and only repairs state invariants.
+- Regression: `regression/bgg_state_monotonicity_v51211.py`; PR and Android beta CI run it before compilation/build.
+- No schema change, network-rate change, signing/applicationId change, or CI versionCode-strategy change.
 
 ## 5.12.10 BGG fuzzy index performance
 - Pixel Test 4 on 5.12.9 still left 73 historical revalidations pending. Diagnostics showed the BGG lane stuck in `MATCHING` with three current identities, and the lane heartbeat aged ~19 s while processing one title.
