@@ -7,6 +7,16 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.9 — Historical BGG drain scheduling
+- Fixed the second bottleneck revealed by Pixel testing after the local-index optimization: historical revalidation was artificially limited to tiny slices and could run before current BGG work.
+- Current BGG identity and enrichment now always precede historical cleanup; historical revalidation runs only when the current BGG lane has no runnable work.
+- Historical cleanup now drains bounded 24-game bursts with a short yield, while the revalidator hard-caps callers at 32 games.
+- Added historical pending work to foreground-service liveness, BGG lane supervision and WorkManager recovery/rescheduling so the one-shot audit cannot silently stop while rows remain.
+- Canonical pending accounting now requires an active listing, matching the actual candidate query.
+- Coalesced historical queue notifications to one broadcast per slice instead of one per game, avoiding UI/update storms while increasing local throughput.
+- Added `regression/historical_bgg_drain_scheduling_v5129.py` and updated the historical safety regression to verify priority semantics rather than obsolete batch constants.
+- No schema/data reset and no signing, applicationId, CI versionCode strategy, Vinted request rate or BGG network-rate changes.
+
 ## 5.12.8 — BGG local-index performance
 - Fixed the root cause of historical BGG revalidation starvation: `localById()` no longer reopens/decompresses/scans the entire ~31k-game local catalog once per game.
 - The local BGG catalog is now indexed once per queue-process `BggSearchClient`, producing both exact title/alias lookup and direct BGG-id lookup from the same parsed `Game` objects.
