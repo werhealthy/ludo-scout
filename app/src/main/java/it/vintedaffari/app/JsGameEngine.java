@@ -3,6 +3,8 @@ package it.vintedaffari.app;
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.util.Log;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
@@ -31,11 +33,17 @@ public final class JsGameEngine {
     }
 
     private static final String TAG = "VintedAffariEngine";
+    private static final long READY_TIMEOUT_MS = 30_000L;
+    private static final long READY_RETRY_MS = 500L;
     private final Context context;
     private final WindowManager windowManager;
+    private final Handler main = new Handler(Looper.getMainLooper());
     private WebView webView;
     private boolean ready = false;
     private boolean attached = false;
+    private boolean verifyInFlight = false;
+    private boolean terminalReadyCallback = false;
+    private long verifyStartedAt = 0L;
     private ReadyListener readyListener;
 
     public JsGameEngine(Context context, WindowManager windowManager) {
@@ -50,6 +58,7 @@ public final class JsGameEngine {
     public void start(ReadyListener listener) {
         this.readyListener = listener;
         if (webView != null) return;
+        ready=false;verifyInFlight=false;terminalReadyCallback=false;verifyStartedAt=System.currentTimeMillis();
 
         webView = new WebView(context);
         webView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
@@ -74,6 +83,9 @@ public final class JsGameEngine {
 
         attachHiddenWebView();
         webView.loadUrl("file:///android_asset/engine/engine.html");
+        // onPageFinished may arrive before engine.html has completed its asynchronous bridge setup,
+        // especially after a WebView/process restart. Probe independently and retry for a bounded time.
+        main.postDelayed(this::verifyEngine, READY_RETRY_MS);
     }
 
     private void attachHiddenWebView() {
@@ -103,27 +115,47 @@ public final class JsGameEngine {
     }
 
     private void verifyEngine() {
-        if (webView == null) return;
+        if (webView == null || ready || terminalReadyCallback || verifyInFlight) return;
+        verifyInFlight=true;
         String js = "(() => JSON.stringify({ready:!!globalThis.VintedAffariAndroidBridge?.ready,gameCount:globalThis.VintedAffariAndroidBridge?.gameCount||0}))()";
-        webView.evaluateJavascript(js, value -> {
-            try {
-                String decoded = decodeJavascriptString(value);
-                JSONObject state = new JSONObject(decoded);
-                ready = state.optBoolean("ready", false);
-                int gameCount = state.optInt("gameCount", 0);
-                if (ready) {
-                    Log.d(TAG, "Motore JS pronto: " + gameCount + " giochi");
-                    if (readyListener != null) readyListener.onReady(gameCount);
-                } else {
-                    String message = "Il runtime JS non risulta pronto.";
-                    Log.e(TAG, message);
-                    if (readyListener != null) readyListener.onError(message);
+        try {
+            webView.evaluateJavascript(js, value -> {
+                verifyInFlight=false;
+                try {
+                    String decoded = decodeJavascriptString(value);
+                    JSONObject state = new JSONObject(decoded);
+                    ready = state.optBoolean("ready", false);
+                    int gameCount = state.optInt("gameCount", 0);
+                    if (ready) {
+                        terminalReadyCallback=true;
+                        Log.d(TAG, "Motore JS pronto: " + gameCount + " giochi");
+                        if (readyListener != null) readyListener.onReady(gameCount);
+                        return;
+                    }
+                    retryVerifyOrFail("Il runtime JS non risulta pronto.");
+                } catch (Exception e) {
+                    Log.w(TAG, "Verifica runtime JS non ancora riuscita", e);
+                    retryVerifyOrFail(e.getMessage());
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Errore verifica runtime JS", e);
-                if (readyListener != null) readyListener.onError(e.getMessage());
-            }
-        });
+            });
+        } catch (Throwable t) {
+            verifyInFlight=false;
+            retryVerifyOrFail(t.getMessage());
+        }
+    }
+
+    private void retryVerifyOrFail(String message) {
+        if (webView == null || ready || terminalReadyCallback) return;
+        long elapsed=System.currentTimeMillis()-verifyStartedAt;
+        if (elapsed < READY_TIMEOUT_MS) {
+            main.postDelayed(this::verifyEngine, READY_RETRY_MS);
+            return;
+        }
+        terminalReadyCallback=true;
+        String safe=(message==null||message.trim().isEmpty())
+                ?"Il runtime JS non è diventato pronto entro 30 secondi.":message;
+        Log.e(TAG, safe);
+        if (readyListener != null) readyListener.onError(safe);
     }
 
     public void analyze(List<VintedCard> cards, BatchListener listener) {
@@ -178,7 +210,7 @@ public final class JsGameEngine {
     }
 
     public void destroy() {
-        ready = false;
+        ready = false;terminalReadyCallback=true;verifyInFlight=false;main.removeCallbacksAndMessages(null);
         if (webView == null) return;
         try {
             if(context instanceof android.app.Activity && webView.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)webView.getParent()).removeView(webView);else if (attached && windowManager != null) windowManager.removeViewImmediate(webView);
