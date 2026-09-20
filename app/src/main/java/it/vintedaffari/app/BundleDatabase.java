@@ -70,6 +70,29 @@ public final class BundleDatabase extends SQLiteOpenHelper {
     private static String encode(List<SellerBundleScanner.SellerItem> items){JSONArray a=new JSONArray();if(items!=null)for(SellerBundleScanner.SellerItem s:items){JSONObject o=new JSONObject();try{o.put("id",s.id);o.put("title",s.title);o.put("brand",s.brand);o.put("url",s.url);o.put("image",s.imageUrl);o.put("photos",s.photosCsv);o.put("published",s.publishedLabel);o.put("price",s.priceCents);o.put("ownerVerified",s.ownerVerified);o.put("sourceKind",s.sourceKind);a.put(o);}catch(Exception ignored){}}return a.toString();}
     private static List<SellerBundleScanner.SellerItem> decode(String json){List<SellerBundleScanner.SellerItem>out=new ArrayList<>();try{JSONArray a=new JSONArray(json==null?"[]":json);for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;SellerBundleScanner.SellerItem s=new SellerBundleScanner.SellerItem();s.id=o.optString("id");s.title=o.optString("title");s.brand=o.optString("brand");s.url=o.optString("url");s.imageUrl=o.optString("image");s.photosCsv=o.optString("photos");s.publishedLabel=o.optString("published");s.priceCents=Math.max(0,o.optInt("price"));s.ownerVerified=o.optBoolean("ownerVerified",false);s.sourceKind=o.optString("sourceKind","");if(!s.id.isEmpty()&&!s.title.isEmpty())out.add(s);}}catch(Exception ignored){}return out;}
 
-    public synchronized void invalidate(DealRecord d){if(d==null)return;getWritableDatabase().delete("bundle_suggestions","source_signature=?",new String[]{d.signature});getWritableDatabase().delete("bundle_diagnostics","source_signature=?",new String[]{d.signature});}
+    /** A bundle is current seller inventory, never historical decoration. If one represented item
+     * is sold/hidden/corrected, invalidate the seller graph (including partner references and caches)
+     * so no other source card can keep advertising that stale combination. */
+    public synchronized void invalidate(DealRecord d){
+        if(d==null)return;SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{
+            if(d.sellerId!=null&&!d.sellerId.isEmpty()){
+                db.delete("bundle_suggestions","seller_id=? OR source_signature=? OR item_id=?",new String[]{d.sellerId,d.signature,d.vintedItemId==null?"":d.vintedItemId});
+                db.delete("bundle_diagnostics","seller_id=? OR source_signature=?",new String[]{d.sellerId,d.signature});
+                db.delete("seller_catalog_cache","seller_id=?",new String[]{d.sellerId});
+                db.delete("seller_snapshot_cache","seller_id=?",new String[]{d.sellerId});
+            }else{
+                db.delete("bundle_suggestions","source_signature=? OR item_id=?",new String[]{d.signature,d.vintedItemId==null?"":d.vintedItemId});
+                db.delete("bundle_diagnostics","source_signature=?",new String[]{d.signature});
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+    }
+    public synchronized int clearSellerGraph(String seller){
+        if(seller==null||seller.isEmpty())return 0;SQLiteDatabase db=getWritableDatabase();db.beginTransaction();int changed=0;try{
+            changed+=db.delete("bundle_suggestions","seller_id=?",new String[]{seller});
+            changed+=db.delete("bundle_diagnostics","seller_id=?",new String[]{seller});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}return changed;
+    }
     public synchronized void clearAll(){SQLiteDatabase db=getWritableDatabase();db.delete("bundle_suggestions",null,null);db.delete("bundle_diagnostics",null,null);db.delete("seller_catalog_cache",null,null);db.delete("seller_snapshot_cache",null,null);db.delete("bundle_counters",null,null);}
 }
