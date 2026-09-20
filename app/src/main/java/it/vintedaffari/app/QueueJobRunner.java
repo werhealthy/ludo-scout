@@ -304,8 +304,11 @@ public final class QueueJobRunner {
         // queue. Two deterministic misses are enough; keep the core listing and stop retrying.
         if(MarketStore.JOB_VINTED_DEEP.equals(job.type)&&isDeterministicMiss(reason)&&job.attempt>=2){
             String variantReason="Pagina Vinted non ha fornito abbastanza testo per confermare la variante BGG";
-            if(market.flagPendingBggVariantReview(job.listingId,variantReason)&&candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.flagBggVariantReview(candidate.signature,variantReason);
-            market.completeJob(job);return;
+            if(market.hasExplicitUserPriorityHistory(job.listingId)){
+                if(market.flagPendingBggVariantReview(job.listingId,variantReason)&&candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.flagBggVariantReview(candidate.signature,variantReason);
+                market.completeJob(job);
+            }else market.autoExcludeJob(job,variantReason);
+            return;
         }
 
         // Eventual background linking must never create a giant human review queue. A real remote
