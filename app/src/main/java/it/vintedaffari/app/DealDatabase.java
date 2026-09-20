@@ -171,7 +171,16 @@ public final class DealDatabase extends SQLiteOpenHelper {
         int[] out=new int[5];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<5;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
     }
 
-    private void fillEngineCounts(ObservationSession s){if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS'",new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst())s.analysisPendingListings=c.getInt(0);}s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings)+s.analysisPendingListings;}
+    private void fillEngineCounts(ObservationSession s){
+        if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];
+        // Raw observation rows are historical telemetry and older builds could leave duplicate
+        // PENDING_ANALYSIS rows behind for one signature. Product progress must follow the current
+        // canonical listing state, otherwise an already-analysed card can keep an old job alive.
+        String pendingSql="SELECT COUNT(DISTINCT l.id) FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
+                "WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND l.enrichment_state='PENDING_ANALYSIS'";
+        try(Cursor c=getReadableDatabase().rawQuery(pendingSql,new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst())s.analysisPendingListings=c.getInt(0);}
+        s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings)+s.analysisPendingListings;
+    }
 
     public synchronized ObservationSession latestObservationSession(){List<ObservationSession> x=recentObservationSessions(System.currentTimeMillis()-7L*24L*60L*60_000L,1);return x.isEmpty()?null:x.get(0);}
 
