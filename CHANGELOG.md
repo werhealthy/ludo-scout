@@ -7,6 +7,17 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.27 — Queue liveness and Catalog truth
+- Fixed a Vinted-lane starvation bug exposed by the 5.12.26 Pixel debug: runnable Motore jobs could coexist with an idle lane because any future LIVE/HUNT/MANUAL retry blocked ordinary work until its retry time.
+- Urgent Vinted work now reserves at most one public-page slot when it is within 65 seconds of becoming runnable. Far-future urgent retries no longer freeze current Motore progress.
+- Existing priority ordering is preserved: once urgent work is due it still preempts ordinary work.
+- The queue lane now reports near-due urgent reservation as an explicit WAITING state instead of “nessuna attività rivendicabile”.
+- Diagnostics add `vintedUrgent={active,due,nextDueAt,reserveUntil}`.
+- Fixed Catalog `Vinted da completare` count/filter mismatch. The badge and filter now agree on missing URL, publication label, or seller id.
+- The red Vinted core warning remains specific to a missing exact page/link; metadata-only incompleteness remains a softer state.
+- Added `regression/queue_liveness_catalog_truth_v51227.py` to PR and beta CI.
+- No schema migration, request-rate increase, signing, applicationId, Firebase, secrets or CI versionCode-strategy change.
+
 ## 5.12.26 — Target-only recovery, truthful review and early price gate
 - Manual “Cerca questo annuncio su Vinted” is now a target-only recovery mode. Search-result cards seen during that flow no longer become ordinary Motore observations/jobs; explicit market-price scans remain unchanged.
 - Recovery copy now explains that one visible result is not enough for an exact automatic link when Vinted does not expose the item URL/id; the exact item must be opened/shared or its link pasted.

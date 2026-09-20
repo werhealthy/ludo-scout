@@ -77,6 +77,8 @@ jobs:
         run: python3 regression/engine_adaptive_fairness_v51225.py
       - name: Run recovery/review/price gates regression
         run: python3 regression/recovery_review_price_gates_v51226.py
+      - name: Run queue liveness/catalog truth regression
+        run: python3 regression/queue_liveness_catalog_truth_v51227.py
 
       - name: Compile debug Java
         run: |

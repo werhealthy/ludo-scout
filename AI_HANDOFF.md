@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.26-recovery-review-price-gates`
-- versionCode: `140`
+- Baseline version: `5.12.27-queue-liveness-catalog-truth`
+- versionCode: `141`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -37,12 +37,13 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Elapsed time alone must never classify, hide, exclude, complete or discard a listing. Correctness comes only from matching/classification/trust state.
 - Motore timing is workload-aware: the target uses core Vinted identity work, while the live ETA uses core candidates still pending. Raw card count is only a temporary conservative fallback before jobs are materialised.
 - One ordinary run owns the automatic Vinted/BGG lane at a time. If another unfinished scroll is waiting, the owner yields after a 10-minute service slice; unfinished listings remain intact and the run resumes in round-robin continuation. With no competing run, it simply keeps working past ten minutes.
-- LIVE_DEAL, HUNT_PRIORITY and explicit manual work can preempt ordinary backlog work.
+- LIVE_DEAL, HUNT_PRIORITY and explicit manual work preempt ordinary backlog work when runnable. A future urgent retry may reserve at most one public-page slot (~65 s); it must never freeze already-runnable Motore work for minutes.
 - Manual review is reserved for cases with an actual user action available. Historical/trust holds stay non-publishable but are not counted or labelled as actionable review.
 - Manual Vinted recovery is target-only: search-result cards visible during the recovery flow must not create ordinary observations/jobs. Exact Vinted identity still requires an exact item URL/id; a single visible search result is not sufficient evidence by itself.
 - Clearly overpriced ordinary listings may be filtered before Vinted network identity only under a conservative ask-price gate (at least 2× and €25 above an existing used-market reference). HUNT_PRIORITY and MANUAL_PRIORITY are exempt.
 - A ready card requires confirmed BGG, exact Vinted item/url, core identity enrichment, no open review and no open core automatic job. Optional deep metadata must not block readiness.
 - Publication date, language and price should be retained when technically available; do not silently drop required data just to make a card look complete.
+- Catalog filter badges and their result predicates must describe the same rows. `Vinted da completare` means missing exact Vinted URL, publication label, or seller id; the red core warning remains specifically for a missing page/link.
 
 ## 5.12.3 correctness changes
 - Motore run detail uses a dedicated observations -> market_listings -> games view rather than Catalogo.
@@ -108,6 +109,18 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.27 Queue liveness and Catalog truth
+
+- Pixel/debug evidence on 5.12.26 showed a real liveness contradiction: the active run still had 6 core Vinted candidates pending and diagnostics reported 7 runnable Vinted jobs, while the Vinted lane repeatedly said `IDLE · nessuna attività rivendicabile`. The public-page gate was READY and no Vinted job was PROCESSING.
+- Root cause was an over-broad urgent-preemption guard: any LIVE/HUNT/MANUAL row whose retry time was still in the future blocked all ordinary Vinted work, even when that retry was many minutes away.
+- Urgent work now reserves only the next public-page slot when its retry is within 65 seconds. If the urgent retry is farther away, already-runnable Motore work continues; when urgent work becomes due, existing priority ordering still claims it first.
+- The Vinted lane reports this bounded reservation as `WAITING · priorità Vinted tra … s` instead of the misleading `IDLE · nessuna attività rivendicabile`.
+- Diagnostics add `vintedUrgent={active,due,nextDueAt,reserveUntil}` so a future queue stall can be distinguished from intentional one-slot reservation.
+- Catalog `Vinted da completare` had a count/filter mismatch: the badge counted missing URL, publication label, or seller id, but the filter only displayed missing URLs. The predicate now uses all three fields and the badge count uses the same active-catalog universe.
+- The core red Vinted warning remains specifically about a missing exact Vinted page/link; publication/seller-only incompleteness stays the softer secondary state.
+- Regression: `regression/queue_liveness_catalog_truth_v51227.py`.
+- No schema migration, request-rate increase, signing/applicationId/Firebase/secrets/CI-versionCode-strategy change.
 
 ## 5.12.26 Recovery scope, review truth and early price gate
 

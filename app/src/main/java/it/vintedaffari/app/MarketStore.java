@@ -2424,9 +2424,12 @@ public final class MarketStore {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM processing_jobs WHERE source=? AND state=? AND updated_at>=?",new String[]{HISTORICAL_SOURCE,COMPLETE,String.valueOf(Math.max(0L,since))})){return c.moveToFirst()?c.getInt(0):0;}
     }
 
+    private static final long URGENT_VINTED_RESERVE_MS=65_000L;
+
     /** Fresh/explicit Vinted work that must preempt backlog batching. Deep metadata is intentionally excluded.
-     * Count all active urgent rows, even when their retry time is still in the future: the backlog must
-     * not consume the next public-page permit just before a live/hunt/manual row becomes runnable. */
+     * Count all active urgent rows, even when their retry time is still in the future. A future retry
+     * no longer freezes ordinary work for minutes: urgentReservationUntil() reserves only the next
+     * public-page slot when the urgent row is close enough to become runnable. */
     public int urgentVintedWorkCount(long now) {
         DealDatabase.ObservationSession run=helper.activeObservationSession();SQLiteDatabase db=helper.getReadableDatabase();
         if(run==null){String sql="SELECT COUNT(*) FROM processing_jobs WHERE job_type=? AND source IN (?,?,?) AND state IN (?,?,?)";try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,"LIVE_DEAL","HUNT_PRIORITY","MANUAL_PRIORITY",PENDING,PROCESSING,FAILED_RETRYABLE})){return c.moveToFirst()?c.getInt(0):0;}}
@@ -2441,6 +2444,25 @@ public final class MarketStore {
         if(run==null){String sql="SELECT COUNT(*) FROM processing_jobs WHERE job_type=? AND source IN (?,?,?) AND state IN (?,?) AND next_attempt_at<=?";try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,"LIVE_DEAL","HUNT_PRIORITY","MANUAL_PRIORITY",PENDING,FAILED_RETRYABLE,String.valueOf(now)})){return c.moveToFirst()?c.getInt(0):0;}}
         String sql="SELECT COUNT(*) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?) AND j.next_attempt_at<=? AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
         try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,FAILED_RETRYABLE,String.valueOf(now),"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
+    }
+
+    public long nextUrgentVintedDueAt(long now) {
+        DealDatabase.ObservationSession run=helper.activeObservationSession();SQLiteDatabase db=helper.getReadableDatabase();
+        if(run==null){
+            String sql="SELECT MIN(next_attempt_at) FROM processing_jobs WHERE job_type=? AND source IN (?,?,?) AND state IN (?,?)";
+            try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,"LIVE_DEAL","HUNT_PRIORITY","MANUAL_PRIORITY",PENDING,FAILED_RETRYABLE})){return c.moveToFirst()&&!c.isNull(0)?c.getLong(0):0L;}
+        }
+        String sql="SELECT MIN(j.next_attempt_at) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?) AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
+        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,FAILED_RETRYABLE,"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()&&!c.isNull(0)?c.getLong(0):0L;}
+    }
+
+    /** Return a future timestamp only when it is worth holding one public-page slot for urgent work.
+     * A retry several minutes away must never starve an already-runnable Motore run. */
+    public long urgentVintedReservationUntil(long now) {
+        if(urgentVintedWorkCount(now)<=0||urgentVintedDueCount(now)>0)return 0L;
+        long next=nextUrgentVintedDueAt(now);
+        if(next<=now||next-now>URGENT_VINTED_RESERVE_MS)return 0L;
+        return next;
     }
 
     /** A strong Vinted batch link proves the marketplace item but not necessarily the exact BGG variant. */

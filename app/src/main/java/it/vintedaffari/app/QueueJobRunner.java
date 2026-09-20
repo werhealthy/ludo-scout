@@ -176,9 +176,9 @@ public final class QueueJobRunner {
             if(local>0)return true;
         }
         if (VintedPublicSession.nextAllowedAt(context) > now) return false;
-        // If a live/hunt/manual identity is waiting for its own retry time, intentionally leave the
-        // public-page lane idle rather than spend the next permit on backlog work.
-        if(!test2bOwner && market.urgentVintedWorkCount(now)>0 && market.urgentVintedDueCount(now)==0) return false;
+        // Reserve at most one public-page slot for near-due LIVE/HUNT/MANUAL work. A retry that is
+        // still minutes away must not freeze already-runnable Motore jobs.
+        if(!test2bOwner && market.urgentVintedReservationUntil(now)>now) return false;
         // Keep only a tiny network window. Deferred listings live outside processing_jobs until the
         // lane is actually available, so thousands of eventual links never block a fresh deal.
         if(market.coreVintedActiveCount()<6&&market.deferredVintedCount()>0)market.promoteDeferredVintedBatch(6-market.coreVintedActiveCount());
