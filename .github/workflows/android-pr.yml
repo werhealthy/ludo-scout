@@ -4,6 +4,11 @@ on:
   pull_request:
     branches:
       - beta
+  # Temporary branch-local CI trigger: the PR webhook did not materialise a run for #25.
+  # Remove before merge; this executes the exact same validation job on the PR head.
+  push:
+    branches:
+      - work/adaptive-engine-fairness
 
 permissions:
   contents: read
