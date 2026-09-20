@@ -1249,6 +1249,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         MarketStore.RuntimeStatus bggReviewWrite=marketDiag.diagnosticState("bgg_match_review_write");
         String bggReviewWriteSummary=bggReviewWrite.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggReviewWrite.updatedAt)+", "+bggReviewWrite.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
+        long engineEpochStart=db.engineEpochStart();
+        String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
         String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
@@ -1347,6 +1349,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "vintedPublicRequestsLocal="+p.getLong("vintedPublicRequests",0)+"\n"+
                 "vintedPublicCacheHitsLocal="+p.getLong("vintedPublicCacheHits",0)+"\n"+
                 "vintedRequestLedger={"+VintedPublicSession.requestLedgerSummary(context)+"}\n"+
+                "engineEpoch={"+engineEpochSummary+"}\n"+
                 "engineRun={"+engineRunSummary+"}\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
