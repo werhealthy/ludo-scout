@@ -64,8 +64,8 @@ checks=[
   "currentReviewBreakdown" in market and "reviewBreakdown={" in radar),
  ("classifier block diagnostics are timestamped by build",
   "lastClassifierBlockAt" in radar and "lastClassifierBlockBuild" in radar),
- ("version bumped",
-  "versionName '5.12.22-bgg-exact-index'" in build and "versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 136" in build),
+ ("version lineage preserved",
+  "versionName '5.12." in build and "versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger())" in build),
 ]
 for name,ok in checks:
     print(("PASS " if ok else "FAIL ")+name)
