@@ -579,13 +579,16 @@ public final class MarketStore {
     public List<VintedCard> pendingAnalysisCards(int limit) {
         List<VintedCard> out = new ArrayList<>();
         DealDatabase.ObservationSession active=helper.activeObservationSession();
-        String runFilter=active==null?"":" AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN " +
+        // No current Motore run means no classifier work. This prevents an expired old run from
+        // being silently resurrected after the 10-minute product SLA.
+        if(active==null)return out;
+        String runFilter=" AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN " +
                 "(SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
         String sql = "SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text " +
                 "FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS'" + runFilter +
                 " ORDER BY last_seen DESC LIMIT ?";
         java.util.ArrayList<String> args=new java.util.ArrayList<>();
-        if(active!=null){args.add(String.valueOf(active.startAt));args.add(String.valueOf(active.endAt));}
+        args.add(String.valueOf(active.startAt));args.add(String.valueOf(active.endAt));
         args.add(String.valueOf(Math.max(1, limit)));
         try (Cursor c = helper.getReadableDatabase().rawQuery(sql, args.toArray(new String[0]))) {
             while (c.moveToNext()) {
@@ -1050,6 +1053,26 @@ public final class MarketStore {
         notifyQueueChanged();
     }
 
+    /** Automatic ambiguity is not a user task. Ordinary rows that cannot be resolved safely are
+     * parked reversibly; an explicit Hunt/manual request keeps the old human-review path. */
+    public void autoExcludeJob(Job job,String reason){
+        if(job==null)return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        db.beginTransaction();try{
+            ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","auto-excluded: "+safe(reason));
+            db.update("processing_jobs",j,"id=?",new String[]{String.valueOf(job.id)});
+            ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_EXCLUDED");l.put("last_error",safe(reason));l.put("manual_review_required",0);l.putNull("manual_review_reason");
+            db.update("market_listings",l,"id=?",new String[]{String.valueOf(job.listingId)});
+            String sig=scalarString(db,"SELECT legacy_signature FROM market_listings WHERE id=?",new String[]{String.valueOf(job.listingId)});
+            if(!TextUtils.isEmpty(sig)){ContentValues d=new ContentValues();d.put("lifecycle","USER_HIDDEN");d.put("verification_state","AUTO_EXCLUDED");d.put("verification_reason",safe(reason));db.update("deals",d,"signature=?",new String[]{sig});}
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        notifyQueueChanged();
+    }
+
+    public static boolean isExplicitUserPriority(Job job){
+        return job!=null&&("HUNT_PRIORITY".equals(job.source)||"MANUAL_PRIORITY".equals(job.source));
+    }
+
     private void markManualReviewOpen(long listingId,String reason){
         if(listingId<=0)return;ContentValues r=new ContentValues();r.put("manual_review_required",1);r.put("manual_review_reason",safe(reason));helper.getWritableDatabase().update("market_listings",r,"id=?",new String[]{String.valueOf(listingId)});
     }
@@ -1318,7 +1341,7 @@ public final class MarketStore {
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=0;
+        int changed=expireOverdueEngineWork(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -1350,13 +1373,20 @@ public final class MarketStore {
                     "job_type=? AND source=? AND state IN (?,?) AND listing_id IN (SELECT id FROM market_listings WHERE lifecycle='UNKNOWN')",
                     new String[]{JOB_VINTED,HISTORICAL_SOURCE,PENDING,FAILED_RETRYABLE});
 
+            String deterministicWhere="job_type=? AND state=? AND ((last_error LIKE ?) OR (attempt>=2 AND (last_error LIKE ? OR last_error LIKE ? OR last_error LIKE ? OR last_error LIKE ? OR last_error LIKE ?)))";
+            String[] deterministicArgs=new String[]{JOB_VINTED,FAILED_RETRYABLE,"Pagina Vinted non disponibile (404)%","nessun candidato Vinted abbastanza univoco%","metadati seller/foto non disponibili%","Nessun annuncio compatibile%","Più annunci compatibili%","Ho trovato un annuncio, ma titolo e prezzo non corrispondono abbastanza%"};
+            // Only explicit user intent deserves a durable manual question. Automatic misses leave
+            // the product quietly and never inflate the review inbox.
             ContentValues blocked=new ContentValues();blocked.put("state",FAILED_PERMANENT);blocked.put("next_attempt_at",0);blocked.put("updated_at",now);
-            int deterministic=db.update("processing_jobs",blocked,"job_type=? AND state=? AND ((last_error LIKE ?) OR (attempt>=2 AND (last_error LIKE ? OR last_error LIKE ? OR last_error LIKE ? OR last_error LIKE ? OR last_error LIKE ?)))",new String[]{JOB_VINTED,FAILED_RETRYABLE,"Pagina Vinted non disponibile (404)%","nessun candidato Vinted abbastanza univoco%","metadati seller/foto non disponibili%","Nessun annuncio compatibile%","Più annunci compatibili%","Ho trovato un annuncio, ma titolo e prezzo non corrispondono abbastanza%"});
-            if(deterministic>0){
-                ContentValues review=new ContentValues();review.put("enrichment_state","NEEDS_REVIEW");
-                db.update("market_listings",review,"id IN (SELECT listing_id FROM processing_jobs WHERE job_type=? AND state=? AND listing_id IS NOT NULL) AND enrichment_state<>'COMPLETE'",new String[]{JOB_VINTED,FAILED_PERMANENT});
+            int explicit=db.update("processing_jobs",blocked,deterministicWhere+" AND source IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",deterministicArgs);
+            if(explicit>0){ContentValues review=new ContentValues();review.put("enrichment_state","NEEDS_REVIEW");review.put("manual_review_required",1);review.put("manual_review_reason","Collegamento Vinted ambiguo su richiesta esplicita");db.update("market_listings",review,"id IN (SELECT listing_id FROM processing_jobs WHERE job_type=? AND state=? AND source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') AND listing_id IS NOT NULL) AND enrichment_state<>'COMPLETE'",new String[]{JOB_VINTED,FAILED_PERMANENT});}
+            ContentValues autoDone=new ContentValues();autoDone.put("state",COMPLETE);autoDone.put("next_attempt_at",0);autoDone.put("updated_at",now);autoDone.put("progress",100);autoDone.put("processing_started_at",0);autoDone.put("last_error","auto-excluded: collegamento Vinted non abbastanza sicuro");
+            int automatic=db.update("processing_jobs",autoDone,deterministicWhere+" AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",deterministicArgs);
+            if(automatic>0){
+                ContentValues excluded=new ContentValues();excluded.put("lifecycle","AUTO_FILTERED");excluded.put("enrichment_state","AUTO_EXCLUDED");excluded.put("manual_review_required",0);excluded.putNull("manual_review_reason");excluded.put("last_error","Collegamento Vinted non abbastanza sicuro");
+                db.update("market_listings",excluded,"id IN (SELECT listing_id FROM processing_jobs WHERE job_type=? AND state=? AND last_error LIKE 'auto-excluded:%' AND listing_id IS NOT NULL)",new String[]{JOB_VINTED,COMPLETE});
             }
-            changed+=deterministic;
+            changed+=explicit+automatic;
             // A batch-linked item may still be waiting for the richer item page to confirm the exact
             // BGG variant. If no deep-metadata job remains, automatic work is over: keep the row in
             // the persistent human-review inbox instead of leaving the run permanently stuck.
@@ -1366,6 +1396,32 @@ public final class MarketStore {
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
         if(changed>0)notifyQueueChanged();
+        return changed;
+    }
+
+    /** Close head-of-line debt once the product SLA is over. The raw observation and price
+     * history remain, but unresolved automatic rows stop owning the Motore and cannot leak to Home. */
+    public int expireOverdueEngineWork(long now){
+        List<DealDatabase.ObservationSession> sessions=helper.recentObservationSessions(Math.max(engineEpochStart(),now-24L*60L*60_000L),40);
+        int changed=0;SQLiteDatabase db=helper.getWritableDatabase();
+        for(DealDatabase.ObservationSession s:sessions){
+            if(s==null||!DealDatabase.engineSlaExpired(s,now)||DealDatabase.engineContentSettled(s))continue;
+            db.beginTransaction();try{
+                String inRun="COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
+                String unresolved="lifecycle='ACTIVE' AND COALESCE(manual_review_required,0)=0 AND "+inRun+
+                        " AND ((vinted_item_id IS NULL OR vinted_item_id='') OR (vinted_url IS NULL OR vinted_url='') OR match_state<>'MATCHED' OR enrichment_state='PENDING_ANALYSIS')"+
+                        " AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=market_listings.id AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') AND p.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
+                List<Long> ids=new ArrayList<>();try(Cursor x=db.rawQuery("SELECT id FROM market_listings WHERE "+unresolved,new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){while(x.moveToNext())ids.add(x.getLong(0));}
+                for(Long id:ids){
+                    if(id==null)continue;String sig=scalarString(db,"SELECT legacy_signature FROM market_listings WHERE id=?",new String[]{String.valueOf(id)});
+                    ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_EXCLUDED");l.put("last_error","Motore: limite di 10 minuti raggiunto");l.put("manual_review_required",0);l.putNull("manual_review_reason");changed+=db.update("market_listings",l,"id=?",new String[]{String.valueOf(id)});
+                    ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("progress",100);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("processing_started_at",0);j.put("last_error","auto-excluded: Motore SLA 10 minuti");db.update("processing_jobs",j,"listing_id=? AND state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",new String[]{String.valueOf(id)});
+                    if(!TextUtils.isEmpty(sig)){ContentValues d=new ContentValues();d.put("lifecycle","USER_HIDDEN");d.put("verification_state","AUTO_EXCLUDED");d.put("verification_reason","Motore: limite di 10 minuti raggiunto");db.update("deals",d,"signature=? AND COALESCE(verification_state,'') NOT IN ('USER_CONFIRMED')",new String[]{sig});}
+                }
+                db.setTransactionSuccessful();
+            }finally{db.endTransaction();}
+        }
+        if(changed>0){setDiagnosticState("engine_sla",changed,"build=engine-sla-v1;expired="+changed+";limitMs="+DealDatabase.ENGINE_RUN_SLA_MS);notifyQueueChanged();}
         return changed;
     }
 
