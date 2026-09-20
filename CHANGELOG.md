@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.13 — BGG cold-index + single-flight
+- Removed the queue-process global all-alias exact-name map that could dominate BGG matcher cold start after an APK/process restart.
+- The local catalog is now parsed once into shared game objects plus a direct BGG-id map; exact title/alias lookups are lazy in-memory scans cached in a bounded 64-query LRU.
+- Preserved queue fuzzy matching on the same shared catalog and the disk-streaming manual/UI path.
+- Added single-flight protection so QueueKeepAliveService and WorkManager cannot execute duplicate local BGG identity batches concurrently.
+- `bggLocalMatch` v3 now reports index load time and exact-cache telemetry for Pixel validation.
+- Added `regression/bgg_cold_index_singleflight_v51213.py` and updated older index regressions for the new architecture.
+- No schema/data reset, request-rate, signing, applicationId or CI versionCode-strategy changes.
+
 ## 5.12.12 — BGG review-write accountability
 - Added transactional, directly observable accounting for the three provisional BGG rows that still appeared stuck after the state-monotonicity fix.
 - `markBggMatchReview()` now validates the current row inside its write transaction, protects a concurrent authoritative match, returns the actual write count, and keeps linked listing review state in the same transaction.
