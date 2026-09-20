@@ -13,6 +13,7 @@
 - Bumped the BGG match algorithm version to 4 so older unresolved review cases can be reconsidered under the stricter trust rule.
 - Added a read-only contamination audit (`bggIdentityTrust`) including the count of seller aliases and already-matched games that remain candidates for a later controlled revalidation pass.
 - Added `regression/bgg_identity_provenance_v5125.py` and wired it into Android beta CI.
+- Added non-distributive `Android PR validation` for pull requests targeting `beta`: regressions plus Java compile before merge, without Firebase or signing-secret use.
 - Existing matched rows are preserved in this step: no destructive reset and no schema migration. Signing, applicationId, CI versionCode strategy and Vinted request pacing are unchanged.
 
 ## 5.12.4 — Performance stability
