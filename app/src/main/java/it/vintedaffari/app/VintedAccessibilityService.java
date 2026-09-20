@@ -1300,9 +1300,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
         long engineEpochStart=engineEpochForExit;long engineDiagNow=System.currentTimeMillis();
         String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
         long runAgeMs=engineRun==null?0L:Math.max(0L,engineDiagNow-engineRun.startAt),runSinceEndMs=engineRun==null?0L:Math.max(0L,engineDiagNow-engineRun.endAt);
-        long runSlaRemainingMs=engineRun==null?0L:Math.max(0L,DealDatabase.ENGINE_RUN_SLA_MS-runSinceEndMs);
+        long runTargetMs=engineRun==null?0L:DealDatabase.engineTargetMs(engineRun);
+        long runTargetRemainingMs=engineRun==null?0L:Math.max(0L,runTargetMs-runSinceEndMs);
         int runReviewPct=engineRun==null||engineRun.validListings<=0?0:Math.round(engineRun.reviewListings*100f/engineRun.validListings);
-        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";ageMs="+runAgeMs+";sinceEndMs="+runSinceEndMs+";slaRemainingMs="+runSlaRemainingMs+";reviewPct="+runReviewPct+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
+        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";ageMs="+runAgeMs+";sinceEndMs="+runSinceEndMs+";targetMs="+runTargetMs+";targetRemainingMs="+runTargetRemainingMs+";timingNonDestructive=true;reviewPct="+runReviewPct+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
         DealDatabase.ObservationSession firstWaiting=null;
         if(engineRun!=null&&engineWaitingRuns>0){
             for(DealDatabase.ObservationSession candidate:db.recentObservationSessions(engineEpochStart,20)){
