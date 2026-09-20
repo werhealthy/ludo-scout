@@ -1241,6 +1241,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         MarketStore.RuntimeStatus priceRefresh=marketDiag.diagnosticState("verified_price_refresh");
         String priceRefreshSummary=priceRefresh.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-priceRefresh.updatedAt)+", "+priceRefresh.detail);
         String bggIdentityTrustSummary=marketDiag.bggIdentityTrustSummary();
+        MarketStore.RuntimeStatus bggLocalMatch=marketDiag.diagnosticState("bgg_local_match");
+        String bggLocalMatchSummary=bggLocalMatch.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggLocalMatch.updatedAt)+", "+bggLocalMatch.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
         String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
         db.close();
@@ -1345,6 +1347,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
                 "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+
                 "bggHistoricalRevalidation={"+marketDiag.historicalBggRevalidationSummary()+"}\n"+
+                "bggLocalMatch={"+bggLocalMatchSummary+"}\n"+
                 "vintedPriceRefresh={"+priceRefreshSummary+"}\n"+
                 "vintedCandidateSnapshotStore={"+VintedCandidateSnapshotStore.summary(context)+"}\n"+
                 "vintedPublicHourlyBudget="+VintedPublicSession.hourlyBudget()+"\n"+
