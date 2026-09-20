@@ -49,6 +49,11 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Run pricing regression tests
+        env:
+          BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
+        run: ./gradlew --no-daemon testDebugUnitTest
+
       - name: Build debug APK
         env:
           BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
