@@ -30,20 +30,12 @@ public final class QueueDrainWorker extends Worker {
     @NonNull @Override public Result doWork() {
         Context context = getApplicationContext();
         QueueWorkScheduler.ensureRecovery(context);
+        // Recovery never competes with the foreground owner in the same process. A stale lane is
+        // repaired by QueueKeepAliveService's supervisor; if the process itself is wedged, this
+        // Worker cannot rescue it because SystemJobService shares the same main process anyway.
+        if (QueueKeepAliveService.isRunning()) return Result.success();
         DealDatabase db = new DealDatabase(context);
         MarketStore market = new MarketStore(context, db);
-        // WorkManager is recovery, but a living Service process is not enough evidence that its
-        // consumer lanes are alive. v5.11.11's process heartbeat could stay fresh even while the
-        // Vinted executor had stopped making progress. Only stand down when every due lane has a
-        // fresh lane-specific heartbeat (or Vinted is intentionally pacing).
-        if (QueueKeepAliveService.isRunning()) {
-            long now=System.currentTimeMillis();
-            int vd=market.runnableVintedDueCount(now), bd=market.runnableBggDueCount(now), hp=market.historicalBggRevalidationPendingCount();
-            long vh=market.laneHeartbeatAt("vinted"), bh=market.laneHeartbeatAt("bgg");
-            boolean vHealthy=vd<=0 || VintedPublicSession.nextAllowedAt(context)>now || market.processingVintedCount()>0 || (vh>0&&now-vh<45_000L);
-            boolean bHealthy=(bd<=0&&hp<=0) || market.processingCount(MarketStore.JOB_BGG)>0 || (bh>0&&now-bh<45_000L);
-            if(vHealthy&&bHealthy)return Result.success();
-        }
         market.resetStaleProcessingOlderThan(15 * 60_000L);
         market.reconcileQueue();
         market.touchProcessorHeartbeat();
