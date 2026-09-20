@@ -29,7 +29,7 @@ public final class QueueJobRunner {
         if(market==null||matcher==null||market.isBggPaused())return 0;
         long batchStarted=android.os.SystemClock.elapsedRealtime();
         List<GameRecord> pending=market.provisionalGamesForMatching(Math.max(1,Math.min(40,limit)));
-        int handled=0,fuzzySearches=0,matched=0,reviewed=0,quarantined=0;
+        int handled=0,fuzzySearches=0,matched=0,reviewDecisions=0,reviewWrites=0,reviewWriteMisses=0,quarantined=0;
         for(GameRecord g:pending){
             if(g==null)continue;
             try{
@@ -77,16 +77,24 @@ public final class QueueJobRunner {
                 if(chosen!=null){market.assignAutoBggMatch(g.id,chosen,confidence);matched++;}
                 else {
                     BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.unresolvedTitle(g.name,fuzzyCandidates,sawAmbiguousExact);
-                    if(gate.action==BoardGameIntakeGate.Action.REVIEW){market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);reviewed++;}
+                    if(gate.action==BoardGameIntakeGate.Action.REVIEW){
+                        reviewDecisions++;int changed=market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);
+                        if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;
+                    }
                     else{market.autoQuarantineGame(g.id,gate.reason);quarantined++;}
                 }
                 handled++;market.touchLaneHeartbeat("bgg");
-            }catch(Throwable t){market.markBggMatchReview(g.id,"Errore match locale: "+safe(t));reviewed++;handled++;}
+            }catch(Throwable t){
+                reviewDecisions++;int changed=market.markBggMatchReview(g.id,"Errore match locale: "+safe(t));
+                if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;handled++;
+            }
         }
         long elapsed=android.os.SystemClock.elapsedRealtime()-batchStarted;
+        int remainingRequired=market.bggMatchRequiredCount();
         market.setDiagnosticState("bgg_local_match",handled,
-                "build=bgg-local-match-v1;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
-                        ";review="+reviewed+";quarantined="+quarantined+";elapsedMs="+elapsed);
+                "build=bgg-local-match-v2;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
+                        ";reviewDecisions="+reviewDecisions+";reviewWrites="+reviewWrites+";reviewWriteMisses="+reviewWriteMisses+
+                        ";quarantined="+quarantined+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed);
         return handled;
     }
 
