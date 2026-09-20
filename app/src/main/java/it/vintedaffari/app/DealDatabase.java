@@ -16,7 +16,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public static final class MissingCounts { public int published, metadata, link, bgg; }
     public static final class ObservationSession {
         public long startAt,endAt;
-        public int observations,uniqueListings,pendingListings,analysisPendingListings,validListings,bggMatchedListings,vintedLinkedListings,completeListings,reviewListings;
+        public int observations,uniqueListings,pendingListings,analysisPendingListings,validListings,bggMatchedListings,vintedLinkedListings,completeListings,reviewListings,heldListings;
         /** Core Vinted identity work is the expensive remote part of a run. coreWorkListings is
          * stable enough for the run target; corePendingListings drives the live ETA. */
         public int coreWorkListings,corePendingListings;
@@ -24,7 +24,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
     public static final class ObservationDay {
         public long startAt,endAt;
-        public int sessions,observations,uniqueListings,validListings,bggMatchedListings,vintedLinkedListings,completeListings,reviewListings;
+        public int sessions,observations,uniqueListings,validListings,bggMatchedListings,vintedLinkedListings,completeListings,reviewListings,heldListings;
         ObservationDay(long start,long end){startAt=start;endAt=end;}
     }
     /** One row in the engine run inspector. This intentionally reads the canonical marketplace
@@ -34,7 +34,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         public long listingId,gameId;
         public String signature,title,canonical,bggId,imageUrl,listingState,listingMatchState,gameState,publishedLabel,languageCode;
         public int priceCents;
-        public boolean bggReady,vintedReady,complete,review;
+        public boolean bggReady,vintedReady,complete,review,held;
     }
 
     public static final long ENGINE_SESSION_GAP_MS=3L*60_000L;
@@ -70,7 +70,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public static boolean engineContentSettled(ObservationSession s){
         if(s==null)return true;
         if(s.analysisPendingListings>0)return false;
-        return s.validListings==0||s.completeListings+s.reviewListings>=s.validListings;
+        return s.validListings==0||s.completeListings+s.reviewListings+s.heldListings>=s.validListings;
     }
     public static long engineTargetMs(ObservationSession s){
         if(s==null)return ENGINE_RUN_TARGET_MIN_MS;
@@ -86,7 +86,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         if(s==null||engineContentSettled(s))return 0L;
         long remote=(long)Math.max(0,s.corePendingListings)*ENGINE_RUN_REMOTE_UNIT_MS;
         long local=s.analysisPendingListings>0?ENGINE_RUN_LOCAL_ETA_MS:0L;
-        int unresolved=Math.max(0,s.validListings-s.completeListings-s.reviewListings);
+        int unresolved=Math.max(0,s.validListings-s.completeListings-s.reviewListings-s.heldListings);
         if(remote==0&&unresolved>0)local=Math.max(local,ENGINE_RUN_LOCAL_ETA_MS);
         return remote+local;
     }
@@ -233,25 +233,29 @@ public final class DealDatabase extends SQLiteOpenHelper {
      * metadata such as publication time may remain unavailable after best-effort enrichment without
      * keeping the whole scroll permanently "unfinished". */
     private int[] engineRangeCounts(long startAt,long endAt){
-        startAt=clampEngineStart(startAt);if(endAt<startAt)return new int[5];
+        startAt=clampEngineStart(startAt);if(endAt<startAt)return new int[6];
         String eligible="l.id IS NOT NULL AND l.lifecycle='ACTIVE' AND l.enrichment_state NOT IN ('AUTO_EXCLUDED','AUTO_FILTERED') AND g.id IS NOT NULL AND g.database_visible=1 AND g.rating>=6.0";
         String bgg=eligible+" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'";
         String vinted=bgg+" AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''";
-        String attention="("+eligible+" AND (COALESCE(l.manual_review_required,0)=1 OR l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' OR g.match_state='BGG_MATCH_REVIEW' OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')))";
-        String ready=vinted+" AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.job_type<>'VINTED_DEEP_ENRICHMENT' AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
+        // Actionable review must describe the inbox the user can actually open. Historical/trust
+        // holds stay non-publishable, but must not masquerade as a question for the user.
+        String attention="("+eligible+" AND (COALESCE(l.manual_review_required,0)=1 OR (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id=''))))";
+        String trustHold="("+eligible+" AND NOT "+attention+" AND (l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')))";
+        String ready=vinted+" AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT "+trustHold+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.job_type<>'VINTED_DEEP_ENRICHMENT' AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
         String sql="SELECT COUNT(DISTINCT CASE WHEN "+eligible+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+bgg+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+vinted+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+ready+" THEN l.id END),"+
-                "COUNT(DISTINCT CASE WHEN "+attention+" THEN l.id END) "+
+                "COUNT(DISTINCT CASE WHEN "+attention+" THEN l.id END),"+
+                "COUNT(DISTINCT CASE WHEN "+trustHold+" THEN l.id END) "+
                 "FROM observations o LEFT JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
                 "LEFT JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature "+
                 "WHERE o.observed_at>=? AND o.observed_at<=?";
-        int[] out=new int[5];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<5;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
+        int[] out=new int[6];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<6;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
     }
 
     private void fillEngineCounts(ObservationSession s){
-        if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];
+        if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];s.heldListings=n[5];
         // Raw observation rows are historical telemetry and older builds could leave duplicate
         // PENDING_ANALYSIS rows behind for one signature. Product progress must follow the current
         // canonical listing state, otherwise an already-analysed card can keep an old job alive.
@@ -262,7 +266,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
                 "JOIN processing_jobs j ON j.listing_id=l.id AND j.job_type=? WHERE o.observed_at>=? AND o.observed_at<=?";
         try(Cursor c=getReadableDatabase().rawQuery(coreSql,new String[]{MarketStore.JOB_VINTED,String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst()){s.coreWorkListings=c.getInt(0);s.corePendingListings=c.getInt(1);}}
-        s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings)+s.analysisPendingListings;
+        s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings-s.heldListings)+s.analysisPendingListings;
     }
 
     public synchronized ObservationSession latestObservationSession(){List<ObservationSession> x=recentObservationSessions(System.currentTimeMillis()-7L*24L*60L*60_000L,1);return x.isEmpty()?null:x.get(0);}
@@ -334,7 +338,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
 
     public synchronized List<ObservationDay> recentObservationDays(int days){
         List<ObservationDay> out=new ArrayList<>();Calendar cal=Calendar.getInstance();cal.set(Calendar.HOUR_OF_DAY,0);cal.set(Calendar.MINUTE,0);cal.set(Calendar.SECOND,0);cal.set(Calendar.MILLISECOND,0);
-        long epoch=engineEpochStart();for(int i=0;i<Math.max(1,days);i++){long dayStart=cal.getTimeInMillis(),end=dayStart+24L*60L*60_000L-1;if(epoch>0&&end<epoch){cal.add(Calendar.DAY_OF_YEAR,-1);continue;}long start=Math.max(dayStart,epoch);int observations=0,unique=0;try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*),COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(start),String.valueOf(end)})){if(c.moveToFirst()){observations=c.getInt(0);unique=c.getInt(1);}}if(observations>0){ObservationDay d=new ObservationDay(start,end);d.observations=observations;d.uniqueListings=unique;List<ObservationSession> sessions=observationSessionsBetween(start,end,100);d.sessions=sessions.size();int[] n=engineRangeCounts(start,end);d.validListings=n[0];d.bggMatchedListings=n[1];d.vintedLinkedListings=n[2];d.completeListings=n[3];d.reviewListings=n[4];out.add(d);}cal.add(Calendar.DAY_OF_YEAR,-1);}
+        long epoch=engineEpochStart();for(int i=0;i<Math.max(1,days);i++){long dayStart=cal.getTimeInMillis(),end=dayStart+24L*60L*60_000L-1;if(epoch>0&&end<epoch){cal.add(Calendar.DAY_OF_YEAR,-1);continue;}long start=Math.max(dayStart,epoch);int observations=0,unique=0;try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*),COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(start),String.valueOf(end)})){if(c.moveToFirst()){observations=c.getInt(0);unique=c.getInt(1);}}if(observations>0){ObservationDay d=new ObservationDay(start,end);d.observations=observations;d.uniqueListings=unique;List<ObservationSession> sessions=observationSessionsBetween(start,end,100);d.sessions=sessions.size();int[] n=engineRangeCounts(start,end);d.validListings=n[0];d.bggMatchedListings=n[1];d.vintedLinkedListings=n[2];d.completeListings=n[3];d.reviewListings=n[4];d.heldListings=n[5];out.add(d);}cal.add(Calendar.DAY_OF_YEAR,-1);}
         return out;
     }
 
@@ -350,15 +354,16 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
                 "AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.enrichment_state<>'NEEDS_REVIEW' "+
                 "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) THEN 1 ELSE 0 END,"+
-                "CASE WHEN COALESCE(l.manual_review_required,0)=1 OR l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' OR g.match_state='BGG_MATCH_REVIEW' "+
-                "OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') THEN 1 ELSE 0 END "+
+                "CASE WHEN COALESCE(l.manual_review_required,0)=1 OR (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id='')) THEN 1 ELSE 0 END,"+
+                "CASE WHEN COALESCE(l.manual_review_required,0)=0 AND NOT (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id='')) AND (l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' "+
+                "OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')) THEN 1 ELSE 0 END "+
                 "FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
                 "LEFT JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature "+
                 "WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND g.id IS NOT NULL AND g.database_visible=1 AND (g.rating IS NULL OR g.rating>=6.0) "+
                 "GROUP BY l.id ORDER BY l.last_seen DESC LIMIT ?";
         try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt),String.valueOf(Math.max(1,limit))})){
-            while(c.moveToNext()){EngineRunItem x=new EngineRunItem();int i=0;x.listingId=c.getLong(i++);x.gameId=c.getLong(i++);x.signature=c.getString(i++);x.title=c.getString(i++);x.canonical=c.getString(i++);x.bggId=c.getString(i++);x.imageUrl=c.getString(i++);x.listingState=c.getString(i++);x.listingMatchState=c.getString(i++);x.gameState=c.getString(i++);x.publishedLabel=c.getString(i++);x.languageCode=c.getString(i++);x.priceCents=c.getInt(i++);x.bggReady=c.getInt(i++)!=0;x.vintedReady=c.getInt(i++)!=0;x.complete=c.getInt(i++)!=0;x.review=c.getInt(i)!=0;
-                boolean keep="all".equals(mode)||"bgg".equals(mode)||("vinted".equals(mode)&&x.bggReady)||("ready".equals(mode)&&x.complete)||("review".equals(mode)&&x.review)||("metadata".equals(mode)&&x.vintedReady&&!x.complete&&!x.review);if(keep)out.add(x);
+            while(c.moveToNext()){EngineRunItem x=new EngineRunItem();int i=0;x.listingId=c.getLong(i++);x.gameId=c.getLong(i++);x.signature=c.getString(i++);x.title=c.getString(i++);x.canonical=c.getString(i++);x.bggId=c.getString(i++);x.imageUrl=c.getString(i++);x.listingState=c.getString(i++);x.listingMatchState=c.getString(i++);x.gameState=c.getString(i++);x.publishedLabel=c.getString(i++);x.languageCode=c.getString(i++);x.priceCents=c.getInt(i++);x.bggReady=c.getInt(i++)!=0;x.vintedReady=c.getInt(i++)!=0;x.complete=c.getInt(i++)!=0;x.review=c.getInt(i++)!=0;x.held=c.getInt(i)!=0;
+                boolean keep="all".equals(mode)||"bgg".equals(mode)||("vinted".equals(mode)&&x.bggReady)||("ready".equals(mode)&&x.complete)||("review".equals(mode)&&x.review)||("metadata".equals(mode)&&x.vintedReady&&!x.complete&&!x.review&&!x.held);if(keep)out.add(x);
             }
         }return out;
     }

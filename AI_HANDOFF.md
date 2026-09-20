@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.25-adaptive-engine-fairness`
-- versionCode: `139`
+- Baseline version: `5.12.26-recovery-review-price-gates`
+- versionCode: `140`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -38,7 +38,9 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Motore timing is workload-aware: the target uses core Vinted identity work, while the live ETA uses core candidates still pending. Raw card count is only a temporary conservative fallback before jobs are materialised.
 - One ordinary run owns the automatic Vinted/BGG lane at a time. If another unfinished scroll is waiting, the owner yields after a 10-minute service slice; unfinished listings remain intact and the run resumes in round-robin continuation. With no competing run, it simply keeps working past ten minutes.
 - LIVE_DEAL, HUNT_PRIORITY and explicit manual work can preempt ordinary backlog work.
-- Manual review is reserved for explicit Hunt/manual intent and truly narrow BGG ambiguity. Ordinary automatic misses are reversibly auto-excluded instead of becoming user work.
+- Manual review is reserved for cases with an actual user action available. Historical/trust holds stay non-publishable but are not counted or labelled as actionable review.
+- Manual Vinted recovery is target-only: search-result cards visible during the recovery flow must not create ordinary observations/jobs. Exact Vinted identity still requires an exact item URL/id; a single visible search result is not sufficient evidence by itself.
+- Clearly overpriced ordinary listings may be filtered before Vinted network identity only under a conservative ask-price gate (at least 2× and €25 above an existing used-market reference). HUNT_PRIORITY and MANUAL_PRIORITY are exempt.
 - A ready card requires confirmed BGG, exact Vinted item/url, core identity enrichment, no open review and no open core automatic job. Optional deep metadata must not block readiness.
 - Publication date, language and price should be retained when technically available; do not silently drop required data just to make a card look complete.
 
@@ -106,6 +108,18 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.26 Recovery scope, review truth and early price gate
+
+- Pixel/debug evidence on 5.12.25 showed three deterministic UX/cost problems: manual Vinted recovery polluted Motore with the surrounding Vinted search results; Motore reported two “ambiguous” rows while the actionable inbox was empty (`historicalHeld=2`); and 18 of 21 valid games were still candidates for core Vinted identity even though some listings were economically hopeless.
+- Manual Vinted recovery is now stored in SQLite as a cross-process target-only scope. Accessibility can still use an explicit exact item-id hint for the target if Vinted exposes one, but all surrounding search-result cards are discarded before observation/thumbnail/job persistence. Returning to Ludo closes the recovery scope. Explicit “Confronta prezzi su Vinted” market-scan behavior is unchanged.
+- Recovery UI explicitly explains that even one visible search result is not enough for an exact link when Vinted does not expose the item URL/id in Accessibility; the user opens/shares the exact item or pastes its URL.
+- Motore now separates `reviewListings` (a real inbox choice) from `heldListings` (non-publishable trust/history state with no user action). Historical `MATCH_UNCERTAIN` no longer creates a phantom “Ambigui” count. Held rows count as automatically settled but remain excluded from trusted Home/Scopri.
+- Added a conservative zero-network price gate before deferred Vinted promotion: an ordinary unlinked listing with an existing used reference is filtered from the automatic product path only when the seller ask is at least 2× the reference and at least €25 above it. Raw/game history remains; Hunt/manual intent bypasses the optimization.
+- Queue reconciliation and repeated matched-noise maintenance now run through the existing maintenance executor after the shell is built, instead of synchronously in Activity startup. This addresses the observed UI ANR/SQLite contention path without changing queue ownership or request pacing.
+- Diagnostics add `manualRecovery`, `manualRecoveryState`, `earlyPriceFilter`, and Motore `held`.
+- Regression: `regression/recovery_review_price_gates_v51226.py`.
+- No schema migration, request-rate increase, signing/applicationId/Firebase/secrets/CI-versionCode-strategy change.
 
 ## 5.12.25 Adaptive Motore fairness
 

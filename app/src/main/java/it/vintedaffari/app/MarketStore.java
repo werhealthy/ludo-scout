@@ -52,6 +52,7 @@ public final class MarketStore {
     private static final String BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:";
     private static final String ENGINE_RUN_CURSOR = "engine_run_cursor_start";
     private static final String ENGINE_RUN_SLICE = "engine_run_slice";
+    private static final String MANUAL_VINTED_RECOVERY = "manual_vinted_recovery";
 
     public static final class Job {
         public long id, listingId, gameId, displayGameId, nextAttemptAt, processingStartedAt;
@@ -67,6 +68,14 @@ public final class MarketStore {
     public static final class RuntimeStatus {
         public String state="", detail="";
         public long value=0L, updatedAt=0L;
+    }
+
+    /** Cross-process recovery scope: while the user is searching one exact Vinted item, visible
+     * search results are context, not a new scouting session. */
+    public static final class ManualVintedRecovery {
+        public long listingId,until;
+        public String signature="",title="";
+        public boolean active(long now){return listingId>0&&until>now;}
     }
 
     public static final class OperationalEpochSummary {
@@ -115,6 +124,30 @@ public final class MarketStore {
     public MarketStore(Context context, DealDatabase helper) {
         this.context = context.getApplicationContext();
         this.helper = helper;
+    }
+
+    public void beginManualVintedRecovery(long listingId,String signature,String title,long ttlMs){
+        if(listingId<=0)return;long now=System.currentTimeMillis(),until=now+Math.max(60_000L,ttlMs);
+        try{JSONObject o=new JSONObject();o.put("until",until);o.put("signature",safe(signature));o.put("title",safe(title));
+            ContentValues v=new ContentValues();v.put("name",MANUAL_VINTED_RECOVERY);v.put("value",listingId);v.put("updated_at",now);v.put("text_value",o.toString());
+            helper.getWritableDatabase().insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+            setDiagnosticState("manual_vinted_recovery",1,"state=ACTIVE;listing="+listingId+";until="+until+";scope=target-only");
+        }catch(Exception ignored){}
+    }
+
+    public ManualVintedRecovery activeManualVintedRecovery(long now){
+        ManualVintedRecovery out=new ManualVintedRecovery();
+        try(Cursor cur=helper.getReadableDatabase().rawQuery("SELECT value,text_value FROM queue_controls WHERE name=? LIMIT 1",new String[]{MANUAL_VINTED_RECOVERY})){
+            if(!cur.moveToFirst())return out;out.listingId=cur.getLong(0);JSONObject o=new JSONObject(cur.isNull(1)?"{}":cur.getString(1));out.until=o.optLong("until",0L);out.signature=o.optString("signature","");out.title=o.optString("title","");
+        }catch(Exception ignored){return new ManualVintedRecovery();}
+        if(!out.active(now)){clearManualVintedRecovery(out.listingId);return new ManualVintedRecovery();}return out;
+    }
+
+    public void clearManualVintedRecovery(long listingId){
+        SQLiteDatabase db=helper.getWritableDatabase();int changed;
+        if(listingId>0)changed=db.delete("queue_controls","name=? AND value=?",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId)});
+        else changed=db.delete("queue_controls","name=?",new String[]{MANUAL_VINTED_RECOVERY});
+        if(changed>0)setDiagnosticState("manual_vinted_recovery",0,"state=IDLE;clearedListing="+listingId);
     }
 
     /** One-time UX cut-over. Old incomplete observations are removed from the active product so the
@@ -1381,10 +1414,34 @@ public final class MarketStore {
         return changed;
     }
 
+    /** Network-cost guard, not the general pricing model. We skip ordinary Vinted identity work
+     * only when the seller ask is so far above an existing used-market reference that edition/noise
+     * is unlikely to change the decision. Manual and Hunt intent always override this optimization. */
+    public int filterClearlyOverpricedAutomaticListings(long now){
+        SQLiteDatabase db=helper.getWritableDatabase();List<Long> ids=new ArrayList<>();List<String> sigs=new ArrayList<>();
+        String sql="SELECT l.id,d.signature FROM market_listings l JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND (l.vinted_url IS NULL OR l.vinted_url='') "+
+                "AND g.database_visible=1 AND g.match_state='MATCHED' AND g.rating>=? AND d.lifecycle='ACTIVE' "+
+                "AND d.benchmark_cents IS NOT NULL AND d.benchmark_cents>0 AND d.item_price_cents>=d.benchmark_cents*2.0 "+
+                "AND d.item_price_cents-d.benchmark_cents>=2500 AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=l.id AND p.job_type=? AND p.state=?) "+
+                "AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=l.id AND p.state IN (?,?,?) AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY'))";
+        try(Cursor cur=db.rawQuery(sql,new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),JOB_VINTED,PROCESSING,PENDING,PROCESSING,FAILED_RETRYABLE})){while(cur.moveToNext()){ids.add(cur.getLong(0));sigs.add(cur.getString(1));}}
+        if(ids.isEmpty())return 0;int changed=0;db.beginTransaction();try{
+            for(int i=0;i<ids.size();i++){long id=ids.get(i);String sig=sigs.get(i);
+                ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_FILTERED");l.put("last_error","Prezzo chiaramente sopra il riferimento usato; verifica Vinted evitata");changed+=db.update("market_listings",l,"id=?",new String[]{String.valueOf(id)});
+                ContentValues d=new ContentValues();d.put("lifecycle","REMOVED");d.put("verification_state","PRICE_FILTERED");d.put("verification_reason","Prezzo almeno 2× e 25 € sopra il riferimento usato; verifica Vinted non necessaria");db.update("deals",d,"signature=?",new String[]{sig});
+                ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("progress",100);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("processing_started_at",0);j.put("last_error","skipped: clearly overpriced before Vinted lookup");
+                db.update("processing_jobs",j,"listing_id=? AND job_type=? AND state IN (?,?) AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",new String[]{String.valueOf(id),JOB_VINTED,PENDING,FAILED_RETRYABLE});
+            }db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0){setDiagnosticState("early_price_filter",changed,"build=early-price-gate-v1;filtered="+changed+";rule=ask>=2x_reference_and_25eur;manualHuntExempt=true");helper.invalidateActiveObservationSessionCache();notifyQueueChanged();}
+        return changed;
+    }
+
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+filterClearlyOverpricedAutomaticListings(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -1591,7 +1648,11 @@ public final class MarketStore {
     /** Materialise only one small same-game batch. A canonical game query can then be shared by
      * VintedPublicSession's cache across several listings, while LIVE/HUNT/MANUAL priorities still preempt. */
     public int promoteDeferredVintedBatch(int limit){
-        int wanted=Math.max(1,Math.min(8,limit));SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();int queued=0;db.beginTransaction();
+        long now=System.currentTimeMillis();
+        // Enforce the price gate immediately before remote work is materialised, not only on the
+        // slower reconciliation pulse.
+        filterClearlyOverpricedAutomaticListings(now);
+        int wanted=Math.max(1,Math.min(8,limit));SQLiteDatabase db=helper.getWritableDatabase();int queued=0;db.beginTransaction();
         try{
             if(activeRunCoreVintedCount()>=8){db.setTransactionSuccessful();return 0;}
             DealDatabase.ObservationSession activeRun=helper.activeObservationSession();
@@ -1797,7 +1858,7 @@ public final class MarketStore {
      * It closes the current core job; callers may separately schedule low-priority completeness work.
      * Duplicate Vinted ids are canonicalised through the same merge path. */
     public long applyTrustedVintedLink(long jobId,long listingId,String url,String itemId,String sellerName,String imageUrl){
-        if(listingId<=0||TextUtils.isEmpty(itemId)||TextUtils.isEmpty(url))return -1L;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();long canonicalId=listingId;db.beginTransaction();try{Long target=scalarLong(db,"SELECT id FROM market_listings WHERE vinted_item_id=? AND id<>?",new String[]{itemId,String.valueOf(listingId)});if(target!=null){mergeListings(db,listingId,target);canonicalId=target;}ContentValues l=new ContentValues();l.put("vinted_item_id",itemId);l.put("vinted_url",url);if(!TextUtils.isEmpty(sellerName))l.put("seller_name",sellerName.trim());if(!TextUtils.isEmpty(imageUrl))l.put("image_url",imageUrl);l.put("enrichment_state","CORE_COMPLETE");l.put("enriched_at",now);l.put("last_error","");l.put("manual_review_required",0);l.putNull("manual_review_reason");db.update("market_listings",l,"id=?",new String[]{String.valueOf(canonicalId)});ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("last_error","");j.put("progress",100);j.put("processing_started_at",0);if(jobId>0)db.update("processing_jobs",j,"id=?",new String[]{String.valueOf(jobId)});db.update("processing_jobs",j,"listing_id=? AND job_type=? AND state IN (?,?,?,?)",new String[]{String.valueOf(canonicalId),JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,FAILED_PERMANENT});db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+listingId});db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+canonicalId});db.setTransactionSuccessful();}finally{db.endTransaction();}notifyQueueChanged();return canonicalId;
+        if(listingId<=0||TextUtils.isEmpty(itemId)||TextUtils.isEmpty(url))return -1L;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();long canonicalId=listingId;db.beginTransaction();try{Long target=scalarLong(db,"SELECT id FROM market_listings WHERE vinted_item_id=? AND id<>?",new String[]{itemId,String.valueOf(listingId)});if(target!=null){mergeListings(db,listingId,target);canonicalId=target;}ContentValues l=new ContentValues();l.put("vinted_item_id",itemId);l.put("vinted_url",url);if(!TextUtils.isEmpty(sellerName))l.put("seller_name",sellerName.trim());if(!TextUtils.isEmpty(imageUrl))l.put("image_url",imageUrl);l.put("enrichment_state","CORE_COMPLETE");l.put("enriched_at",now);l.put("last_error","");l.put("manual_review_required",0);l.putNull("manual_review_reason");db.update("market_listings",l,"id=?",new String[]{String.valueOf(canonicalId)});ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("last_error","");j.put("progress",100);j.put("processing_started_at",0);if(jobId>0)db.update("processing_jobs",j,"id=?",new String[]{String.valueOf(jobId)});db.update("processing_jobs",j,"listing_id=? AND job_type=? AND state IN (?,?,?,?)",new String[]{String.valueOf(canonicalId),JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,FAILED_PERMANENT});db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+listingId});db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+canonicalId});db.delete("queue_controls","name=? AND value IN (?,?)",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId),String.valueOf(canonicalId)});db.setTransactionSuccessful();}finally{db.endTransaction();}notifyQueueChanged();return canonicalId;
     }
 
     /** Human confirmation wrapper retained for existing manual flows. */
@@ -2298,7 +2359,7 @@ public final class MarketStore {
         if(listingId<=0)return null;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();String signature=null;db.beginTransaction();
         try{try(Cursor c=db.rawQuery("SELECT legacy_signature,temp_fingerprint FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)})){if(c.moveToFirst())signature=!TextUtils.isEmpty(c.getString(0))?c.getString(0):c.getString(1);}
             ContentValues l=new ContentValues();l.put("lifecycle","REMOVED");l.put("enrichment_state","REMOVED");l.put("last_error",safe(reason));l.put("last_seen",now);l.put("manual_review_required",0);l.putNull("manual_review_reason");db.update("market_listings",l,"id=?",new String[]{String.valueOf(listingId)});
-            ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","archiviato dall'utente: "+safe(reason));db.update("processing_jobs",j,"listing_id=? AND job_type IN (?,?) AND state IN (?,?,?,?)",new String[]{String.valueOf(listingId),JOB_VINTED,JOB_VINTED_DEEP,PENDING,PROCESSING,FAILED_RETRYABLE,FAILED_PERMANENT});db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+listingId});db.setTransactionSuccessful();
+            ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","archiviato dall'utente: "+safe(reason));db.update("processing_jobs",j,"listing_id=? AND job_type IN (?,?) AND state IN (?,?,?,?)",new String[]{String.valueOf(listingId),JOB_VINTED,JOB_VINTED_DEEP,PENDING,PROCESSING,FAILED_RETRYABLE,FAILED_PERMANENT});db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+listingId});db.delete("queue_controls","name=? AND value=?",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId)});db.setTransactionSuccessful();
         }finally{db.endTransaction();}
         notifyQueueChanged();return signature;
     }
