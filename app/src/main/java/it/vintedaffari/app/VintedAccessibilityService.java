@@ -288,9 +288,18 @@ public final class VintedAccessibilityService extends AccessibilityService {
         ProductPage product = ProductPageParser.parse(root);
         DealRecord currentProductDeal=null;
         if (product != null) {
-            handleProductPage(product);
-            currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
-            if(product.sold&&currentProductDeal!=null){database.markSold(currentProductDeal.signature);bundleDatabase.invalidate(currentProductDeal);OperationCenter.done(this,"sold:"+currentProductDeal.signature,OperationCenter.LINK,"Articolo venduto · rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;}
+            long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore==null?null:marketStore.activeOpenedVintedTarget(now);
+            boolean exactOpened=opened!=null&&opened.active(now);
+            if(exactOpened)currentProductDeal=database.findBySignature(opened.signature);
+            if(currentProductDeal==null)currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
+            long exactListingId=exactOpened?opened.listingId:(currentProductDeal==null||marketStore==null?0L:marketStore.listingIdForSignature(currentProductDeal.signature));
+            handleProductPage(product,currentProductDeal,exactListingId);
+            if(exactOpened&&marketStore!=null)marketStore.clearOpenedVintedTarget(opened.listingId);
+            if(product.sold&&currentProductDeal!=null){
+                database.markSold(currentProductDeal.signature);if(marketStore!=null&&exactListingId>0)marketStore.markSold(exactListingId);bundleDatabase.invalidate(currentProductDeal);
+                diag().edit().putString("lastOpenedVintedReconcile","sold:"+currentProductDeal.signature+";exact="+exactOpened).apply();
+                OperationCenter.done(this,"sold:"+currentProductDeal.signature,OperationCenter.LINK,"Articolo venduto · rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
+            }
             // The Vinted item page itself can expose a visible "Articoli dell'utente" rail.
             // Capture that rail as a zero-request seller snapshot only when the source seller is
             // already verified and the section boundary is narrow enough to be unambiguous.
@@ -911,18 +920,24 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(nextDelay>0)handler.postDelayed(()->scanBundleBacklog(false),nextDelay);
     }
 
-    private void handleProductPage(ProductPage page) {
+    private void handleProductPage(ProductPage page,DealRecord exactDeal,long exactListingId) {
         if (page == null || database == null) return;
         int priceCents=(int)Math.round(page.itemPrice*100.0);
         Integer ship=page.shippingPrice==null?null:(int)Math.round(page.shippingPrice*100.0);
-        database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,System.currentTimeMillis());
-        DealRecord d=database.findByTitlePrice(page.title,priceCents);
+        DealRecord d=exactDeal;
+        if(d==null){database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,System.currentTimeMillis());d=database.findByTitlePrice(page.title,priceCents);}
         String sig=d==null?"":d.signature;
+        if(d!=null){
+            if(!TextUtils.isEmpty(page.publishedLabel))database.updatePublishedLabel(sig,page.publishedLabel);
+            if(!TextUtils.isEmpty(page.sellerName))database.updateSellerNameHint(sig,page.sellerName);
+            if(page.itemPrice>0)database.updateVerifiedCurrentPrice(sig,priceCents,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0),System.currentTimeMillis());
+            if(marketStore!=null&&exactListingId>0)marketStore.updateExactProductMetadata(exactListingId,page.sellerName,page.publishedLabel,page.itemPrice>0?priceCents:null,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0));
+        }
         SharedPreferences.Editor e=diag().edit().putString("lastProductTitle",page.title).putInt("lastProductPriceCents",priceCents);
         if(ship!=null)e.putInt("lastProductShippingCents",ship);else e.remove("lastProductShippingCents");
         if(sig!=null && !sig.isEmpty()){
             e.putString("lastProductSignature",sig);ThumbnailStore.captureProduct(this,page,sig);
-            long listingId=marketStore==null?0L:marketStore.listingIdForSignature(sig);
+            long listingId=exactListingId>0?exactListingId:(marketStore==null?0L:marketStore.listingIdForSignature(sig));
             if(!TextUtils.isEmpty(page.sellerName)){
                 database.updateSellerNameHint(sig,page.sellerName);
                 if(marketStore!=null&&listingId>0)marketStore.setSellerHint(listingId,page.sellerName);
