@@ -35,9 +35,14 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
 
     public static final long ENGINE_SESSION_GAP_MS=3L*60_000L;
-    /** UX contract: an ordinary Vinted scroll may never own the Motore for more than ten minutes
-     * after its last captured card. Unresolved automatic work is parked instead of blocking later scrolls. */
-    public static final long ENGINE_RUN_SLA_MS=10L*60_000L;
+    /** 10 minutes is the target for a small/ordinary scroll, not a correctness deadline.
+     * Vinted public pages are deliberately paced at roughly one request every 55 seconds, so larger
+     * runs need a workload-aware estimate. Timing must never classify, hide or discard a listing. */
+    public static final long ENGINE_RUN_TARGET_MIN_MS=10L*60_000L;
+    public static final long ENGINE_RUN_TARGET_BASE_MS=5L*60_000L;
+    public static final long ENGINE_RUN_REMOTE_UNIT_MS=55_000L;
+    /** Legacy alias kept for older regression/diagnostic callers; do not use as a fixed deadline. */
+    public static final long ENGINE_RUN_SLA_MS=ENGINE_RUN_TARGET_MIN_MS;
     public static final long ENGINE_DUPLICATE_SIGHTING_MS=10L*60_000L;
     private static final long ACTIVE_RUN_CACHE_MS=1_500L;private ObservationSession cachedActiveRun=null;private long cachedActiveRunAt=0L;
 
@@ -58,13 +63,20 @@ public final class DealDatabase extends SQLiteOpenHelper {
         if(s.analysisPendingListings>0)return false;
         return s.validListings==0||s.completeListings+s.reviewListings>=s.validListings;
     }
+    public static long engineTargetMs(ObservationSession s){
+        if(s==null)return ENGINE_RUN_TARGET_MIN_MS;
+        int eligible=Math.max(0,s.validListings);
+        long workload=ENGINE_RUN_TARGET_BASE_MS+(long)eligible*ENGINE_RUN_REMOTE_UNIT_MS;
+        return Math.max(ENGINE_RUN_TARGET_MIN_MS,workload);
+    }
+    /** Timing target only. This can drive ETA/diagnostics but never automatic correctness decisions. */
     public static boolean engineSlaExpired(ObservationSession s,long now){
-        return s!=null&&now-s.endAt>=ENGINE_RUN_SLA_MS;
+        return s!=null&&now-s.endAt>=engineTargetMs(s);
     }
     public static boolean engineAutomaticDone(ObservationSession s,long now){
         if(s==null)return true;
         if(now-s.endAt<ENGINE_SESSION_GAP_MS)return false;
-        return engineContentSettled(s)||engineSlaExpired(s,now);
+        return engineContentSettled(s);
     }
 
     private static void createOverrides(SQLiteDatabase db){db.execSQL("CREATE TABLE IF NOT EXISTS listing_overrides(signature TEXT PRIMARY KEY,item_id TEXT,payload TEXT,excluded INTEGER NOT NULL DEFAULT 0,reason TEXT)");}

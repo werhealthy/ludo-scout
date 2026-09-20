@@ -71,6 +71,8 @@ jobs:
         run: python3 regression/bgg_exact_index_no_timeout_review_v51222.py
       - name: Run review/fuzzy/queue truth regression
         run: python3 regression/review_fuzzy_queue_truth_v51223.py
+      - name: Run adaptive Motore timing regression
+        run: python3 regression/engine_adaptive_timing_v51224.py
 
       - name: Compile debug Java
         run: |

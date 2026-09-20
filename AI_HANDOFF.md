@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.23-review-fuzzy-queue-truth`
-- versionCode: `137`
+- Baseline version: `5.12.24-adaptive-engine-timing`
+- versionCode: `138`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,18 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.24 Adaptive Motore timing
+
+- Product correction from Pixel/UX review: 10 minutes is a target for a small scroll, not a universal correctness deadline.
+- Current Vinted public-page pacing is intentionally conservative at roughly one request every 55 seconds with a 60/hour budget. Therefore a run containing many genuinely eligible listings can require materially more than 10 minutes even when healthy.
+- Motore now computes a workload-aware timing estimate: minimum 10 minutes; otherwise approximately 5 minutes base + 55 seconds per eligible listing. This is deliberately conservative and improves automatically when local/batch resolution reduces remote work.
+- Elapsed time alone can no longer mark a listing `AUTO_EXCLUDED`, hide a deal, or declare a run complete. A run finishes only when its automatic content is actually settled.
+- The timing observer is diagnostics-only (`engine-timing-v2`). It reports target/over-target state but never mutates listing correctness.
+- UI copy says `stima` instead of promising `chiusura entro`, and waiting-scroll copy no longer claims a hard 10-minute release.
+- Existing per-job watchdogs, retry rules, technical quarantine, classifier filtering and trust gates remain responsible for real failures; timing is not evidence.
+- Regression: `regression/engine_adaptive_timing_v51224.py`.
+- No schema migration, request-rate increase, signing/applicationId/CI-versionCode-strategy change.
 
 ## 5.12.23 Review/fuzzy/queue truth
 
