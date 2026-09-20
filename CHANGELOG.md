@@ -9,7 +9,7 @@
 
 ## 5.12.11 — BGG state monotonicity
 - Fixed a state-race exposed by Pixel Test 5: repeated/stale analysis could reset a game already moved to BGG review back to `BGG_MATCH_REQUIRED`, which permanently blocked historical revalidation behind the same three current titles.
-- Provisional re-analysis may now refresh only unresolved states. `BGG_MATCH_REVIEW` and `AUTO_QUARANTINED` are monotonic and cannot be silently reopened.
+- Provisional re-analysis may now refresh only unresolved states. `BGG_MATCH_REVIEW` and `AUTO_QUARANTINED` are monotonic and cannot be silently reopened, even by a late `status=matched` analysis result.
 - `markBggMatchReview()` now updates canonical game state and active linked listing state in one SQLite transaction.
 - Stale analysis results no longer mutate inactive listings; a listing tied to an already quarantined game is refiltered rather than resurrected.
 - `reconcileQueue()` repairs legacy game/listing drift for review and auto-quarantine states without deleting records.
