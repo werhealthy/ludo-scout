@@ -2116,6 +2116,28 @@ public final class MarketStore {
         if(TextUtils.isEmpty(signature))return false;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();Long id=scalarLong(db,"SELECT id FROM market_listings WHERE legacy_signature=? OR temp_fingerprint=? ORDER BY last_seen DESC LIMIT 1",new String[]{signature,signature});if(id==null)return false;String url=scalarString(db,"SELECT vinted_url FROM market_listings WHERE id=?",new String[]{String.valueOf(id)});if(!TextUtils.isEmpty(url))return true;ContentValues st=new ContentValues();st.put("enrichment_state","PENDING_ENRICHMENT");db.update("market_listings",st,"id=?",new String[]{String.valueOf(id)});enqueueListingJob(db,id,JOB_VINTED,now,340,"HUNT_PRIORITY");notifyQueueChanged();return true;
     }
 
+    /** One-time product turnaround cut-over: automatic review debt created by older builds is
+     * archived, not deleted. Explicit Hunt/manual requests are preserved. Fresh sightings can
+     * reactivate the same listing under the new stricter three-way pipeline. */
+    public int archiveAutomaticReviewDebtBefore(long cutoff){
+        SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();int archived=0;
+        db.beginTransaction();try{
+            List<Long> ids=new ArrayList<>();
+            try(Cursor c=db.rawQuery("SELECT l.id FROM market_listings l WHERE l.lifecycle='ACTIVE' AND COALESCE(l.manual_review_required,0)=1 AND l.last_seen<? AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY'))",new String[]{String.valueOf(cutoff)})){while(c.moveToNext())ids.add(c.getLong(0));}
+            for(Long id:ids){
+                String sig=scalarString(db,"SELECT legacy_signature FROM market_listings WHERE id=?",new String[]{String.valueOf(id)});
+                ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_EXCLUDED");l.put("manual_review_required",0);l.putNull("manual_review_reason");l.put("last_error","Review automatica precedente archiviata dal turnaround UX");archived+=db.update("market_listings",l,"id=?",new String[]{String.valueOf(id)});
+                ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("progress",100);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("processing_started_at",0);j.put("last_error","review automatica archiviata");db.update("processing_jobs",j,"listing_id=? AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",new String[]{String.valueOf(id)});
+                if(!TextUtils.isEmpty(sig)){ContentValues d=new ContentValues();d.put("lifecycle","USER_HIDDEN");d.put("verification_state","EPOCH_ARCHIVED_REVIEW");d.put("verification_reason","Review automatica precedente archiviata");db.update("deals",d,"signature=?",new String[]{sig});}
+            }
+            ContentValues g=new ContentValues();g.put("match_state","EPOCH_ARCHIVED_REVIEW");g.put("database_visible",0);g.put("filter_reason","Review BGG automatica precedente archiviata dal turnaround UX");
+            archived+=db.update("games",g,"database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND last_seen<?",new String[]{String.valueOf(cutoff)});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(archived>0){setDiagnosticState("review_turnaround",archived,"build=review-turnaround-v1;archived="+archived+";cutoff="+cutoff);notifyQueueChanged();}
+        return archived;
+    }
+
     public int vintedReviewCount(){long epoch=engineEpochStart();try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND COALESCE(manual_review_required,0)=1 AND last_seen>=?",new String[]{String.valueOf(epoch)})){return c.moveToFirst()?c.getInt(0):0;}}
     public List<GameRecord> bggMatchReviewGames(int limit){List<GameRecord> out=new ArrayList<>();long epoch=engineEpochStart();String sql="SELECT id,bgg_id,provisional_key,canonical_name,original_name,alternate_names,year,description,thumbnail_url,image_url,min_players,max_players,playtime,min_age,weight,rating,voters,bgg_rank,categories,mechanics,designers,artists,publishers,families,expansions,base_games,bgg_url,match_state,match_confidence,first_seen,last_seen,metadata_updated_at FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND last_seen>=? ORDER BY last_seen DESC LIMIT ?";try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(epoch),String.valueOf(Math.max(1,limit))})){while(c.moveToNext())out.add(readGameBase(c));}return out;}
 
