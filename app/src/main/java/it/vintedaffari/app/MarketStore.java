@@ -49,10 +49,13 @@ public final class MarketStore {
     private static final String KEY_BGG_PAUSED = "bgg_paused";
     public static final String KEY_ENGINE_EPOCH_START = "engine_epoch_start";
     public static final String HISTORICAL_SOURCE = "LEGACY_V9";
+    public static final String CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH";
+    private static final long CATALOG_HEALTH_MAX_AGE_MS=24L*60L*60_000L;
     private static final String BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:";
     private static final String ENGINE_RUN_CURSOR = "engine_run_cursor_start";
     private static final String ENGINE_RUN_SLICE = "engine_run_slice";
     private static final String MANUAL_VINTED_RECOVERY = "manual_vinted_recovery";
+    private static final String OPENED_VINTED_TARGET = "opened_vinted_target";
 
     public static final class Job {
         public long id, listingId, gameId, displayGameId, nextAttemptAt, processingStartedAt;
@@ -148,6 +151,36 @@ public final class MarketStore {
         if(listingId>0)changed=db.delete("queue_controls","name=? AND value=?",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId)});
         else changed=db.delete("queue_controls","name=?",new String[]{MANUAL_VINTED_RECOVERY});
         if(changed>0)setDiagnosticState("manual_vinted_recovery",0,"state=IDLE;clearedListing="+listingId);
+    }
+
+    /** Exact outbound provenance. Unlike manual search recovery, this is set only when Ludo itself
+     * opens a known /items/... URL, so the first product page can be reconciled to the exact card. */
+    public void beginOpenedVintedTarget(long listingId,String signature,String title,long ttlMs){
+        if(listingId<=0)return;long now=System.currentTimeMillis(),until=now+Math.max(30_000L,ttlMs);
+        try{JSONObject o=new JSONObject();o.put("until",until);o.put("signature",safe(signature));o.put("title",safe(title));
+            ContentValues v=new ContentValues();v.put("name",OPENED_VINTED_TARGET);v.put("value",listingId);v.put("updated_at",now);v.put("text_value",o.toString());
+            helper.getWritableDatabase().insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+            setDiagnosticState("opened_vinted_target",1,"state=ACTIVE;listing="+listingId+";until="+until);
+        }catch(Exception ignored){}
+    }
+    public ManualVintedRecovery activeOpenedVintedTarget(long now){
+        ManualVintedRecovery out=new ManualVintedRecovery();
+        try(Cursor cur=helper.getReadableDatabase().rawQuery("SELECT value,text_value FROM queue_controls WHERE name=? LIMIT 1",new String[]{OPENED_VINTED_TARGET})){
+            if(!cur.moveToFirst())return out;out.listingId=cur.getLong(0);JSONObject o=new JSONObject(cur.isNull(1)?"{}":cur.getString(1));out.until=o.optLong("until",0L);out.signature=o.optString("signature","");out.title=o.optString("title","");
+        }catch(Exception ignored){return new ManualVintedRecovery();}
+        if(!out.active(now)){clearOpenedVintedTarget(out.listingId);return new ManualVintedRecovery();}return out;
+    }
+    public void clearOpenedVintedTarget(long listingId){
+        SQLiteDatabase db=helper.getWritableDatabase();int changed=listingId>0?db.delete("queue_controls","name=? AND value=?",new String[]{OPENED_VINTED_TARGET,String.valueOf(listingId)}):db.delete("queue_controls","name=?",new String[]{OPENED_VINTED_TARGET});
+        if(changed>0)setDiagnosticState("opened_vinted_target",0,"state=IDLE;clearedListing="+listingId);
+    }
+    public boolean updateExactProductMetadata(long listingId,String sellerName,String publishedLabel,Integer priceCents,Integer protectedPriceCents){
+        if(listingId<=0)return false;SQLiteDatabase db=helper.getWritableDatabase();ContentValues v=new ContentValues();
+        if(!TextUtils.isEmpty(sellerName))v.put("seller_name",sellerName.trim());
+        if(!TextUtils.isEmpty(publishedLabel))v.put("published_label",publishedLabel.trim());
+        if(v.size()>0){v.put("enriched_at",System.currentTimeMillis());db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});}
+        boolean priceChanged=priceCents!=null&&priceCents>0&&updateVerifiedCurrentPrice(listingId,priceCents,protectedPriceCents);
+        return v.size()>0||priceChanged;
     }
 
     /** One-time UX cut-over. Old incomplete observations are removed from the active product so the
@@ -692,10 +725,11 @@ public final class MarketStore {
         SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();int queued=0;
         db.beginTransaction();
         String sql="SELECT l.id,l.game_id FROM market_listings l WHERE l.lifecycle='ACTIVE' " +
-                "AND l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') " +
+                "AND (l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') OR " +
+                "((l.vinted_url IS NOT NULL AND l.vinted_url<>'') AND ((l.published_label IS NULL OR l.published_label='') OR (l.seller_id IS NULL OR l.seller_id='')))) " +
                 "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') " +
                 "AND (j.listing_id=l.id OR (l.game_id IS NOT NULL AND j.game_id=l.game_id))) " +
-                "ORDER BY l.last_seen DESC LIMIT ?";
+                "ORDER BY CASE WHEN (l.published_label IS NULL OR l.published_label='' OR l.seller_id IS NULL OR l.seller_id='') THEN 0 ELSE 1 END,l.last_seen DESC LIMIT ?";
         try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(Math.max(1,limit))})){
             while(c.moveToNext()){
                 long listingId=c.getLong(0);String type=listingVintedJobType(db,listingId);
@@ -712,7 +746,8 @@ public final class MarketStore {
     /** Number of incomplete active listings that are not already covered by an active job. */
     public int unqueuedIncompleteCount() {
         String sql="SELECT COUNT(*) FROM market_listings l WHERE l.lifecycle='ACTIVE' " +
-                "AND l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') " +
+                "AND (l.enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') OR " +
+                "((l.vinted_url IS NOT NULL AND l.vinted_url<>'') AND ((l.published_label IS NULL OR l.published_label='') OR (l.seller_id IS NULL OR l.seller_id='')))) " +
                 "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') " +
                 "AND (j.listing_id=l.id OR (l.game_id IS NOT NULL AND j.game_id=l.game_id)))";
         try(Cursor c=helper.getReadableDatabase().rawQuery(sql,null)){return c.moveToFirst()?c.getInt(0):0;}
@@ -831,7 +866,7 @@ public final class MarketStore {
             }
             boolean allowHistory = vintedHistoryAllowed(db, now);
             DealDatabase.ObservationSession activeRun=test2bOwner?null:helper.activeObservationSession();
-            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR (? = 0 AND j.source='LIVE_DEAL') OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
+            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH')) OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql = "SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
                     "FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                     "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE' " +
@@ -1211,6 +1246,12 @@ public final class MarketStore {
         helper.getWritableDatabase().update("market_listings", v, "id=?", new String[]{String.valueOf(listingId)});
     }
 
+    public void markUnavailable(long listingId,String reason){
+        if(listingId<=0)return;ContentValues v=new ContentValues();v.put("lifecycle","REMOVED");v.put("last_seen",System.currentTimeMillis());v.put("last_error",safe(reason));
+        helper.getWritableDatabase().update("market_listings",v,"id=?",new String[]{String.valueOf(listingId)});
+        notifyQueueChanged();
+    }
+
     public void applyBggMetadata(BggMetadata m) {
         if (m == null || TextUtils.isEmpty(m.bggId)) return;
         SQLiteDatabase db = helper.getWritableDatabase();
@@ -1499,8 +1540,26 @@ public final class MarketStore {
             changed+=orphanVariants+autoVariants;
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
+        // Catalog health uses the same paced public-page lane, but only when no Motore scroll owns
+        // it. One exact item at a time is enough to refresh a small catalog without starving discovery.
+        changed+=enqueueCatalogHealthCheckIfIdle(now);
         if(changed>0)notifyQueueChanged();
         return changed;
+    }
+
+    public int enqueueCatalogHealthCheckIfIdle(long now){
+        if(helper.activeObservationSession()!=null)return 0;SQLiteDatabase db=helper.getWritableDatabase();
+        try(Cursor active=db.rawQuery("SELECT 1 FROM processing_jobs WHERE source=? AND state IN (?,?,?) LIMIT 1",new String[]{CATALOG_HEALTH_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE})){if(active.moveToFirst())return 0;}
+        long cutoff=now-CATALOG_HEALTH_MAX_AGE_MS;Long listingId=scalarLong(db,
+                "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' "+
+                "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
+                "AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.rating>=? "+
+                "AND COALESCE(l.enriched_at,0)<? AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN (?,?,?)) "+
+                "ORDER BY CASE WHEN l.published_label IS NULL OR l.published_label='' OR l.seller_id IS NULL OR l.seller_id='' THEN 0 ELSE 1 END,COALESCE(l.enriched_at,0) ASC LIMIT 1",
+                new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(cutoff),PENDING,PROCESSING,FAILED_RETRYABLE});
+        if(listingId==null)return 0;enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,5,CATALOG_HEALTH_SOURCE);
+        setDiagnosticState("catalog_health",1,"build=catalog-health-v1;state=QUEUED;listing="+listingId+";maxAgeMs="+CATALOG_HEALTH_MAX_AGE_MS);
+        QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);return 1;
     }
 
     /** 5.12.22 cut-over: 5.12.21 proved that the old O(31k) exact matcher could hit its
@@ -1657,9 +1716,12 @@ public final class MarketStore {
             if(activeRunCoreVintedCount()>=8){db.setTransactionSuccessful();return 0;}
             DealDatabase.ObservationSession activeRun=helper.activeObservationSession();
             if(activeRun==null){db.setTransactionSuccessful();return 0;}
-            Long gameId=scalarLong(db,"SELECT l.game_id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND l.deferred_retry_at<=? AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=? AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) GROUP BY l.game_id ORDER BY MIN(l.first_seen) ASC LIMIT 1",new String[]{String.valueOf(now),String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt)});
+            // deferred_retry_at is a background-parking throttle only. Once this scroll owns the
+            // Motore lane again, its unresolved listings must be rematerialised now rather than wait
+            // hours for a retry timestamp that was assigned while another run was active.
+            Long gameId=scalarLong(db,"SELECT l.game_id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=? AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) GROUP BY l.game_id ORDER BY MIN(l.first_seen) ASC LIMIT 1",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt)});
             if(gameId==null){db.setTransactionSuccessful();return 0;}
-            try(Cursor c=db.rawQuery("SELECT l.id FROM market_listings l WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND l.deferred_retry_at<=? AND (l.vinted_url IS NULL OR l.vinted_url='') AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) ORDER BY l.first_seen ASC LIMIT ?",new String[]{String.valueOf(gameId),String.valueOf(now),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt),String.valueOf(wanted)})){
+            try(Cursor c=db.rawQuery("SELECT l.id FROM market_listings l WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND (l.vinted_url IS NULL OR l.vinted_url='') AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) ORDER BY l.first_seen ASC LIMIT ?",new String[]{String.valueOf(gameId),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt),String.valueOf(wanted)})){
                 while(c.moveToNext()){long id=c.getLong(0);ContentValues st=new ContentValues();st.put("enrichment_state","PENDING_ENRICHMENT");db.update("market_listings",st,"id=?",new String[]{String.valueOf(id)});enqueueListingJob(db,id,JOB_VINTED,now,80,"DEFERRED_LINK");queued++;}
             }
             db.setTransactionSuccessful();
@@ -1757,7 +1819,7 @@ public final class MarketStore {
         if(isVintedPaused())return 0;
         SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT COUNT(*) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
         java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);a.add(String.valueOf(now));if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
@@ -1782,7 +1844,7 @@ public final class MarketStore {
         if(isVintedPaused())return 0L;
         long now=System.currentTimeMillis();SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT MIN(j.next_attempt_at) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
         java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
@@ -1812,7 +1874,7 @@ public final class MarketStore {
     }
 
     public int incompleteListingCount() {
-        try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE')",null)){return c.moveToFirst()?c.getInt(0):0;}
+        try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND (enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') OR ((vinted_url IS NOT NULL AND vinted_url<>'') AND ((published_label IS NULL OR published_label='') OR (seller_id IS NULL OR seller_id=''))))",null)){return c.moveToFirst()?c.getInt(0):0;}
     }
 
     public int pendingAnalysisCount() {
@@ -2835,7 +2897,7 @@ public final class MarketStore {
             if(!c.moveToFirst())return JOB_VINTED;
             if("LOCAL_ONLY".equals(c.getString(4))||"DEFERRED_LINK".equals(c.getString(4)))return null;
             if(TextUtils.isEmpty(c.getString(0)))return JOB_VINTED;
-            if(TextUtils.isEmpty(c.getString(2)))return JOB_VINTED_DEEP;
+            if(TextUtils.isEmpty(c.getString(1))||TextUtils.isEmpty(c.getString(2)))return JOB_VINTED_DEEP;
             return null;
         }
     }

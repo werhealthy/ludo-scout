@@ -33,7 +33,7 @@ checks=[
     ("time alone cannot complete a run", "engineSlaExpired" not in auto and "engineContentSettled(s)" in auto),
     ("timing observer is non-destructive", "AUTO_FILTERED" not in observe and "USER_HIDDEN" not in observe and "nonDestructive=true" in observe),
     ("diagnostics expose adaptive target", "targetMs=" in radar and "etaMs=" in radar and "timingNonDestructive=true" in radar),
-    ("UI calls timing an estimate", '" candidati da verificare online · circa "+mins+" min"' in ui and "engineEtaMs(run)" in ui),
+    ("UI calls timing a lane/service estimate", '" verifiche Vinted · ~"+mins+" min di corsia"' in ui and "engineEtaMs(run)" in ui),
     ("UI no longer promises a ten-minute hard cutoff", "chiusura entro" not in ui and "non può bloccarli oltre 10 minuti" not in ui),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]

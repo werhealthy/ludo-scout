@@ -7,6 +7,19 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.28 — Catalog freshness, bundle health and ETA truth
+- Fixed Motore ETA for parked current-run work. Exact Vinted identities still missing now remain in the estimate even when no durable Vinted job is currently materialised.
+- When a deferred scroll becomes the Motore owner again, its parked unresolved Vinted links can resume immediately instead of inheriting a long background retry timestamp.
+- Motore now labels remaining time as `~N min di corsia` and indicates when fairness may alternate service with other scrolls.
+- Added low-priority idle Catalog health: when no Motore scroll is active, one already-linked catalog item at a time can be rechecked through the existing 55-second-paced public-page lane, prioritizing missing publication/seller metadata and then stale items older than 24 hours.
+- Exact health checks remove sold/404 listings from the active catalog without creating user review and refresh publication/seller/current-price metadata when available.
+- Opening a known Vinted item from Ludo now carries short-lived exact provenance into Accessibility. A sold product page updates the exact Ludo card rather than relying on seller title/price rediscovery.
+- Bundle state is now current-inventory-derived: sold/hidden/corrected items invalidate their seller graph and caches; sellers falling below two active eligible games lose stale bundle rows.
+- Catalog Bundle chips/presets require an actually reconstructable two-game bundle, preventing a card from showing Bundle while its detail/page has no real combination.
+- Manual `Ricontrolla dati` now includes missing Vinted publication date and seller metadata.
+- Added diagnostics for catalog health, exact-open reconciliation and `coreRemaining` plus regression `catalog_freshness_bundle_health_eta_v51228.py`.
+- No schema migration, request-rate increase, signing, applicationId, Firebase, secrets or CI versionCode-strategy change.
+
 ## 5.12.27 — Queue liveness and Catalog truth
 - Fixed a Vinted-lane starvation bug exposed by the 5.12.26 Pixel debug: runnable Motore jobs could coexist with an idle lane because any future LIVE/HUNT/MANUAL retry blocked ordinary work until its retry time.
 - Urgent Vinted work now reserves at most one public-page slot when it is within 65 seconds of becoming runnable. Far-future urgent retries no longer freeze current Motore progress.

@@ -288,9 +288,18 @@ public final class VintedAccessibilityService extends AccessibilityService {
         ProductPage product = ProductPageParser.parse(root);
         DealRecord currentProductDeal=null;
         if (product != null) {
-            handleProductPage(product);
-            currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
-            if(product.sold&&currentProductDeal!=null){database.markSold(currentProductDeal.signature);bundleDatabase.invalidate(currentProductDeal);OperationCenter.done(this,"sold:"+currentProductDeal.signature,OperationCenter.LINK,"Articolo venduto · rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;}
+            long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore==null?null:marketStore.activeOpenedVintedTarget(now);
+            boolean exactOpened=opened!=null&&opened.active(now);
+            if(exactOpened)currentProductDeal=database.findBySignature(opened.signature);
+            if(currentProductDeal==null)currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
+            long exactListingId=exactOpened?opened.listingId:(currentProductDeal==null||marketStore==null?0L:marketStore.listingIdForSignature(currentProductDeal.signature));
+            handleProductPage(product,currentProductDeal,exactListingId);
+            if(exactOpened&&marketStore!=null)marketStore.clearOpenedVintedTarget(opened.listingId);
+            if(product.sold&&currentProductDeal!=null){
+                database.markSold(currentProductDeal.signature);if(marketStore!=null&&exactListingId>0)marketStore.markSold(exactListingId);bundleDatabase.invalidate(currentProductDeal);
+                diag().edit().putString("lastOpenedVintedReconcile","sold:"+currentProductDeal.signature+";exact="+exactOpened).apply();
+                OperationCenter.done(this,"sold:"+currentProductDeal.signature,OperationCenter.LINK,"Articolo venduto · rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
+            }
             // The Vinted item page itself can expose a visible "Articoli dell'utente" rail.
             // Capture that rail as a zero-request seller snapshot only when the source seller is
             // already verified and the section boundary is narrow enough to be unambiguous.
@@ -667,7 +676,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private void resolvePriority(DealRecord d){
         if(d==null||linkNetworkInFlight)return;linkNetworkInFlight=true;lastPriorityLinkAttemptAt=System.currentTimeMillis();String type=TextUtils.isEmpty(d.vintedUrl)?OperationCenter.LINK:OperationCenter.SELLER;String id=(OperationCenter.LINK.equals(type)?"link:":"seller:")+d.signature;OperationCenter.running(this,id,type,d.vintedTitle);
         linkResolver.resolve(d,new AutoLinkResolver.Callback(){
-            @Override public void onResolved(VintedLinkResolver.Result r){linkNetworkInFlight=false;if(r.sold){DealRecord sold=database.findBySignature(r.signature);database.markSold(r.signature);if(sold!=null)bundleDatabase.invalidate(sold);OperationCenter.done(VintedAccessibilityService.this,id,type,"Articolo venduto · rimosso da Ludo Scout");finishManualTargetIfNeeded(r.signature,true,"Articolo venduto rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);return;}database.applyResolvedLink(r.signature,r.itemId,r.url,r.imageUrl,r.confidence,r.reason,r.sellerId,r.sellerName,r.photosCsv,System.currentTimeMillis());if(!TextUtils.isEmpty(r.publishedLabel)){database.updatePublishedLabel(r.signature,r.publishedLabel);diag().edit().putString("lastPublishedLabel",r.publishedLabel).putLong("publishedMetadataResolved",diag().getLong("publishedMetadataResolved",0)+1).apply();}finishManualTargetIfNeeded(r.signature,true,"Dati annuncio aggiornati");if(!TextUtils.isEmpty(r.sellerId)){bundleDatabase.setDiagnostic(r.signature,r.sellerId,"SELLER_FOUND",0,0,0,null);bundleDatabase.increment("sellerFound");if(r.sellerSnapshot!=null){bundleDatabase.storeSnapshot(r.sellerId,r.itemId,"item-public-page",r.sellerSnapshot);bundleDatabase.setDiagnostic(r.signature,r.sellerId,r.sellerSnapshot.isEmpty()?"SNAPSHOT_EMPTY":"SNAPSHOT_FOUND",r.sellerSnapshot.size(),0,0,null);if(!TextUtils.isEmpty(r.snapshotParser))diag().edit().putString("bundleParser",r.snapshotParser).apply();}}else bundleDatabase.setDiagnostic(r.signature,null,"SELLER_UNKNOWN",0,0,0,"sellerId assente");OperationCenter.done(VintedAccessibilityService.this,id,type,r.matchedTitle);DealRecord fresh=database.findBySignature(r.signature);applyPendingSellerRail(r.signature,r.sellerId,r.sellerName);rebuildLocalBundlesForSeller(fresh);maybeScanBundles(fresh);if(r.imageUrl!=null&&!r.imageUrl.isEmpty())ThumbnailStore.downloadRemote(getApplicationContext(),r.signature,r.imageUrl);SharedPreferences pp=diag();pp.edit().putLong("linksResolved",pp.getLong("linksResolved",0)+1).putString("lastLinkResolution",r.matchedTitle+" → "+r.url+" ("+r.confidence+")").apply();sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);}
+            @Override public void onResolved(VintedLinkResolver.Result r){linkNetworkInFlight=false;if(r.sold){DealRecord sold=database.findBySignature(r.signature);database.markSold(r.signature);if(marketStore!=null){long listingId=marketStore.listingIdForSignature(r.signature);if(listingId>0)marketStore.markSold(listingId);}if(sold!=null)bundleDatabase.invalidate(sold);OperationCenter.done(VintedAccessibilityService.this,id,type,"Articolo venduto · rimosso da Ludo Scout");finishManualTargetIfNeeded(r.signature,true,"Articolo venduto rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);return;}database.applyResolvedLink(r.signature,r.itemId,r.url,r.imageUrl,r.confidence,r.reason,r.sellerId,r.sellerName,r.photosCsv,System.currentTimeMillis());if(!TextUtils.isEmpty(r.publishedLabel)){database.updatePublishedLabel(r.signature,r.publishedLabel);diag().edit().putString("lastPublishedLabel",r.publishedLabel).putLong("publishedMetadataResolved",diag().getLong("publishedMetadataResolved",0)+1).apply();}finishManualTargetIfNeeded(r.signature,true,"Dati annuncio aggiornati");if(!TextUtils.isEmpty(r.sellerId)){bundleDatabase.setDiagnostic(r.signature,r.sellerId,"SELLER_FOUND",0,0,0,null);bundleDatabase.increment("sellerFound");if(r.sellerSnapshot!=null){bundleDatabase.storeSnapshot(r.sellerId,r.itemId,"item-public-page",r.sellerSnapshot);bundleDatabase.setDiagnostic(r.signature,r.sellerId,r.sellerSnapshot.isEmpty()?"SNAPSHOT_EMPTY":"SNAPSHOT_FOUND",r.sellerSnapshot.size(),0,0,null);if(!TextUtils.isEmpty(r.snapshotParser))diag().edit().putString("bundleParser",r.snapshotParser).apply();}}else bundleDatabase.setDiagnostic(r.signature,null,"SELLER_UNKNOWN",0,0,0,"sellerId assente");OperationCenter.done(VintedAccessibilityService.this,id,type,r.matchedTitle);DealRecord fresh=database.findBySignature(r.signature);applyPendingSellerRail(r.signature,r.sellerId,r.sellerName);rebuildLocalBundlesForSeller(fresh);maybeScanBundles(fresh);if(r.imageUrl!=null&&!r.imageUrl.isEmpty())ThumbnailStore.downloadRemote(getApplicationContext(),r.signature,r.imageUrl);SharedPreferences pp=diag();pp.edit().putLong("linksResolved",pp.getLong("linksResolved",0)+1).putString("lastLinkResolution",r.matchedTitle+" → "+r.url+" ("+r.confidence+")").apply();sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);}
             @Override public void onUnresolved(String signature,String reason){linkNetworkInFlight=false;boolean deferred="cooldown".equals(reason)||isRateLimited(reason);if(deferred){manualRefreshAttempted.remove(signature);long until=authoritativeVintedResumeAt(d);if(until<=System.currentTimeMillis())until=System.currentTimeMillis()+currentLinkGapMs(d);maintenancePauseReason=reason;if("cooldown".equals(reason))bundleDatabase.increment("linkCooldownDeferred");else bundleDatabase.increment("rateLimited");OperationCenter.paused(VintedAccessibilityService.this,id,type,"Vinted in pausa · riprovo al momento consentito");if(manualMetadataRefresh)setVintedPause(until,reason);}else{finishManualTargetIfNeeded(signature,false,"Dati Vinted ancora mancanti · "+reason);OperationCenter.error(VintedAccessibilityService.this,id,type,d.vintedTitle,reason);}SharedPreferences pp=diag();pp.edit().putLong("linkResolveMisses",pp.getLong("linkResolveMisses",0)+1).putString("lastLinkResolveMiss",reason).apply();if(!manualMetadataRefresh)handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,currentLinkGapMs(d));}
         });
     }
@@ -697,7 +706,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(source==null||bundleDatabase==null||TextUtils.isEmpty(source.sellerId))return;
         List<DealRecord> same=new ArrayList<>();
         for(DealRecord d:database.getDeals("all_with_review",1200))if(d!=null&&source.sellerId.equals(d.sellerId))same.add(d);
-        if(same.size()<2){bundleDatabase.replace(source.signature,source.sellerId,Collections.emptyList());return;}
+        if(same.size()<2){bundleDatabase.clearSellerGraph(source.sellerId);bundleDatabase.setDiagnostic(source.signature,source.sellerId,"NO_BOARDGAMES",same.size(),0,0,"Seller graph sceso sotto due giochi attivi");return;}
         for(DealRecord d:same){List<BundleSuggestion> out=BundlePlanner.forSource(d,same);bundleDatabase.replace(d.signature,d.sellerId,out);bundleDatabase.setDiagnostic(d.signature,d.sellerId,out.isEmpty()?"NO_BOARDGAMES":"BUNDLE_READY",same.size(),out.size(),out.size(),out.isEmpty()?"Seller graph senza coppie eleggibili":"Seller graph locale");}
     }
 
@@ -706,8 +715,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
         Map<String,List<DealRecord>> bySeller=new LinkedHashMap<>();
         for(DealRecord d:database.getDeals("all_with_review",1500))if(d!=null&&!TextUtils.isEmpty(d.sellerId))bySeller.computeIfAbsent(d.sellerId,k->new ArrayList<>()).add(d);
         int sellers=0,bundles=0;
-        for(List<DealRecord> group:bySeller.values()){
-            if(group.size()<2)continue;sellers++;
+        for(Map.Entry<String,List<DealRecord>> entry:bySeller.entrySet()){
+            List<DealRecord> group=entry.getValue();
+            if(group.size()<2){bundleDatabase.clearSellerGraph(entry.getKey());continue;}sellers++;
             for(DealRecord d:group){List<BundleSuggestion> out=BundlePlanner.forSource(d,group);bundleDatabase.replace(d.signature,d.sellerId,out);bundleDatabase.setDiagnostic(d.signature,d.sellerId,out.isEmpty()?"NO_BOARDGAMES":"BUNDLE_READY",group.size(),out.size(),out.size(),out.isEmpty()?"Seller graph senza coppie eleggibili":"Seller graph locale");bundles+=out.size();}
         }
         diag().edit().putInt("bundleLocalGraphSellers",sellers).putInt("bundleLocalGraphSuggestions",bundles).apply();
@@ -911,18 +921,24 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(nextDelay>0)handler.postDelayed(()->scanBundleBacklog(false),nextDelay);
     }
 
-    private void handleProductPage(ProductPage page) {
+    private void handleProductPage(ProductPage page,DealRecord exactDeal,long exactListingId) {
         if (page == null || database == null) return;
         int priceCents=(int)Math.round(page.itemPrice*100.0);
         Integer ship=page.shippingPrice==null?null:(int)Math.round(page.shippingPrice*100.0);
-        database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,System.currentTimeMillis());
-        DealRecord d=database.findByTitlePrice(page.title,priceCents);
+        DealRecord d=exactDeal;
+        if(d==null){database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,System.currentTimeMillis());d=database.findByTitlePrice(page.title,priceCents);}
         String sig=d==null?"":d.signature;
+        if(d!=null){
+            if(!TextUtils.isEmpty(page.publishedLabel))database.updatePublishedLabel(sig,page.publishedLabel);
+            if(!TextUtils.isEmpty(page.sellerName))database.updateSellerNameHint(sig,page.sellerName);
+            if(page.itemPrice>0)database.updateVerifiedCurrentPrice(sig,priceCents,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0),System.currentTimeMillis());
+            if(marketStore!=null&&exactListingId>0)marketStore.updateExactProductMetadata(exactListingId,page.sellerName,page.publishedLabel,page.itemPrice>0?priceCents:null,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0));
+        }
         SharedPreferences.Editor e=diag().edit().putString("lastProductTitle",page.title).putInt("lastProductPriceCents",priceCents);
         if(ship!=null)e.putInt("lastProductShippingCents",ship);else e.remove("lastProductShippingCents");
         if(sig!=null && !sig.isEmpty()){
             e.putString("lastProductSignature",sig);ThumbnailStore.captureProduct(this,page,sig);
-            long listingId=marketStore==null?0L:marketStore.listingIdForSignature(sig);
+            long listingId=exactListingId>0?exactListingId:(marketStore==null?0L:marketStore.listingIdForSignature(sig));
             if(!TextUtils.isEmpty(page.sellerName)){
                 database.updateSellerNameHint(sig,page.sellerName);
                 if(marketStore!=null&&listingId>0)marketStore.setSellerHint(listingId,page.sellerName);
@@ -1322,6 +1338,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String earlyPriceFilterSummary=earlyPriceFilter.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-earlyPriceFilter.updatedAt)+", "+earlyPriceFilter.detail);
         MarketStore.RuntimeStatus manualRecoveryState=marketDiag.diagnosticState("manual_vinted_recovery");
         String manualRecoveryStateSummary=manualRecoveryState.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-manualRecoveryState.updatedAt)+", "+manualRecoveryState.detail);
+        MarketStore.RuntimeStatus openedVintedTarget=marketDiag.diagnosticState("opened_vinted_target");
+        String openedVintedTargetSummary=openedVintedTarget.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedTarget.updatedAt)+", "+openedVintedTarget.detail);
+        MarketStore.RuntimeStatus catalogHealth=marketDiag.diagnosticState("catalog_health");
+        String catalogHealthSummary=catalogHealth.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-catalogHealth.updatedAt)+", "+catalogHealth.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
         long engineEpochStart=engineEpochForExit;long engineDiagNow=System.currentTimeMillis();
         String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
@@ -1330,7 +1350,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         long runTargetRemainingMs=engineRun==null?0L:Math.max(0L,runTargetMs-runSinceEndMs);
         long runEtaMs=engineRun==null?0L:DealDatabase.engineEtaMs(engineRun);
         int runReviewPct=engineRun==null||engineRun.validListings<=0?0:Math.round(engineRun.reviewListings*100f/engineRun.validListings);
-        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";ageMs="+runAgeMs+";sinceEndMs="+runSinceEndMs+";targetMs="+runTargetMs+";targetRemainingMs="+runTargetRemainingMs+";etaMs="+runEtaMs+";coreWork="+engineRun.coreWorkListings+";corePending="+engineRun.corePendingListings+";timingNonDestructive=true;reviewPct="+runReviewPct+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";held="+engineRun.heldListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
+        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";ageMs="+runAgeMs+";sinceEndMs="+runSinceEndMs+";targetMs="+runTargetMs+";targetRemainingMs="+runTargetRemainingMs+";etaMs="+runEtaMs+";coreWork="+engineRun.coreWorkListings+";corePending="+engineRun.corePendingListings+";coreRemaining="+engineRun.coreRemainingListings+";timingNonDestructive=true;reviewPct="+runReviewPct+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";held="+engineRun.heldListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
         DealDatabase.ObservationSession firstWaiting=null;
         if(engineRun!=null&&engineWaitingRuns>0){
             for(DealDatabase.ObservationSession candidate:db.recentObservationSessions(engineEpochStart,80)){
@@ -1339,7 +1359,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             }
         }
         String waitingState=firstWaiting==null?"NONE":(engineRun!=null&&firstWaiting.startAt<engineRun.startAt?"DEFERRED":"WAITING");
-        String engineWaitingSummary=firstWaiting==null?"state=NONE":("state="+waitingState+";start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";etaMs="+DealDatabase.engineEtaMs(firstWaiting)+";coreWork="+firstWaiting.coreWorkListings+";corePending="+firstWaiting.corePendingListings+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";held="+firstWaiting.heldListings+";analysisPending="+firstWaiting.analysisPendingListings);
+        String engineWaitingSummary=firstWaiting==null?"state=NONE":("state="+waitingState+";start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";etaMs="+DealDatabase.engineEtaMs(firstWaiting)+";coreWork="+firstWaiting.coreWorkListings+";corePending="+firstWaiting.corePendingListings+";coreRemaining="+firstWaiting.coreRemainingListings+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";held="+firstWaiting.heldListings+";analysisPending="+firstWaiting.analysisPendingListings);
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
@@ -1453,6 +1473,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "vintedIdleParking={"+vintedIdleParkingSummary+"}\n"+
                 "earlyPriceFilter={"+earlyPriceFilterSummary+"}\n"+
                 "manualRecoveryState={"+manualRecoveryStateSummary+"}\n"+
+                "openedVintedTarget={"+openedVintedTargetSummary+"}\n"+
+                "catalogHealth={"+catalogHealthSummary+"}\n"+
+                "lastOpenedVintedReconcile="+p.getString("lastOpenedVintedReconcile","")+"\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
                 "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+

@@ -63,8 +63,9 @@ checks=[
     ("historical revalidation is described as held, not human review",
      "heldGames" in reval and "persistent review instead of being guessed" not in reval),
     ("idle runnable count matches claimable source policy",
-     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')" in runnable and
-     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')" in next_due),
+     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')" in runnable and
+     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')" in next_due and
+     "if(helper.activeObservationSession()!=null)return 0" in market),
     ("idle ordinary jobs are parked instead of spinning",
      "parkIdleOrdinaryVintedJobs" in market and "parked: nessuno scroll attivo" in market and
      "hasActiveObservationRun()" in runner),
