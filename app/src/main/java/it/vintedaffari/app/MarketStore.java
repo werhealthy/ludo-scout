@@ -1382,7 +1382,7 @@ public final class MarketStore {
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+expireOverdueEngineWork(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -1468,30 +1468,24 @@ public final class MarketStore {
         return reopened;
     }
 
-    /** Close head-of-line debt once the product SLA is over. The raw observation and price
-     * history remain, but unresolved automatic rows stop owning the Motore and cannot leak to Home. */
-    public int expireOverdueEngineWork(long now){
-        List<DealDatabase.ObservationSession> sessions=helper.recentObservationSessions(Math.max(engineEpochStart(),now-24L*60L*60_000L),40);
-        int changed=0;SQLiteDatabase db=helper.getWritableDatabase();
-        for(DealDatabase.ObservationSession s:sessions){
-            if(s==null||!DealDatabase.engineSlaExpired(s,now)||DealDatabase.engineContentSettled(s))continue;
-            db.beginTransaction();try{
-                String inRun="COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
-                String unresolved="lifecycle='ACTIVE' AND COALESCE(manual_review_required,0)=0 AND "+inRun+
-                        " AND ((vinted_item_id IS NULL OR vinted_item_id='') OR (vinted_url IS NULL OR vinted_url='') OR match_state<>'MATCHED' OR enrichment_state='PENDING_ANALYSIS')"+
-                        " AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=market_listings.id AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') AND p.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
-                List<Long> ids=new ArrayList<>();try(Cursor x=db.rawQuery("SELECT id FROM market_listings WHERE "+unresolved,new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){while(x.moveToNext())ids.add(x.getLong(0));}
-                for(Long id:ids){
-                    if(id==null)continue;String sig=scalarString(db,"SELECT legacy_signature FROM market_listings WHERE id=?",new String[]{String.valueOf(id)});
-                    ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_EXCLUDED");l.put("last_error","Motore: limite di 10 minuti raggiunto");l.put("manual_review_required",0);l.putNull("manual_review_reason");changed+=db.update("market_listings",l,"id=?",new String[]{String.valueOf(id)});
-                    ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("progress",100);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("processing_started_at",0);j.put("last_error","auto-excluded: Motore SLA 10 minuti");db.update("processing_jobs",j,"listing_id=? AND state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",new String[]{String.valueOf(id)});
-                    if(!TextUtils.isEmpty(sig)){ContentValues d=new ContentValues();d.put("lifecycle","USER_HIDDEN");d.put("verification_state","AUTO_EXCLUDED");d.put("verification_reason","Motore: limite di 10 minuti raggiunto");db.update("deals",d,"signature=? AND COALESCE(verification_state,'') NOT IN ('USER_CONFIRMED')",new String[]{sig});}
-                }
-                db.setTransactionSuccessful();
-            }finally{db.endTransaction();}
+    /** Timing telemetry only. A slow run must remain eligible for completion: elapsed time alone
+     * is never evidence that a listing is wrong. The adaptive target reflects the current count of
+     * eligible games and the deliberately conservative Vinted public-page pacing. */
+    public int observeEngineTiming(long now){
+        DealDatabase.ObservationSession active=helper.activeObservationSession();
+        if(active==null){
+            setDiagnosticState("engine_sla",0,"build=engine-timing-v2;state=IDLE;nonDestructive=true");
+            return 0;
         }
-        if(changed>0){setDiagnosticState("engine_sla",changed,"build=engine-sla-v1;expired="+changed+";limitMs="+DealDatabase.ENGINE_RUN_SLA_MS);notifyQueueChanged();}
-        return changed;
+        long target=DealDatabase.engineTargetMs(active);
+        long sinceEnd=Math.max(0L,now-active.endAt);
+        boolean overTarget=sinceEnd>=target&&!DealDatabase.engineContentSettled(active);
+        setDiagnosticState("engine_sla",overTarget?1:0,
+                "build=engine-timing-v2;state="+(overTarget?"OVER_TARGET":"ACTIVE")+
+                        ";targetMs="+target+";sinceEndMs="+sinceEnd+";valid="+active.validListings+
+                        ";ready="+active.completeListings+";review="+active.reviewListings+
+                        ";analysisPending="+active.analysisPendingListings+";nonDestructive=true");
+        return 0;
     }
 
     public int vintedActiveCount() {
