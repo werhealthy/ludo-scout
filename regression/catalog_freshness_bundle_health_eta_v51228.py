@@ -25,7 +25,6 @@ assert eta(0,0,1)==60_000
 
 promote=market[market.index("public int promoteDeferredVintedBatch"):market.index("public void deferBackgroundLink")]
 health=market[market.index("public int enqueueCatalogHealthCheckIfIdle"):market.index("public int reopenTechnicalBggReviewsForExactIndex")]
-exact_open=market[market.index("public void beginOpenedVintedTarget"):market.index("/** Finds or creates", market.index("public void beginOpenedVintedTarget")) if "/** Finds or creates" in market[market.index("public void beginOpenedVintedTarget"):] else market.index("public long listingIdForSignature", market.index("public void beginOpenedVintedTarget"))]
 product_scan=radar[radar.index("ProductPage product = ProductPageParser.parse"):radar.index("List<VintedCard> discovered",radar.index("ProductPage product = ProductPageParser.parse"))]
 bundle_rebuild=radar[radar.index("private void rebuildLocalBundlesForSeller"):radar.index("private void maybeScanBundles",radar.index("private void rebuildLocalBundlesForSeller"))]
 manual_counts=market[market.index("public int prioritizeIncompleteListings"):market.index("/** Active job for one legacy/feed card",market.index("public int prioritizeIncompleteListings"))]
