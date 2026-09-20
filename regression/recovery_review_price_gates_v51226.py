@@ -69,9 +69,11 @@ checks=[
      "filterClearlyOverpricedAutomaticListings(now);" in promotion and
      "d.item_price_cents>=d.benchmark_cents*2.0" in market and
      "d.item_price_cents-d.benchmark_cents>=2500" in market),
-    ("price optimization never sacrifices Hunt or manual intent",
+    ("price optimization never sacrifices Hunt/manual or in-flight work",
      "p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY')" in market and
-     "COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')" in market),
+     "COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')" in market and
+     "p.job_type=? AND p.state=?" in market and
+     'state IN (?,?)' in market[market.index("public int filterClearlyOverpricedAutomaticListings"):market.index("public int reconcileQueue")]),
     ("price-filtered rows keep history but leave the automatic product path",
      '"PRICE_FILTERED"' in market and '"AUTO_FILTERED"' in market and
      "verifica Vinted evitata" in market),
