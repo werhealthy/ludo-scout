@@ -1,0 +1,42 @@
+name: Android PR validation
+
+on:
+  pull_request:
+    branches:
+      - beta
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Regressions and Java compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Validate Android SDK
+        run: |
+          test -n "$ANDROID_HOME" || (echo "ANDROID_HOME is not set" && exit 1)
+          test -d "$ANDROID_HOME" || (echo "Android SDK directory not found: $ANDROID_HOME" && exit 1)
+
+      - name: Run performance stability regression
+        run: python3 regression/performance_stability_v5124.py
+
+      - name: Run BGG identity provenance regression
+        run: python3 regression/bgg_identity_provenance_v5125.py
+
+      - name: Compile debug Java
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
