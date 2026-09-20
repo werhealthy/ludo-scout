@@ -478,6 +478,17 @@ public final class MarketStore {
             // resurrect an inactive listing or overwrite its terminal state.
             if(!TextUtils.isEmpty(listingLifecycle)&&!"ACTIVE".equals(listingLifecycle)){db.setTransactionSuccessful();return;}
             Long oldGameId = scalarLong(db, "SELECT game_id FROM market_listings WHERE id=?", new String[]{String.valueOf(listingId)});
+            String oldGameState=oldGameId==null?"":scalarString(db,"SELECT match_state FROM games WHERE id=?",new String[]{String.valueOf(oldGameId)});
+            if("BGG_MATCH_REVIEW".equals(oldGameState)){
+                ContentValues hold=new ContentValues();hold.put("match_state","BGG_MATCH_REVIEW");hold.put("enrichment_state","NEEDS_REVIEW");
+                String why=scalarString(db,"SELECT filter_reason FROM games WHERE id=?",new String[]{String.valueOf(oldGameId)});if(!TextUtils.isEmpty(why))hold.put("last_error",why);
+                db.update("market_listings",hold,"id=?",new String[]{String.valueOf(listingId)});db.setTransactionSuccessful();return;
+            }
+            if("AUTO_QUARANTINED".equals(oldGameState)){
+                ContentValues hold=new ContentValues();hold.put("lifecycle","AUTO_FILTERED");hold.put("enrichment_state","AUTO_FILTERED");hold.put("match_state","AUTO_FILTERED_NON_GAME");
+                String why=scalarString(db,"SELECT filter_reason FROM games WHERE id=?",new String[]{String.valueOf(oldGameId)});if(!TextUtils.isEmpty(why))hold.put("last_error",why);
+                db.update("market_listings",hold,"id=?",new String[]{String.valueOf(listingId)});db.setTransactionSuccessful();return;
+            }
             long gameId; String matchState;
             if ("matched".equals(analysis.status) && !TextUtils.isEmpty(analysis.bggId)) {
                 gameId = upsertMatchedGame(db, analysis, card.title, now); matchState = "MATCHED";
