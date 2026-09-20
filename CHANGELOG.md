@@ -7,6 +7,18 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.26 — Target-only recovery, truthful review and early price gate
+- Manual “Cerca questo annuncio su Vinted” is now a target-only recovery mode. Search-result cards seen during that flow no longer become ordinary Motore observations/jobs; explicit market-price scans remain unchanged.
+- Recovery copy now explains that one visible result is not enough for an exact automatic link when Vinted does not expose the item URL/id; the exact item must be opened/shared or its link pasted.
+- Split user-actionable review from non-actionable trust/history holds. Historical `MATCH_UNCERTAIN` rows remain excluded from trusted surfaces but no longer inflate the “da controllare” count or lead to an empty inbox.
+- Held rows are considered settled automatic work, so they do not keep a run alive forever; Motore labels them as non-published with no action required.
+- Added a conservative pre-network price gate: ordinary unlinked listings are removed from automatic Vinted work only when seller ask is at least 2× and €25 above an existing used-market reference. Hunt/manual work is exempt and raw/game history is preserved.
+- Applied the price gate immediately before deferred Vinted promotion so it can actually save the scarce public-page request.
+- Moved queue reconciliation and repeated noise maintenance off Activity startup’s UI thread to reduce the observed SQLite contention/input-ANR path.
+- Diagnostics add manual recovery suppression/state, early price filtering and Motore held counts.
+- Added `regression/recovery_review_price_gates_v51226.py` to PR and beta CI.
+- No schema migration, request-rate increase, signing, applicationId, Firebase, secrets or CI versionCode-strategy change.
+
 ## 5.12.25 — Adaptive Motore fairness and real-work ETA
 - Closed the remaining head-of-line gap left after 5.12.24: the oldest unfinished scroll can no longer monopolize the ordinary automatic lane indefinitely.
 - Motore timing now models core Vinted identity work rather than raw valid-card count. The target is a 10-minute floor, otherwise roughly 1 minute of local/setup allowance plus 55 seconds per core remote candidate.
