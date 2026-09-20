@@ -7,14 +7,14 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.3-engine-correctness`
+- Baseline version: `5.12.4-performance-stability`
 - versionCode: `118`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
 - Gradle wrapper: 8.9
 - Android Gradle Plugin: 8.7.3
-- Current development stage: engine correctness before full visual redesign.
+- Current development stage: engine performance/stability validation before full visual redesign.
 
 ## Git workflow
 - Repository: `werhealthy/ludo-scout` (private)
@@ -24,8 +24,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Do not overwrite another chat's active work branch.
 - Every significant change must update this file and `CHANGELOG.md`.
 - CI workflow: `.github/workflows/android-beta.yml`.
-- CI is currently manual (`workflow_dispatch`) until the first signed cloud APK is verified on the existing Pixel install.
-- The first CI milestone is signature-preserving `assembleDebug`; Firebase distribution comes only after that passes.
+- CI is currently manual-triggered (`workflow_dispatch`). The `Android beta` workflow builds the signed debug APK, verifies the preserved signing certificate, uploads the APK artifact and distributes it through Firebase App Distribution.
+- CI versionCode remains `1,000,000 + github.run_number`; do not change the signing key, package/applicationId or versionCode strategy without explicit user approval.
 
 ## Current engine invariants
 - Vinted Accessibility observation remains the core UX: user scrolls Vinted normally.
@@ -49,6 +49,20 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Unresolvable `BGG_VARIANT_PENDING` is promoted to persistent review.
 - Thumbnail capture/cache memory pressure protections are enabled.
 - Diagnostics include `engineRun={...}`.
+
+## 5.12.4 performance/stability changes
+- Motore run inspector is paginated at 24 rows per page instead of inflating up to 220 thumbnail-heavy cards at once.
+- Run-list rendering no longer performs per-row Deal/MarketListing lookups just to obtain a thumbnail.
+- Motore run subpages are not force-rebuilt every few seconds; queue-driven refresh is coalesced and slower while a run inspector is open.
+- OperationCenter/deal reconciliation is single-flight + coalesced instead of allowing repeated 1,200-row scans to queue.
+- The old Test-1 deep Accessibility identity diagnostic probe is retired from production observation. Production keeps only a small explicit `/items/<digits>` opportunistic check and never requests Compose extra-data for this purpose.
+- Accessibility event diagnostics are batched rather than writing SharedPreferences on every event.
+- Screenshot capture is single-flight; remote thumbnail decoding uses RGB_565 and skips under low heap headroom.
+- Active-run lookup has a short cache and waiting-run counting avoids recomputing full BGG/Vinted status for every later session.
+- UI bitmap cache reduced to 4 MiB.
+- Static regression guard: `regression/performance_stability_v5124.py`; Android beta CI runs it before the Android build.
+- No database/schema migration in 5.12.4.
+- Remaining open performance question: current request efficiency is much better than the historical resolver (~6 physical link requests per newly linked row in the latest field diagnostic), but active-run completion time still needs fresh Pixel measurement after these CPU/memory fixes. Do not increase Vinted request rate; future throughput work must reduce requests via shared family discovery/snapshot reuse/fewer fallbacks.
 
 ## Known UX direction
 The next major phase is a full Motore redesign. Avoid treating all information as equal cards.
