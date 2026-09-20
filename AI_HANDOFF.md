@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.18-workmanager-mainthread-stability`
-- versionCode: `132`
+- Baseline version: `5.12.19-queue-single-owner-engine-order`
+- versionCode: `133`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,18 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.19 Queue single-owner + current-run engine ordering
+
+- 5.12.17 Pixel validation confirmed the acquisition fix at product level (20 unique cards) but also showed a new scroll waiting behind the older active run and a fresh default-process WorkManager ANR after install.
+- 5.12.18 moved heavy Service/WorkManager operations off the Android main thread and made Motore pending counts canonical. A further deterministic review of current beta found two remaining ownership gaps that are fixed here before another Pixel cycle:
+  - `QueueWakeReceiver.ACTION_NOW` started the foreground queue owner and then still fell through to one-shot WorkManager enqueue. ACTION_NOW is now foreground-service-only.
+  - `QueueDrainWorker` now exits before opening SQLite whenever the foreground queue is STARTING or RUNNING. WorkManager is recovery only.
+- Classifier/JS analysis now follows the same Motore ordering as Vinted/BGG durable jobs. `MarketStore.pendingAnalysisCards()` scopes pending analysis to the oldest active observation run; RAM hints can no longer let a newer waiting scroll jump ahead.
+- A waiting scroll is rechecked every 5 seconds after the current classifier batch drains, so it can advance automatically without requiring another Vinted visit.
+- `JsGameEngine` no longer treats one early cold-WebView readiness check as terminal. Readiness retries are single-chain/single-flight every 500 ms for up to 30 seconds before exposing an error.
+- Regression: `regression/queue_single_owner_engine_order_v51219.py` includes an executable active-vs-waiting SQLite fixture plus guards for single-owner wake/recovery, classifier ordering and WebView readiness recovery.
+- No schema migration, no signing/applicationId/network-rate/CI-versionCode strategy changes.
 
 ## 5.12.18 WorkManager/main-thread stability
 
