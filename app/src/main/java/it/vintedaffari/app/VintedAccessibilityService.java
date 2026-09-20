@@ -341,7 +341,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 if (!listingNow.allowPriceModel) {
                     SharedPreferences pp = diag();
                     pp.edit().putLong("classifierBlocked", pp.getLong("classifierBlocked", 0) + 1)
-                            .putString("lastClassifierBlock", listingNow.type.name() + ": " + listingNow.reason + " | " + card.title).apply();
+                            .putString("lastClassifierBlock", listingNow.type.name() + ": " + listingNow.reason + " | " + card.title)
+                            .putLong("lastClassifierBlockAt",now).putString("lastClassifierBlockBuild",BuildConfig.VERSION_NAME).apply();
                 }
             }
 
@@ -1288,6 +1289,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String bggReviewWriteSummary=bggReviewWrite.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggReviewWrite.updatedAt)+", "+bggReviewWrite.detail);
         MarketStore.RuntimeStatus engineSla=marketDiag.diagnosticState("engine_sla");
         String engineSlaSummary=engineSla.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-engineSla.updatedAt)+", "+engineSla.detail);
+        MarketStore.RuntimeStatus bggExactCutover=marketDiag.diagnosticState("bgg_exact_index_cutover");
+        String bggExactCutoverSummary=bggExactCutover.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggExactCutover.updatedAt)+", "+bggExactCutover.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
         long engineEpochStart=engineEpochForExit;long engineDiagNow=System.currentTimeMillis();
         String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
@@ -1328,6 +1331,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "analysesStored=" + p.getLong("analysesStored", 0) + "\n" +
                 "classifierBlocked=" + p.getLong("classifierBlocked", 0) + "\n" +
                 "lastClassifierBlock=" + p.getString("lastClassifierBlock", "") + "\n" +
+                "lastClassifierBlockMeta=ageMs=" + (p.getLong("lastClassifierBlockAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("lastClassifierBlockAt",0))) + "; build=" + p.getString("lastClassifierBlockBuild","unknown") + "\n" +
                 "catalogStored="+p.getInt("catalogStored",-1)+"\n"+"catalogFiltered="+p.getInt("catalogFiltered",-1)+"\n"+"catalogPreset="+p.getString("catalogPreset","")+"\n"+"catalogFeed=" + all + "\n" +
                 "hot=" + hot + "\n" +
                 "good=" + good + "\n" +
@@ -1409,6 +1413,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineRun={"+engineRunSummary+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
+                "bggExactIndexCutover={"+bggExactCutoverSummary+"}\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
                 "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+
