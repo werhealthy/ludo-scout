@@ -21,7 +21,7 @@ checks = [
     ("bounded service slice", "BggHistoricalRevalidator.runSlice(market,bggMatcher,2)" in service),
     ("recovery worker advances audit", "BggHistoricalRevalidator.runSlice(market,bggMatcher,4)" in worker),
     ("diagnostics expose revalidation", "bggHistoricalRevalidation={" in diag),
-    ("version bumped", "5.12.7-revalidation-accounting" in build),
+    ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
 
 failed = [name for name, ok in checks if not ok]
