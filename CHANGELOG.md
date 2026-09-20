@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.19 — Queue single owner and Motore analysis ordering
+- ACTION_NOW now starts only the foreground queue owner and no longer also enqueues one-shot WorkManager work.
+- QueueDrainWorker stands down before opening SQLite whenever the foreground queue is starting or running; WorkManager is recovery-only.
+- Pending classifier batches are scoped to the oldest active Motore observation run, preventing a newer waiting scroll from consuming JS analysis ahead of current work.
+- RAM Accessibility hints no longer bypass persisted current-run ordering; waiting scrolls are rechecked every 5 seconds and can advance without another Vinted visit.
+- JsGameEngine readiness retries in a bounded, single-chain loop every 500 ms for up to 30 seconds instead of failing after one cold-WebView check.
+- Added `regression/queue_single_owner_engine_order_v51219.py` and wired it into PR/beta CI.
+- No schema migration, signing, applicationId, request-rate or CI versionCode-strategy changes.
+
 ## 5.12.18 — WorkManager/main-thread stability
 - Pixel validation confirmed unique-card acquisition counts, but Android recorded a fresh default-process ANR 47.8 seconds after the 5.12.17 package update: `No response to onStartJob ... SystemJobService`.
 - Moved queue-service database/reconcile/sweep/supervisor work off Android Service callbacks onto a serialized control executor; `startForeground()` remains immediate and `onStartCommand()` now returns without synchronous SQLite work.
