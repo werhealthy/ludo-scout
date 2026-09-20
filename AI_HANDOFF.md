@@ -7,14 +7,14 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.4-performance-stability`
-- versionCode: `118`
+- Baseline version: `5.12.5-bgg-identity-provenance`
+- versionCode: `119`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
 - Gradle wrapper: 8.9
 - Android Gradle Plugin: 8.7.3
-- Current development stage: engine performance/stability validation before full visual redesign.
+- Current development stage: correctness turnaround first; BGG identity provenance containment is active, historical revalidation and identity-model hardening follow before throughput/UX redesign.
 
 ## Git workflow
 - Repository: `werhealthy/ludo-scout` (private)
@@ -63,6 +63,14 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Static regression guard: `regression/performance_stability_v5124.py`; Android beta CI runs it before the Android build.
 - No database/schema migration in 5.12.4.
 - Remaining open performance question: current request efficiency is much better than the historical resolver (~6 physical link requests per newly linked row in the latest field diagnostic), but active-run completion time still needs fresh Pixel measurement after these CPU/memory fixes. Do not increase Vinted request rate; future throughput work must reduce requests via shared family discovery/snapshot reuse/fewer fallbacks.
+
+## 5.12.5 BGG identity provenance firewall
+- Automatic zero-network BGG memory reuse now trusts only authoritative BGG metadata/aliases, the canonical game name, an auto-selected canonical BGG name, or an explicit manual BGG choice.
+- Seller-authored Vinted titles (`VINTED`, `VINTED_VARIANT`) remain stored as useful observational/search evidence but can no longer, by themselves, bootstrap a future automatic BGG identity at 99.5 confidence.
+- BGG match algorithm version is `4`, so older unresolved review cases may be retried under the stricter provenance rule.
+- Existing `MATCHED` identities are intentionally not rewritten or deleted by this task. Diagnostics now expose `bggIdentityTrust={... matchedToRevalidate=...}` so the next correctness task can target historical revalidation without an indiscriminate reset.
+- Static regression guard: `regression/bgg_identity_provenance_v5125.py`; Android beta CI runs it before the Android build.
+- No database/schema migration, no signing/applicationId/versionCode-strategy change, and no request-rate change.
 
 ## Known UX direction
 The next major phase is a full Motore redesign. Avoid treating all information as equal cards.
