@@ -15,6 +15,7 @@
 - Pending JS analysis is now active-run-first end to end: persisted MarketStore state, not the `:radar` RAM queue, owns batch selection. Later scrolls remain genuinely waiting and are picked up automatically after the active run closes.
 - System exit diagnostics v3 add current-installed-build counters alongside epoch/24h history.
 - Added `regression/queue_single_owner_anr_engine_recovery_v51218.py` and wired it into PR/beta CI.
+- Updated the historical-drain regression to enforce the new ownership rule: the foreground service drains history while live; WorkManager preserves historical recovery only when the service is absent.
 - No schema migration, signing/applicationId, CI versionCode-strategy, Firebase, secret or network-rate changes.
 
 ## 5.12.17 — Acquisition dedupe and crash stability
