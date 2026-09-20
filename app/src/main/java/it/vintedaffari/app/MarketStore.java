@@ -1073,6 +1073,11 @@ public final class MarketStore {
         return job!=null&&("HUNT_PRIORITY".equals(job.source)||"MANUAL_PRIORITY".equals(job.source));
     }
 
+    public boolean hasExplicitUserPriorityHistory(long listingId){
+        if(listingId<=0)return false;
+        try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT 1 FROM processing_jobs WHERE listing_id=? AND source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') LIMIT 1",new String[]{String.valueOf(listingId)})){return c.moveToFirst();}
+    }
+
     private void markManualReviewOpen(long listingId,String reason){
         if(listingId<=0)return;ContentValues r=new ContentValues();r.put("manual_review_required",1);r.put("manual_review_reason",safe(reason));helper.getWritableDatabase().update("market_listings",r,"id=?",new String[]{String.valueOf(listingId)});
     }
@@ -1390,9 +1395,13 @@ public final class MarketStore {
             // A batch-linked item may still be waiting for the richer item page to confirm the exact
             // BGG variant. If no deep-metadata job remains, automatic work is over: keep the row in
             // the persistent human-review inbox instead of leaving the run permanently stuck.
+            String orphanWhere="lifecycle='ACTIVE' AND match_state='BGG_VARIANT_PENDING' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.listing_id=market_listings.id AND j.job_type=? AND j.state IN (?,?,?))";
             ContentValues variantReview=new ContentValues();variantReview.put("match_state","BGG_VARIANT_REVIEW");variantReview.put("manual_review_required",1);variantReview.put("manual_review_reason","Variante BGG non confermata automaticamente");variantReview.put("last_error","Variante BGG non confermata automaticamente");
-            int orphanVariants=db.update("market_listings",variantReview,"lifecycle='ACTIVE' AND match_state='BGG_VARIANT_PENDING' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.listing_id=market_listings.id AND j.job_type=? AND j.state IN (?,?,?))",new String[]{JOB_VINTED_DEEP,PENDING,PROCESSING,FAILED_RETRYABLE});
-            if(orphanVariants>0){db.execSQL("UPDATE deals SET verification_state='BGG_VARIANT_REVIEW',verification_reason='Variante BGG non confermata automaticamente' WHERE signature IN (SELECT legacy_signature FROM market_listings WHERE match_state='BGG_VARIANT_REVIEW' AND legacy_signature IS NOT NULL)");changed+=orphanVariants;}
+            int orphanVariants=db.update("market_listings",variantReview,orphanWhere+" AND EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=market_listings.id AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY'))",new String[]{JOB_VINTED_DEEP,PENDING,PROCESSING,FAILED_RETRYABLE});
+            if(orphanVariants>0)db.execSQL("UPDATE deals SET verification_state='BGG_VARIANT_REVIEW',verification_reason='Variante BGG non confermata automaticamente' WHERE signature IN (SELECT legacy_signature FROM market_listings WHERE match_state='BGG_VARIANT_REVIEW' AND legacy_signature IS NOT NULL)");
+            ContentValues variantExcluded=new ContentValues();variantExcluded.put("lifecycle","AUTO_FILTERED");variantExcluded.put("enrichment_state","AUTO_EXCLUDED");variantExcluded.put("manual_review_required",0);variantExcluded.putNull("manual_review_reason");variantExcluded.put("last_error","Variante BGG non confermata: esclusa dall'automatico");
+            int autoVariants=db.update("market_listings",variantExcluded,orphanWhere+" AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=market_listings.id AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY'))",new String[]{JOB_VINTED_DEEP,PENDING,PROCESSING,FAILED_RETRYABLE});
+            changed+=orphanVariants+autoVariants;
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
         if(changed>0)notifyQueueChanged();
