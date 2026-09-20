@@ -7,6 +7,16 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.18 — Single-owner queue, ANR fix and engine recovery
+- Fixed a deterministic dual-consumer bug: `QueueWakeReceiver.ACTION_NOW` started the foreground queue service and also fell through to immediate WorkManager scheduling. Foreground work is now single-owner; WorkManager only recovers when the service is absent.
+- `QueueDrainWorker` now stands down before opening queue SQLite whenever `QueueKeepAliveService` owns the queue.
+- Moved queue DB initialization/maintenance, reconcile/sweep, lane supervision and notification-state queries off the default-process main thread. `onStartCommand()` no longer performs SQLite work synchronously, addressing the observed `SystemJobService onStartJob` ANR and `SQLITE_BUSY` contention.
+- Added retryable JS-engine readiness probing (500 ms, bounded to 30 s) so a slow/restarted WebView cannot strand `PENDING_ANALYSIS` after a package update.
+- Pending JS analysis is now active-run-first: while one Motore job is active, later scrolls remain genuinely waiting instead of consuming classifier work ahead of it.
+- System exit diagnostics v3 add current-installed-build counters alongside epoch/24h history.
+- Added `regression/queue_single_owner_anr_engine_recovery_v51218.py` and wired it into PR/beta CI.
+- No schema migration, signing/applicationId, CI versionCode-strategy, Firebase, secret or network-rate changes.
+
 ## 5.12.17 — Acquisition dedupe and crash stability
 - Fixed Motore card-count inflation caused by repeated Accessibility renders of the same visible Vinted cards. Same title/brand/price sightings and re-analysis are suppressed for 10 minutes, with the observation dedupe persisted in SQLite so it survives `:radar` restarts.
 - Motore now reports unique Vinted cards in the hero, job detail header and daily chronology; raw observation events remain available only in diagnostics.
