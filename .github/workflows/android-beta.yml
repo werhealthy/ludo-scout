@@ -97,6 +97,8 @@ jobs:
         run: python3 regression/engine_runtime_cross_process_v51220.py
       - name: Run product turnaround SLA/trust regression
         run: python3 regression/product_turnaround_sla_trust_v51221.py
+      - name: Run BGG exact-index / no-timeout-review regression
+        run: python3 regression/bgg_exact_index_no_timeout_review_v51222.py
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
