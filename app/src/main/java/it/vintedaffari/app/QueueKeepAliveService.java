@@ -9,9 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -21,6 +19,8 @@ import androidx.core.content.ContextCompat;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /** Foreground owner and supervisor for the durable queue. */
 public final class QueueKeepAliveService extends Service {
@@ -33,9 +33,10 @@ public final class QueueKeepAliveService extends Service {
     private static final long IDLE_SLEEP_MS=4_000L;
     private static final long LANE_STALE_MS=35_000L;
     private static volatile boolean RUNNING=false;
+    private static volatile boolean STARTING=false;
 
-    private final Handler main=new Handler(Looper.getMainLooper());
     private volatile boolean alive=false;
+    private final ScheduledExecutorService controlExecutor=Executors.newSingleThreadScheduledExecutor(r->{Thread t=new Thread(r,"ludo-queue-control");t.setDaemon(false);return t;});
     private ExecutorService vintedExecutor,bggExecutor;
     private Future<?> vintedFuture,bggFuture;
     private int idleNotificationPulses=0;
@@ -51,12 +52,12 @@ public final class QueueKeepAliveService extends Service {
         if(!alive)return;
         try{
             long now=System.currentTimeMillis();
-            // Overall heartbeat says the service process is alive. Lane heartbeats below are the
-            // authoritative signal for whether the actual consumers are alive.
+            // This entire supervisor pulse runs off the process main thread. Android delivers
+            // JobService/Service callbacks on that thread, so SQLite/reconcile work here must never
+            // delay WorkManager's SystemJobService.onStartJob acknowledgement.
             if(market!=null)market.touchProcessorHeartbeat();
             if(market!=null)market.deferStuckVintedProcessing(180_000L,10*60_000L);
             if(market!=null&&now-lastReconcileAt>=30_000L){market.reconcileQueue();lastReconcileAt=now;}
-            // This lane is zero-network and therefore keeps progressing during Vinted cooldowns.
             if(market!=null&&now-lastLocalMaintenanceAt>=20_000L){try{market.inferDeferredLanguages(80);}catch(Throwable ignored){}lastLocalMaintenanceAt=now;}
             superviseLanes(false);
             DealDatabase.ObservationSession activeRun=db==null?null:db.activeObservationSession();
@@ -65,11 +66,12 @@ public final class QueueKeepAliveService extends Service {
             if(activeRun!=null)active++;
             if(active<=0){if(++idleNotificationPulses>=3){stopSelf();return;}}else idleNotificationPulses=0;
             NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);nm.notify(NOTIFICATION_ID,notification());
-        }catch(Throwable t){Log.w(TAG,"notification/supervisor pulse failed",t);}
-        main.postDelayed(this,8_000L);
-    }};
+        }catch(Throwable t){Log.w(TAG,"notification/supervisor pulse failed",t);ProcessCrashJournal.recordHandled(QueueKeepAliveService.this,"queue:pulse",t);}
+        if(alive&&!controlExecutor.isShutdown())try{controlExecutor.schedule(this,8_000L,TimeUnit.MILLISECONDS);}catch(Throwable ignored){}
+    }}
 
     public static boolean isRunning(){return RUNNING;}
+    public static boolean isStarting(){return STARTING;}
 
     public static void ensureRunning(Context context){
         if(context==null)return;
@@ -85,10 +87,19 @@ public final class QueueKeepAliveService extends Service {
         }catch(Throwable t){
             Log.e(TAG,"foreground startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:foreground",t);stopSelf();return;
         }
+        // From this point the foreground-service contract is satisfied. Everything that can touch
+        // SQLite, WorkManager or the 31k-game matcher is moved off the process main thread.
+        alive=true;RUNNING=true;STARTING=true;
+        try{controlExecutor.execute(this::initializeBackground);}catch(Throwable t){
+            STARTING=false;Log.e(TAG,"queue async startup submit failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:submit",t);stopSelf();
+        }
+    }
+
+    private void initializeBackground(){
         try{
             db=new DealDatabase(this);market=new MarketStore(this,db);market.startOperationalEpochIfMissing();market.touchProcessorHeartbeat();
         }catch(Throwable t){
-            Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);stopSelf();return;
+            STARTING=false;Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);stopSelf();return;
         }
         try{resolver=new AutoLinkResolver(this);}catch(Throwable t){Log.w(TAG,"resolver init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:resolver",t);}
         try{bgg=new BggEnricher(this,db,market);bggMatcher=new BggSearchClient(this);}catch(Throwable t){Log.w(TAG,"bgg init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:bgg",t);}
@@ -97,15 +108,21 @@ public final class QueueKeepAliveService extends Service {
         try{QueueWorkScheduler.ensureRecovery(this);}catch(Throwable t){Log.w(TAG,"recovery scheduler startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:recovery",t);}
         try{QueueJobRunner.sweepMissing(this,market);}catch(Throwable t){Log.w(TAG,"sweep startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:sweep",t);}
         try{sessionStartRemaining=market.jobSummary().active();lastRemaining=sessionStartRemaining;lastProgressAt=System.currentTimeMillis();}catch(Throwable t){ProcessCrashJournal.recordHandled(this,"queue:onCreate:summary",t);}
-        alive=true;RUNNING=true;
+        STARTING=false;
+        if(!alive)return;
         try{superviseLanes(true);}catch(Throwable t){Log.e(TAG,"lane startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:lanes",t);}
-        main.post(notificationPulse);
+        notificationPulse.run();
     }
 
     @Override public int onStartCommand(Intent intent,int flags,int startId){
-        if(!alive||market==null)return START_NOT_STICKY;
-        try{market.touchProcessorHeartbeat();QueueJobRunner.sweepMissing(this,market);}catch(Throwable t){Log.w(TAG,"start command maintenance failed",t);ProcessCrashJournal.recordHandled(this,"queue:onStartCommand:maintenance",t);}
-        try{superviseLanes(true);}catch(Throwable t){Log.e(TAG,"start command lanes failed",t);ProcessCrashJournal.recordHandled(this,"queue:onStartCommand:lanes",t);}
+        if(!alive)return START_NOT_STICKY;
+        // onStartCommand is a main-thread Android callback. Keep it acknowledgement-only; queue
+        // maintenance runs on the same serialized control executor used by startup/pulses.
+        try{controlExecutor.execute(()->{
+            if(!alive||market==null)return;
+            try{market.touchProcessorHeartbeat();QueueJobRunner.sweepMissing(QueueKeepAliveService.this,market);}catch(Throwable t){Log.w(TAG,"start command maintenance failed",t);ProcessCrashJournal.recordHandled(QueueKeepAliveService.this,"queue:onStartCommand:maintenance",t);}
+            try{superviseLanes(true);}catch(Throwable t){Log.e(TAG,"start command lanes failed",t);ProcessCrashJournal.recordHandled(QueueKeepAliveService.this,"queue:onStartCommand:lanes",t);}
+        });}catch(Throwable t){ProcessCrashJournal.recordHandled(this,"queue:onStartCommand:submit",t);}
         return START_STICKY;
     }
 
@@ -259,6 +276,6 @@ public final class QueueKeepAliveService extends Service {
     private Notification baseNotification(String text,int max,int progress,boolean indeterminate){NotificationCompat.Builder b=builder().setContentTitle("Ludo Scout").setContentText(text).setOngoing(true).setOnlyAlertOnce(true).setSilent(true);if(max>0||indeterminate)b.setProgress(Math.max(1,max),Math.max(0,progress),indeterminate);return b.build();}
     private NotificationCompat.Builder builder(){Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);PendingIntent pi=PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);return new NotificationCompat.Builder(this,CHANNEL).setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pi).setCategory(NotificationCompat.CATEGORY_PROGRESS);}
 
-    @Override public void onDestroy(){alive=false;RUNNING=false;main.removeCallbacks(notificationPulse);try{if(vintedFuture!=null)vintedFuture.cancel(true);}catch(Throwable ignored){}try{if(bggFuture!=null)bggFuture.cancel(true);}catch(Throwable ignored){}try{if(vintedExecutor!=null)vintedExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggExecutor!=null)bggExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggMatcher!=null)bggMatcher.shutdown();}catch(Throwable ignored){}try{if(db!=null)db.close();}catch(Throwable ignored){}super.onDestroy();}
+    @Override public void onDestroy(){alive=false;RUNNING=false;STARTING=false;try{controlExecutor.shutdownNow();}catch(Throwable ignored){}try{if(vintedFuture!=null)vintedFuture.cancel(true);}catch(Throwable ignored){}try{if(bggFuture!=null)bggFuture.cancel(true);}catch(Throwable ignored){}try{if(vintedExecutor!=null)vintedExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggExecutor!=null)bggExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggMatcher!=null)bggMatcher.shutdown();}catch(Throwable ignored){}try{if(db!=null)db.close();}catch(Throwable ignored){}super.onDestroy();}
     @Override public IBinder onBind(Intent intent){return null;}
 }
