@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.17-acquisition-crash-stability`
-- versionCode: `131`
+- Baseline version: `5.12.18-single-owner-anr-engine-recovery`
+- versionCode: `132`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,19 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.18 Single-owner queue + ANR + engine recovery
+
+- Pixel validation of 5.12.17 confirmed the product-facing unique-card count (`20 card Vinted uniche`) but exposed that the visible active job was still the older 5.12.16 run: `analysisPending=7; waitingRuns=1`. The new scroll was correctly queued behind it.
+- A fresh current-build ANR was recorded immediately after package update: default process, `No response to onStartJob ... SystemJobService`, with RSS ~536 MB. The same debug also captured handled `SQLiteDatabaseLockedException` in `queue:onStartCommand:maintenance`.
+- Deterministic root cause: `QueueWakeReceiver.ACTION_NOW` started `QueueKeepAliveService` and then fell through to `scheduleLocal()`, launching WorkManager as a second same-process queue consumer. WorkManager and the foreground service could therefore race over SQLite and duplicate queue working sets.
+- `ACTION_NOW` is now foreground-service-only; `QueueDrainWorker` exits before opening the queue DB whenever the service owns the queue. WorkManager remains recovery for times when the service is absent.
+- `QueueKeepAliveService` claims ownership immediately after `startForeground()` and moves DB initialization, reconcile/sweep, lane supervision, notification-state queries and periodic maintenance off the default-process main thread onto one serialized supervisor executor. `onStartCommand()` is now non-blocking.
+- `JsGameEngine` readiness is no longer a one-shot `onPageFinished` probe. It retries every 500 ms for up to 30 s, covering slower/restarted WebView initialization so pending analysis cannot remain stuck merely because the bridge became ready after page-finished.
+- `MarketStore.pendingAnalysisCards()` now scopes analysis to the active Motore run while one exists. A newer scroll does not consume the JS classifier ahead of the older job that the UI says is active.
+- `systemExitHistory` v3 additionally exposes `buildSince` plus `crashBuild/anrBuild/memoryBuild/otherBuild`, separating current-installed-build failures from older epoch history.
+- Regression: `regression/queue_single_owner_anr_engine_recovery_v51218.py` executes an active-vs-waiting analysis fixture and statically guards single queue ownership, off-main service lifecycle work, JS readiness retry and build-scoped exit telemetry.
+- No schema migration, signing/applicationId, CI versionCode strategy, Firebase distribution, secrets or network-rate changes.
 
 ## 5.12.17 Acquisition dedupe + crash stability
 
