@@ -50,6 +50,8 @@ public final class MarketStore {
     public static final String KEY_ENGINE_EPOCH_START = "engine_epoch_start";
     public static final String HISTORICAL_SOURCE = "LEGACY_V9";
     private static final String BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:";
+    private static final String ENGINE_RUN_CURSOR = "engine_run_cursor_start";
+    private static final String ENGINE_RUN_SLICE = "engine_run_slice";
 
     public static final class Job {
         public long id, listingId, gameId, displayGameId, nextAttemptAt, processingStartedAt;
@@ -1382,7 +1384,7 @@ public final class MarketStore {
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -1468,9 +1470,60 @@ public final class MarketStore {
         return reopened;
     }
 
+    private long[] engineRunSlice(SQLiteDatabase db){
+        long owner=0L,started=0L;
+        try(Cursor c=db.rawQuery("SELECT value,updated_at FROM queue_controls WHERE name=? LIMIT 1",new String[]{ENGINE_RUN_SLICE})){
+            if(c.moveToFirst()){owner=Math.max(0L,c.getLong(0));started=Math.max(0L,c.getLong(1));}
+        }
+        return new long[]{owner,started};
+    }
+
+    private void writeEngineRunControl(SQLiteDatabase db,String name,long value,long now,String detail){
+        ContentValues v=new ContentValues();v.put("name",name);v.put("value",value);v.put("updated_at",now);v.put("text_value",detail);
+        db.insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    /** Fairness rotation only: after one service slice, a large run may hand the ordinary automatic
+     * lane to the next unfinished scroll. Nothing is completed, hidden, excluded or reclassified.
+     * If no other scroll is waiting, the current run simply keeps going. */
+    public int yieldOverBudgetEngineRun(long now){
+        DealDatabase.ObservationSession active=helper.activeObservationSession();
+        if(active==null){
+            setDiagnosticState("engine_fairness",0,"build=engine-fairness-v1;state=IDLE;nonDestructive=true");
+            return 0;
+        }
+        // Do not rotate while the user is still creating the current scroll/session.
+        if(now-active.endAt<DealDatabase.ENGINE_SESSION_GAP_MS)return 0;
+        SQLiteDatabase db=helper.getWritableDatabase();long[] slice=engineRunSlice(db);
+        if(slice[0]!=active.startAt||slice[1]<=0L){
+            writeEngineRunControl(db,ENGINE_RUN_SLICE,active.startAt,now,"active="+active.startAt);
+            setDiagnosticState("engine_fairness",0,"build=engine-fairness-v1;state=ACTIVE;run="+active.startAt+";servedMs=0;sliceMs="+DealDatabase.ENGINE_RUN_FAIRNESS_SLICE_MS+";nonDestructive=true");
+            return 0;
+        }
+        long served=Math.max(0L,now-slice[1]);
+        if(served<DealDatabase.ENGINE_RUN_FAIRNESS_SLICE_MS){
+            setDiagnosticState("engine_fairness",0,"build=engine-fairness-v1;state=ACTIVE;run="+active.startAt+";servedMs="+served+";sliceMs="+DealDatabase.ENGINE_RUN_FAIRNESS_SLICE_MS+";nonDestructive=true");
+            return 0;
+        }
+        DealDatabase.ObservationSession next=helper.nextUnfinishedObservationSessionAfter(active.startAt,now);
+        if(next==null){
+            setDiagnosticState("engine_fairness",0,"build=engine-fairness-v1;state=CONTINUING;run="+active.startAt+";servedMs="+served+";waiting=0;nonDestructive=true");
+            return 0;
+        }
+        db.beginTransaction();try{
+            writeEngineRunControl(db,ENGINE_RUN_CURSOR,next.startAt,now,"yieldedFrom="+active.startAt+";to="+next.startAt);
+            writeEngineRunControl(db,ENGINE_RUN_SLICE,next.startAt,now,"active="+next.startAt+";resumedFrom="+active.startAt);
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        helper.invalidateActiveObservationSessionCache();
+        setDiagnosticState("engine_fairness",1,"build=engine-fairness-v1;state=YIELDED;from="+active.startAt+";to="+next.startAt+";servedMs="+served+";remaining="+Math.max(0,active.validListings-active.completeListings-active.reviewListings)+";nonDestructive=true");
+        notifyQueueChanged();
+        return 1;
+    }
+
     /** Timing telemetry only. A slow run must remain eligible for completion: elapsed time alone
-     * is never evidence that a listing is wrong. The adaptive target reflects the current count of
-     * eligible games and the deliberately conservative Vinted public-page pacing. */
+     * is never evidence that a listing is wrong. The adaptive target reflects core remote work,
+     * while ETA shrinks with the candidates still waiting for Vinted identity. */
     public int observeEngineTiming(long now){
         DealDatabase.ObservationSession active=helper.activeObservationSession();
         if(active==null){
@@ -1478,11 +1531,13 @@ public final class MarketStore {
             return 0;
         }
         long target=DealDatabase.engineTargetMs(active);
+        long eta=DealDatabase.engineEtaMs(active);
         long sinceEnd=Math.max(0L,now-active.endAt);
         boolean overTarget=sinceEnd>=target&&!DealDatabase.engineContentSettled(active);
         setDiagnosticState("engine_sla",overTarget?1:0,
-                "build=engine-timing-v2;state="+(overTarget?"OVER_TARGET":"ACTIVE")+
-                        ";targetMs="+target+";sinceEndMs="+sinceEnd+";valid="+active.validListings+
+                "build=engine-timing-v3;state="+(overTarget?"OVER_TARGET":"ACTIVE")+
+                        ";targetMs="+target+";etaMs="+eta+";sinceEndMs="+sinceEnd+";valid="+active.validListings+
+                        ";coreWork="+active.coreWorkListings+";corePending="+active.corePendingListings+
                         ";ready="+active.completeListings+";review="+active.reviewListings+
                         ";analysisPending="+active.analysisPendingListings+";nonDestructive=true");
         return 0;
