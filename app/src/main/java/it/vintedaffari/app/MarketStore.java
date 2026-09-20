@@ -1346,7 +1346,7 @@ public final class MarketStore {
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=expireOverdueEngineWork(now);
+        int changed=reopenTechnicalBggReviewsForExactIndex(now)+expireOverdueEngineWork(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -1406,6 +1406,30 @@ public final class MarketStore {
         } finally { db.endTransaction(); }
         if(changed>0)notifyQueueChanged();
         return changed;
+    }
+
+    /** 5.12.22 cut-over: 5.12.21 proved that the old O(31k) exact matcher could hit its
+     * CPU budget and incorrectly create human review. Those rows are technical debt, not ambiguity.
+     * Reopen only timeout/error reviews once so the compact exact index can evaluate them again. */
+    public int reopenTechnicalBggReviewsForExactIndex(long now){
+        final String marker="bgg_exact_index_v4_cutover";
+        SQLiteDatabase db=helper.getWritableDatabase();
+        try(Cursor done=db.rawQuery("SELECT 1 FROM queue_controls WHERE name=? LIMIT 1",new String[]{marker})){if(done.moveToFirst())return 0;}
+        String technical="database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW' AND ("+
+                "filter_reason LIKE 'Ricerca BGG %oltre il budget%' OR filter_reason LIKE 'Errore match locale:%' OR filter_reason LIKE 'Errore tecnico match locale:%')";
+        int reopened=0;db.beginTransaction();try{
+            ContentValues g=new ContentValues();g.put("match_state","BGG_MATCH_REQUIRED");g.put("filter_reason","Riaperto da indice BGG esatto 5.12.22");g.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);
+            reopened=db.update("games",g,technical,null);
+            if(reopened>0){
+                ContentValues l=new ContentValues();l.put("match_state","BGG_MATCH_REQUIRED");l.put("manual_review_required",0);l.putNull("manual_review_reason");l.put("last_error","");
+                db.update("market_listings",l,"game_id IN (SELECT id FROM games WHERE filter_reason='Riaperto da indice BGG esatto 5.12.22') AND lifecycle='ACTIVE'",null);
+                db.execSQL("UPDATE market_listings SET enrichment_state=CASE WHEN vinted_url IS NOT NULL AND vinted_url<>'' THEN 'CORE_COMPLETE' ELSE 'LOCAL_ONLY' END WHERE game_id IN (SELECT id FROM games WHERE filter_reason='Riaperto da indice BGG esatto 5.12.22') AND lifecycle='ACTIVE'");
+            }
+            ContentValues q=new ContentValues();q.put("name",marker);q.put("value",reopened);q.put("updated_at",now);q.put("text_value","build=bgg-exact-index-v4;reopened="+reopened);db.insertWithOnConflict("queue_controls",null,q,SQLiteDatabase.CONFLICT_REPLACE);
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(reopened>0){setDiagnosticState("bgg_exact_index_cutover",reopened,"build=bgg-exact-index-v4;reopened="+reopened);notifyQueueChanged();}
+        return reopened;
     }
 
     /** Close head-of-line debt once the product SLA is over. The raw observation and price
