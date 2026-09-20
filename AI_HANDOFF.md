@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.16-engine-epoch-progress-stability`
-- versionCode: `130`
+- Baseline version: `5.12.17-acquisition-crash-stability`
+- versionCode: `131`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,17 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.17 Acquisition dedupe + crash stability
+
+- Pixel validation of 5.12.16 exposed two independent correctness/stability signals in the same fresh job: ~20 unique Vinted cards produced 66 raw observation events, and Android recorded a fresh default-process `CRASH` after the engine epoch.
+- Accessibility now suppresses identical title/brand/price sightings and re-analysis for 10 minutes. `DealDatabase.recordSighting()` also applies the same SQLite-backed dedupe window so a `:radar` process restart cannot manufacture a second Motore acquisition from the same visible cards.
+- Motore product copy now uses `uniqueListings` for “card Vinted” counts in the hero, job header and daily chronology; raw `observations` remains diagnostic telemetry only.
+- Crash journaling writes the minimal timestamp/process/error/root header before allocating/formatting a stack trace, improving survival under OOM/heap-pressure failures.
+- Android exit-history diagnostics are now scoped to Ludo processes (`it.vintedaffari.app`, `:ui`, `:radar`) instead of UID-wide WebView sandbox exits, are explicitly scoped to the current engine epoch, and expose PSS/RSS plus recent app exits.
+- The same Pixel run showed one local BGG fuzzy decision taking ~74 s immediately before the recorded queue-process crash. Queue exact/fuzzy local catalog scans now have a 2.5 s per-search CPU budget. A timed-out/incomplete scan is never auto-trusted; it becomes optional review and reports timeout telemetry.
+- Regression: `regression/engine_acquisition_crash_stability_v51217.py` models persisted same-card dedupe and statically guards unique-card UX, crash attribution, OOM-tolerant journaling, and BGG search budgets.
+- No schema migration, no signing/applicationId/network-rate/CI-versionCode strategy changes.
 
 ## 5.12.16 Motore epoch + progress semantics + queue startup stability
 - Product reset after real-device evidence: the old Motore timeline/review inbox mixed multiple historical iterations with the current job. A new durable `engine_epoch_start` in SQLite scopes Motore sessions/history/review to the new cycle while retaining all raw observations, prices, matched identities and market history.
