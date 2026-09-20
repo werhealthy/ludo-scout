@@ -304,11 +304,29 @@ public final class VintedAccessibilityService extends AccessibilityService {
         }
 
         List<VintedCard> discovered = new ArrayList<>();
+        MarketStore.ManualVintedRecovery recovery=marketStore==null?null:marketStore.activeManualVintedRecovery(System.currentTimeMillis());
+        boolean recoveryActive=recovery!=null&&recovery.active(System.currentTimeMillis());
         // A Vinted item-detail page contains seller/recommendation rails that may be shoes, books,
         // glasses, etc. The product itself is already handled above by ProductPageParser; those
         // rails must not become new catalog games just because they are visible on the same page.
-        if (product == null) collectCards(root, discovered);
-        else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
+        if (product == null) {
+            collectCards(root, discovered);
+            if(recoveryActive){
+                int visible=discovered.size();boolean exactHintApplied=false;
+                // Recovery is target-only. We may consume an explicit /items/<id> if Vinted happens
+                // to expose it for the exact original signature, but never persist the surrounding
+                // search results as new Motore observations.
+                if(!TextUtils.isEmpty(recovery.signature))for(VintedCard card:discovered){
+                    String sig=DealDatabase.signature(card);if(!recovery.signature.equals(sig))continue;
+                    long before=p.getLong("vintedIdsCapturedFromAccessibility",0L);applyExplicitVintedIdentityHint(card,sig);
+                    if(diag().getLong("vintedIdsCapturedFromAccessibility",0L)>before)exactHintApplied=true;
+                }
+                p.edit().putLong("manualRecoverySuppressedCards",p.getLong("manualRecoverySuppressedCards",0L)+visible)
+                        .putInt("manualRecoveryLastVisible",visible).putBoolean("manualRecoveryExactHintApplied",exactHintApplied)
+                        .putString("manualRecoveryTarget",recovery.title).apply();
+                discovered.clear();
+            }
+        } else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
         p.edit()
                 .putInt("lastCardsParsed", discovered.size())
                 .putLong("cardsParsedTotal", p.getLong("cardsParsedTotal", 0) + discovered.size())
@@ -1461,6 +1479,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "a11yProbeLastAncestorExplicit="+p.getString("a11yProbeLastAncestorExplicit","")+"\n"+
                 "vintedIdsCapturedFromAccessibility="+p.getLong("vintedIdsCapturedFromAccessibility",0)+" / cardsParsed="+p.getLong("cardsParsedTotal",0)+"\n"+
                 "lastAccessibilityVintedId="+p.getString("lastAccessibilityVintedId","")+"\n"+
+                "manualRecovery={suppressedCards="+p.getLong("manualRecoverySuppressedCards",0)+", lastVisible="+p.getInt("manualRecoveryLastVisible",0)+", exactHintApplied="+p.getBoolean("manualRecoveryExactHintApplied",false)+", target="+safeDiag(p.getString("manualRecoveryTarget",""))+"}\n"+
                 "libraryLastError="+p.getString("libraryLastError","")+"\n"+
                 "refreshBulkRequested="+p.getBoolean("manualBulkRequested",false)+"\n"+
                  "refreshBulkMode="+p.getBoolean("refreshBulkMode",false)+"; total="+p.getInt("refreshBulkTotal",0)+"; completed="+p.getInt("refreshBulkCompleted",0)+"; queued="+p.getInt("refreshBulkQueued",0)+"; current="+p.getString("refreshBulkCurrent","")+"\n"+
