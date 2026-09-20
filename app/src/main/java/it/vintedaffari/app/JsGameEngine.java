@@ -132,7 +132,7 @@ public final class JsGameEngine {
         verifyInFlight=true;
         final WebView current=webView;
         final int attempt=++verifyAttempts;
-        state("VERIFY_START","attempt="+attempt);
+        if(traceAttempt(attempt))state("VERIFY_START","attempt="+attempt);
         String js = "(() => JSON.stringify({ready:!!globalThis.VintedAffariAndroidBridge?.ready,gameCount:globalThis.VintedAffariAndroidBridge?.gameCount||0,bridge:!!globalThis.VintedAffariAndroidBridge,catalog:!!globalThis.VintedLocalCatalog,games:globalThis.VintedLocalCatalog?.games?.length||0,doc:document.readyState}))()";
         current.evaluateJavascript(js, value -> {
             verifyInFlight=false;
@@ -143,7 +143,7 @@ public final class JsGameEngine {
                 ready = state.optBoolean("ready", false);
                 int gameCount = state.optInt("gameCount", 0);
                 String detail="attempt="+attempt+";doc="+safe(state.optString("doc",""))+";bridge="+state.optBoolean("bridge",false)+";catalog="+state.optBoolean("catalog",false)+";games="+state.optInt("games",0)+";gameCount="+gameCount;
-                state("VERIFY_RESULT",detail);
+                if(traceAttempt(attempt)||ready)state("VERIFY_RESULT",detail);
                 if (ready) {
                     Log.d(TAG, "Motore JS pronto: " + gameCount + " giochi");
                     state("READY","games="+gameCount+";attempt="+attempt);
@@ -179,6 +179,10 @@ public final class JsGameEngine {
             verifyRetryScheduled=false;
             verifyEngine();
         },Math.max(1L,delayMs));
+    }
+
+    private static boolean traceAttempt(int attempt){
+        return attempt<=2||attempt%10==0;
     }
 
     private void state(String state,String detail){
