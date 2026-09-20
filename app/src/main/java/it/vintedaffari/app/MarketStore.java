@@ -2279,6 +2279,11 @@ public final class MarketStore {
         helper.getWritableDatabase().update("market_listings",v,"id=?",new String[]{String.valueOf(listingId)});
         setDiagnosticState("bgg_variant_guard",2,"state=REVIEW;listing="+listingId+";reason="+safe(reason));
     }
+    public boolean isBggVariantPending(long listingId){
+        if(listingId<=0)return false;
+        try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT 1 FROM market_listings WHERE id=? AND match_state='BGG_VARIANT_PENDING' LIMIT 1",new String[]{String.valueOf(listingId)})){return c.moveToFirst();}
+    }
+
     public boolean flagPendingBggVariantReview(long listingId,String reason){
         if(listingId<=0)return false;ContentValues v=new ContentValues();v.put("match_state","BGG_VARIANT_REVIEW");v.put("last_error",safe(reason));v.put("manual_review_required",1);v.put("manual_review_reason",safe(reason));
         int changed=helper.getWritableDatabase().update("market_listings",v,"id=? AND match_state='BGG_VARIANT_PENDING'",new String[]{String.valueOf(listingId)});
