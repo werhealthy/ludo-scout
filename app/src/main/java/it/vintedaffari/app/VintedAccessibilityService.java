@@ -208,8 +208,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         .apply();
                 // Restore analysis work that existed only in RAM in v5.10. Keep the batch bounded
                 // so the WebView engine is never flooded after a long offline period.
+                pendingForAnalysis.clear();
                 if(marketStore!=null){for(VintedCard c:marketStore.pendingAnalysisCards(40))pendingForAnalysis.put(DealDatabase.signature(c),c);}
-                Log.i(TAG, "Motore pronto: " + gameCount + " giochi. Flush coda=" + pendingForAnalysis.size());
+                Log.i(TAG, "Motore pronto: " + gameCount + " giochi. Flush coda attiva=" + pendingForAnalysis.size());
                 flushPendingAnalysis();
                 rebuildLocalBundles();
                 scheduleScan(0);
@@ -305,7 +306,6 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
         long now = System.currentTimeMillis();
         if(now-lastBacklogAttemptAt>30_000L){lastBacklogAttemptAt=now;handler.post(this::resolveBacklog);}
-        List<VintedCard> freshForAnalysis = new ArrayList<>();
 
         for (VintedCard card : discovered) {
             String sig = DealDatabase.signature(card);
@@ -336,19 +336,12 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 Long lastAnalyzed = recentlyAnalyzed.get(sig);
                 boolean analysisDue=lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS;
                 if(analysisDue){
-                    if(engine != null && engine.isReady() && !analysisBatchInFlight){
-                        freshForAnalysis.add(card);
-                        recentlyAnalyzed.put(sig, now);
-                        pendingForAnalysis.remove(sig);
-                    }else{
-                        // Queue only genuinely due work. Previously every re-render entered this map
-                        // and continuePersistentAnalysis() could immediately re-analyse it despite the
-                        // REANALYZE guard, amplifying repeated Accessibility events.
-                        pendingForAnalysis.put(sig, card);
-                        if (pendingForAnalysis.size() > 500) {
-                            String first = pendingForAnalysis.keySet().iterator().next();
-                            pendingForAnalysis.remove(first);
-                        }
+                    // RAM is only a wake/cache hint. Batch ownership is decided later from persisted
+                    // MarketStore state so a waiting scroll cannot jump ahead of the active Motore job.
+                    pendingForAnalysis.put(sig, card);
+                    if (pendingForAnalysis.size() > 500) {
+                        String first = pendingForAnalysis.keySet().iterator().next();
+                        pendingForAnalysis.remove(first);
                     }
                 }else pendingForAnalysis.remove(sig);
             }
@@ -361,15 +354,19 @@ public final class VintedAccessibilityService extends AccessibilityService {
         trimOld(recentlySighted, now, 10 * 60_000L, 1600);
         trimOld(recentlyAnalyzed, now, 10 * 60_000L, 1600);
 
-        if (!freshForAnalysis.isEmpty()) analyzeBatch(freshForAnalysis);
+        if (engine != null && engine.isReady()) continuePersistentAnalysis();
     }
 
     private void flushPendingAnalysis() {
-        if (engine == null || !engine.isReady() || pendingForAnalysis.isEmpty()) return;
-        List<VintedCard> batch = new ArrayList<>(pendingForAnalysis.values());
-        pendingForAnalysis.clear();
+        if (engine == null || !engine.isReady()) return;
+        List<VintedCard> batch = marketStore==null?new ArrayList<>(pendingForAnalysis.values()):marketStore.pendingAnalysisCards(40);
+        if(batch.isEmpty())return;
         long now = System.currentTimeMillis();
-        for (VintedCard card : batch) recentlyAnalyzed.put(DealDatabase.signature(card), now);
+        for (VintedCard card : batch) {
+            String sig=DealDatabase.signature(card);
+            pendingForAnalysis.remove(sig);
+            recentlyAnalyzed.put(sig, now);
+        }
         analyzeBatch(batch);
     }
 
@@ -462,8 +459,17 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     private void continuePersistentAnalysis(){
         if(analysisBatchInFlight||engine==null||!engine.isReady()||marketStore==null)return;
-        if(!pendingForAnalysis.isEmpty()){flushPendingAnalysis();return;}
-        List<VintedCard> next=marketStore.pendingAnalysisCards(40);if(!next.isEmpty())analyzeBatch(next);
+        List<VintedCard> next=marketStore.pendingAnalysisCards(40);
+        if(!next.isEmpty()){
+            long now=System.currentTimeMillis();
+            for(VintedCard card:next){String sig=DealDatabase.signature(card);pendingForAnalysis.remove(sig);recentlyAnalyzed.put(sig,now);}
+            analyzeBatch(next);
+            return;
+        }
+        // If another captured scroll is waiting behind non-classifier work, re-check cheaply until
+        // activeObservationSession advances; no user revisit to Vinted is required to start it.
+        if(database!=null&&database.waitingObservationSessionCount()>0)
+            handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L);
     }
 
 
