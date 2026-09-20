@@ -24,7 +24,7 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Do not overwrite another chat's active work branch.
 - Every significant change must update this file and `CHANGELOG.md`.
 - CI workflow: `.github/workflows/android-beta.yml`.
-- CI is currently manual-triggered (`workflow_dispatch`). The `Android beta` workflow builds the signed debug APK, verifies the preserved signing certificate, uploads the APK artifact and distributes it through Firebase App Distribution.
+- `Android beta` runs on pushes to `beta` and can also be triggered manually (`workflow_dispatch`). It builds the signed debug APK, verifies the preserved signing certificate, uploads the APK artifact and distributes it through Firebase App Distribution.
 - CI versionCode remains `1,000,000 + github.run_number`; do not change the signing key, package/applicationId or versionCode strategy without explicit user approval.
 
 ## Current engine invariants
