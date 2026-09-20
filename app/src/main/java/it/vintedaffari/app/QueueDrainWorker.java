@@ -86,7 +86,7 @@ public final class QueueDrainWorker extends Worker {
         // Do not use WorkManager Result.retry() as a queue continuation: its exponential backoff
         // made a large backlog look frozen overnight. Persisted state is authoritative, so finish
         // this bounded pass successfully and schedule the next due pass explicitly.
-        if (remaining.active() > 0 || market.deferredVintedCount() > 0) {
+        if (remaining.active() > 0 || market.deferredVintedCount() > 0 || market.historicalBggRevalidationPendingCount() > 0) {
             long now=System.currentTimeMillis();
             long due = market.nextDueAt();
             long deferredDue=market.nextDeferredVintedDueAt();
