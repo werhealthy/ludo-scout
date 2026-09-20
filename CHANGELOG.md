@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.18 — Default-process ANR and engine readiness stability
+- Pixel validation of 5.12.17 confirmed unique-card acquisition counting while exposing a fresh post-install default-process ANR: WorkManager's SystemJobService could not answer onStartJob within the system deadline.
+- Removed SQLite/queue work from QueueKeepAliveService.onCreate(), onStartCommand() and the recurring main-thread notification pulse. Foreground promotion remains immediate; initialization and recurring supervision are serialized on a dedicated queue supervisor executor.
+- WorkManager recovery now stands down before opening the app database while the foreground queue is STARTING or RUNNING, reducing duplicate initialization and SQLite contention.
+- Added a bounded single-flight JsGameEngine readiness watchdog for slow cold WebView/catalog startup so pending analysis is not abandoned after one missed readiness check.
+- Upgraded exit diagnostics to system-exit-v3 with a bounded main-thread trace snippet from the latest Ludo ApplicationExitInfo when available.
+- Added `regression/default_process_anr_stability_v51218.py` and wired it into PR and beta CI.
+- No schema migration, request-rate, signing, applicationId or CI versionCode-strategy changes.
+
 ## 5.12.17 — Acquisition dedupe and crash stability
 - Fixed Motore card-count inflation caused by repeated Accessibility renders of the same visible Vinted cards. Same title/brand/price sightings and re-analysis are suppressed for 10 minutes, with the observation dedupe persisted in SQLite so it survives `:radar` restarts.
 - Motore now reports unique Vinted cards in the hero, job detail header and daily chronology; raw observation events remain available only in diagnostics.
