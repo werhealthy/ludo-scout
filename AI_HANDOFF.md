@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.27-queue-liveness-catalog-truth`
-- versionCode: `141`
+- Baseline version: `5.12.28-catalog-freshness-bundle-health-eta`
+- versionCode: `142`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -35,7 +35,7 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - BGG rating below 6 is filtered before ordinary Vinted linking where possible.
 - Exact Vinted identity and exact BGG identity are separate facts.
 - Elapsed time alone must never classify, hide, exclude, complete or discard a listing. Correctness comes only from matching/classification/trust state.
-- Motore timing is workload-aware: the target uses core Vinted identity work, while the live ETA uses core candidates still pending. Raw card count is only a temporary conservative fallback before jobs are materialised.
+- Motore timing is workload-aware: the target uses core Vinted identity work, while the live ETA counts exact Vinted identities still missing even when their durable job is temporarily parked. The displayed `~N min di corsia` is service-lane work, not a wall-clock promise when fairness rotates multiple scrolls.
 - One ordinary run owns the automatic Vinted/BGG lane at a time. If another unfinished scroll is waiting, the owner yields after a 10-minute service slice; unfinished listings remain intact and the run resumes in round-robin continuation. With no competing run, it simply keeps working past ten minutes.
 - LIVE_DEAL, HUNT_PRIORITY and explicit manual work preempt ordinary backlog work when runnable. A future urgent retry may reserve at most one public-page slot (~65 s); it must never freeze already-runnable Motore work for minutes.
 - Manual review is reserved for cases with an actual user action available. Historical/trust holds stay non-publishable but are not counted or labelled as actionable review.
@@ -44,6 +44,9 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - A ready card requires confirmed BGG, exact Vinted item/url, core identity enrichment, no open review and no open core automatic job. Optional deep metadata must not block readiness.
 - Publication date, language and price should be retained when technically available; do not silently drop required data just to make a card look complete.
 - Catalog filter badges and their result predicates must describe the same rows. `Vinted da completare` means missing exact Vinted URL, publication label, or seller id; the red core warning remains specifically for a missing page/link.
+- Catalog health is maintenance, not discovery: when no Motore scroll owns the Vinted lane, at most one exact already-linked catalog item is rechecked through the existing paced public-page lane. Sold/404 items leave the active catalog while history remains.
+- Opening a known Vinted item from a Ludo card creates short-lived exact provenance separate from manual search recovery. The opened product page may safely update that exact listing's sold state, publication metadata and price.
+- Bundle labels represent current seller inventory, not historical suggestions. A sold/hidden/corrected member invalidates the seller graph; a seller with fewer than two active eligible games must expose no bundle.
 
 ## 5.12.3 correctness changes
 - Motore run detail uses a dedicated observations -> market_listings -> games view rather than Catalogo.
@@ -109,6 +112,21 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.28 Catalog freshness, bundle health and Motore ETA truth
+
+- Pixel/debug evidence on 5.12.27 showed a run with 9 valid games, 6 exact Vinted identities, 5 ready and 1 hold but `corePending=0` / `etaMs=60000`. Three BGG-ready listings still needed exact Vinted identity; they were parked outside `processing_jobs`, so the old ETA mistook queue materialisation for product completion.
+- `coreRemainingListings` now counts BGG-ready listings whose exact Vinted item/url is still missing independently of durable-job state. ETA uses the larger of materialised pending work and product work still required.
+- A yielded/deferred listing's `deferred_retry_at` remains a background throttle only. When its original scroll owns Motore again, unresolved rows can be rematerialised immediately instead of waiting hours for a retry timestamp assigned under a different owner.
+- Motore copy reports `~N min di corsia` and explicitly says it may alternate with other scrolls. This is a service-work estimate, not a wall-clock completion promise.
+- Added an idle-only Catalog health pass. With no active Motore run, one already-linked BGG-valid listing older than 24 hours may enter low-priority exact Vinted metadata verification through the existing paced public-page lane. Missing publication/seller metadata is prioritized. Request rate is unchanged.
+- Exact health checks retire sold or HTTP-404 listings from the active catalog without creating human review; raw/history state is preserved. Successful checks refresh metadata and current price when available.
+- Opening a known Vinted item from Ludo records a two-minute exact outbound target. Accessibility consumes that target before title/price heuristics, so a visible sold page such as Mysterium can update the exact canonical/legacy card and invalidate its seller bundle.
+- Bundle invalidation is seller-wide: suggestions, diagnostics and stale seller caches are removed when a represented item is sold/hidden/corrected. Local bundle rebuild clears seller graphs that fall below two active games. Catalog bundle chips/presets now require a live two-game bundle, not a stale persisted row.
+- Manual `Ricontrolla dati` now sees the same missing Vinted publication/seller metadata surfaced by Catalog.
+- Diagnostics add `coreRemaining`, `catalogHealth`, `openedVintedTarget` and `lastOpenedVintedReconcile`.
+- Regression: `regression/catalog_freshness_bundle_health_eta_v51228.py` plus updated 5.12.24/5.12.25 timing guards.
+- No schema migration, request-rate increase, signing/applicationId/Firebase/secrets/CI-versionCode-strategy change.
 
 ## 5.12.27 Queue liveness and Catalog truth
 
