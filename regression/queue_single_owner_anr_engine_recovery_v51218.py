@@ -8,6 +8,7 @@ worker=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueDrainWorker.java").read
 service=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueKeepAliveService.java").read_text(encoding="utf-8")
 engine=(ROOT/"app/src/main/java/it/vintedaffari/app/JsGameEngine.java").read_text(encoding="utf-8")
 market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")
+radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
 crash=(ROOT/"app/src/main/java/it/vintedaffari/app/ProcessCrashJournal.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
@@ -57,6 +58,7 @@ checks=[
     ("main-thread pulse only dispatches supervisor work", "supervisorExecutor.execute" in pulse and "market." not in pulse),
     ("JS engine retries readiness instead of one-shot failure", "READY_TIMEOUT_MS = 30_000L" in engine and "READY_RETRY_MS = 500L" in engine and "main.postDelayed(this::verifyEngine" in engine and "retryVerifyOrFail" in engine),
     ("active Motore run owns pending analysis", "DealDatabase.ObservationSession active=helper.activeObservationSession()" in market and "SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?" in market),
+    ("RAM queue cannot bypass active-run classifier ownership", "marketStore.pendingAnalysisCards(40)" in radar and "new ArrayList<>(pendingForAnalysis.values())" in radar and "freshForAnalysis.add(card)" not in radar and "waitingObservationSessionCount()>0" in radar),
     ("exit diagnostics distinguish current installed build", "build=system-exit-v3" in crash and "lastUpdateTime" in crash and "crashBuild=" in crash and "anrBuild=" in crash),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
