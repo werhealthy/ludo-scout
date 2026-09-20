@@ -78,7 +78,7 @@ public final class ProcessCrashJournal {
                 if(now-at<=day){
                     if(why==ApplicationExitInfo.REASON_CRASH||why==ApplicationExitInfo.REASON_CRASH_NATIVE)crash24++;
                     else if(why==ApplicationExitInfo.REASON_ANR)anr24++;
-                    else if(why==ApplicationExitInfo.REASON_LOW_MEMORY||why==ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE||why==ApplicationExitInfo.REASON_MEMORY_LIMITER)lowMem24++;
+                    else if(why==ApplicationExitInfo.REASON_LOW_MEMORY||why==ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE)lowMem24++;
                     else other24++;
                 }
                 if(at>latestAt){latestAt=at;process=e.getProcessName();reason=reasonName(why);description=e.getDescription();}
@@ -96,7 +96,6 @@ public final class ProcessCrashJournal {
             case ApplicationExitInfo.REASON_ANR:return"ANR";
             case ApplicationExitInfo.REASON_LOW_MEMORY:return"LOW_MEMORY";
             case ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE:return"EXCESSIVE_RESOURCE";
-            case ApplicationExitInfo.REASON_MEMORY_LIMITER:return"MEMORY_LIMITER";
             case ApplicationExitInfo.REASON_INITIALIZATION_FAILURE:return"INITIALIZATION_FAILURE";
             case ApplicationExitInfo.REASON_DEPENDENCY_DIED:return"DEPENDENCY_DIED";
             case ApplicationExitInfo.REASON_SIGNALED:return"SIGNALED";
