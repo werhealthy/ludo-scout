@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.9-bgg-historical-drain`
-- versionCode: `123`
+- Baseline version: `5.12.10-bgg-fuzzy-index-performance`
+- versionCode: `124`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,16 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.10 BGG fuzzy index performance
+- Pixel Test 4 on 5.12.9 still left 73 historical revalidations pending. Diagnostics showed the BGG lane stuck in `MATCHING` with three current identities, and the lane heartbeat aged ~19 s while processing one title.
+- Root cause: the current local matcher’s fuzzy fallback still called `BggSearchClient.localCandidates()`, which reopened/decompressed/scanned the full ~31k-game gzip catalog for every fuzzy query.
+- Added a queue-only `localCandidatesIndexed()` path. The long-lived queue client reuses the same parsed `Game` objects already owned by the exact/id indexes and performs in-memory scoring without reopening the gzip catalog.
+- The short-lived/manual `localCandidates()` path intentionally remains streaming from disk. This avoids retaining the 31k-game catalog in UI/manual clients and preserves the earlier heap/OOM protection.
+- Indexed fuzzy ranking keeps only the best 16 candidates in a bounded priority queue and uses a 32-query LRU cache. Returned candidates are copies so queue ranking cannot mutate shared index objects.
+- Added cross-process `bggLocalMatch={handled,fuzzy,matched,review,quarantined,elapsedMs}` diagnostics so Pixel tests can measure local matcher latency directly.
+- Regression: `regression/bgg_fuzzy_index_performance_v51210.py` protects the queue-only indexed path, bounded candidate/cache sizes, UI streaming path, shared-object reuse and telemetry.
+- No schema/data reset, no Vinted/BGG network-rate change, no signing/applicationId/versionCode-strategy change.
 
 ## Known UX direction
 The next major phase is a full Motore redesign. Avoid treating all information as equal cards.
