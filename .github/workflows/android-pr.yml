@@ -35,6 +35,8 @@ jobs:
 
       - name: Run BGG identity provenance regression
         run: python3 regression/bgg_identity_provenance_v5125.py
+      - name: Run historical BGG revalidation regression
+        run: python3 regression/historical_bgg_revalidation_v5126.py
 
       - name: Compile debug Java
         run: |
