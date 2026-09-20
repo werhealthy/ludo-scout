@@ -27,8 +27,9 @@ public final class QueueJobRunner {
      * ranking. Reviews from older matcher versions are eligible once; true ambiguities do not loop. */
     public static int matchBggIdentities(Context context,MarketStore market,BggSearchClient matcher,int limit){
         if(market==null||matcher==null||market.isBggPaused())return 0;
+        long batchStarted=android.os.SystemClock.elapsedRealtime();
         List<GameRecord> pending=market.provisionalGamesForMatching(Math.max(1,Math.min(40,limit)));
-        int handled=0;
+        int handled=0,fuzzySearches=0,matched=0,reviewed=0,quarantined=0;
         for(GameRecord g:pending){
             if(g==null)continue;
             try{
@@ -59,7 +60,8 @@ public final class QueueJobRunner {
                 // accepting same-title collisions; expansions/sequel words were never stripped.
                 if(chosen==null&&!sawAmbiguousExact){
                     String q=variants.get(variants.size()-1);
-                    fuzzyCandidates=matcher.localCandidates(q);
+                    fuzzySearches++;
+                    fuzzyCandidates=matcher.localCandidatesIndexed(q);
                     if(!fuzzyCandidates.isEmpty()){
                         BggSearchClient.Game best=fuzzyCandidates.get(0);
                         int second=fuzzyCandidates.size()>1?fuzzyCandidates.get(1).searchScore:0;
@@ -72,15 +74,19 @@ public final class QueueJobRunner {
                     reviewReason="Più giochi BGG hanno lo stesso titolo";
                 }
 
-                if(chosen!=null)market.assignAutoBggMatch(g.id,chosen,confidence);
+                if(chosen!=null){market.assignAutoBggMatch(g.id,chosen,confidence);matched++;}
                 else {
                     BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.unresolvedTitle(g.name,fuzzyCandidates,sawAmbiguousExact);
-                    if(gate.action==BoardGameIntakeGate.Action.REVIEW)market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);
-                    else market.autoQuarantineGame(g.id,gate.reason);
+                    if(gate.action==BoardGameIntakeGate.Action.REVIEW){market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);reviewed++;}
+                    else{market.autoQuarantineGame(g.id,gate.reason);quarantined++;}
                 }
                 handled++;market.touchLaneHeartbeat("bgg");
-            }catch(Throwable t){market.markBggMatchReview(g.id,"Errore match locale: "+safe(t));handled++;}
+            }catch(Throwable t){market.markBggMatchReview(g.id,"Errore match locale: "+safe(t));reviewed++;handled++;}
         }
+        long elapsed=android.os.SystemClock.elapsedRealtime()-batchStarted;
+        market.setDiagnosticState("bgg_local_match",handled,
+                "build=bgg-local-match-v1;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
+                        ";review="+reviewed+";quarantined="+quarantined+";elapsedMs="+elapsed);
         return handled;
     }
 
