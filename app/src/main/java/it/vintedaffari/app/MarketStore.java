@@ -1423,14 +1423,15 @@ public final class MarketStore {
                 "JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND (l.vinted_url IS NULL OR l.vinted_url='') "+
                 "AND g.database_visible=1 AND g.match_state='MATCHED' AND g.rating>=? AND d.lifecycle='ACTIVE' "+
                 "AND d.benchmark_cents IS NOT NULL AND d.benchmark_cents>0 AND d.item_price_cents>=d.benchmark_cents*2.0 "+
-                "AND d.item_price_cents-d.benchmark_cents>=2500 AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=l.id AND p.state IN (?,?,?) AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY'))";
-        try(Cursor cur=db.rawQuery(sql,new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),PENDING,PROCESSING,FAILED_RETRYABLE})){while(cur.moveToNext()){ids.add(cur.getLong(0));sigs.add(cur.getString(1));}}
+                "AND d.item_price_cents-d.benchmark_cents>=2500 AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=l.id AND p.job_type=? AND p.state=?) "+
+                "AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=l.id AND p.state IN (?,?,?) AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY'))";
+        try(Cursor cur=db.rawQuery(sql,new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),JOB_VINTED,PROCESSING,PENDING,PROCESSING,FAILED_RETRYABLE})){while(cur.moveToNext()){ids.add(cur.getLong(0));sigs.add(cur.getString(1));}}
         if(ids.isEmpty())return 0;int changed=0;db.beginTransaction();try{
             for(int i=0;i<ids.size();i++){long id=ids.get(i);String sig=sigs.get(i);
                 ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_FILTERED");l.put("last_error","Prezzo chiaramente sopra il riferimento usato; verifica Vinted evitata");changed+=db.update("market_listings",l,"id=?",new String[]{String.valueOf(id)});
                 ContentValues d=new ContentValues();d.put("lifecycle","REMOVED");d.put("verification_state","PRICE_FILTERED");d.put("verification_reason","Prezzo almeno 2× e 25 € sopra il riferimento usato; verifica Vinted non necessaria");db.update("deals",d,"signature=?",new String[]{sig});
                 ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("progress",100);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("processing_started_at",0);j.put("last_error","skipped: clearly overpriced before Vinted lookup");
-                db.update("processing_jobs",j,"listing_id=? AND job_type=? AND state IN (?,?,?) AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",new String[]{String.valueOf(id),JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE});
+                db.update("processing_jobs",j,"listing_id=? AND job_type=? AND state IN (?,?) AND COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')",new String[]{String.valueOf(id),JOB_VINTED,PENDING,FAILED_RETRYABLE});
             }db.setTransactionSuccessful();
         }finally{db.endTransaction();}
         if(changed>0){setDiagnosticState("early_price_filter",changed,"build=early-price-gate-v1;filtered="+changed+";rule=ask>=2x_reference_and_25eur;manualHuntExempt=true");helper.invalidateActiveObservationSessionCache();notifyQueueChanged();}
