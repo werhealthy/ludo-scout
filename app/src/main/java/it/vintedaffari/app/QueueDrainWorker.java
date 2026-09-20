@@ -38,10 +38,10 @@ public final class QueueDrainWorker extends Worker {
         // fresh lane-specific heartbeat (or Vinted is intentionally pacing).
         if (QueueKeepAliveService.isRunning()) {
             long now=System.currentTimeMillis();
-            int vd=market.runnableVintedDueCount(now), bd=market.runnableBggDueCount(now);
+            int vd=market.runnableVintedDueCount(now), bd=market.runnableBggDueCount(now), hp=market.historicalBggRevalidationPendingCount();
             long vh=market.laneHeartbeatAt("vinted"), bh=market.laneHeartbeatAt("bgg");
             boolean vHealthy=vd<=0 || VintedPublicSession.nextAllowedAt(context)>now || market.processingVintedCount()>0 || (vh>0&&now-vh<45_000L);
-            boolean bHealthy=bd<=0 || market.processingCount(MarketStore.JOB_BGG)>0 || (bh>0&&now-bh<45_000L);
+            boolean bHealthy=(bd<=0&&hp<=0) || market.processingCount(MarketStore.JOB_BGG)>0 || (bh>0&&now-bh<45_000L);
             if(vHealthy&&bHealthy)return Result.success();
         }
         market.resetStaleProcessingOlderThan(15 * 60_000L);
@@ -54,7 +54,6 @@ public final class QueueDrainWorker extends Worker {
         int processed = 0;
 
         QueueJobRunner.sweepMissing(context, market);
-        BggHistoricalRevalidator.runSlice(market,bggMatcher,4);
 
         try {
             while (!isStopped() && processed < MAX_ITEMS && System.currentTimeMillis() - started < MAX_RUN_MS) {
@@ -71,6 +70,16 @@ public final class QueueDrainWorker extends Worker {
         } catch (Throwable t) {
             Log.w(TAG, "background queue pass failed", t);
         }
+
+        // Recovery follows the same priority as the foreground service: only spend remaining local
+        // budget on historical revalidation after current BGG identity/enrichment work is clear.
+        try{
+            long now=System.currentTimeMillis();
+            if(!isStopped()&&processed<MAX_ITEMS&&now-started<MAX_RUN_MS&&market.bggMatchRequiredCount()==0&&market.runnableBggDueCount(now)==0){
+                int historical=BggHistoricalRevalidator.runSlice(market,bggMatcher,Math.min(24,MAX_ITEMS-processed));
+                processed+=historical;
+            }
+        }catch(Throwable t){Log.w(TAG,"historical BGG recovery pass failed",t);}
 
         MarketStore.JobSummary remaining = market.jobSummary();
         context.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(context.getPackageName()));
