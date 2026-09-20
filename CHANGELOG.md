@@ -7,6 +7,13 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.14 — BGG algorithm-version numeric affinity
+- Fixed a SQLite comparison bug that could keep review rows permanently eligible for re-matching even after `match_algorithm_version` was updated to the current algorithm.
+- All version predicates now cast the bound parameter to INTEGER explicitly, including current matcher selection/counting and historical revalidation selection/counting.
+- Added `bggMatchBreakdown` diagnostics separating pure required identities, legacy review rows and current review rows.
+- Added `regression/bgg_version_affinity_v51214.py` and wired it into PR/beta CI.
+- No schema/data reset, request-rate, signing, applicationId or CI versionCode-strategy changes.
+
 ## 5.12.13 — BGG cold-index + single-flight
 - Removed the queue-process global all-alias exact-name map that could dominate BGG matcher cold start after an APK/process restart.
 - The local catalog is now parsed once into shared game objects plus a direct BGG-id map; exact title/alias lookups are lazy in-memory scans cached in a bounded 64-query LRU.
