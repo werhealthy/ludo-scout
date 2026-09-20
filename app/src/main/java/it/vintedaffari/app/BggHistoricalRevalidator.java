@@ -14,13 +14,13 @@ import java.util.List;
  * persistent review instead of being guessed.
  */
 public final class BggHistoricalRevalidator {
-    public static final String BUILD="bgg-historical-revalidation-v1";
+    public static final String BUILD="bgg-historical-revalidation-v2";
 
     private BggHistoricalRevalidator(){}
 
     public static int runSlice(MarketStore market,BggSearchClient matcher,int limit){
         if(market==null||matcher==null)return 0;
-        List<MarketStore.HistoricalBggCandidate> games=market.historicalBggRevalidationCandidates(Math.max(1,Math.min(6,limit)));
+        List<MarketStore.HistoricalBggCandidate> games=market.historicalBggRevalidationCandidates(Math.max(1,Math.min(32,limit)));
         if(games.isEmpty()){
             market.setDiagnosticState("bgg_historical_revalidation",1,"state=DONE;"+market.historicalBggRevalidationSummary());
             return 0;
@@ -37,7 +37,7 @@ public final class BggHistoricalRevalidator {
                     market.flagHistoricalBggReview(listing.id,"Rivalidazione BGG storica: ID "+candidate.bggId+" non presente nell'indice locale corrente.");
                     review++;reviewListings++;
                 }
-                market.completeHistoricalBggRevalidation(candidate.gameId,"REVIEW_NO_LOCAL_BGG","listings="+candidate.listings.size(),false);
+                market.completeHistoricalBggRevalidation(candidate.gameId,"REVIEW_NO_LOCAL_BGG","listings="+candidate.listings.size(),false,false);
                 reviewGames++;processed++;continue;
             }
 
@@ -54,11 +54,12 @@ public final class BggHistoricalRevalidator {
             String state=review==0?"VERIFIED":"REVIEW";
             market.completeHistoricalBggRevalidation(candidate.gameId,state,
                     "bgg="+candidate.bggId+"; supported="+supported+"; review="+review+"; listings="+candidate.listings.size(),
-                    independentlyVerified);
+                    independentlyVerified,false);
             if(review>0)reviewGames++;else verifiedGames++;
             processed++;
         }
 
+        if(processed>0)market.notifyHistoricalBggRevalidationChanged();
         market.setDiagnosticState("bgg_historical_revalidation",1,
                 "state=RUNNING;build="+BUILD+";slice="+processed+";verifiedGames="+verifiedGames+
                         ";reviewGames="+reviewGames+";reviewListings="+reviewListings+";"+market.historicalBggRevalidationSummary());
