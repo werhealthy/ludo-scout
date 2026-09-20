@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class QueueJobRunner {
     private static final String TAG = "LudoBackground";
+    private static final AtomicBoolean BGG_IDENTITY_RUNNING = new AtomicBoolean(false);
     private QueueJobRunner() {}
 
     /** Zero-network BGG identity stage. It first reuses only authoritative BGG/manual aliases,
@@ -27,7 +28,12 @@ public final class QueueJobRunner {
      * ranking. Reviews from older matcher versions are eligible once; true ambiguities do not loop. */
     public static int matchBggIdentities(Context context,MarketStore market,BggSearchClient matcher,int limit){
         if(market==null||matcher==null||market.isBggPaused())return 0;
+        if(!BGG_IDENTITY_RUNNING.compareAndSet(false,true)){
+            market.setDiagnosticState("bgg_local_match",0,"build=bgg-local-match-v3;state=BUSY;singleFlight=true;"+matcher.localIndexSummary());
+            return 0;
+        }
         long batchStarted=android.os.SystemClock.elapsedRealtime();
+        try{
         List<GameRecord> pending=market.provisionalGamesForMatching(Math.max(1,Math.min(40,limit)));
         int handled=0,fuzzySearches=0,matched=0,reviewDecisions=0,reviewWrites=0,reviewWriteMisses=0,quarantined=0;
         for(GameRecord g:pending){
@@ -92,10 +98,11 @@ public final class QueueJobRunner {
         long elapsed=android.os.SystemClock.elapsedRealtime()-batchStarted;
         int remainingRequired=market.bggMatchRequiredCount();
         market.setDiagnosticState("bgg_local_match",handled,
-                "build=bgg-local-match-v2;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
+                "build=bgg-local-match-v3;state=DONE;singleFlight=true;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
                         ";reviewDecisions="+reviewDecisions+";reviewWrites="+reviewWrites+";reviewWriteMisses="+reviewWriteMisses+
-                        ";quarantined="+quarantined+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed);
+                        ";quarantined="+quarantined+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
         return handled;
+        }finally{BGG_IDENTITY_RUNNING.set(false);}
     }
 
     public static boolean processOneBgg(Context context, MarketStore market, BggEnricher bgg) {
