@@ -7,6 +7,14 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.10 — BGG fuzzy index performance
+- Fixed the remaining local BGG matcher full-scan path: queue fuzzy matching no longer reopens/decompresses/scans the ~31k-game gzip catalog once per query.
+- Added a queue-only in-memory fuzzy scorer over the catalog objects already retained by exact/id indexes, with a bounded top-16 heap and 32-query LRU cache.
+- Preserved the existing disk-streaming fuzzy path for short-lived/manual clients to avoid reintroducing a large retained catalog into UI processes.
+- Added `bggLocalMatch` diagnostics with batch counts and elapsed time so local matcher stalls can be measured on Pixel.
+- Added `regression/bgg_fuzzy_index_performance_v51210.py` and wired it into PR and Android beta CI.
+- No schema/data reset and no signing, applicationId, CI versionCode strategy, Vinted request rate or BGG network-rate changes.
+
 ## 5.12.9 — Historical BGG drain scheduling
 - Fixed the second bottleneck revealed by Pixel testing after the local-index optimization: historical revalidation was artificially limited to tiny slices and could run before current BGG work.
 - Current BGG identity and enrichment now always precede historical cleanup; historical revalidation runs only when the current BGG lane has no runnable work.
