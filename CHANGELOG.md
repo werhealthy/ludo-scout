@@ -7,6 +7,17 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.25 — Adaptive Motore fairness and real-work ETA
+- Closed the remaining head-of-line gap left after 5.12.24: the oldest unfinished scroll can no longer monopolize the ordinary automatic lane indefinitely.
+- Motore timing now models core Vinted identity work rather than raw valid-card count. The target is a 10-minute floor, otherwise roughly 1 minute of local/setup allowance plus 55 seconds per core remote candidate.
+- Added a live ETA based on core Vinted candidates still pending; it shrinks as online identity work completes and does not include optional deep metadata.
+- Added non-destructive round-robin continuation: when another unfinished scroll exists, an ordinary run yields after a 10-minute service slice. Its listings/jobs remain untouched and resume on a later turn.
+- HUNT_PRIORITY and MANUAL_PRIORITY keep their existing preemption; trusted-only Home/Scopri rules are unchanged.
+- Motore UI now reports remaining online verifications, uses `In pausa · riprenderà` for yielded work, and explains that acquired scrolls rotate without discarding cards.
+- Diagnostics add `engineFairness`, `etaMs`, `coreWork` and `corePending`.
+- Added `regression/engine_adaptive_fairness_v51225.py` and updated the 5.12.24 timing regression to the real-work model.
+- No schema migration, request-rate increase, signing, applicationId, Firebase, secrets or CI versionCode-strategy change.
+
 ## 5.12.24 — Adaptive, non-destructive Motore timing
 - Replaced the universal 10-minute Motore correctness cutoff with workload-aware timing. Ten minutes remains the product target for a small/ordinary scroll.
 - The timing estimate is based on actual eligible listings and the deliberately conservative Vinted public-page pace: minimum 10 minutes, otherwise roughly 5 minutes base plus 55 seconds per eligible listing.
