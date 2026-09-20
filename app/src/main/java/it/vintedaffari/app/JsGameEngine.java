@@ -37,6 +37,7 @@ public final class JsGameEngine {
     private boolean ready = false;
     private boolean attached = false;
     private boolean verifyInFlight = false;
+    private boolean verifyRetryScheduled = false;
     private long verifyStartedAt = 0L;
     private ReadyListener readyListener;
     private static final long READY_RETRY_MS = 500L;
@@ -79,7 +80,7 @@ public final class JsGameEngine {
         attachHiddenWebView();
         verifyStartedAt=android.os.SystemClock.elapsedRealtime();
         webView.loadUrl("file:///android_asset/engine/engine.html");
-        webView.postDelayed(this::verifyEngine,READY_RETRY_MS);
+        scheduleVerifyRetry(webView,READY_RETRY_MS);
     }
 
     private void attachHiddenWebView() {
@@ -137,12 +138,21 @@ public final class JsGameEngine {
         if(current!=webView||ready||webView==null)return;
         long elapsed=android.os.SystemClock.elapsedRealtime()-verifyStartedAt;
         if(elapsed<READY_TIMEOUT_MS){
-            current.postDelayed(this::verifyEngine,READY_RETRY_MS);
+            scheduleVerifyRetry(current,READY_RETRY_MS);
             return;
         }
         String message="Il runtime JS non risulta pronto dopo "+elapsed+" ms.";
         Log.e(TAG,message);
         if(readyListener!=null)readyListener.onError(message);
+    }
+
+    private void scheduleVerifyRetry(WebView current,long delayMs){
+        if(current==null||current!=webView||ready||verifyRetryScheduled)return;
+        verifyRetryScheduled=true;
+        current.postDelayed(()->{
+            verifyRetryScheduled=false;
+            verifyEngine();
+        },Math.max(1L,delayMs));
     }
 
     public void analyze(List<VintedCard> cards, BatchListener listener) {
@@ -199,6 +209,7 @@ public final class JsGameEngine {
     public void destroy() {
         ready = false;
         verifyInFlight = false;
+        verifyRetryScheduled = false;
         verifyStartedAt = Long.MAX_VALUE;
         if (webView == null) return;
         try {
