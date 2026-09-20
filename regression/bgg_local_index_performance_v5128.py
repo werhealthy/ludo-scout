@@ -9,16 +9,17 @@ byid_start = client.index("public Game localById")
 byid_end = client.index("public Integer localMarketReferenceCents", byid_start)
 byid = client[byid_start:byid_end]
 
-exact_start = client.index("private Map<String,List<Game>> exactIndex")
-exact_end = client.index("private static void addExact", exact_start)
-exact = client[exact_start:exact_end]
+catalog_start = client.index("private void ensureCatalogIndex")
+catalog_end = client.index("public String localIndexSummary", catalog_start)
+catalog = client[catalog_start:catalog_end]
 
 checks = [
     ("localById uses retained id index", "localByIdIndex" in byid and ".get(bggId)" in byid),
     ("localById does not rescan compressed catalog", "openSearchIndex()" not in byid and "BufferedReader" not in byid and "GZIPInputStream" not in byid),
-    ("id and exact indexes built in one catalog pass", "Map<String,Game> byId" in exact and "byId.put(g.id,g)" in exact and "addExact(exact" in exact),
-    ("single compressed catalog open during index build", exact.count("openSearchIndex()") == 1),
-    ("id index cleared on shutdown", "localByIdIndex=null" in client),
+    ("id and catalog refs built in one catalog pass", "Map<String,Game> byId" in catalog and "byId.put(g.id,g)" in catalog and "catalog.add(g)" in catalog),
+    ("single compressed catalog open during shared index build", catalog.count("openSearchIndex()") == 1),
+    ("global all-alias exact map removed", "localExactIndex" not in client and "addExact(" not in client),
+    ("id index cleared on shutdown", "localByIdIndex=null" in client and "localCatalogIndex=null" in client),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
 
