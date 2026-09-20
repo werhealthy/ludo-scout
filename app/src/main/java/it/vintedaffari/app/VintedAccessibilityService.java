@@ -1286,10 +1286,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String bggLocalMatchSummary=bggLocalMatch.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggLocalMatch.updatedAt)+", "+bggLocalMatch.detail);
         MarketStore.RuntimeStatus bggReviewWrite=marketDiag.diagnosticState("bgg_match_review_write");
         String bggReviewWriteSummary=bggReviewWrite.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggReviewWrite.updatedAt)+", "+bggReviewWrite.detail);
+        MarketStore.RuntimeStatus engineSla=marketDiag.diagnosticState("engine_sla");
+        String engineSlaSummary=engineSla.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-engineSla.updatedAt)+", "+engineSla.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
-        long engineEpochStart=engineEpochForExit;
+        long engineEpochStart=engineEpochForExit;long engineDiagNow=System.currentTimeMillis();
         String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
-        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
+        long runAgeMs=engineRun==null?0L:Math.max(0L,engineDiagNow-engineRun.startAt),runSinceEndMs=engineRun==null?0L:Math.max(0L,engineDiagNow-engineRun.endAt);
+        long runSlaRemainingMs=engineRun==null?0L:Math.max(0L,DealDatabase.ENGINE_RUN_SLA_MS-runSinceEndMs);
+        int runReviewPct=engineRun==null||engineRun.validListings<=0?0:Math.round(engineRun.reviewListings*100f/engineRun.validListings);
+        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";ageMs="+runAgeMs+";sinceEndMs="+runSinceEndMs+";slaRemainingMs="+runSlaRemainingMs+";reviewPct="+runReviewPct+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
         DealDatabase.ObservationSession firstWaiting=null;
         if(engineRun!=null&&engineWaitingRuns>0){
             for(DealDatabase.ObservationSession candidate:db.recentObservationSessions(engineEpochStart,20)){
@@ -1297,7 +1302,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 if(firstWaiting==null||candidate.startAt<firstWaiting.startAt)firstWaiting=candidate;
             }
         }
-        String engineWaitingSummary=firstWaiting==null?"state=NONE":("state=WAITING;start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";analysisPending="+firstWaiting.analysisPendingListings);
+        String engineWaitingSummary=firstWaiting==null?"state=NONE":("state=WAITING;start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";analysisPending="+firstWaiting.analysisPendingListings);
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
@@ -1403,6 +1408,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineEpoch={"+engineEpochSummary+"}\n"+
                 "engineRun={"+engineRunSummary+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
+                "engineSla={"+engineSlaSummary+"}\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
                 "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+
