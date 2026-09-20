@@ -7,6 +7,13 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.8 — BGG local-index performance
+- Fixed the root cause of historical BGG revalidation starvation: `localById()` no longer reopens/decompresses/scans the entire ~31k-game local catalog once per game.
+- The local BGG catalog is now indexed once per queue-process `BggSearchClient`, producing both exact title/alias lookup and direct BGG-id lookup from the same parsed `Game` objects.
+- Subsequent historical BGG id resolution is O(1), while audit batch sizes and network pacing remain unchanged.
+- Added `regression/bgg_local_index_performance_v5128.py` and wired it into PR validation and Android beta CI.
+- No schema/data reset and no signing, applicationId, CI versionCode strategy, Vinted request rate or BGG network-rate changes.
+
 ## 5.12.7 — Revalidation accounting fix
 - Aligned historical revalidation diagnostics with execution: `USER_CONFIRMED` identities are excluded from `pending`/`matchedToRevalidate`, so completion can truthfully reach zero.
 - Mixed games with at least one historical listing requiring review are persistently counted as review even if another listing independently confirms the canonical BGG identity.
