@@ -318,7 +318,7 @@ public final class QueueJobRunner {
             market.markUnavailable(job.listingId,reason);
             if(candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.markUnavailable(candidate.signature,reason);
             try{new BundleDatabase(context).invalidate(candidate);}catch(Throwable ignored){}
-            market.completeJob(job);market.setDiagnosticState("catalog_health",2,"build=catalog-health-v1;state=REMOVED;listing="+job.listingId+";reason="+safe(reason));
+            market.completeJob(job);market.setDiagnosticState("catalog_health",2,"build=catalog-health-v1;state=REMOVED;listing="+job.listingId+";reason="+(reason==null?"":reason));
             return;
         }
 
