@@ -23,6 +23,7 @@ reconcile_block = market[reconcile_start:reconcile_end]
 
 checks = [
     ("stale analysis cannot mutate inactive listing", "listingLifecycle" in apply_block and '!"ACTIVE".equals(listingLifecycle)' in apply_block),
+    ("late matched analysis cannot override review/quarantine", "oldGameState" in apply_block and '"BGG_MATCH_REVIEW".equals(oldGameState)' in apply_block and '"AUTO_QUARANTINED".equals(oldGameState)' in apply_block and apply_block.index("oldGameState") < apply_block.index('if ("matched".equals(analysis.status)')),
     ("listing state follows persisted game state", 'SELECT match_state FROM games WHERE id=?' in apply_block and 'matchState=TextUtils.isEmpty(persisted)?' in apply_block),
     ("quarantined game refilters stale listing", '"AUTO_QUARANTINED".equals(matchState)' in apply_block and '"AUTO_FILTERED_NON_GAME"' in apply_block),
     ("review transition updates game and listings", '"BGG_MATCH_REVIEW"' in review_block and 'db.update("market_listings"' in review_block),
