@@ -58,6 +58,9 @@ jobs:
             -storepass android \
             | grep -E 'Alias name:|SHA256:' || true
 
+      - name: Run performance stability regression
+        run: python3 regression/performance_stability_v5124.py
+
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
