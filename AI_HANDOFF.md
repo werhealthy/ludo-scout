@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.12-bgg-review-write-accountability`
-- versionCode: `126`
+- Baseline version: `5.12.13-bgg-cold-index-singleflight`
+- versionCode: `127`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,16 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.13 BGG cold-index + single-flight
+- Pixel Test 7 proved review persistence itself works: `bggReviewWrite` showed `BGG_MATCH_REVIEW -> BGG_MATCH_REVIEW`, `gameChanged=1`, `listingChanged=1`. The fresh write appeared ~12 s old while `bggLocalMatch` was still the stale v1 summary from ~172 s earlier, showing the new batch had not completed.
+- Root cause moved to cold-start architecture: the queue client still built a global all-alias exact-name HashMap before answering exact lookups. On a fresh process after APK update this can dominate startup CPU/heap, despite warm subsequent fuzzy batches being fast.
+- Removed the retained global alias map. The queue process now parses the gzip catalog once into shared `Game` objects plus `BGG id -> Game`; exact title/alias lookup scans that in-memory catalog lazily and caches only the most recent 64 exact queries.
+- Queue fuzzy lookup continues to reuse the same catalog and retains only its bounded top-16 heap + 32-query cache.
+- Added process-level single-flight to `QueueJobRunner.matchBggIdentities()` so foreground service and WorkManager cannot duplicate the same local identity batch concurrently. A second caller reports `state=BUSY` instead of doing duplicate work.
+- `bggLocalMatch` v3 now includes local-index telemetry: catalog loaded flag, game count, cold load milliseconds, exact scan/cache-hit counts and cache sizes.
+- Regression: `regression/bgg_cold_index_singleflight_v51213.py`; existing 5.12.8/5.12.10 guards were updated to validate the lighter shared-catalog architecture instead of the removed global alias map.
+- No schema/data reset, no network-rate change, no signing/applicationId/versionCode-strategy change.
 
 ## 5.12.12 BGG review-write accountability
 - Pixel Test 6 still showed `handled=3`, `review=3`, but `bggMatchRequired=3` and `bggMatchReview=15` unchanged. Fuzzy matching itself was fast (63 ms), so the remaining uncertainty is the persistence transition itself.

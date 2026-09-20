@@ -15,16 +15,16 @@ stream_start = client.index("private List<Game> localSearch")
 stream_end = client.index("public List<Game> localCandidates(String query)", stream_start)
 stream = client[stream_start:stream_end]
 
-exact_start = client.index("private Map<String,List<Game>> exactIndex")
-exact_end = client.index("private static final class RankedLocal", exact_start)
-exact = client[exact_start:exact_end]
+catalog_start = client.index("private void ensureCatalogIndex")
+catalog_end = client.index("public String localIndexSummary", catalog_start)
+catalog = client[catalog_start:catalog_end]
 
 checks = [
     ("queue uses indexed fuzzy path", "matcher.localCandidatesIndexed(q)" in runner and "matcher.localCandidates(q)" not in runner),
     ("indexed fuzzy path avoids compressed catalog IO", "openSearchIndex()" not in indexed and "GZIPInputStream" not in indexed and "BufferedReader" not in indexed),
     ("short-lived/manual path remains streaming", "openSearchIndex()" in stream and "GZIPInputStream" in stream),
-    ("catalog refs built in same exact-index pass", "catalog.add(g)" in exact and "byId.put(g.id,g)" in exact),
-    ("no second full Game object graph for queue catalog", "copySearchGame" in client and "catalog.add(g)" in exact),
+    ("catalog refs built in shared index pass", "catalog.add(g)" in catalog and "byId.put(g.id,g)" in catalog),
+    ("no second full Game object graph for queue catalog", "copySearchGame" in client and "catalog.add(g)" in catalog),
     ("fuzzy candidate heap is bounded", "PriorityQueue<RankedLocal> top=new PriorityQueue<>(16" in indexed and "top.size()<16" in indexed),
     ("queue fuzzy cache is bounded", "queueFuzzyCache" in client and "return size()>32" in client),
     ("queue fuzzy cache cleared on shutdown", "queueFuzzyCache.clear()" in client and "localCatalogIndex=null" in client),
