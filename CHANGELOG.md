@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## Git workflow / CI bootstrap
+- Published the Git-ready 5.12.3 baseline to private GitHub repository `werhealthy/ludo-scout`.
+- Created `beta` from `main` for test-build integration.
+- Added manual GitHub Actions workflow `.github/workflows/android-beta.yml`.
+- First CI target is a signed debug APK using the same local Android debug keystore already used by Android Studio.
+- CI requires repository secrets `BGG_TOKEN` and `ANDROID_DEBUG_KEYSTORE_BASE64`.
+- Firebase App Distribution is intentionally deferred until the first GitHub-built APK successfully updates the existing Pixel installation.
+
 ## 5.12.3 — Engine correctness
 - Dedicated Motore run inspector instead of redirecting run details to Catalogo.
 - Active-run scoped Vinted/BGG ordinary processing; newer runs wait.

@@ -1,7 +1,7 @@
 # Ludo Scout — AI handoff
 
 ## Source of truth
-Once this folder is published, the private GitHub repository is the only source of truth.
+The private GitHub repository `werhealthy/ludo-scout` is now the source of truth.
 Do not reconstruct the project from an older ZIP when the repository is available.
 
 ## Current baseline
@@ -15,6 +15,17 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Gradle wrapper: 8.9
 - Android Gradle Plugin: 8.7.3
 - Current development stage: engine correctness before full visual redesign.
+
+## Git workflow
+- Repository: `werhealthy/ludo-scout` (private)
+- `main`: user-verified stable baseline.
+- `beta`: integration branch used for test builds delivered to the Pixel.
+- Significant work should start from `beta` on `work/<task-name>`.
+- Do not overwrite another chat's active work branch.
+- Every significant change must update this file and `CHANGELOG.md`.
+- CI workflow: `.github/workflows/android-beta.yml`.
+- CI is currently manual (`workflow_dispatch`) until the first signed cloud APK is verified on the existing Pixel install.
+- The first CI milestone is signature-preserving `assembleDebug`; Firebase distribution comes only after that passes.
 
 ## Current engine invariants
 - Vinted Accessibility observation remains the core UX: user scrolls Vinted normally.
@@ -49,23 +60,18 @@ The intended hierarchy is run-oriented:
 5. history grouped by day, with individual scrolls only inside a day.
 Use concrete language (`card Vinted osservate`, `giochi trovati`, `BGG riconosciuto`, `Vinted collegato`, `card pronta`) rather than ambiguous labels such as `gioco valido`.
 
-## Repository workflow (target)
-- `main`: latest user-verified stable version.
-- `beta`: integration branch used for builds delivered to the Pixel.
-- Significant work should start from `beta` on `work/<task-name>`.
-- Do not overwrite another chat's active work branch.
-- Every significant change must update this file and `CHANGELOG.md`.
-
 ## Secrets
 Never commit secrets, signing keys or local SDK paths.
 - `secrets.properties` is ignored and should not normally be needed.
 - Local BGG token should live in `%USERPROFILE%\\.gradle\\gradle.properties` as `BGG_TOKEN=...`.
-- CI will receive secrets through GitHub Actions Secrets/environment.
-- Signing material must stay outside Git. Do not generate a new signing key until the currently installed app signature has been identified/preserved.
+- CI expects GitHub Actions secret `BGG_TOKEN`.
+- CI expects GitHub Actions secret `ANDROID_DEBUG_KEYSTORE_BASE64`, containing the existing developer-machine `%USERPROFILE%\\.android\\debug.keystore` encoded as Base64.
+- Signing material must stay outside Git.
 
 ## Android signing warning
 The baseline has no custom `signingConfig`; Android Studio debug builds therefore normally use the developer machine's debug keystore (`%USERPROFILE%\\.android\\debug.keystore`).
-Before CI distribution is enabled, preserve/verify the certificate used by the currently installed Ludo build. CI must use a compatible signing certificate or Android will refuse an in-place update and local app data may be lost if the user uninstalls.
+The GitHub workflow restores that exact keystore to `$HOME/.android/debug.keystore` before `assembleDebug`.
+Do not replace it with a newly generated key: the first cloud APK must update the existing Pixel installation without uninstalling or losing local app data.
 
 ## Required completion note after every task
 State explicitly:
