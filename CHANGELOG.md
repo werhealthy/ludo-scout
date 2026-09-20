@@ -7,6 +7,11 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.7 — Revalidation accounting fix
+- Aligned historical revalidation diagnostics with execution: `USER_CONFIRMED` identities are excluded from `pending`/`matchedToRevalidate`, so completion can truthfully reach zero.
+- Mixed games with at least one historical listing requiring review are persistently counted as review even if another listing independently confirms the canonical BGG identity.
+- No data, identity, queue, network, signing or schema behavior changed beyond these accounting semantics.
+
 ## 5.12.6 — Historical BGG revalidation
 - Added a restart-safe, zero-network one-shot audit for pre-v4 automatic BGG identities after Pixel diagnostics reported 143 historical `MATCHED` games still needing revalidation.
 - Manual/user-confirmed identities are excluded from automatic audit.
