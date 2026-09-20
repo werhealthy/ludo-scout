@@ -61,7 +61,7 @@ public final class QueueKeepAliveService extends Service {
             superviseLanes(false);
             DealDatabase.ObservationSession activeRun=db==null?null:db.activeObservationSession();
             maybeNotifyNextRunComplete(now);
-            int active=market==null?1:market.jobSummary().active()+market.bggMatchRequiredCount()+market.deferredVintedReadyCount(now);
+            int active=market==null?1:market.jobSummary().active()+market.bggMatchRequiredCount()+market.deferredVintedReadyCount(now)+market.historicalBggRevalidationPendingCount();
             if(activeRun!=null)active++;
             if(active<=0){if(++idleNotificationPulses>=3){stopSelf();return;}}else idleNotificationPulses=0;
             NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);nm.notify(NOTIFICATION_ID,notification());
@@ -104,7 +104,7 @@ public final class QueueKeepAliveService extends Service {
         if(vintedExecutor==null||vintedExecutor.isShutdown()||vintedFuture==null||vintedFuture.isDone()||vintedFuture.isCancelled())restartVintedLane("start");
         else if(vintedNeeds&&vintedCanRun&&!vintedProcessing&&vintedStale&&(userWake||now-vh>LANE_STALE_MS+10_000L))restartVintedLane("stale heartbeat");
 
-        boolean bggNeeds=market.runnableBggDueCount(now)>0||market.bggMatchRequiredCount()>0;
+        boolean bggNeeds=market.runnableBggDueCount(now)>0||market.bggMatchRequiredCount()>0||market.historicalBggRevalidationPendingCount()>0;
         long bh=market.laneHeartbeatAt("bgg");boolean bggStale=bh<=0||now-bh>LANE_STALE_MS;
         if(bggExecutor==null||bggExecutor.isShutdown()||bggFuture==null||bggFuture.isDone()||bggFuture.isCancelled())restartBggLane("start");
         else if(bggNeeds&&market.processingCount(MarketStore.JOB_BGG)==0&&bggStale&&(userWake||now-bh>LANE_STALE_MS+10_000L))restartBggLane("stale heartbeat");
@@ -155,24 +155,31 @@ public final class QueueKeepAliveService extends Service {
             try{
                 long now=System.currentTimeMillis();market.touchLaneHeartbeat("bgg");
                 if(market.isBggPaused()){market.setLaneStatus("bgg","PAUSED","Database in pausa",0L);sleep(2_000L);continue;}
-                // Historical revalidation is zero-network and one-shot per game. Keep the
-                // slice tiny so current-run BGG work remains responsive.
-                int historical=BggHistoricalRevalidator.runSlice(market,bggMatcher,2);
-                if(historical>0){market.setLaneStatus("bgg","REVALIDATING",historical+" identità storiche controllate",0L);market.touchLaneHeartbeat("bgg");}
-
-                // Fairness: identity matching is zero-network and must not sit behind a large
-                // enrichment backlog. Do a small bounded slice on every loop, then still give
-                // enrichment its turn in the same iteration.
+                // Current-run identity work always precedes historical cleanup.
                 int matching=market.bggMatchRequiredCount();
                 if(matching>0){market.setLaneStatus("bgg","MATCHING","Riconosco giochi · "+matching+" da abbinare",0L);resolveLocalBggMatches(8);market.touchLaneHeartbeat("bgg");}
 
                 int due=market.runnableBggDueCount(System.currentTimeMillis());
-                if(due<=0){
-                    market.reconcileQueue();due=market.runnableBggDueCount(System.currentTimeMillis());
-                    if(due<=0){long next=market.nextRunnableBggDueAt();int review=market.bggMatchReviewCount();int remaining=market.bggMatchRequiredCount();String detail=remaining>0?remaining+" giochi da riconoscere":(review>0?review+" match BGG da verificare":"nessuna scheda BGG pronta");market.setLaneStatus("bgg","IDLE",detail,next);sleepUntil(next);continue;}
+                if(due<=0){market.reconcileQueue();due=market.runnableBggDueCount(System.currentTimeMillis());}
+                if(due>0){
+                    market.setLaneStatus("bgg","CLAIMING",due+" schede pronte",0L);if(bgg==null)bgg=new BggEnricher(this,db,market);
+                    int batch=QueueJobRunner.processBggBatch(this,market,bgg,20);market.touchLaneHeartbeat("bgg");if(batch>0)market.setLaneStatus("bgg","ACTIVE","batch "+batch+" schede",0L);else sleep(1_000L);
+                    continue;
                 }
-                market.setLaneStatus("bgg","CLAIMING",due+" schede pronte",0L);if(bgg==null)bgg=new BggEnricher(this,db,market);
-                int batch=QueueJobRunner.processBggBatch(this,market,bgg,20);market.touchLaneHeartbeat("bgg");if(batch>0)market.setLaneStatus("bgg","ACTIVE","batch "+batch+" schede",0L);else sleep(1_000L);
+
+                // Only when no current BGG identity/enrichment work is runnable do we spend CPU on
+                // the one-shot historical audit. The local indexes make this cheap; a bounded burst
+                // drains useful work quickly without stealing priority from current observations.
+                int remainingCurrent=market.bggMatchRequiredCount();
+                int historicalPending=market.historicalBggRevalidationPendingCount();
+                if(remainingCurrent<=0&&historicalPending>0){
+                    int historical=BggHistoricalRevalidator.runSlice(market,bggMatcher,24);
+                    market.setLaneStatus("bgg","REVALIDATING",historical+" identità storiche controllate · "+market.historicalBggRevalidationPendingCount()+" residue",0L);
+                    market.touchLaneHeartbeat("bgg");
+                    if(historical>0){sleep(350L);continue;}
+                }
+
+                long next=market.nextRunnableBggDueAt();int review=market.bggMatchReviewCount();int remaining=market.bggMatchRequiredCount();String detail=remaining>0?remaining+" giochi da riconoscere":(historicalPending>0?historicalPending+" identità storiche da rivalidare":(review>0?review+" match BGG da verificare":"nessuna scheda BGG pronta"));market.setLaneStatus("bgg","IDLE",detail,next);sleepUntil(next);continue;
             }catch(InterruptedException e){Thread.currentThread().interrupt();break;}
             catch(Throwable t){Log.e(TAG,"BGG lane fault",t);try{market.setLaneStatus("bgg","FAULT",safe(t),System.currentTimeMillis());market.touchLaneHeartbeat("bgg");}catch(Throwable ignored){}sleepQuiet(2_000L);}
         }
