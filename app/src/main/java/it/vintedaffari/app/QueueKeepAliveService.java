@@ -68,7 +68,7 @@ public final class QueueKeepAliveService extends Service {
             NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);nm.notify(NOTIFICATION_ID,notification());
         }catch(Throwable t){Log.w(TAG,"notification/supervisor pulse failed",t);ProcessCrashJournal.recordHandled(QueueKeepAliveService.this,"queue:pulse",t);}
         if(alive&&!controlExecutor.isShutdown())try{controlExecutor.schedule(this,8_000L,TimeUnit.MILLISECONDS);}catch(Throwable ignored){}
-    }}
+    }};
 
     public static boolean isRunning(){return RUNNING;}
     public static boolean isStarting(){return STARTING;}
