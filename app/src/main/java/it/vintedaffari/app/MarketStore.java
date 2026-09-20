@@ -49,6 +49,8 @@ public final class MarketStore {
     private static final String KEY_BGG_PAUSED = "bgg_paused";
     public static final String KEY_ENGINE_EPOCH_START = "engine_epoch_start";
     public static final String HISTORICAL_SOURCE = "LEGACY_V9";
+    public static final String CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH";
+    private static final long CATALOG_HEALTH_MAX_AGE_MS=24L*60L*60_000L;
     private static final String BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:";
     private static final String ENGINE_RUN_CURSOR = "engine_run_cursor_start";
     private static final String ENGINE_RUN_SLICE = "engine_run_slice";
@@ -862,7 +864,7 @@ public final class MarketStore {
             }
             boolean allowHistory = vintedHistoryAllowed(db, now);
             DealDatabase.ObservationSession activeRun=test2bOwner?null:helper.activeObservationSession();
-            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR (? = 0 AND j.source='LIVE_DEAL') OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
+            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH')) OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql = "SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
                     "FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                     "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE' " +
@@ -1242,6 +1244,12 @@ public final class MarketStore {
         helper.getWritableDatabase().update("market_listings", v, "id=?", new String[]{String.valueOf(listingId)});
     }
 
+    public void markUnavailable(long listingId,String reason){
+        if(listingId<=0)return;ContentValues v=new ContentValues();v.put("lifecycle","REMOVED");v.put("last_seen",System.currentTimeMillis());v.put("last_error",safe(reason));
+        helper.getWritableDatabase().update("market_listings",v,"id=?",new String[]{String.valueOf(listingId)});
+        notifyQueueChanged();
+    }
+
     public void applyBggMetadata(BggMetadata m) {
         if (m == null || TextUtils.isEmpty(m.bggId)) return;
         SQLiteDatabase db = helper.getWritableDatabase();
@@ -1530,8 +1538,26 @@ public final class MarketStore {
             changed+=orphanVariants+autoVariants;
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
+        // Catalog health uses the same paced public-page lane, but only when no Motore scroll owns
+        // it. One exact item at a time is enough to refresh a small catalog without starving discovery.
+        changed+=enqueueCatalogHealthCheckIfIdle(now);
         if(changed>0)notifyQueueChanged();
         return changed;
+    }
+
+    public int enqueueCatalogHealthCheckIfIdle(long now){
+        if(helper.activeObservationSession()!=null)return 0;SQLiteDatabase db=helper.getWritableDatabase();
+        try(Cursor active=db.rawQuery("SELECT 1 FROM processing_jobs WHERE source=? AND state IN (?,?,?) LIMIT 1",new String[]{CATALOG_HEALTH_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE})){if(active.moveToFirst())return 0;}
+        long cutoff=now-CATALOG_HEALTH_MAX_AGE_MS;Long listingId=scalarLong(db,
+                "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' "+
+                "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
+                "AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.rating>=? "+
+                "AND COALESCE(l.enriched_at,0)<? AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN (?,?,?)) "+
+                "ORDER BY CASE WHEN l.published_label IS NULL OR l.published_label='' OR l.seller_id IS NULL OR l.seller_id='' THEN 0 ELSE 1 END,COALESCE(l.enriched_at,0) ASC LIMIT 1",
+                new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(cutoff),PENDING,PROCESSING,FAILED_RETRYABLE});
+        if(listingId==null)return 0;enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,5,CATALOG_HEALTH_SOURCE);
+        setDiagnosticState("catalog_health",1,"build=catalog-health-v1;state=QUEUED;listing="+listingId+";maxAgeMs="+CATALOG_HEALTH_MAX_AGE_MS);
+        QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);return 1;
     }
 
     /** 5.12.22 cut-over: 5.12.21 proved that the old O(31k) exact matcher could hit its
@@ -1791,7 +1817,7 @@ public final class MarketStore {
         if(isVintedPaused())return 0;
         SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT COUNT(*) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
         java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);a.add(String.valueOf(now));if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
@@ -1816,7 +1842,7 @@ public final class MarketStore {
         if(isVintedPaused())return 0L;
         long now=System.currentTimeMillis();SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT MIN(j.next_attempt_at) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
         java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
@@ -2869,7 +2895,7 @@ public final class MarketStore {
             if(!c.moveToFirst())return JOB_VINTED;
             if("LOCAL_ONLY".equals(c.getString(4))||"DEFERRED_LINK".equals(c.getString(4)))return null;
             if(TextUtils.isEmpty(c.getString(0)))return JOB_VINTED;
-            if(TextUtils.isEmpty(c.getString(2)))return JOB_VINTED_DEEP;
+            if(TextUtils.isEmpty(c.getString(1))||TextUtils.isEmpty(c.getString(2)))return JOB_VINTED_DEEP;
             return null;
         }
     }
