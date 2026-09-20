@@ -58,8 +58,15 @@ public final class DealEvaluator {
             return insufficient(null, null);
         }
         int item = Math.max(0, (int) Math.round(card.itemPrice * 100.0));
-        return evaluate(item, analysis.totalCents, analysis.benchmarkCents,
+        Evaluation result = evaluate(item, analysis.totalCents, analysis.benchmarkCents,
                 analysis.offerCents, analysis.afterOfferCents, analysis.shippingCents);
+        // The embedded BGG model knows whether its sample is strong enough for the strongest badge.
+        // Preserve that confidence gate while Java becomes the single product decision layer.
+        if (result.decision == Decision.GREAT_BUY && !"hot".equals(analysis.tier)) {
+            return new Evaluation(Decision.GOOD_PRICE, "Buon prezzo", result.reason,
+                    result.suggestedOfferCents, result.currentTotalCents, result.benchmarkCents);
+        }
+        return result;
     }
 
     public static Evaluation evaluate(DealRecord deal) {
@@ -97,16 +104,20 @@ public final class DealEvaluator {
             }
         }
 
+        Integer suggestedOffer = offerCents;
         Integer plausibleOfferTotal = afterOfferCents;
-        if ((plausibleOfferTotal == null || plausibleOfferTotal <= 0) && offerCents != null && offerCents > 0) {
-            plausibleOfferTotal = offerTotal(offerCents, shippingCents);
+        if ((suggestedOffer == null || suggestedOffer <= 0) && shippingCents != null && shippingCents >= 0) {
+            suggestedOffer = PurchaseMath.maxItemForTotal(goodCeiling, shippingCents);
+            plausibleOfferTotal = offerTotal(suggestedOffer, shippingCents);
+        } else if ((plausibleOfferTotal == null || plausibleOfferTotal <= 0) && suggestedOffer != null && suggestedOffer > 0) {
+            plausibleOfferTotal = offerTotal(suggestedOffer, shippingCents);
         }
-        if (offerCents != null && offerCents > 0 && offerCents < itemCents) {
-            double cut = (itemCents - offerCents) / (double) itemCents;
-            if (cut <= 0.18 && plausibleOfferTotal != null && plausibleOfferTotal <= goodCeiling) {
+        if (suggestedOffer != null && suggestedOffer > 0 && suggestedOffer < itemCents) {
+            double cut = (itemCents - suggestedOffer) / (double) itemCents;
+            if (cut >= 0.05 && cut <= 0.18 && plausibleOfferTotal != null && plausibleOfferTotal <= goodCeiling) {
                 return new Evaluation(Decision.OFFER, "Prova un’offerta",
-                        "A " + money(offerCents) + " diventerebbe un buon prezzo",
-                        offerCents, currentTotalCents, benchmark);
+                        "A " + money(suggestedOffer) + " diventerebbe un buon prezzo",
+                        suggestedOffer, currentTotalCents, benchmark);
             }
         }
 
