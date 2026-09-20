@@ -1935,17 +1935,30 @@ public final class MarketStore {
         notifyQueueChanged();return count;
     }
 
-    public void markBggMatchReview(long gameId,String reason){
-        if(gameId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();int changed=0;db.beginTransaction();try{
-            ContentValues v=new ContentValues();v.put("match_state","BGG_MATCH_REVIEW");v.put("filter_reason",safe(reason));v.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);
-            changed=db.update("games",v,"id=? AND (bgg_id IS NULL OR bgg_id='')",new String[]{String.valueOf(gameId)});
-            if(changed>0){
-                ContentValues l=new ContentValues();l.put("match_state","BGG_MATCH_REVIEW");l.put("last_error",safe(reason));
-                db.update("market_listings",l,"game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(gameId)});
+    /** Atomically moves one still-provisional game into persistent review.
+     * Returns the number of canonical game rows changed (0/1) so callers can distinguish a review
+     * decision from a write that lost a race to a concurrent match/delete. */
+    public int markBggMatchReview(long gameId,String reason){
+        if(gameId<=0)return 0;SQLiteDatabase db=helper.getWritableDatabase();int changed=0,listingChanged=0,visible=-1;String before="",after="",bgg="";
+        db.beginTransaction();try{
+            try(Cursor c=db.rawQuery("SELECT COALESCE(match_state,''),COALESCE(bgg_id,''),database_visible FROM games WHERE id=? LIMIT 1",new String[]{String.valueOf(gameId)})){
+                if(c.moveToFirst()){before=safe(c.getString(0));bgg=safe(c.getString(1));visible=c.getInt(2);}
             }
+            if(!TextUtils.isEmpty(before)&&TextUtils.isEmpty(bgg)){
+                ContentValues v=new ContentValues();v.put("match_state","BGG_MATCH_REVIEW");v.put("filter_reason",safe(reason));v.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);
+                changed=db.update("games",v,"id=?",new String[]{String.valueOf(gameId)});
+                if(changed>0){
+                    ContentValues l=new ContentValues();l.put("match_state","BGG_MATCH_REVIEW");l.put("enrichment_state","NEEDS_REVIEW");l.put("last_error",safe(reason));
+                    listingChanged=db.update("market_listings",l,"game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(gameId)});
+                }
+            }
+            after=scalarString(db,"SELECT COALESCE(match_state,'') FROM games WHERE id=?",new String[]{String.valueOf(gameId)});
             db.setTransactionSuccessful();
         }finally{db.endTransaction();}
-        if(changed>0)notifyQueueChanged();
+        setDiagnosticState("bgg_match_review_write",changed,
+                "build=bgg-review-write-v1;game="+gameId+";before="+safe(before)+";after="+safe(after)+";bgg="+safe(bgg)+
+                        ";visible="+visible+";gameChanged="+changed+";listingChanged="+listingChanged+";reason="+safe(reason));
+        if(changed>0)notifyQueueChanged();return changed;
     }
     public int bggMatchReviewCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='') AND match_state='BGG_MATCH_REVIEW'",null)){return c.moveToFirst()?c.getInt(0):0;}}
 
