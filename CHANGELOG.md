@@ -7,6 +7,17 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.18 — WorkManager/main-thread stability
+- Pixel validation confirmed unique-card acquisition counts, but Android recorded a fresh default-process ANR 47.8 seconds after the 5.12.17 package update: `No response to onStartJob ... SystemJobService`.
+- Moved queue-service database/reconcile/sweep/supervisor work off Android Service callbacks onto a serialized control executor; `startForeground()` remains immediate and `onStartCommand()` now returns without synchronous SQLite work.
+- Moved default-process WorkManager enqueue operations out of `BroadcastReceiver.onReceive()` via `goAsync()`, with an additional main-looper dispatch guard in `QueueWorkScheduler`.
+- WorkManager recovery now stands down while the foreground queue owner is still cold-starting, reducing SQLite startup contention.
+- Motore analysis progress now uses canonical market-listing state rather than stale raw duplicate observation rows, preventing already-analysed cards from keeping an older job alive.
+- System-exit diagnostics v3 report crash/ANR/memory counts since the current APK install boundary, while retaining epoch and 24-hour history.
+- Added `engineWaiting` diagnostics for the first queued scroll behind the active job.
+- Added `regression/workmanager_mainthread_stability_v51218.py` with an executable SQLite stale-pending fixture and main-thread ownership guards; wired it into PR and beta CI.
+- No database/schema migration, signing, applicationId, request-rate or CI versionCode-strategy changes.
+
 ## 5.12.17 — Acquisition dedupe and crash stability
 - Fixed Motore card-count inflation caused by repeated Accessibility renders of the same visible Vinted cards. Same title/brand/price sightings and re-analysis are suppressed for 10 minutes, with the observation dedupe persisted in SQLite so it survives `:radar` restarts.
 - Motore now reports unique Vinted cards in the hero, job detail header and daily chronology; raw observation events remain available only in diagnostics.

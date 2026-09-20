@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.17-acquisition-crash-stability`
-- versionCode: `131`
+- Baseline version: `5.12.18-workmanager-mainthread-stability`
+- versionCode: `132`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -105,6 +105,19 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.18 WorkManager/main-thread stability
+
+- Pixel validation of 5.12.17 confirmed the acquisition dedupe: the Motore returned to ~20 unique Vinted cards instead of 35/58/66 repeated Accessibility events.
+- The same install exposed a fresh default-process ANR 47.8s after the APK update: `No response to onStartJob ... SystemJobService`. The queue foreground service was still doing SQLite/reconcile/scheduler/sweep work synchronously from Android Service callbacks, and a handled `SQLiteDatabaseLockedException` had already shown queue-owner contention.
+- `QueueKeepAliveService` now calls `startForeground()` immediately and moves database construction, epoch/reconcile, WorkManager recovery registration, sweep, lane supervision, periodic queue maintenance and notification state calculation onto a dedicated serialized control executor. `onStartCommand()` is acknowledgement-only on the Android main thread.
+- `QueueWakeReceiver` uses `goAsync()` plus a single background executor for WorkManager enqueue calls. `QueueWorkScheduler` additionally dispatches default-process calls off the main looper as a safety net.
+- WorkManager recovery does not open/compete for SQLite while the foreground owner is still in cold-start initialization.
+- Motore `analysisPending` now follows canonical `market_listings.enrichment_state='PENDING_ANALYSIS'` rather than stale raw observation rows. This fixes old jobs that stayed active because pre-5.12.17 duplicate observation rows were still marked pending after the canonical listing had already advanced.
+- Crash diagnostics v3 derive a current-install boundary from Android `PACKAGE_UPDATED` exits and report `crashAfterInstall/anrAfterInstall/memoryAfterInstall` separately from epoch/24h history.
+- Diagnostics now expose the first waiting Motore run (`engineWaiting`) so a newer scroll can be inspected without hiding behind the current oldest job.
+- Regression: `regression/workmanager_mainthread_stability_v51218.py` includes an executable SQLite fixture for the stale duplicate-pending trap plus static guards for main-thread scheduling/WorkManager ownership.
+- No schema migration, no signing/applicationId/network-rate/CI-versionCode strategy changes.
 
 ## 5.12.17 Acquisition dedupe + crash stability
 

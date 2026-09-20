@@ -89,6 +89,8 @@ jobs:
         run: python3 regression/engine_epoch_progress_stability_v51216.py
       - name: Run acquisition/crash stability regression
         run: python3 regression/engine_acquisition_crash_stability_v51217.py
+      - name: Run WorkManager/main-thread stability regression
+        run: python3 regression/workmanager_mainthread_stability_v51218.py
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew

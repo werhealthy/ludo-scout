@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Looper;
 
 import androidx.work.BackoffPolicy;
 import androidx.work.Constraints;
@@ -15,6 +16,8 @@ import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Durable background wake-up for the market queue.
@@ -32,7 +35,16 @@ public final class QueueWorkScheduler {
     private static final String UNIQUE_NOW = "ludo-market-queue-now";
     private static final String UNIQUE_RECOVERY = "ludo-market-queue-recovery";
     private static final String UNIQUE_CONTINUE = "ludo-market-queue-continue";
+    private static final ExecutorService SCHEDULER_EXEC=Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,"ludo-work-scheduler");t.setDaemon(false);return t;});
     private QueueWorkScheduler() {}
+
+    private static void runLocalOffMain(Runnable task) {
+        if(task==null)return;
+        try{
+            if(Looper.myLooper()==Looper.getMainLooper())SCHEDULER_EXEC.execute(task);
+            else task.run();
+        }catch(Throwable ignored){}
+    }
 
     private static Constraints network() {
         return new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
@@ -62,7 +74,7 @@ public final class QueueWorkScheduler {
     public static void schedule(Context context) {
         if (context == null) return;
         if (!isDefaultProcess(context)) { wakeDefaultProcess(context, ACTION_NOW, 0L); return; }
-        scheduleLocal(context);
+        Context app=context.getApplicationContext();runLocalOffMain(()->scheduleLocal(app));
     }
 
     static void scheduleLocal(Context context) {
@@ -81,7 +93,7 @@ public final class QueueWorkScheduler {
     public static void ensureRecovery(Context context) {
         if (context == null) return;
         if (!isDefaultProcess(context)) { wakeDefaultProcess(context, ACTION_RECOVERY, 0L); return; }
-        ensureRecoveryLocal(context);
+        Context app=context.getApplicationContext();runLocalOffMain(()->ensureRecoveryLocal(app));
     }
 
     static void ensureRecoveryLocal(Context context) {
@@ -99,7 +111,7 @@ public final class QueueWorkScheduler {
     public static void scheduleAfter(Context context, long delayMs) {
         if (context == null) return;
         if (!isDefaultProcess(context)) { wakeDefaultProcess(context, ACTION_AFTER, delayMs); return; }
-        scheduleAfterLocal(context, delayMs);
+        Context app=context.getApplicationContext();runLocalOffMain(()->scheduleAfterLocal(app,delayMs));
     }
 
     static void scheduleAfterLocal(Context context, long delayMs) {
