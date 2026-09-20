@@ -2,6 +2,9 @@ name: Android beta
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - beta
 
 permissions:
   contents: read
