@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.15 — Crash diagnostics + executable SQLite integration
+- Added application-wide crash journaling so UI, radar and queue/default processes are all covered instead of only MainActivity.
+- Added Android system exit-history diagnostics on API 30+ to identify actual process deaths as CRASH, ANR, memory-related or other exit reasons.
+- Added `processCrashJournal` and `systemExitHistory` to the technical diagnostic output.
+- Added an executable sqlite3 BGG state-machine integration test that reproduces the previously missed affinity bug and verifies current/historical work drains after transitions.
+- Added a dedicated regression for multi-process crash diagnostics and wired both new tests into PR and beta CI.
+- Shifted Pixel usage to final real-device validation rather than repeated debugging of deterministic SQLite behavior.
+- No schema/data reset, request-rate, signing, applicationId or CI versionCode-strategy changes.
+
 ## 5.12.14 — BGG algorithm-version numeric affinity
 - Fixed a SQLite comparison bug that could keep review rows permanently eligible for re-matching even after `match_algorithm_version` was updated to the current algorithm.
 - All version predicates now cast the bound parameter to INTEGER explicitly, including current matcher selection/counting and historical revalidation selection/counting.
