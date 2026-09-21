@@ -10,6 +10,10 @@ radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.ja
 explore=(ROOT/"app/src/main/java/it/vintedaffari/app/BundleExploration.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
+transient_start=runner.index("if (isTransientVintedWait(reason))")
+transient_end=runner.index("} else if (isDeterministicMiss(reason))",transient_start)
+transient_branch=runner[transient_start:transient_end]
+
 checks=[
     ("release identity",
      "5.12.30-engine-recovery-truth" in build),
@@ -23,8 +27,9 @@ checks=[
      "job.attempt>=3" in runner and
      "listingBelongsToActiveRun(job.listingId)" in runner),
     ("transient waits are not manual-review evidence",
-     "isTransientVintedWait(reason)" in runner and
-     "settleAutomaticAmbiguity" not in runner[runner.index("if (isTransientVintedWait(reason))"):runner.index("market.retryJob(job, reason, next)")]),
+     "isTransientVintedWait(reason)" in transient_branch and
+     "settleAutomaticAmbiguity" not in transient_branch and
+     "next = Math.max(VintedPublicSession.nextAllowedAt(context), resolver.nextAllowedAt(candidate))" in transient_branch),
     ("historical catalog repair is serial and self-cleaning",
      'CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY"' in market and
      'source IN (?,?)' in market[market.index("public int enqueueCatalogHealthCheckIfIdle"):market.index("5.12.22 cut-over")] and
