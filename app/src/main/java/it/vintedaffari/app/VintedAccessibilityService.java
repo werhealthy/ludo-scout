@@ -502,7 +502,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         if(localRef!=null&&localRef>0)ga=ga.withUsedMarketBenchmark(localRef,"vinted_local_evidence","Vinted locale + riferimento usato");
                     }
                     database.record(card, ga, analyzedListing, t);
-                    if(marketStore!=null){marketStore.applyAnalysis(card,ga,analyzedListing,t);if(localRef!=null&&ga!=null&&!TextUtils.isEmpty(ga.bggId))marketStore.refreshLocalVintedBenchmarksForBgg(ga.bggId);}
+                    if(marketStore!=null){marketStore.applyAnalysis(card,ga,analyzedListing,t);if(ga!=null&&!TextUtils.isEmpty(ga.bggId))marketStore.refreshLocalVintedBenchmarksForBgg(ga.bggId);}
                     boolean huntCandidate=ga!=null&&"matched".equals(ga.status)&&!TextUtils.isEmpty(ga.bggId)
                             &&HuntDatabase.wantsCandidate(getApplicationContext(),ga.bggId,ga.totalCents);
                     if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);
