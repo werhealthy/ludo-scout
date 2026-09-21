@@ -44,8 +44,8 @@ checks=[
      'menuAction("Nascondi annuncio",RED)' in menu and
      'TextView soldAction=' not in detail),
     ("Listing detail contextualizes secondary information",
-     '"Contesto prezzo"' in detail and
-     '"Scheda gioco"' in ui and
+     '"Contesto prezzo"' not in detail and
+     'linkedDealTagStrip(d,game)' in detail and
      '"Dettagli gioco e costi  ⌄"' not in detail),
 ]
 
