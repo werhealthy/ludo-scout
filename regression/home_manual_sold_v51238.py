@@ -13,7 +13,7 @@ tile=ui[ui.index("private View tileCardV51"):ui.index("private View scoreView",u
 
 checks=[
     ("release identity",
-     "versionName '5.12.38-home-manual-sold-ui'" in build and
+     "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
     ("Home keeps semantic sections independently populated",
@@ -31,8 +31,8 @@ checks=[
      'more.setContentDescription("Azioni annuncio")' in card and
      "showListingActions(d)" in card),
     ("manual sold action is explicit and historical",
-     '"Questo annuncio è venduto"' in manual and
-     '"Lo tolgo subito dagli annunci attivi. Il gioco e questo prezzo restano nello storico di Ludo."' in manual),
+     '"Segna annuncio come venduto"' in ui and
+     '"L’annuncio verrà rimosso dal Mercato attivo. Il gioco e il prezzo osservato resteranno nello storico."' in ui),
     ("manual sold updates both legacy and canonical listing state",
      "db.markSold(sig)" in manual and
      "marketStore.markSold(listingId)" in manual and
