@@ -51,16 +51,40 @@ public final class ProductPageParser {
         }
         String combined=(text+" "+desc).trim();
         String lower=combined.toLowerCase(Locale.ROOT);
-        if(lower.matches(".*\\b(venduto|venduta|sold)\\b.*")
-                ||lower.contains("non più disponibile")
-                ||lower.contains("non e più disponibile")
-                ||lower.contains("non è disponibile")
-                ||lower.contains("articolo non disponibile")
-                ||lower.contains("item unavailable"))p.sold=true;
+        if(isUnavailableText(lower))p.sold=true;
         if(!combined.isEmpty() && combined.toLowerCase(Locale.ROOT).contains("spedizione") && combined.contains("€")){
             Double v=firstPrice(combined); if(v!=null)p.shippingPrice=v;
         }
         for(int i=0;i<n.getChildCount();i++){AccessibilityNodeInfo c=n.getChild(i);if(c!=null)walk(c,p);}
+    }
+
+    public static boolean hasStrongUnavailableSignal(AccessibilityNodeInfo root){
+        return hasStrongUnavailableSignal(root,false);
+    }
+
+    private static boolean hasStrongUnavailableSignal(AccessibilityNodeInfo n,boolean insideRecommendation){
+        if(n==null)return false;
+        String id=n.getViewIdResourceName();String lid=id==null?"":id.toLowerCase(Locale.ROOT);
+        boolean excluded=insideRecommendation||lid.contains("items_item")||lid.contains("homepage")||lid.contains("recommend")||lid.contains("carousel");
+        String text=n.getText()==null?"":n.getText().toString().trim();
+        String desc=n.getContentDescription()==null?"":n.getContentDescription().toString().trim();
+        String lower=(text+" "+desc).trim().toLowerCase(Locale.ROOT);
+        if(!excluded&&n.isVisibleToUser()&&isUnavailableText(lower))return true;
+        for(int i=0;i<n.getChildCount();i++){
+            AccessibilityNodeInfo child=n.getChild(i);
+            if(child!=null&&hasStrongUnavailableSignal(child,excluded))return true;
+        }
+        return false;
+    }
+
+    private static boolean isUnavailableText(String lower){
+        if(lower==null||lower.isEmpty())return false;
+        return lower.matches(".*\\b(venduto|venduta|sold)\\b.*")
+                ||lower.contains("non più disponibile")
+                ||lower.contains("non e più disponibile")
+                ||lower.contains("non è disponibile")
+                ||lower.contains("articolo non disponibile")
+                ||lower.contains("item unavailable");
     }
 
     private static void parseSummary(String s, ProductPage p){
