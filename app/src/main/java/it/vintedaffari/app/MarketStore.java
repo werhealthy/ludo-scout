@@ -1958,6 +1958,7 @@ public final class MarketStore {
             // Re-open only the final exact-page pass. It is high priority because the user just
             // supplied the missing identity, but it still respects the same paced public Vinted lane.
             enqueueListingJob(db,canonicalId,JOB_VINTED_DEEP,now,260,MANUAL_RECOVERY_SOURCE);
+            db.execSQL("UPDATE processing_jobs SET attempt=0 WHERE job_key=?",new Object[]{"vinted-deep:"+canonicalId});
             Long gameId=scalarLong(db,"SELECT game_id FROM market_listings WHERE id=?",new String[]{String.valueOf(canonicalId)});
             if(gameId!=null&&bggRefreshDue(db,gameId,now))enqueueJob(db,"bgg:"+gameId,JOB_BGG,null,gameId,now,250,MANUAL_RECOVERY_SOURCE);
             db.setTransactionSuccessful();
@@ -2850,7 +2851,7 @@ public final class MarketStore {
                 targetId=sourceGameId;ContentValues v=new ContentValues();v.put("bgg_id",selected.id);v.putNull("provisional_key");if(!TextUtils.isEmpty(selected.name)){v.put("canonical_name",selected.name);v.put("normalized_name",normalize(selected.name));}put(v,"year",selected.year);put(v,"rating",selected.rating);put(v,"voters",selected.voters);put(v,"bgg_rank",selected.rank);put(v,"weight",selected.weight);put(v,"min_players",selected.minPlayers);put(v,"max_players",selected.maxPlayers);put(v,"playtime",selected.playtime);put(v,"image_url",selected.imageUrl);put(v,"categories",selected.categories);v.put("bgg_url","https://boardgamegeek.com/boardgame/"+selected.id);v.put("match_state","MATCHED");v.put("match_confidence",100);v.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);v.put("last_seen",now);db.update("games",v,"id=?",new String[]{String.valueOf(sourceGameId)});
                 db.execSQL("UPDATE market_listings SET match_state='MATCHED',match_confidence=100,manual_review_required=0,manual_review_reason=NULL WHERE game_id=?",new Object[]{sourceGameId});
             }
-            addAlias(db,targetId,selected.name,"MANUAL_BGG");enqueueJob(db,"bgg:"+targetId,JOB_BGG,null,targetId,now,250,MANUAL_RECOVERY_SOURCE);
+            addAlias(db,targetId,selected.name,"MANUAL_BGG");enqueueJob(db,"bgg:"+targetId,JOB_BGG,null,targetId,now,250,MANUAL_RECOVERY_SOURCE);db.execSQL("UPDATE processing_jobs SET attempt=0 WHERE job_key=?",new Object[]{"bgg:"+targetId});
             // The manual BGG decision is not the end of the card: every linked listing returns to
             // Motore so the remaining Vinted identity/metadata can complete automatically.
             try(Cursor rows=db.rawQuery("SELECT id,vinted_url,published_label,seller_id FROM market_listings WHERE game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(targetId)})){
@@ -2858,10 +2859,10 @@ public final class MarketStore {
                     long listingId=rows.getLong(0);String url=rows.getString(1),published=rows.getString(2),seller=rows.getString(3);
                     if(TextUtils.isEmpty(url)){
                         ContentValues st=new ContentValues();st.put("enrichment_state","PENDING_ENRICHMENT");st.put("last_error","");db.update("market_listings",st,"id=?",new String[]{String.valueOf(listingId)});
-                        enqueueListingJob(db,listingId,JOB_VINTED,now,260,MANUAL_RECOVERY_SOURCE);
+                        enqueueListingJob(db,listingId,JOB_VINTED,now,260,MANUAL_RECOVERY_SOURCE);db.execSQL("UPDATE processing_jobs SET attempt=0 WHERE job_key=?",new Object[]{"vinted:"+listingId});
                     }else if(TextUtils.isEmpty(published)||TextUtils.isEmpty(seller)){
                         ContentValues st=new ContentValues();st.put("enrichment_state","CORE_COMPLETE");st.put("last_error","");db.update("market_listings",st,"id=?",new String[]{String.valueOf(listingId)});
-                        enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,250,MANUAL_RECOVERY_SOURCE);
+                        enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,250,MANUAL_RECOVERY_SOURCE);db.execSQL("UPDATE processing_jobs SET attempt=0 WHERE job_key=?",new Object[]{"vinted-deep:"+listingId});
                     }
                 }
             }
