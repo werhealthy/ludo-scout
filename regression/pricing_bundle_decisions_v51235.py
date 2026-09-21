@@ -13,7 +13,10 @@ build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 bgg=(ROOT/"app/src/main/java/it/vintedaffari/app/BggSearchClient.java").read_text(encoding="utf-8")
 
 checks=[
-    ("release identity","5.12.35-pricing-bundle-exploration" in build),
+    ("release identity",
+     ("5.12.35-pricing-bundle-exploration" in build or "5.12.36-ux-vnext-sold-reconcile" in build) and
+     "applicationId 'it.vintedaffari.app'" in build and
+     "1000000 + ciVersionCode.toInteger()" in build),
     ("no user-visible expensive category",'"Troppo caro"' not in evaluator and 'Decision.REJECT,""' in evaluator and '"Prezzo alto"' not in ui),
     ("central decisions exist",all(x in evaluator for x in ["GREAT_BUY","GOOD_PRICE","OFFER","FAIR","INSUFFICIENT_DATA","REJECT"])),
     ("typical BGG value is median","cents: Math.round(p.usedMedianEUR * 100)" in bridge and "marketMedianCents: Math.round(p.usedMedianEUR * 100)" in bridge),
