@@ -15,8 +15,8 @@ transient_end=runner.index("} else if (isDeterministicMiss(reason))",transient_s
 transient_branch=runner[transient_start:transient_end]
 
 checks=[
-    ("release identity",
-     "5.12.30-engine-recovery-truth" in build),
+    ("recovery release lineage keeps application identity",
+     "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
     ("human recovery is a separate durable source",
      'MANUAL_RECOVERY_SOURCE = "MANUAL_RECOVERY"' in market and
      "enqueueListingJob(db,canonicalId,JOB_VINTED_DEEP,now,260,MANUAL_RECOVERY_SOURCE)" in market),
@@ -46,8 +46,8 @@ checks=[
      "prossima richiesta" in ui),
     ("recovery station is explicit",
      'renderEngineHeader("Da completare"' in ui and
-     '"Manca il collegamento Vinted"' in ui and
-     '"Manca il gioco BGG"' in ui),
+     '"Collegamento Vinted"' in ui and
+     '"Gioco BGG"' in ui),
     ("catalog shows publishable cards and links recovery back to Motore",
      'db.getDeals("trusted_any_price",800)' in ui and
      '"Da completare · "+blockedCount' in ui),
@@ -55,8 +55,8 @@ checks=[
      '"Vinted da completare · "' not in ui and
      'warning.setContentDescription("Dati in aggiornamento")' in ui),
     ("bundle page distinguishes real bundles from seller exploration",
-     '"Bundle trovati"' in ui and
-     '"Venditori da esplorare"' in ui and
+     '"Bundle confermati · "' in ui and
+     '"Da esplorare · "' in ui and
      "BundleExploration.begin(this,d)" in ui),
     ("bundle exploration intent is bounded",
      "TTL_MS=10L*60_000L" in explore and
