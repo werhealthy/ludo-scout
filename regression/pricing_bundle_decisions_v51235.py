@@ -10,13 +10,15 @@ ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(en
 bundle=(ROOT/"app/src/main/java/it/vintedaffari/app/BundleExploration.java").read_text(encoding="utf-8")
 radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
+bgg=(ROOT/"app/src/main/java/it/vintedaffari/app/BggSearchClient.java").read_text(encoding="utf-8")
 
 checks=[
     ("release identity","5.12.35-pricing-bundle-exploration" in build),
-    ("no user-visible expensive category",'"Troppo caro"' not in evaluator and 'Decision.REJECT,""' in evaluator),
+    ("no user-visible expensive category",'"Troppo caro"' not in evaluator and 'Decision.REJECT,""' in evaluator and '"Prezzo alto"' not in ui),
     ("central decisions exist",all(x in evaluator for x in ["GREAT_BUY","GOOD_PRICE","OFFER","FAIR","INSUFFICIENT_DATA","REJECT"])),
     ("typical BGG value is median","cents: Math.round(p.usedMedianEUR * 100)" in bridge and "marketMedianCents: Math.round(p.usedMedianEUR * 100)" in bridge),
     ("Q25 remains separate","marketQ25Cents: Math.round(p.usedQ25EUR * 100)" in bridge),
+    ("compact BGG fallback reads median column","c.length>=3?c[2]:c[1]" in bgg and "int median=" in bgg),
     ("small Vinted samples are shrunk","priorWeight=5" in market and "s.count>=8" in market and "resolveVintedReference" in market),
     ("local quartiles are explicit","q25Cents,q75Cents" in market and "q25Offset" in market),
     ("price rejects leave product surfaces",'"PRICE_FILTERED"' in db and '"lifecycle","REMOVED"' in db and '"tier","filtered"' in db),
