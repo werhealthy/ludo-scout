@@ -115,6 +115,8 @@ jobs:
         run: python3 regression/motore_network_priority_v51229.py
       - name: Run Motore recovery/truth regression
         run: python3 regression/engine_recovery_truth_v51230.py
+      - name: Run review actions/bundle memory regression
+        run: python3 regression/review_actions_bundle_memory_v51231.py
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
