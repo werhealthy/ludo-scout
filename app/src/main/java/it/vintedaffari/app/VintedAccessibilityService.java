@@ -70,6 +70,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private final LinkedHashMap<String,List<String>> pendingSellerRails = new LinkedHashMap<>();
     /** Diagnostic-only dedupe for the Accessibility identity probe. This never determines listing identity. */
     private final LinkedHashSet<String> accessibilityIdentityProbeSeen = new LinkedHashSet<>();
+    private String lastBundleExploreIntent="";
+    private int bundleExploreHintsThisIntent=0;
 
     private JsGameEngine engine;
     private DealDatabase database;
@@ -309,6 +311,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 if(TextUtils.isEmpty(currentProductDeal.sellerId)&&!railSignatures.isEmpty()){pendingSellerRails.put(currentProductDeal.signature,railSignatures);while(pendingSellerRails.size()>120){String first=pendingSellerRails.keySet().iterator().next();pendingSellerRails.remove(first);}}
                 while(contextualSellerHints.size()>600){String first=contextualSellerHints.keySet().iterator().next();contextualSellerHints.remove(first);}
                 if(!railSignatures.isEmpty())diag().edit().putInt("bundleAccessibilitySnapshot",railSignatures.size()).putString("bundleStrategy",TextUtils.isEmpty(currentProductDeal.sellerId)?"accessibility-seller-rail-pending":"accessibility-seller-rail").apply();
+                BundleExploration.State explore=BundleExploration.current(this);
+                if(explore!=null&&explore.matches(currentProductDeal)){
+                    String exploreKey=explore.sourceSignature+"|"+explore.expiresAt;
+                    if(!exploreKey.equals(lastBundleExploreIntent)){
+                        lastBundleExploreIntent=exploreKey;bundleExploreHintsThisIntent=hinted;
+                        diag().edit().putBoolean("bundleExploreActive",true).putString("bundleExploreSource",currentProductDeal.signature).putString("bundleExploreSeller",currentProductDeal.sellerId==null?"":currentProductDeal.sellerId).putInt("bundleExploreRailHints",hinted).putLong("bundleExploreSeenAt",System.currentTimeMillis()).apply();
+                        final DealRecord exploreSource=currentProductDeal;handler.postDelayed(()->maybeScanBundles(exploreSource,true),180L);
+                    }
+                }
             }
         }
 
@@ -334,6 +345,17 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         .putInt("manualRecoveryLastVisible",visible).putBoolean("manualRecoveryExactHintApplied",exactHintApplied)
                         .putString("manualRecoveryTarget",recovery.title).apply();
                 discovered.clear();
+            }else{
+                BundleExploration.State sellerExplore=BundleExploration.current(this);
+                if(sellerExplore!=null&&sellerExplore.canTagVisibleSellerCards()&&!TextUtils.isEmpty(sellerExplore.sellerId)){
+                    int tagged=0;
+                    for(VintedCard card:discovered){
+                        if(bundleExploreHintsThisIntent>=40)break;
+                        String sig=DealDatabase.signature(card);contextualSellerHints.put(sig,new String[]{sellerExplore.sellerId,null});bundleExploreHintsThisIntent++;tagged++;
+                    }
+                    while(contextualSellerHints.size()>600){String first=contextualSellerHints.keySet().iterator().next();contextualSellerHints.remove(first);}
+                    if(tagged>0)diag().edit().putBoolean("bundleExploreActive",true).putString("bundleStrategy","explicit-seller-exploration").putInt("bundleExploreVisibleHints",bundleExploreHintsThisIntent).apply();
+                }
             }
         } else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
         p.edit()
@@ -1368,6 +1390,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         }
         String waitingState=firstWaiting==null?"NONE":(engineRun!=null&&firstWaiting.startAt<engineRun.startAt?"DEFERRED":"WAITING");
         String engineWaitingSummary=firstWaiting==null?"state=NONE":("state="+waitingState+";start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";etaMs="+DealDatabase.engineEtaMs(firstWaiting)+";coreWork="+firstWaiting.coreWorkListings+";corePending="+firstWaiting.corePendingListings+";coreRemaining="+firstWaiting.coreRemainingListings+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";held="+firstWaiting.heldListings+";analysisPending="+firstWaiting.analysisPendingListings);
+        String engineCoreRemainingSummary=marketDiag.engineCoreRemainingSummary();
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
@@ -1473,6 +1496,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "vintedRequestLedger={"+VintedPublicSession.requestLedgerSummary(context)+"}\n"+
                 "engineEpoch={"+engineEpochSummary+"}\n"+
                 "engineRun={"+engineRunSummary+"}\n"+
+                "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
                 "engineFairness={"+engineFairnessSummary+"}\n"+
