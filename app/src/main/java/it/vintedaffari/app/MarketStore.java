@@ -304,7 +304,7 @@ public final class MarketStore {
                 "vinted_item_id TEXT UNIQUE,game_id INTEGER,vinted_title TEXT NOT NULL,brand TEXT,item_condition TEXT," +
                 "current_price_cents INTEGER NOT NULL,protected_price_cents INTEGER,favorites INTEGER," +
                 "seller_id TEXT,seller_name TEXT,vinted_url TEXT,image_url TEXT,listing_photos_csv TEXT," +
-                "published_label TEXT,language_code TEXT,observed_text TEXT,category_raw TEXT,category_normalized TEXT,category_source TEXT,category_confidence INTEGER NOT NULL DEFAULT 0,category_observed_at INTEGER NOT NULL DEFAULT 0,deferred_retry_at INTEGER NOT NULL DEFAULT 'ACTIVE'," +
+                "published_label TEXT,language_code TEXT,observed_text TEXT,category_raw TEXT,category_normalized TEXT,category_source TEXT,category_confidence INTEGER NOT NULL DEFAULT 0,category_observed_at INTEGER NOT NULL DEFAULT 0,deferred_retry_at INTEGER NOT NULL DEFAULT 0,lifecycle TEXT NOT NULL DEFAULT 'ACTIVE'," +
                 "enrichment_state TEXT NOT NULL DEFAULT 'PENDING_ANALYSIS',match_state TEXT NOT NULL DEFAULT 'PENDING_ANALYSIS'," +
                 "match_confidence REAL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,seen_count INTEGER NOT NULL DEFAULT 1," +
                 "manual_review_required INTEGER NOT NULL DEFAULT 0,manual_review_reason TEXT," +
