@@ -27,6 +27,7 @@ public final class HuntDatabase extends SQLiteOpenHelper {
         if(g==null||g.id==null||g.id.isEmpty())return;ContentValues v=new ContentValues();v.put("bgg_id",g.id);v.put("name",g.name);v.put("image_url",g.imageUrl);if(g.rating!=null)v.put("rating",g.rating);if(target!=null)v.put("target_cents",target);v.put("created_at",System.currentTimeMillis());getWritableDatabase().insertWithOnConflict("hunts",null,v,SQLiteDatabase.CONFLICT_REPLACE);
     }
     public synchronized void remove(long id){getWritableDatabase().delete("hunts","id=?",new String[]{String.valueOf(id)});}
+    public synchronized void removeByBggId(String bggId){if(bggId==null||bggId.trim().isEmpty())return;getWritableDatabase().delete("hunts","bgg_id=?",new String[]{bggId.trim()});}
     public synchronized List<Hunt> all(){
         List<Hunt> out=new ArrayList<>();Cursor c=getReadableDatabase().rawQuery("SELECT id,bgg_id,name,image_url,rating,target_cents,created_at,last_notified_at FROM hunts ORDER BY created_at DESC",null);while(c.moveToNext()){Hunt h=new Hunt();h.id=c.getLong(0);h.bggId=c.getString(1);h.name=c.getString(2);h.imageUrl=c.getString(3);h.rating=c.isNull(4)?null:c.getDouble(4);h.targetCents=c.isNull(5)?null:c.getInt(5);h.createdAt=c.getLong(6);h.lastNotifiedAt=c.getLong(7);out.add(h);}c.close();return out;
     }
