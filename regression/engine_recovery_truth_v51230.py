@@ -50,10 +50,11 @@ checks=[
      '"Gioco BGG"' in ui),
     ("catalog shows publishable cards and links recovery back to Motore",
      'db.getDeals("trusted_any_price",800)' in ui and
-     '"Da completare · "+blockedCount' in ui),
+     '" annunci da completare · Apri Motore"' in ui and
+     'navigate("activity")' in ui),
     ("strong red incomplete badge is removed",
      '"Vinted da completare · "' not in ui and
-     'warning.setContentDescription("Dati in aggiornamento")' in ui),
+     'View dot=new View(this);dot.setBackground(round(ORANGE,999,0,0))' in ui),
     ("bundle page distinguishes real bundles from seller exploration",
      '"Bundle confermati · "' in ui and
      ('"Da controllare · "' in ui or '"Da esplorare · "' in ui) and
