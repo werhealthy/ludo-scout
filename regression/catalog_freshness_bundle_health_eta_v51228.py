@@ -38,14 +38,18 @@ checks=[
     ("active owner reactivates its parked links regardless of background retry timestamp",
      "deferred_retry_at<=?" not in promote and
      "SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?" in promote),
-    ("Motore UI labels ETA as lane work under fairness",
-     '" verifiche Vinted · ~"+mins+" min di corsia"' in ui and
-     '" · può alternarsi con altri scroll"' in ui),
-    ("catalog health is idle-only, exact-linked, one-at-a-time and low priority",
+    ("Motore UI shows factual remaining work instead of a minute forecast",
+     "min di corsia" not in ui and
+     '" verifiche Vinted rimaste"' in ui and
+     '" · prossima richiesta "+retryCountdown(wait)' in ui),
+    ("catalog health is idle-only, serial, and can repair both exact and missing-link history",
      'CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH"' in market and
+     'CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY"' in market and
      "if(helper.activeObservationSession()!=null)return 0" in health and
      "l.vinted_item_id IS NOT NULL" in health and "l.vinted_url IS NOT NULL" in health and
-     "source=?" in health and "enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,5,CATALOG_HEALTH_SOURCE)" in health),
+     "source IN (?,?)" in health and
+     "enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,5,CATALOG_HEALTH_SOURCE)" in health and
+     "enqueueListingJob(db,recovery,JOB_VINTED,now,4,CATALOG_RECOVERY_SOURCE)" in health),
     ("catalog health uses existing paced resolver rather than new networking",
      "CATALOG_HEALTH_SOURCE.equals(job.source)" in runner and
      "VintedPublicSession" not in health and "HttpURLConnection" not in health),
