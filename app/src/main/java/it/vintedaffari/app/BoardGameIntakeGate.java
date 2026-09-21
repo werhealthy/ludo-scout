@@ -60,9 +60,13 @@ public final class BoardGameIntakeGate {
 
     /** Guard even a nominally exact BGG match when the marketplace title is known to collide with
      * books/media/collectibles. Exact string equality is identity evidence, not product-type proof. */
-    public static Decision matchedAnalysis(VintedCard card,GameAnalysis analysis,boolean learnedCollisionRisk){
+    public static Decision matchedAnalysis(VintedCard card,ListingClassifier.Result product,GameAnalysis analysis,boolean learnedCollisionRisk){
         String title=card==null?"":card.title,raw=card==null?"":card.rawDescription;
         if(isStrongNonGameText(title,raw))return new Decision(Action.QUARANTINE,"Segnali forti di categoria non gioco da tavolo");
+        // BGG title equality identifies a candidate, not the marketplace product. Only an
+        // independently positive marketplace classification can publish automatically.
+        if(product==null||!product.hasPositiveBoardGameEvidence())
+            return new Decision(Action.QUARANTINE,"Il titolo coincide con BGG ma manca una prova indipendente che l'oggetto sia un gioco da tavolo");
         boolean risky=seededCollisionTitle(title)||learnedCollisionRisk;
         if(!risky)return new Decision(Action.ACCEPT,"Match BGG con contesto marketplace non a rischio");
         String publisher=analysis==null?"":analysis.productPublisher;
@@ -78,10 +82,12 @@ public final class BoardGameIntakeGate {
     }
 
     /** Live Accessibility/JS decision after the local catalog matcher has had a chance to identify it. */
-    public static Decision afterAnalysis(VintedCard card,GameAnalysis analysis){
+    public static Decision afterAnalysis(VintedCard card,ListingClassifier.Result product,GameAnalysis analysis){
         String title=card==null?"":card.title;
         String raw=card==null?"":card.rawDescription;
         if(isStrongNonGameText(title,raw))return new Decision(Action.QUARANTINE,"Segnali forti di categoria non gioco da tavolo");
+        if(product==null||!product.hasPositiveBoardGameEvidence())
+            return new Decision(Action.QUARANTINE,"Nessuna prova positiva di prodotto gioco da tavolo");
         if(analysis==null)return new Decision(Action.QUARANTINE,"Nessuna evidenza BGG disponibile");
         if("excluded".equals(analysis.status))return new Decision(Action.QUARANTINE,"Il matcher locale classifica l'articolo come accessorio/lotto");
         double score=analysis.matchConfidence==null?0.0:analysis.matchConfidence;

@@ -10,7 +10,7 @@ import java.util.*;
 
 public final class DealDatabase extends SQLiteOpenHelper {
     private static final String DB_NAME="vinted_affari.db";
-    private static final int DB_VERSION=20;
+    private static final int DB_VERSION=21;
     private static final String COLS="id,signature,first_seen,last_seen,seen_count,vinted_title,brand,item_condition,item_price_cents,protected_price_cents,favorites,analysis_status,bgg_id,game_name,display_name,rating,bgg_rank,voters,quality_score,tier,tier_label,total_cents,benchmark_cents,offer_cents,shipping_cents,discount,language_code,match_reason,lifecycle,confirmed,listing_type,verification_state,verification_reason,vinted_url,resolved_at,shipping_verified_cents,vinted_item_id,image_url,link_confidence,link_reason,published_label,bgg_image_url,bgg_categories,bgg_minplayers,bgg_maxplayers,bgg_weight,bgg_playtime,seller_id,seller_name,listing_photos_csv";
 
     public static final class MissingCounts { public int published, metadata, link, bgg; }
@@ -134,6 +134,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         if(oldV<18){MarketStore.upgradeV17ToV18(db);}
         if(oldV<19){MarketStore.upgradeV18ToV19(db);}
         if(oldV<20){MarketStore.upgradeV19ToV20(db);}
+        if(oldV<21){MarketStore.upgradeV20ToV21(db);}
     }
     private static void safeAlter(SQLiteDatabase db,String sql){try{db.execSQL(sql);}catch(Exception ignored){}}
 

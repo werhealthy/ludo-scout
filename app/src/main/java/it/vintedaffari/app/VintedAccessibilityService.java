@@ -376,9 +376,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 .putLong("cardsParsedTotal", p.getLong("cardsParsedTotal", 0) + discovered.size())
                 .apply();
         if (discovered.isEmpty()) return;
-        // Capture the visible listing artwork once, at observation time. This gives the resolver a
-        // durable visual fingerprint even if the listing is sold or becomes hard to rediscover later.
-        ThumbnailStore.captureMissing(this, discovered);
+        // Screenshot/crop work is optional identity evidence, not a prerequisite for discovery.
+        // Bound it to a small set of viable candidates before allocating a full-screen bitmap.
+        List<VintedCard> thumbnailCandidates=new ArrayList<>();
+        for(VintedCard candidate:discovered){
+            ListingClassifier.Result classified=ListingClassifier.classify(candidate);
+            if(classified.type!=ListingClassifier.Type.NON_GAME&&classified.allowIdentityCandidate)thumbnailCandidates.add(candidate);
+            if(thumbnailCandidates.size()>=8)break;
+        }
+        ThumbnailStore.captureMissing(this, thumbnailCandidates);
 
         long now = System.currentTimeMillis();
         if(now-lastBacklogAttemptAt>30_000L){lastBacklogAttemptAt=now;handler.post(this::resolveBacklog);}
@@ -408,7 +414,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 }
             }
 
-            if (listingNow.allowPriceModel) {
+            if (listingNow.allowIdentityCandidate) {
                 Long lastAnalyzed = recentlyAnalyzed.get(sig);
                 boolean analysisDue=lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS;
                 if(analysisDue){
@@ -471,7 +477,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     // It must show positive board-game evidence; otherwise keep it in a reversible
                     // auto-filtered quarantine and let the fast discovery pipeline continue.
                     if(ga==null||!"matched".equals(ga.status)||TextUtils.isEmpty(ga.bggId)){
-                        BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,ga);
+                        BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
                         if(gate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                             if(noisy!=null)database.exclude(noisy,"Scarto automatico pre-BGG: "+gate.reason);
@@ -484,7 +490,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         // game Watergate vs books titled Watergate). For titles with learned/seeded
                         // cross-category collisions require a second board-game signal.
                         boolean collisionRisk=marketStore!=null&&marketStore.isCollisionRiskTitle(card.title);
-                        BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,ga,collisionRisk);
+                        BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,analyzedListing,ga,collisionRisk);
                         if(matchedGate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                             if(noisy!=null)database.exclude(noisy,"Scarto automatico post-match: "+matchedGate.reason);
@@ -992,8 +998,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
             if(!TextUtils.isEmpty(page.publishedLabel))database.updatePublishedLabel(sig,page.publishedLabel);
             if(!TextUtils.isEmpty(page.sellerName))database.updateSellerNameHint(sig,page.sellerName);
             if(page.itemPrice>0)database.updateVerifiedCurrentPrice(sig,priceCents,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0),System.currentTimeMillis());
-            if(marketStore!=null&&exactListingId>0)marketStore.updateExactProductMetadata(exactListingId,page.sellerName,page.publishedLabel,page.itemPrice>0?priceCents:null,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0));
+            if(marketStore!=null&&exactListingId>0){
+                marketStore.updateExactProductMetadata(exactListingId,page.sellerName,page.publishedLabel,page.itemPrice>0?priceCents:null,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0));
+            }
         }
+        if(marketStore!=null&&exactListingId>0)marketStore.updateVintedCategoryEvidence(exactListingId,page.categoryRaw,page.categoryNormalized,page.categorySource,page.categoryConfidence);
         SharedPreferences.Editor e=diag().edit().putString("lastProductTitle",page.title).putInt("lastProductPriceCents",priceCents);
         if(ship!=null)e.putInt("lastProductShippingCents",ship);else e.remove("lastProductShippingCents");
         if(sig!=null && !sig.isEmpty()){

@@ -28,6 +28,17 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - `Android beta` runs on pushes to `beta` and can also be triggered manually (`workflow_dispatch`). It builds the signed debug APK, verifies the preserved signing certificate, uploads the APK artifact and distributes it through Firebase App Distribution.
 - CI versionCode remains `1,000,000 + github.run_number`; do not change the signing key, package/applicationId or versionCode strategy without explicit user approval.
 
+## 5.12.42 pipeline integrity recovery (pending beta validation)
+- Repository baseline inspected for this recovery: main and beta had the same source tree at 5.12.41. The field build 5.12.37-ux-library-ludo-cardfix predates this branch and must not be used as proof that later GitHub UX changes fixed a pipeline defect.
+- Product type, BGG identity, exact Vinted identity and publication eligibility are now distinct gates. A title match only nominates BGG identity; automatic publication additionally requires positive marketplace game evidence and compatible authoritative BGG item type.
+- ListingClassifier is fail-closed: unknown marketplace text is UNCERTAIN, may retain bounded identity evidence, but cannot enter price/publication as an implicit base game. This removes cross-category collision dependence on title blacklists.
+- Product-page category/catalog accessibility semantics are retained as raw/normalized/source/confidence/timestamp evidence when Vinted exposes them. Feed cards remain category-unknown. A structured non-game category reversibly auto-filters the exact canonical listing.
+- BGG XML metadata now carries BGG type; base game ↔ boardgame and expansion ↔ boardgameexpansion are validated before catalog readiness. Mismatch is retained as TYPE_MISMATCH, not silently converted.
+- Catalog semantics are explicit: storedAll is every active legacy row; eligible is exactly getDeals("trusted_any_price"); visible is eligible after the current query/preset/filters. Empty state and count are derived from eligible, never from storedAll.
+- Reconciliation ownership is serialized through the foreground control lane. UI activity wake and Vinted/BGG consumer loops no longer each invoke the expensive global reconcile. Screenshot crops/file writes move off accessibility callbacks and feed capture is capped at eight viable candidates.
+- DB migration 21 is additive only: category provenance columns on market_listings; no reset or history deletion. New regression: regression/pipeline_integrity_v51242.py plus executable BGG compatibility fixtures.
+- Pixel validation still required after beta build: compare uiLastRenderMs, queue SQLITE_BUSY/ANR/memory exits, catalogEligible vs catalogVisible, category capture rate, and 150–250-card scroll behavior. Do not change Vinted public-hour budget.
+
 ## 5.12.35 pricing / bundle product invariants
 - User-facing deal decisions are centralized in `DealEvaluator`: Offertona, Buon prezzo, Prova un'offerta, Prezzo giusto and Pochi dati. `REJECT` is internal only; it removes the listing from product surfaces while preserving market history.
 - “Typical used price” means median. Q25 is a separate low-market band. The compact BGG used-price fallback reads its median column.

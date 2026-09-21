@@ -189,6 +189,25 @@ public final class MarketStore {
         return v.size()>0||priceChanged;
     }
 
+    /** Stores category provenance without manufacturing a feed category. A structured non-game
+     * Vinted category wins over a title match and leaves the row reversible in AUTO_FILTERED. */
+    public boolean updateVintedCategoryEvidence(long listingId,String raw,String normalized,String source,int confidence) {
+        if(listingId<=0||TextUtils.isEmpty(raw)||TextUtils.isEmpty(normalized))return false;
+        long now=System.currentTimeMillis();SQLiteDatabase db=helper.getWritableDatabase();db.beginTransaction();
+        try{
+            ContentValues v=new ContentValues();v.put("category_raw",raw.trim());v.put("category_normalized",normalized.trim());v.put("category_source",safe(source));v.put("category_confidence",Math.max(0,Math.min(100,confidence)));v.put("category_observed_at",now);
+            int changed=db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
+            if(changed>0&&ListingClassifier.isExplicitNonGameCategory(normalized)){
+                String reason="Categoria Vinted incompatibile con gioco da tavolo: "+raw.trim();
+                ContentValues hidden=new ContentValues();hidden.put("lifecycle","AUTO_FILTERED");hidden.put("enrichment_state","AUTO_FILTERED");hidden.put("match_state","CATEGORY_INCOMPATIBLE");hidden.put("last_error",reason);
+                db.update("market_listings",hidden,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
+                ContentValues legacy=new ContentValues();legacy.put("verification_state","CATEGORY_INCOMPATIBLE");legacy.put("verification_reason",reason);
+                db.update("deals",legacy,"signature=(SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?)",new String[]{String.valueOf(listingId)});
+            }
+            db.setTransactionSuccessful();return changed>0;
+        }finally{db.endTransaction();}
+    }
+
     /** One-time UX cut-over. Old incomplete observations are removed from the active product so the
      * new engine can be validated from a genuine zero state. Completed listings are preserved.
      * Incomplete rows are archived rather than physically destroyed, so a future sighting can revive
@@ -285,7 +304,7 @@ public final class MarketStore {
                 "vinted_item_id TEXT UNIQUE,game_id INTEGER,vinted_title TEXT NOT NULL,brand TEXT,item_condition TEXT," +
                 "current_price_cents INTEGER NOT NULL,protected_price_cents INTEGER,favorites INTEGER," +
                 "seller_id TEXT,seller_name TEXT,vinted_url TEXT,image_url TEXT,listing_photos_csv TEXT," +
-                "published_label TEXT,language_code TEXT,observed_text TEXT,deferred_retry_at INTEGER NOT NULL DEFAULT 0,lifecycle TEXT NOT NULL DEFAULT 'ACTIVE'," +
+                "published_label TEXT,language_code TEXT,observed_text TEXT,category_raw TEXT,category_normalized TEXT,category_source TEXT,category_confidence INTEGER NOT NULL DEFAULT 0,category_observed_at INTEGER NOT NULL DEFAULT 0,deferred_retry_at INTEGER NOT NULL DEFAULT 0,lifecycle TEXT NOT NULL DEFAULT 'ACTIVE'," +
                 "enrichment_state TEXT NOT NULL DEFAULT 'PENDING_ANALYSIS',match_state TEXT NOT NULL DEFAULT 'PENDING_ANALYSIS'," +
                 "match_confidence REAL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,seen_count INTEGER NOT NULL DEFAULT 1," +
                 "manual_review_required INTEGER NOT NULL DEFAULT 0,manual_review_reason TEXT," +
@@ -357,6 +376,15 @@ public final class MarketStore {
         try { db.execSQL("ALTER TABLE market_listings ADD COLUMN manual_review_required INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
         try { db.execSQL("ALTER TABLE market_listings ADD COLUMN manual_review_reason TEXT"); } catch (Exception ignored) {}
         try { db.execSQL("UPDATE market_listings SET manual_review_required=1,manual_review_reason=COALESCE(last_error,'Da verificare') WHERE lifecycle='ACTIVE' AND id IN (SELECT listing_id FROM processing_jobs WHERE job_type='VINTED_ENRICHMENT' AND state='FAILED_PERMANENT' AND listing_id IS NOT NULL)"); } catch (Exception ignored) {}
+    }
+
+    /** Additive category evidence observed only on a Vinted product page. */
+    public static void upgradeV20ToV21(SQLiteDatabase db) {
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_raw TEXT"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_normalized TEXT"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_source TEXT"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_confidence INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_observed_at INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
     }
 
     /** v5.11.14: split Vinted core identity work from optional deep metadata. Existing rows that
@@ -557,7 +585,7 @@ public final class MarketStore {
                     v.put("first_seen", now);
                     v.put("last_seen", now);
                     v.put("lifecycle", "ACTIVE");
-                    boolean allowed = listing == null || listing.allowPriceModel;
+                    boolean allowed = listing == null || listing.allowIdentityCandidate;
                     v.put("enrichment_state", allowed ? "PENDING_ANALYSIS" : "BLOCKED_CLASSIFIER");
                     v.put("match_state", allowed ? "PENDING_ANALYSIS" : "BLOCKED_CLASSIFIER");
                     id = db.insertOrThrow("market_listings", null, v);
@@ -1295,6 +1323,27 @@ public final class MarketStore {
         try {
             Long id = scalarLong(db, "SELECT id FROM games WHERE bgg_id=?", new String[]{m.bggId});
             if (id == null) { db.setTransactionSuccessful(); return; }
+            String listingTypeRaw=scalarString(db,"SELECT listing_type FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE' ORDER BY last_seen DESC LIMIT 1",new String[]{m.bggId});
+            ListingClassifier.Type listingType=ListingClassifier.Type.UNCERTAIN;
+            try{ if(!TextUtils.isEmpty(listingTypeRaw))listingType=ListingClassifier.Type.valueOf(listingTypeRaw); }catch(Throwable ignored){}
+            BggProductCompatibility.Verdict typeVerdict=BggProductCompatibility.validate(listingType.name(),m.itemType);
+            if(typeVerdict!=BggProductCompatibility.Verdict.COMPATIBLE){
+                String state=typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE?"TYPE_MISMATCH":"TYPE_UNVERIFIED";
+                String reason=typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE
+                        ?"Tipo BGG incompatibile: annuncio "+listingType+" / BGG "+safe(m.itemType)
+                        :"Tipo prodotto non verificabile: annuncio "+listingType+" / BGG "+safe(m.itemType);
+                ContentValues hidden=new ContentValues();hidden.put("database_visible",0);hidden.put("filter_reason",reason);hidden.put("match_state",state);
+                db.update("games",hidden,"id=?",new String[]{String.valueOf(id)});
+                ContentValues filtered=new ContentValues();filtered.put("enrichment_state",state);filtered.put("match_state",state);filtered.put("last_error",reason);
+                if(typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE)filtered.put("lifecycle","AUTO_FILTERED");
+                db.update("market_listings",filtered,"game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(id)});
+                ContentValues legacy=new ContentValues();legacy.put("verification_state",state);legacy.put("verification_reason",reason);
+                db.update("deals",legacy,"bgg_id=? AND lifecycle='ACTIVE'",new String[]{m.bggId});
+                ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("updated_at",System.currentTimeMillis());done.put("next_attempt_at",0);done.put("last_error",reason);done.put("progress",100);
+                db.update("processing_jobs",done,"game_id=? AND job_type=?",new String[]{String.valueOf(id),JOB_BGG});
+                setDiagnosticState("bgg_product_type",1,"state="+state+";game="+id+";listingType="+listingType+";bggType="+safe(m.itemType));
+                db.setTransactionSuccessful();return;
+            }
             ContentValues v = new ContentValues();
             if (!TextUtils.isEmpty(m.name)) { v.put("canonical_name", m.name); v.put("normalized_name", normalize(m.name)); }
             put(v, "original_name", emptyToNull(m.originalName)); put(v, "alternate_names", emptyToNull(m.alternateNames));
@@ -1311,6 +1360,11 @@ public final class MarketStore {
                 if (eligible) v.putNull("filter_reason"); else v.put("filter_reason", "BGG_RATING_BELOW_6");
             }
             db.update("games", v, "id=?", new String[]{String.valueOf(id)});
+            if(typeVerdict==BggProductCompatibility.Verdict.COMPATIBLE && listingType==ListingClassifier.Type.EXPANSION){
+                ContentValues verified=new ContentValues();verified.put("verification_state","OK");verified.putNull("verification_reason");
+                db.update("deals",verified,"bgg_id=? AND lifecycle='ACTIVE' AND verification_state='EXPANSION_CHECK'",new String[]{m.bggId});
+            }
+            setDiagnosticState("bgg_product_type",1,"state="+typeVerdict+";game="+id+";listingType="+listingType+";bggType="+safe(m.itemType));
             if(m.marketUsedCount!=null&&m.marketUsedCount>0&&m.marketUsedMedianCents!=null&&m.marketUsedMedianCents>0)saveBggMarketStats(db,m.bggId,m.marketUsedMedianCents,m.marketUsedMinCents,m.marketUsedCount,System.currentTimeMillis());
             if (m.rating != null && m.rating < 6.0) {
                 ContentValues skipped = new ContentValues(); skipped.put("state", COMPLETE); skipped.put("updated_at", System.currentTimeMillis()); skipped.put("next_attempt_at", 0); skipped.put("last_error", "skipped: BGG rating below 6"); skipped.put("progress",100);
