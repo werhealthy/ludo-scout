@@ -189,6 +189,25 @@ public final class MarketStore {
         return v.size()>0||priceChanged;
     }
 
+    /** Stores category provenance without manufacturing a feed category. A structured non-game
+     * Vinted category wins over a title match and leaves the row reversible in AUTO_FILTERED. */
+    public boolean updateVintedCategoryEvidence(long listingId,String raw,String normalized,String source,int confidence) {
+        if(listingId<=0||TextUtils.isEmpty(raw)||TextUtils.isEmpty(normalized))return false;
+        long now=System.currentTimeMillis();SQLiteDatabase db=helper.getWritableDatabase();db.beginTransaction();
+        try{
+            ContentValues v=new ContentValues();v.put("category_raw",raw.trim());v.put("category_normalized",normalized.trim());v.put("category_source",safe(source));v.put("category_confidence",Math.max(0,Math.min(100,confidence)));v.put("category_observed_at",now);
+            int changed=db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
+            if(changed>0&&ListingClassifier.isExplicitNonGameCategory(normalized)){
+                String reason="Categoria Vinted incompatibile con gioco da tavolo: "+raw.trim();
+                ContentValues hidden=new ContentValues();hidden.put("lifecycle","AUTO_FILTERED");hidden.put("enrichment_state","AUTO_FILTERED");hidden.put("match_state","CATEGORY_INCOMPATIBLE");hidden.put("last_error",reason);
+                db.update("market_listings",hidden,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
+                ContentValues legacy=new ContentValues();legacy.put("verification_state","CATEGORY_INCOMPATIBLE");legacy.put("verification_reason",reason);
+                db.update("deals",legacy,"signature=(SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?)",new String[]{String.valueOf(listingId)});
+            }
+            db.setTransactionSuccessful();return changed>0;
+        }finally{db.endTransaction();}
+    }
+
     /** One-time UX cut-over. Old incomplete observations are removed from the active product so the
      * new engine can be validated from a genuine zero state. Completed listings are preserved.
      * Incomplete rows are archived rather than physically destroyed, so a future sighting can revive
@@ -285,7 +304,7 @@ public final class MarketStore {
                 "vinted_item_id TEXT UNIQUE,game_id INTEGER,vinted_title TEXT NOT NULL,brand TEXT,item_condition TEXT," +
                 "current_price_cents INTEGER NOT NULL,protected_price_cents INTEGER,favorites INTEGER," +
                 "seller_id TEXT,seller_name TEXT,vinted_url TEXT,image_url TEXT,listing_photos_csv TEXT," +
-                "published_label TEXT,language_code TEXT,observed_text TEXT,deferred_retry_at INTEGER NOT NULL DEFAULT 0,lifecycle TEXT NOT NULL DEFAULT 'ACTIVE'," +
+                "published_label TEXT,language_code TEXT,observed_text TEXT,category_raw TEXT,category_normalized TEXT,category_source TEXT,category_confidence INTEGER NOT NULL DEFAULT 0,category_observed_at INTEGER NOT NULL DEFAULT 0,deferred_retry_at INTEGER NOT NULL DEFAULT 'ACTIVE'," +
                 "enrichment_state TEXT NOT NULL DEFAULT 'PENDING_ANALYSIS',match_state TEXT NOT NULL DEFAULT 'PENDING_ANALYSIS'," +
                 "match_confidence REAL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,seen_count INTEGER NOT NULL DEFAULT 1," +
                 "manual_review_required INTEGER NOT NULL DEFAULT 0,manual_review_reason TEXT," +
@@ -357,6 +376,15 @@ public final class MarketStore {
         try { db.execSQL("ALTER TABLE market_listings ADD COLUMN manual_review_required INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
         try { db.execSQL("ALTER TABLE market_listings ADD COLUMN manual_review_reason TEXT"); } catch (Exception ignored) {}
         try { db.execSQL("UPDATE market_listings SET manual_review_required=1,manual_review_reason=COALESCE(last_error,'Da verificare') WHERE lifecycle='ACTIVE' AND id IN (SELECT listing_id FROM processing_jobs WHERE job_type='VINTED_ENRICHMENT' AND state='FAILED_PERMANENT' AND listing_id IS NOT NULL)"); } catch (Exception ignored) {}
+    }
+
+    /** Additive category evidence observed only on a Vinted product page. */
+    public static void upgradeV20ToV21(SQLiteDatabase db) {
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_raw TEXT"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_normalized TEXT"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_source TEXT"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_confidence INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
+        try { db.execSQL("ALTER TABLE market_listings ADD COLUMN category_observed_at INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
     }
 
     /** v5.11.14: split Vinted core identity work from optional deep metadata. Existing rows that
