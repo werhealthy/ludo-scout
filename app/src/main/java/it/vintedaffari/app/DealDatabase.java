@@ -387,7 +387,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "SUM(CASE WHEN vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (listing_photos_csv IS NULL OR listing_photos_csv='') OR (published_label IS NULL OR published_label='')) THEN 1 ELSE 0 END)," +
                 "SUM(CASE WHEN (vinted_url IS NULL OR vinted_url='') THEN 1 ELSE 0 END)," +
                 "SUM(CASE WHEN bgg_id IS NOT NULL AND bgg_id<>'' AND (bgg_image_url IS NULL OR bgg_image_url='') THEN 1 ELSE 0 END) " +
-                "FROM deals WHERE lifecycle='ACTIVE' AND (rating IS NULL OR rating>=6.0) AND tier IN ('hot','good','verify')";
+                "FROM deals WHERE lifecycle='ACTIVE' AND (rating IS NULL OR rating>=6.0) AND tier IN ('hot','good','offer','fair','insufficient','verify')";
         try(Cursor c=getReadableDatabase().rawQuery(sql,null)){if(c.moveToFirst()){out.published=c.isNull(0)?0:c.getInt(0);out.metadata=c.isNull(1)?0:c.getInt(1);out.link=c.isNull(2)?0:c.getInt(2);out.bgg=c.isNull(3)?0:c.getInt(3);}}
         return out;
     }
