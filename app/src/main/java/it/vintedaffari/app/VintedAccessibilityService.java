@@ -1388,6 +1388,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String openedVintedVerifySummary=openedVintedVerify.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedVerify.updatedAt)+", "+openedVintedVerify.detail);
         MarketStore.RuntimeStatus catalogHealth=marketDiag.diagnosticState("catalog_health");
         String catalogHealthSummary=catalogHealth.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-catalogHealth.updatedAt)+", "+catalogHealth.detail);
+        MarketStore.RuntimeStatus catalogRatingSweep=marketDiag.diagnosticState("catalog_rating_sweep");
+        String catalogRatingSweepSummary=catalogRatingSweep.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-catalogRatingSweep.updatedAt)+", "+catalogRatingSweep.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
         long engineEpochStart=engineEpochForExit;long engineDiagNow=System.currentTimeMillis();
         String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
@@ -1524,6 +1526,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "openedVintedTarget={"+openedVintedTargetSummary+"}\n"+
                 "openedVintedVerify={"+openedVintedVerifySummary+"}\n"+
                 "catalogHealth={"+catalogHealthSummary+"}\n"+
+                "catalogRatingSweep={"+catalogRatingSweepSummary+"}\n"+
                 "lastOpenedVintedPage="+p.getString("lastOpenedVintedPage","")+"\n"+
                 "lastOpenedVintedReconcile="+p.getString("lastOpenedVintedReconcile","")+"\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+

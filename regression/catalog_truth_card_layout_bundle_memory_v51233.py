@@ -16,7 +16,8 @@ hero_bundle=ui[ui.index("private View heroBundleV51"):ui.index("private void add
 current=explore[explore.index("public static State current"):explore.index("public static boolean wasExplored")]
 
 checks=[
-    ("release identity","5.12.33-catalog-truth-card-layout-bundle-memory" in build),
+    ("catalog/card/bundle release lineage keeps app identity",
+     "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
     ("public catalog trusts canonical BGG rating, not stale legacy rating",
      "g.database_visible=1" in trusted and "g.rating IS NOT NULL" in trusted and "g.rating>=6.0" in trusted),
     ("all matched-game paths hide known BGG ratings below six",

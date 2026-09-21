@@ -60,6 +60,7 @@ public final class MarketStore {
     private static final String ENGINE_RUN_SLICE = "engine_run_slice";
     private static final String MANUAL_VINTED_RECOVERY = "manual_vinted_recovery";
     private static final String OPENED_VINTED_TARGET = "opened_vinted_target";
+    private static final String CATALOG_RATING_SWEEP_V51234 = "catalog_rating_sweep_v51234";
 
     public static final class Job {
         public long id, listingId, gameId, displayGameId, nextAttemptAt, processingStartedAt;
@@ -1511,10 +1512,56 @@ public final class MarketStore {
         return changed;
     }
 
+    /**
+     * One-time global repair for installs that already contained catalog rows before the rating gate
+     * became authoritative on every write path. This is value-based only: titles/names never take
+     * part in the decision. Raw observations and listing history are preserved.
+     */
+    public int enforceGlobalCatalogRatingGate(long now){
+        SQLiteDatabase db=helper.getWritableDatabase();
+        try(Cursor done=db.rawQuery("SELECT 1 FROM queue_controls WHERE name=? LIMIT 1",new String[]{CATALOG_RATING_SWEEP_V51234})){
+            if(done.moveToFirst())return 0;
+        }
+        int gamesHidden=0,gamesRestored=0,dealsSynced=0,jobsClosed=0;
+        db.beginTransaction();try{
+            ContentValues hide=new ContentValues();hide.put("database_visible",0);hide.put("filter_reason","BGG_RATING_BELOW_6");
+            gamesHidden=db.update("games",hide,"rating IS NOT NULL AND rating<? AND database_visible<>0",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)});
+
+            ContentValues restore=new ContentValues();restore.put("database_visible",1);restore.putNull("filter_reason");
+            gamesRestored=db.update("games",restore,"rating IS NOT NULL AND rating>=? AND database_visible=0 AND filter_reason='BGG_RATING_BELOW_6'",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)});
+
+            // Canonical BGG is the source of truth. Old DealRecord mirrors can otherwise display a
+            // stale 5.x/6.x value even though the canonical game has already been refreshed.
+            db.execSQL("UPDATE deals SET rating=(SELECT g.rating FROM games g WHERE g.bgg_id=deals.bgg_id),"+
+                    "voters=(SELECT g.voters FROM games g WHERE g.bgg_id=deals.bgg_id),"+
+                    "bgg_rank=(SELECT g.bgg_rank FROM games g WHERE g.bgg_id=deals.bgg_id) "+
+                    "WHERE bgg_id IS NOT NULL AND bgg_id<>'' AND EXISTS(SELECT 1 FROM games g WHERE g.bgg_id=deals.bgg_id AND g.rating IS NOT NULL) "+
+                    "AND (rating IS NULL OR ABS(rating-(SELECT g.rating FROM games g WHERE g.bgg_id=deals.bgg_id))>0.0001 "+
+                    "OR COALESCE(voters,-1)<>COALESCE((SELECT g.voters FROM games g WHERE g.bgg_id=deals.bgg_id),-1) "+
+                    "OR COALESCE(bgg_rank,-1)<>COALESCE((SELECT g.bgg_rank FROM games g WHERE g.bgg_id=deals.bgg_id),-1))");
+            try(Cursor ch=db.rawQuery("SELECT changes()",null)){if(ch.moveToFirst())dealsSynced=ch.getInt(0);}
+
+            ContentValues jobDone=new ContentValues();jobDone.put("state",COMPLETE);jobDone.put("progress",100);jobDone.put("next_attempt_at",0);jobDone.put("updated_at",now);jobDone.put("processing_started_at",0);jobDone.put("last_error","skipped: BGG rating below 6");
+            jobsClosed=db.update("processing_jobs",jobDone,
+                    "state IN (?,?,?) AND (game_id IN (SELECT id FROM games WHERE rating IS NOT NULL AND rating<?) "+
+                    "OR listing_id IN (SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE g.rating IS NOT NULL AND g.rating<?))",
+                    new String[]{PENDING,PROCESSING,FAILED_RETRYABLE,String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(DealPolicy.MIN_BGG_RATING)});
+
+            ContentValues marker=new ContentValues();marker.put("name",CATALOG_RATING_SWEEP_V51234);marker.put("value",gamesHidden);marker.put("updated_at",now);
+            marker.put("text_value","build=catalog-rating-truth-v1;hidden="+gamesHidden+";restored="+gamesRestored+";dealsSynced="+dealsSynced+";jobsClosed="+jobsClosed+";threshold="+DealPolicy.MIN_BGG_RATING);
+            db.insertWithOnConflict("queue_controls",null,marker,SQLiteDatabase.CONFLICT_REPLACE);
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        int changed=gamesHidden+gamesRestored+dealsSynced+jobsClosed;
+        setDiagnosticState("catalog_rating_sweep",gamesHidden,"build=catalog-rating-truth-v1;state=DONE;hidden="+gamesHidden+";restored="+gamesRestored+";dealsSynced="+dealsSynced+";jobsClosed="+jobsClosed+";threshold="+DealPolicy.MIN_BGG_RATING);
+        if(changed>0){helper.invalidateActiveObservationSessionCache();notifyQueueChanged();}
+        return changed;
+    }
+
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+filterClearlyOverpricedAutomaticListings(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+filterClearlyOverpricedAutomaticListings(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);

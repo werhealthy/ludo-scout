@@ -91,6 +91,8 @@ jobs:
         run: python3 regression/sold_reconcile_next_action_v51232.py
       - name: Run catalog truth/card layout/bundle memory regression
         run: python3 regression/catalog_truth_card_layout_bundle_memory_v51233.py
+      - name: Run global rating sweep regression
+        run: python3 regression/global_rating_sweep_v51234.py
 
       - name: Compile debug Java
         run: |
