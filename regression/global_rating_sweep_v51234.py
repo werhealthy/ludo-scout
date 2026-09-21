@@ -69,7 +69,7 @@ db.executemany("INSERT INTO processing_jobs VALUES(?,?,?,?,?,?,?,?,?)",[
 ])
 
 threshold=6.0
-db.execute("UPDATE games SET database_visible=0,filter_reason='BGG_RATING_BELOW_6' WHERE rating IS NOT NULL AND rating<? AND (database_visible<>0 OR COALESCE(filter_reason,'')<>'BGG_RATING_BELOW_6')",(threshold,))
+db.execute("UPDATE games SET database_visible=0,filter_reason='BGG_RATING_BELOW_6' WHERE rating IS NOT NULL AND rating<? AND database_visible<>0",(threshold,))
 db.execute("UPDATE games SET database_visible=1,filter_reason=NULL WHERE rating IS NOT NULL AND rating>=? AND database_visible=0 AND filter_reason='BGG_RATING_BELOW_6'",(threshold,))
 db.execute("""UPDATE deals SET
  rating=(SELECT g.rating FROM games g WHERE g.bgg_id=deals.bgg_id),
