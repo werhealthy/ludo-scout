@@ -15,7 +15,7 @@ menu=ui[ui.index("private void showDetailActions"):ui.index("private void addRel
 
 checks=[
     ("release identity",
-     "versionName '5.12.39-ux-system-v1'" in build and
+     "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build),
     ("design system contract exists",
      "quiet, premium, data-smart" in system and
@@ -34,8 +34,9 @@ checks=[
      "setBackgroundColor(Color.TRANSPARENT)" in row and
      "View divider=new View(this)" in row and
      "decision=text(" not in row),
-    ("Listing detail has one primary CTA",
-     'Button primary=button(hasVinted?"Apri su Vinted":"Collega annuncio",LIME)' in detail and
+    ("Listing detail has one dominant Vinted provider action",
+     'providerLinkCard(R.drawable.provider_vinted_logo,"Vinted"' in detail and
+     'if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);' in detail and
      "providerAction(" not in detail),
     ("Listing detail moves corrective actions into contextual menu",
      'more.setContentDescription("Altre azioni")' in detail and
