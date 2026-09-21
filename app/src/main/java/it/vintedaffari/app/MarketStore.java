@@ -1244,6 +1244,22 @@ public final class MarketStore {
         QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);notifyQueueChanged();
     }
 
+    /** Exact fallback after the user has opened a known Vinted item from Ludo. Accessibility normally
+     * reconciles the item page immediately; if Vinted hides the sold/unavailable label from the
+     * accessibility tree, this rechecks the same exact URL through the existing paced public lane. */
+    public void enqueueOpenedListingVerification(long listingId){
+        if(listingId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();boolean queued=false;
+        db.beginTransaction();try{
+            try(Cursor c=db.rawQuery("SELECT lifecycle,vinted_url FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)})){
+                if(c.moveToFirst()&&"ACTIVE".equals(c.getString(0))&&!TextUtils.isEmpty(c.getString(1))){
+                    enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,245,"OPENED_VERIFY");queued=true;
+                }
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(queued){setDiagnosticState("opened_vinted_verify",1,"state=QUEUED;listing="+listingId);QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);notifyQueueChanged();}
+    }
+
     public void markSold(long listingId) {
         if(listingId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
         db.beginTransaction();try{
