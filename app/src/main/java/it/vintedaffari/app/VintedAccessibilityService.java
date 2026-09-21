@@ -1384,6 +1384,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String manualRecoveryStateSummary=manualRecoveryState.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-manualRecoveryState.updatedAt)+", "+manualRecoveryState.detail);
         MarketStore.RuntimeStatus openedVintedTarget=marketDiag.diagnosticState("opened_vinted_target");
         String openedVintedTargetSummary=openedVintedTarget.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedTarget.updatedAt)+", "+openedVintedTarget.detail);
+        MarketStore.RuntimeStatus openedVintedVerify=marketDiag.diagnosticState("opened_vinted_verify");
+        String openedVintedVerifySummary=openedVintedVerify.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedVerify.updatedAt)+", "+openedVintedVerify.detail);
         MarketStore.RuntimeStatus catalogHealth=marketDiag.diagnosticState("catalog_health");
         String catalogHealthSummary=catalogHealth.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-catalogHealth.updatedAt)+", "+catalogHealth.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
@@ -1520,7 +1522,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "earlyPriceFilter={"+earlyPriceFilterSummary+"}\n"+
                 "manualRecoveryState={"+manualRecoveryStateSummary+"}\n"+
                 "openedVintedTarget={"+openedVintedTargetSummary+"}\n"+
+                "openedVintedVerify={"+openedVintedVerifySummary+"}\n"+
                 "catalogHealth={"+catalogHealthSummary+"}\n"+
+                "lastOpenedVintedPage="+p.getString("lastOpenedVintedPage","")+"\n"+
                 "lastOpenedVintedReconcile="+p.getString("lastOpenedVintedReconcile","")+"\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
