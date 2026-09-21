@@ -21,8 +21,16 @@ public final class ProductPage {
     public Rect summaryBounds = new Rect();
     public Rect priceBounds = new Rect();
 
+    public boolean hasProductStructure() {
+        return !contentBounds.isEmpty() || !imageBounds.isEmpty() || !summaryBounds.isEmpty() || !priceBounds.isEmpty();
+    }
+
     public boolean isValid() {
-        return title != null && !title.trim().isEmpty() && (itemPrice > 0 || sold);
+        boolean hasTitle=title != null && !title.trim().isEmpty();
+        // Sold pages can suppress price or move the title to a different accessibility node.
+        // Structural product-page evidence + an explicit sold/unavailable signal is enough when
+        // Ludo already has exact outbound provenance for the listing.
+        return (hasTitle && itemPrice > 0) || (sold && (hasTitle || hasProductStructure()));
     }
 
     public VintedCard asCard() {
