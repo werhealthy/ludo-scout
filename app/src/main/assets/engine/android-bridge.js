@@ -65,8 +65,8 @@
   function tierLabel(tier) {
     if (tier === 'hot') return 'Offertona';
     if (tier === 'good') return 'Buon prezzo';
-    if (tier === 'normal') return 'Da negoziare';
-    if (tier === 'poor') return 'Prezzo alto';
+    if (tier === 'normal') return 'Prezzo giusto';
+    if (tier === 'poor') return null;
     return null;
   }
 
