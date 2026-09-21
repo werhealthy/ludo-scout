@@ -133,6 +133,8 @@ jobs:
         run: python3 regression/ux_system_v1_v51239.py
       - name: Run connected product graph UX regression
         run: python3 regression/connected_product_graph_v51240.py
+      - name: Run invisible-interaction UX regression
+        run: python3 regression/invisible_interaction_v51241.py
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
