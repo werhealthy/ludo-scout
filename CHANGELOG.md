@@ -1,5 +1,16 @@
 # Ludo Scout — Changelog
 
+## 5.12.42 — Pipeline integrity recovery
+
+- Replaced the implicit BASE_GAME fallback with an UNCERTAIN state. A BGG-like title now needs independent marketplace evidence before it can become a price/publication candidate; unknown observations remain reversible rather than becoming title-collision cards.
+- Added product/BGG-type compatibility validation: BASE_GAME accepts only BGG boardgame, EXPANSION only boardgameexpansion. Authoritative XML type is persisted through enrichment; mismatches become retained TYPE_MISMATCH rows rather than silently publishing as the wrong product type.
+- Product-page Vinted category/catalog semantics are now durable, sourced evidence (raw, normalized, source, confidence, timestamp). A labelled non-game category filters the exact canonical listing; missing feed category remains explicitly unknown.
+- Defined Catalog population truth: storedAll, eligible, and visible are separate diagnostics. The Catalog count and empty search state now refer to the same eligible query as the rendered list, preventing “124 saved / 7 visible” from being presented as one population.
+- Serialized global queue reconciliation through the control lane; Activity wake and consumer lanes no longer compete with independent reconcile transactions. Bound screenshot capture to eight viable cards and moved crop/file work off accessibility callbacks.
+- Added additive schema migration 21 and pipeline-integrity regressions, including base/expansion fixtures, collision guard, catalog contract guards, category provenance and a deterministic 200-card thumbnail-cap stress harness.
+- No data reset, signing/applicationId/CI-version strategy or Vinted request budget increase.
+
+
 ## 5.12.35 — Pricing decisions + bundle exploration
 - Added a single pricing decision layer: **Offertona**, **Buon prezzo**, **Prova un'offerta**, **Prezzo giusto** and **Pochi dati**. Overpriced rows use an internal reject state and leave product surfaces automatically; raw market history is preserved.
 - Used-market semantics are now explicit: the BGG median is the typical used value, while Q25 remains a lower market band used only for stronger deal evidence. The compact offline BGG index now reads its median column instead of the lower-band column.
