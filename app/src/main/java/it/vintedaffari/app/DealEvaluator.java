@@ -3,7 +3,7 @@ package it.vintedaffari.app;
 /**
  * Single product decision for price/value.
  *
- * <p>"Troppo caro" is deliberately internal: REJECT rows are removed from product surfaces.
+ * <p>Overpriced listings are deliberately internal-only: REJECT rows are removed from product surfaces.
  * Fair seller asks stay available because shipping can make them useful bundle leads.</p>
  */
 public final class DealEvaluator {
