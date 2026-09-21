@@ -1298,7 +1298,7 @@ public final class MarketStore {
             String listingTypeRaw=scalarString(db,"SELECT listing_type FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE' ORDER BY last_seen DESC LIMIT 1",new String[]{m.bggId});
             ListingClassifier.Type listingType=ListingClassifier.Type.UNCERTAIN;
             try{ if(!TextUtils.isEmpty(listingTypeRaw))listingType=ListingClassifier.Type.valueOf(listingTypeRaw); }catch(Throwable ignored){}
-            BggProductCompatibility.Verdict typeVerdict=BggProductCompatibility.validate(listingType,m.itemType);
+            BggProductCompatibility.Verdict typeVerdict=BggProductCompatibility.validate(listingType.name(),m.itemType);
             if(typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE){
                 String reason="Tipo BGG incompatibile: annuncio "+listingType+" / BGG "+safe(m.itemType);
                 ContentValues hidden=new ContentValues();hidden.put("database_visible",0);hidden.put("filter_reason",reason);hidden.put("match_state","TYPE_MISMATCH");
