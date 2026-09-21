@@ -39,6 +39,9 @@ public final class ProductPageParser {
                     if(!p.detailsText.isEmpty())p.detailsText += " · ";
                     if(p.detailsText.length()<4000)p.detailsText += hint.substring(0,Math.min(hint.length(),Math.max(0,4000-p.detailsText.length())));
                 }
+                // Category/catal​og semantic wrappers are a distinct source from seller prose.
+                // Preserve their value only when Vinted exposes it; feed cards remain category-unknown.
+                if(lid.contains("category")||lid.contains("catalog"))p.captureCategory(hint,"accessibility_product_page:"+id);
             }
             if(p.sellerName.isEmpty() && (lid.contains("user")||lid.contains("seller")||lid.contains("member")) &&
                     (lid.contains("name")||lid.contains("login")||lid.contains("profile"))){
