@@ -91,6 +91,17 @@ public final class ListingClassifier {
         return new Result(Type.UNCERTAIN, "Manca un segnale positivo che l'oggetto sia un gioco da tavolo.", true, false);
     }
 
+    /** Applies only to a labelled Vinted category captured from the product page, never to a
+     * free-form seller title. This is deliberately category-level, not a collision blacklist. */
+    public static boolean isExplicitNonGameCategory(String categoryNormalized) {
+        String c=norm(categoryNormalized);
+        if(c.isEmpty())return false;
+        return c.contains("musica")||c.contains("music")||c.contains("libri")||c.contains("books")||
+                c.contains("abbigliamento")||c.contains("clothing")||c.contains("scarpe")||
+                c.contains("elettronica")||c.contains("beauty")||c.contains("bellezza")||
+                c.contains("sport")||c.contains("casa")||c.contains("collectibles");
+    }
+
     public static boolean isExtremePriceAnomaly(GameAnalysis a) {
         if (a == null || a.totalCents == null || a.benchmarkCents == null || a.benchmarkCents <= 0) return false;
         return a.totalCents <= Math.round(a.benchmarkCents * 0.28);
