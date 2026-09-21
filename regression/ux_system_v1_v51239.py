@@ -42,9 +42,10 @@ checks=[
      'menuAction("Segna annuncio come venduto",ORANGE)' in menu and
      'menuAction("Nascondi annuncio",RED)' in menu and
      'TextView soldAction=' not in detail),
-    ("Listing detail exposes progressive disclosure",
-     '"Dettagli gioco e costi  ⌄"' in detail and
-     "details.setVisibility(View.GONE)" in detail),
+    ("Listing detail contextualizes secondary information",
+     '"Contesto prezzo"' in detail and
+     '"Scheda gioco"' in ui and
+     '"Dettagli gioco e costi  ⌄"' not in detail),
 ]
 
 for name,ok in checks:
