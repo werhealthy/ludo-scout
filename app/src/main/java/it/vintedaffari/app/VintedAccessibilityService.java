@@ -539,9 +539,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
         QueueKeepAliveService.ensureRunning(this);
         QueueWorkScheduler.schedule(this);
     }
+    private boolean motoreHasAutomaticWork(){return marketStore!=null&&marketStore.hasActiveObservationRun();}
     private void scanBundleBacklog(){scanBundleBacklog(false);}
     private void scanBundleBacklog(boolean force){
-        if(manualBulkMode)return;
+        if(manualBulkMode||motoreHasAutomaticWork())return;
         if(marketStore!=null&&marketStore.vintedActiveCount()>20)return;
         if(database==null||bundleDatabase==null)return;Set<String>seen=new HashSet<>();DealRecord best=null;double bestScore=-1;
         for(DealRecord d:database.getDeals("all_with_review",240)){if(d==null||d.sellerId==null||d.sellerId.isEmpty()||!seen.add(d.sellerId)||bundleDatabase.countForSource(d.signature)>0)continue;if(!force&&!networkPriority(d))continue;long last=bundleDatabase.lastAttemptForSeller(d.sellerId);if(!force&&System.currentTimeMillis()-last<2*60*60_000L)continue;double score=bundlePriority(d);if(score>bestScore){bestScore=score;best=d;}}
@@ -741,8 +742,12 @@ public final class VintedAccessibilityService extends AccessibilityService {
             OperationCenter.done(this,"bundle:"+source.sellerId,OperationCenter.BUNDLE,cachedLocalBundles.size()+" bundle · dati locali verificati");
             finishBundleSeller(source.sellerId,1000L);sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
         }
-        // Bundle discovery is opportunistic. Never spend the same public Vinted budget while the
-        // core listing-enrichment lane has a meaningful backlog; local seller graph above still works.
+        // The local seller graph above is zero-network and may run anytime. Public-page Bundle
+        // discovery waits until Motore has no unfinished automatic run.
+        if(motoreHasAutomaticWork()){
+            bundleDatabase.setDiagnostic(source.signature,source.sellerId,"RATE_LIMITED",0,0,0,"Motore ha priorità sulla corsia Vinted");
+            finishBundleSeller(source.sellerId,60_000L);return;
+        }
         if(marketStore!=null&&marketStore.vintedActiveCount()>20){
             bundleDatabase.setDiagnostic(source.signature,source.sellerId,"RATE_LIMITED",0,0,0,"core Vinted queue has priority");
             finishBundleSeller(source.sellerId,60_000L);
@@ -812,6 +817,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void startDeepScan(DealRecord source,String sourceSignature,String sellerId,int snapshotCount,int snapshotMatches,String deepTask){
+        if(motoreHasAutomaticWork()){OperationCenter.doneIfActive(this,deepTask,OperationCenter.DEEP_SCAN,"rimandato · Motore ha priorità");finishBundleSeller(sellerId,60_000L);return;}
         if(marketStore!=null&&marketStore.vintedActiveCount()>20){OperationCenter.doneIfActive(this,deepTask,OperationCenter.DEEP_SCAN,"rimandato · priorità dati annunci");finishBundleSeller(sellerId,60_000L);return;}
         if(manualBulkMode){OperationCenter.doneIfActive(this,deepTask,OperationCenter.DEEP_SCAN,"rimandato · priorità aggiornamento dati");finishBundleSeller(sellerId,5*60_000L);return;}
         synchronized(bundleSellersInFlight){
@@ -872,6 +878,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void verifyBundleMatches(DealRecord source,String sig,String sid,int profileCount,List<SellerBundleScanner.SellerItem> matchedItems){
+        if(motoreHasAutomaticWork()){bundleDatabase.setDiagnostic(sig,sid,"RATE_LIMITED",profileCount,matchedItems==null?0:matchedItems.size(),0,"Motore ha priorità sulla verifica bundle");finishBundleSeller(sid,60_000L);return;}
         String verifyTask="verify:"+sid;OperationCenter.running(this,verifyTask,OperationCenter.SELLER,matchedItems.size()+" match BGG · max 3 verifiche pubbliche");
         bundleScanner.verifyMatches(source,matchedItems,3,new SellerBundleScanner.Callback(){
             @Override public void onItems(String signature,String seller,List<SellerBundleScanner.SellerItem> verified){
