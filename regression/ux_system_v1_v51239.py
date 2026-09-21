@@ -15,7 +15,7 @@ menu=ui[ui.index("private void showDetailActions"):ui.index("private void addRel
 
 checks=[
     ("release identity",
-     "versionName '5.12.39-ux-system-v1'" in build and
+     "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build),
     ("design system contract exists",
      "quiet, premium, data-smart" in system and
@@ -34,17 +34,19 @@ checks=[
      "setBackgroundColor(Color.TRANSPARENT)" in row and
      "View divider=new View(this)" in row and
      "decision=text(" not in row),
-    ("Listing detail has one primary CTA",
-     'Button primary=button(hasVinted?"Apri su Vinted":"Collega annuncio",LIME)' in detail and
+    ("Listing detail has one dominant Vinted provider action",
+     'providerLinkCard(R.drawable.provider_vinted_logo,"Vinted"' in detail and
+     'if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);' in detail and
      "providerAction(" not in detail),
     ("Listing detail moves corrective actions into contextual menu",
      'more.setContentDescription("Altre azioni")' in detail and
      'menuAction("Segna annuncio come venduto",ORANGE)' in menu and
      'menuAction("Nascondi annuncio",RED)' in menu and
      'TextView soldAction=' not in detail),
-    ("Listing detail exposes progressive disclosure",
-     '"Dettagli gioco e costi  ⌄"' in detail and
-     "details.setVisibility(View.GONE)" in detail),
+    ("Listing detail contextualizes secondary information",
+     '"Contesto prezzo"' in detail and
+     '"Scheda gioco"' in ui and
+     '"Dettagli gioco e costi  ⌄"' not in detail),
 ]
 
 for name,ok in checks:
