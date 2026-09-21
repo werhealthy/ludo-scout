@@ -12,13 +12,12 @@
     if (!p || p.conflict || p.usedMode < 1 || !(p.usedMedianEUR > 0) || !(p.usedQ25EUR > 0) || p.usedN < 3) return null;
     return {
       name: game.name,
-      // Use the lower quartile as the conservative used-market reference. The bundled
-      // model does not expose a trustworthy edition-level raw minimum; Q25 avoids
-      // inventing one and, critically, never compares Vinted used against retail NEW.
-      cents: Math.round(p.usedQ25EUR * 100),
-      kind: 'used_market_low',
+      // "Typical used price" is the observed median. Q25 remains a separate lower
+      // market band for exceptional-deal detection; it must never masquerade as the median.
+      cents: Math.round(p.usedMedianEUR * 100),
+      kind: 'used_market',
       automatic: true,
-      marketMedianCents: Math.round(p.usedQ25EUR * 100),
+      marketMedianCents: Math.round(p.usedMedianEUR * 100),
       marketObservedMedianCents: Math.round(p.usedMedianEUR * 100),
       marketQ25Cents: Math.round(p.usedQ25EUR * 100),
       marketQ75Cents: Math.round((p.usedQ75EUR || p.usedMedianEUR) * 100),
@@ -66,8 +65,8 @@
   function tierLabel(tier) {
     if (tier === 'hot') return 'Offertona';
     if (tier === 'good') return 'Buon prezzo';
-    if (tier === 'normal') return 'Da negoziare';
-    if (tier === 'poor') return 'Prezzo alto';
+    if (tier === 'normal') return 'Prezzo giusto';
+    if (tier === 'poor') return null;
     return null;
   }
 

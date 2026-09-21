@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.29-motore-network-priority`
-- versionCode: `143`
+- Baseline version: `5.12.35-pricing-bundle-exploration`
+- versionCode: `149`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -27,6 +27,16 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Pull requests targeting `beta` are pre-merge validated by `.github/workflows/android-pr.yml` (static regressions + Java compile only; no signing/Firebase distribution).
 - `Android beta` runs on pushes to `beta` and can also be triggered manually (`workflow_dispatch`). It builds the signed debug APK, verifies the preserved signing certificate, uploads the APK artifact and distributes it through Firebase App Distribution.
 - CI versionCode remains `1,000,000 + github.run_number`; do not change the signing key, package/applicationId or versionCode strategy without explicit user approval.
+
+## 5.12.35 pricing / bundle product invariants
+- User-facing deal decisions are centralized in `DealEvaluator`: Offertona, Buon prezzo, Prova un'offerta, Prezzo giusto and Pochi dati. `REJECT` is internal only; it removes the listing from product surfaces while preserving market history.
+- “Typical used price” means median. Q25 is a separate low-market band. The compact BGG used-price fallback reads its median column.
+- Three to seven comparable Vinted asking prices refine the global/prior benchmark; they do not replace it outright. Eight or more comparable listings may make the local median primary.
+- Offer targets solve for a good all-in total and must remain within a plausible 5–15% reduction.
+- Discover is selective; Catalog may retain fair/insufficient-data rows. Explicit Hunt intent remains separate from normal deal filtering.
+- Bundle prospecting may start from a strong game even when the single purchase is not itself a bargain. Existing BundleExploration intent is reused; do not add aggressive seller scraping.
+- A bundle with unknown package shipping must not show an exact total or all-in saving.
+- Notifications remain stricter than cards: exact identities, existing safety gates, GREAT_BUY, and the legacy 30% all-in saving threshold.
 
 ## Current engine invariants
 - Vinted Accessibility observation remains the core UX: user scrolls Vinted normally.

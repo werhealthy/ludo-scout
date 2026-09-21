@@ -28,6 +28,10 @@ public final class GameAnalysis {
     public final boolean languageBlocked;
     public final String referenceKind;
     public final String referenceSource;
+    public final Integer marketQ25Cents;
+    public final Integer marketSampleSize;
+    public final String marketConfidence;
+    public final boolean marketAllowHot;
     public final String productTitle;
     public final String productPublisher;
     public final Integer productScore;
@@ -44,6 +48,7 @@ public final class GameAnalysis {
                          Integer benchmarkCents, Integer offerCents, Integer afterOfferCents, Integer feeCents,
                          Integer shippingCents, Integer savingsCents, Double discount, String languageCode,
                          boolean languageBlocked, String referenceKind, String referenceSource,
+                         Integer marketQ25Cents, Integer marketSampleSize, String marketConfidence, boolean marketAllowHot,
                          String productTitle, String productPublisher, Integer productScore, String matchReason,
                          String candidateName, String candidateBggId, Double matchConfidence) {
         this.status = status;
@@ -71,6 +76,10 @@ public final class GameAnalysis {
         this.languageBlocked = languageBlocked;
         this.referenceKind = referenceKind;
         this.referenceSource = referenceSource;
+        this.marketQ25Cents = marketQ25Cents;
+        this.marketSampleSize = marketSampleSize;
+        this.marketConfidence = marketConfidence;
+        this.marketAllowHot = marketAllowHot;
         this.productTitle = productTitle;
         this.productPublisher = productPublisher;
         this.productScore = productScore;
@@ -96,14 +105,14 @@ public final class GameAnalysis {
         }
         return new GameAnalysis(status, reason, gameName, matchedAlias, displayName, bggId, averageRating, geekRating,
                 rank, voters, qualityScore, nextTier, nextLabel, totalCents, referenceCents, null, null, feeCents,
-                shippingCents, savings, pct, languageCode, languageBlocked, kind, source, productTitle,
-                productPublisher, productScore, matchReason, candidateName, candidateBggId, matchConfidence);
+                shippingCents, savings, pct, languageCode, languageBlocked, kind, source, null, null, "local", false,
+                productTitle, productPublisher, productScore, matchReason, candidateName, candidateBggId, matchConfidence);
     }
 
     /** Explicit Vinted market-scan context: keep price/language evidence from the observation but
      * pin identity to the game the user deliberately searched for. Benchmark is reset until local
      * comparable evidence or BGG refresh supplies the correct market reference. */
-    public GameAnalysis withCanonicalIdentity(GameRecord game,String why){if(game==null||game.bggId==null||game.bggId.isEmpty())return this;Integer q=QualityComposite.score(game.rank,null,game.rating,game.voters);return new GameAnalysis("matched",why,game.name,game.name,game.name,game.bggId,game.rating,null,game.rank,game.voters,q,"normal","Prezzo da confrontare",totalCents,null,null,null,feeCents,shippingCents,null,null,languageCode,languageBlocked,"vinted_scan","Ricerca Vinted avviata dalla scheda gioco",productTitle,productPublisher,productScore,why,game.name,game.bggId,100.0);}
+    public GameAnalysis withCanonicalIdentity(GameRecord game,String why){if(game==null||game.bggId==null||game.bggId.isEmpty())return this;Integer q=QualityComposite.score(game.rank,null,game.rating,game.voters);return new GameAnalysis("matched",why,game.name,game.name,game.name,game.bggId,game.rating,null,game.rank,game.voters,q,"normal","Prezzo da confrontare",totalCents,null,null,null,feeCents,shippingCents,null,null,languageCode,languageBlocked,"vinted_scan","Ricerca Vinted avviata dalla scheda gioco",null,null,"local",false,productTitle,productPublisher,productScore,why,game.name,game.bggId,100.0);}
 
     public static GameAnalysis fromJson(JSONObject json) {
         String status = optString(json, "status");
@@ -141,6 +150,10 @@ public final class GameAnalysis {
                 language != null && language.optBoolean("blocked", false),
                 reference == null ? null : optString(reference, "kind"),
                 reference == null ? null : optString(reference, "sourceLabel"),
+                reference == null ? null : optInt(reference, "marketQ25Cents"),
+                reference == null ? null : optInt(reference, "marketN"),
+                reference == null ? null : optString(reference, "confidence"),
+                reference != null && reference.optBoolean("allowHot", false),
                 product == null ? null : optString(product, "title"),
                 product == null ? null : optString(product, "publisher"),
                 product == null ? null : optInt(product, "score"),

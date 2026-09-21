@@ -116,8 +116,9 @@ public final class MarketStore {
     }
 
     public static final class MarketReferenceStats {
-        public final int count; public final Integer typicalCents,minCents;
-        MarketReferenceStats(int count,Integer typicalCents,Integer minCents){this.count=count;this.typicalCents=typicalCents;this.minCents=minCents;}
+        public final int count; public final Integer typicalCents,q25Cents,q75Cents,minCents;
+        MarketReferenceStats(int count,Integer typicalCents,Integer minCents){this(count,typicalCents,null,null,minCents);}
+        MarketReferenceStats(int count,Integer typicalCents,Integer q25Cents,Integer q75Cents,Integer minCents){this.count=count;this.typicalCents=typicalCents;this.q25Cents=q25Cents;this.q75Cents=q75Cents;this.minCents=minCents;}
     }
 
     public static final class BggMarketStats {
@@ -618,8 +619,9 @@ public final class MarketStore {
                 }
             }
             boolean hasUrl=!TextUtils.isEmpty(scalarString(db,"SELECT vinted_url FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)}));
-            boolean liveResolve=shouldAutoResolveVinted(analysis)&&!hasUrl;
-            boolean eventualLink=!hasUrl && "MATCHED".equals(matchState) && analysis.averageRating!=null && analysis.averageRating>=DealPolicy.MIN_BGG_RATING && !analysis.languageBlocked;
+            DealEvaluator.Evaluation priceDecision=DealEvaluator.evaluate(card,analysis);
+            boolean liveResolve=priceDecision.visible()&&shouldAutoResolveVinted(analysis)&&!hasUrl;
+            boolean eventualLink=priceDecision.visible()&&!hasUrl && "MATCHED".equals(matchState) && analysis.averageRating!=null && analysis.averageRating>=DealPolicy.MIN_BGG_RATING && !analysis.languageBlocked;
             ContentValues v = new ContentValues();
             v.put("game_id", gameId); v.put("match_state", matchState); put(v, "match_confidence", analysis.matchConfidence);
             String detected=ListingLanguageDetector.detect(card.title,card.rawDescription,card.brand);
@@ -1318,7 +1320,7 @@ public final class MarketStore {
                 // Once BGG opens the quality gate, every valid listing may eventually receive its
                 // Vinted identity. Only hot rows enter the fast lane; the rest stay DEFERRED_LINK.
                 ContentValues deferred=new ContentValues();deferred.put("enrichment_state","DEFERRED_LINK");deferred.put("deferred_retry_at",0);
-                db.update("market_listings",deferred,"game_id=? AND lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='') AND enrichment_state IN ('LOCAL_ONLY','PENDING_ANALYSIS')",new String[]{String.valueOf(id)});
+                db.update("market_listings",deferred,"game_id=? AND lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='') AND enrichment_state IN ('LOCAL_ONLY','PENDING_ANALYSIS') AND NOT EXISTS (SELECT 1 FROM deals d WHERE d.signature=COALESCE(NULLIF(market_listings.legacy_signature,''),market_listings.temp_fingerprint) AND (d.tier='filtered' OR d.verification_state='PRICE_FILTERED'))",new String[]{String.valueOf(id)});
                 try(Cursor hot=db.rawQuery("SELECT l.id FROM market_listings l JOIN deals d ON d.signature=l.legacy_signature WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND (l.vinted_url IS NULL OR l.vinted_url='') AND d.lifecycle='ACTIVE' AND d.tier='hot'",new String[]{String.valueOf(id)})){
                     while(hot.moveToNext()){long listingId=hot.getLong(0);ContentValues st=new ContentValues();st.put("enrichment_state","PENDING_ENRICHMENT");db.update("market_listings",st,"id=?",new String[]{String.valueOf(listingId)});enqueueListingJob(db,listingId,JOB_VINTED,System.currentTimeMillis(),320,"LIVE_DEAL");}
                 }
@@ -2051,24 +2053,36 @@ public final class MarketStore {
     private static void saveBggMarketStats(SQLiteDatabase db,String bggId,Integer typicalCents,Integer minCents,int count,long updatedAt){try{JSONObject o=new JSONObject();o.put("count",count);o.put("typical",typicalCents==null?JSONObject.NULL:typicalCents);o.put("min",minCents==null?JSONObject.NULL:minCents);ContentValues v=new ContentValues();v.put("name","bgg_market:"+bggId);v.put("value",count);v.put("updated_at",updatedAt);v.put("text_value",o.toString());db.insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);}catch(Exception ignored){}}
     public BggMarketStats bggMarketStats(String bggId){if(TextUtils.isEmpty(bggId))return new BggMarketStats(0,null,null,0);try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT value,updated_at,text_value FROM queue_controls WHERE name=?",new String[]{"bgg_market:"+bggId})){if(!c.moveToFirst())return new BggMarketStats(0,null,null,0);int count=c.getInt(0);long at=c.getLong(1);String raw=c.getString(2);JSONObject o=TextUtils.isEmpty(raw)?new JSONObject():new JSONObject(raw);Integer typical=o.isNull("typical")?null:o.optInt("typical",0);Integer min=o.isNull("min")?null:o.optInt("min",0);return new BggMarketStats(count,typical!=null&&typical>0?typical:null,min!=null&&min>0?min:null,at); }catch(Exception ignored){return new BggMarketStats(0,null,null,0);}}
 
-    /** Comparable Vinted market evidence. From three valid listings onward, the median becomes the
-     * main market reference; a single anomalously low row can no longer manufacture a fake discount.
-     * Text-dependent games compare only Italian observations for the Italian scouting workflow. */
+    /** Comparable Vinted asking-price evidence. The median is "typical"; Q25/Q75 describe the
+     * market band. Small local samples inform the benchmark but do not replace BGG outright. */
     public MarketReferenceStats localVintedReferenceStats(String bggId,String excludeSignature,String languageCode){
-        if(TextUtils.isEmpty(bggId))return new MarketReferenceStats(0,null,null);String lc=languageCode==null?"":languageCode.trim().toUpperCase(Locale.ROOT);
+        if(TextUtils.isEmpty(bggId))return new MarketReferenceStats(0,null,null,null,null);String lc=languageCode==null?"":languageCode.trim().toUpperCase(Locale.ROOT);
         StringBuilder where=new StringBuilder(" FROM market_listings l JOIN games g ON g.id=l.game_id WHERE g.bgg_id=? AND l.lifecycle='ACTIVE' AND l.match_state='MATCHED' AND l.current_price_cents>0");
         ArrayList<String> args=new ArrayList<>();args.add(bggId);
         if(!TextUtils.isEmpty(excludeSignature)){where.append(" AND COALESCE(l.legacy_signature,l.temp_fingerprint)<>?");args.add(excludeSignature);}
         if(lc.contains("DEP")){where.append(" AND UPPER(COALESCE(l.language_code,'')) LIKE 'IT%'");}
         else if(!lc.contains("IND")){String code=lc.contains("|")?lc.substring(0,lc.indexOf('|')):lc;if(code.matches("IT|EN|FR|DE|ES|NL|PT")){where.append(" AND UPPER(COALESCE(l.language_code,'')) LIKE ?");args.add(code+"%");}}
-        SQLiteDatabase db=helper.getReadableDatabase();int n=0,min=0;try(Cursor c=db.rawQuery("SELECT COUNT(*),MIN(l.current_price_cents)"+where,args.toArray(new String[0]))){if(c.moveToFirst()){n=c.getInt(0);if(!c.isNull(1))min=c.getInt(1);}}
-        if(n==0)return new MarketReferenceStats(0,null,null);int offset=(n-1)/2;Integer median=null;try(Cursor c=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT "+(n%2==0?"2":"1")+" OFFSET "+offset,args.toArray(new String[0]))){if(c.moveToFirst()){int a=c.getInt(0);if(n%2==0&&c.moveToNext())median=(a+c.getInt(0))/2;else median=a;}}
-        return new MarketReferenceStats(n,median,min>0?min:null);
+        SQLiteDatabase db=helper.getReadableDatabase();int n=0,min=0;try(Cursor cursor=db.rawQuery("SELECT COUNT(*),MIN(l.current_price_cents)"+where,args.toArray(new String[0]))){if(cursor.moveToFirst()){n=cursor.getInt(0);if(!cursor.isNull(1))min=cursor.getInt(1);}}
+        if(n==0)return new MarketReferenceStats(0,null,null,null,null);
+        int offset=(n-1)/2;Integer median=null;try(Cursor cursor=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT "+(n%2==0?"2":"1")+" OFFSET "+offset,args.toArray(new String[0]))){if(cursor.moveToFirst()){int a=cursor.getInt(0);if(n%2==0&&cursor.moveToNext())median=(a+cursor.getInt(0))/2;else median=a;}}
+        int q25Offset=(int)Math.floor((n-1)*.25),q75Offset=(int)Math.ceil((n-1)*.75);Integer q25=null,q75=null;
+        try(Cursor cursor=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT 1 OFFSET "+q25Offset,args.toArray(new String[0]))){if(cursor.moveToFirst())q25=cursor.getInt(0);}
+        try(Cursor cursor=db.rawQuery("SELECT l.current_price_cents"+where+" ORDER BY l.current_price_cents LIMIT 1 OFFSET "+q75Offset,args.toArray(new String[0]))){if(cursor.moveToFirst())q75=cursor.getInt(0);}
+        return new MarketReferenceStats(n,median,q25,q75,min>0?min:null);
     }
 
-    /** Backward-compatible benchmark accessor. Vinted takes over only with at least three comparable
-     * listings; otherwise BGG remains the fallback in refreshLegacyDealBenchmarks. */
-    public Integer localVintedReferenceCents(String bggId,String excludeSignature,String languageCode){MarketReferenceStats s=localVintedReferenceStats(bggId,excludeSignature,languageCode);return s.count>=3?s.typicalCents:null;}
+    /** 3-7 local listings are evidence, not truth. Treat BGG/the previous benchmark as five
+     * pseudo-observations; from 8 comparable Vinted listings onward the local median may stand alone. */
+    static Integer resolveVintedReference(MarketReferenceStats s,Integer priorCents){
+        if(s==null||s.count<3||s.typicalCents==null||s.typicalCents<=0)return null;
+        if(s.count>=8||priorCents==null||priorCents<=0)return s.typicalCents;
+        final int priorWeight=5;
+        return (int)Math.round((s.count*(double)s.typicalCents+priorWeight*(double)priorCents)/(s.count+priorWeight));
+    }
+
+    /** Compatibility accessor: only mature local evidence replaces the global prior by itself. */
+    public Integer localVintedReferenceCents(String bggId,String excludeSignature,String languageCode){MarketReferenceStats s=localVintedReferenceStats(bggId,excludeSignature,languageCode);return s.count>=8?s.typicalCents:null;}
+    public Integer localVintedReferenceCents(String bggId,String excludeSignature,String languageCode,Integer priorCents){return resolveVintedReference(localVintedReferenceStats(bggId,excludeSignature,languageCode),priorCents);}
 
     public Integer localVintedMinCents(String bggId,String excludeSignature,String languageCode){MarketReferenceStats s=localVintedReferenceStats(bggId,excludeSignature,languageCode);return s.minCents;}
 
@@ -2087,18 +2101,24 @@ public final class MarketStore {
      * waiting for the six-hour global maintenance pass. */
     public int refreshLocalVintedBenchmarksForBgg(String bggId){
         if(TextUtils.isEmpty(bggId))return 0;
-        SQLiteDatabase read=helper.getReadableDatabase();
-        List<String> sigs=new ArrayList<>();List<ContentValues> values=new ArrayList<>();
-        String sql="SELECT signature,language_code,item_price_cents,protected_price_cents,total_cents,shipping_verified_cents,tier,tier_label FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE'";
-        try(Cursor c=read.rawQuery(sql,new String[]{bggId})){
-            while(c.moveToNext()){
-                String sig=c.getString(0),lang=c.getString(1);MarketReferenceStats stats=localVintedReferenceStats(bggId,sig,lang);
-                if(stats.count<3||stats.typicalCents==null||stats.typicalCents<=0)continue;
-                int item=c.getInt(2);Integer protectedC=c.isNull(3)?null:c.getInt(3),totalC=c.isNull(4)?null:c.getInt(4),shipping=c.isNull(5)?null:c.getInt(5);
-                int effective;if(shipping!=null){int base=protectedC!=null?protectedC:item;effective=base+shipping;}else if(totalC!=null&&totalC>0)effective=totalC;else if(protectedC!=null&&protectedC>0)effective=protectedC;else effective=item;
-                double discount=(stats.typicalCents-effective)*100.0/stats.typicalCents;String tier=c.getString(6),label=c.getString(7);
-                if(!"verify".equals(tier)){if(effective<=Math.floor(stats.typicalCents*.80)){tier="hot";label="Offertona";}else if(effective<stats.typicalCents){tier="good";label="Buon prezzo";}else{tier="normal";label="Prezzo di mercato";}}
-                ContentValues v=new ContentValues();v.put("benchmark_cents",stats.typicalCents);v.putNull("offer_cents");v.put("discount",discount);v.put("tier",tier);v.put("tier_label",label);sigs.add(sig);values.add(v);
+        SQLiteDatabase read=helper.getReadableDatabase();List<String>sigs=new ArrayList<>();List<ContentValues>values=new ArrayList<>();
+        String sql="SELECT signature,language_code,item_price_cents,protected_price_cents,total_cents,shipping_verified_cents,tier,tier_label,benchmark_cents,shipping_cents FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE'";
+        try(Cursor cursor=read.rawQuery(sql,new String[]{bggId})){
+            while(cursor.moveToNext()){
+                String sig=cursor.getString(0),lang=cursor.getString(1);MarketReferenceStats stats=localVintedReferenceStats(bggId,sig,lang);
+                Integer prior=cursor.isNull(8)?null:cursor.getInt(8);Integer reference=resolveVintedReference(stats,prior);if(reference==null||reference<=0)continue;
+                int item=cursor.getInt(2);Integer protectedC=cursor.isNull(3)?null:cursor.getInt(3),totalC=cursor.isNull(4)?null:cursor.getInt(4),shippingVerified=cursor.isNull(5)?null:cursor.getInt(5),shippingEstimated=cursor.isNull(9)?null:cursor.getInt(9);
+                int effective;if(shippingVerified!=null){int base=protectedC!=null?protectedC:item+PurchaseMath.vintedFee(item);effective=base+shippingVerified;}else if(totalC!=null&&totalC>0)effective=totalC;else if(protectedC!=null&&protectedC>0)effective=protectedC;else effective=item;
+                Integer shipping=shippingVerified!=null?shippingVerified:shippingEstimated;boolean allowGreat=stats.count>=8;
+                DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(item,effective,reference,allowGreat?stats.q25Cents:null,allowGreat,null,null,shipping);
+                double discount=(reference-effective)*100.0/reference;String tier=cursor.getString(6);
+                ContentValues v=new ContentValues();v.put("benchmark_cents",reference);v.put("discount",discount);
+                if(evaluation.suggestedOfferCents==null)v.putNull("offer_cents");else v.put("offer_cents",evaluation.suggestedOfferCents);
+                if(!"verify".equals(tier)){
+                    if(evaluation.visible()){v.put("tier",evaluation.storageTier());v.put("tier_label",evaluation.label);}
+                    else{v.put("lifecycle","REMOVED");v.put("tier","filtered");v.put("tier_label","");v.put("verification_state","PRICE_FILTERED");v.put("verification_reason","Prezzo automaticamente escluso dopo aggiornamento del mercato locale");}
+                }
+                sigs.add(sig);values.add(v);
             }
         }
         if(values.isEmpty())return 0;SQLiteDatabase db=helper.getWritableDatabase();int changed=0;db.beginTransaction();try{for(int i=0;i<values.size();i++)changed+=db.update("deals",values.get(i),"signature=?",new String[]{sigs.get(i)});db.setTransactionSuccessful();}finally{db.endTransaction();}
@@ -2115,54 +2135,37 @@ public final class MarketStore {
 
     public void updateLegacyListingLanguage(String signature,String languageCode){if(TextUtils.isEmpty(signature))return;ContentValues v=new ContentValues();if(TextUtils.isEmpty(languageCode))v.putNull("language_code");else v.put("language_code",languageCode.trim().toUpperCase(Locale.ROOT));helper.getWritableDatabase().update("market_listings",v,"temp_fingerprint=? OR legacy_signature=?",new String[]{signature,signature});}
 
-    /** Rebuild current deal benchmarks from source data instead of trusting the historical value
-     * captured when a card was first analysed. Priority: another valid local Vinted listing, then
-     * the bundled low used-market BGG reference. Retail/new prices are intentionally excluded. */
+    /** Rebuild current deal decisions from the freshest used-market evidence. Mature Vinted
+     * observations win; small local samples are blended with the BGG/previous prior. Retail/new
+     * prices remain context only and never create a deal. */
     public int refreshLegacyDealBenchmarks(BggSearchClient bgg){
         if(bgg==null)return 0;
-        List<DealRecord> deals=helper.getDeals("all_with_review",5000);
-        List<String> signatures=new ArrayList<>();
-        List<ContentValues> updates=new ArrayList<>();
-        // Compute against the readable store first. Do not hold a write transaction while scanning
-        // thousands of rows: that was enough to make tab changes stutter on large databases.
+        List<DealRecord> deals=helper.getDeals("all_with_review",5000);List<String>signatures=new ArrayList<>();List<ContentValues>updates=new ArrayList<>();
         for(DealRecord d:deals){
             if(d==null||TextUtils.isEmpty(d.signature)||TextUtils.isEmpty(d.bggId))continue;
-            Integer ref=localVintedReferenceCents(d.bggId,d.signature,d.languageCode);
             boolean languageDependent=!TextUtils.isEmpty(d.languageCode)&&d.languageCode.toUpperCase(Locale.ROOT).contains("DEP");
-            if(ref==null||ref<=0){BggMarketStats live=bggMarketStats(d.bggId);if(!languageDependent&&live.count>=2&&live.fresh(System.currentTimeMillis()))ref=live.typicalCents;}
-            if(ref==null||ref<=0)ref=bgg.localMarketReferenceCents(d.bggId);
-            Integer newBenchmark=(ref==null||ref<=0)?null:ref;
-            Integer newOffer=null;
-            Double newDiscount=null;
-            String newTier=d.tier,newTierLabel=d.tierLabel;
-            if(newBenchmark==null){
-                if(!"verify".equals(d.tier)){newTier="normal";newTierLabel="Senza riferimento usato";}
-            }else{
-                Integer total=effectiveLegacyTotal(d);
-                if(total!=null){
-                    newDiscount=(newBenchmark-total)*100.0/newBenchmark;
-                    if(!"verify".equals(d.tier)){
-                        if(total<=Math.floor(newBenchmark*.80)){newTier="hot";newTierLabel="Offertona";}
-                        else if(total<newBenchmark){newTier="good";newTierLabel="Buon prezzo";}
-                        else{newTier="normal";newTierLabel="Prezzo di mercato";}
-                    }
-                }
+            BggMarketStats live=bggMarketStats(d.bggId);
+            Integer prior=(!languageDependent&&live.count>=2&&live.fresh(System.currentTimeMillis())&&live.typicalCents!=null&&live.typicalCents>0)?live.typicalCents:d.benchmarkCents;
+            if(prior==null||prior<=0)prior=bgg.localMarketReferenceCents(d.bggId);
+            MarketReferenceStats local=localVintedReferenceStats(d.bggId,d.signature,d.languageCode);
+            Integer ref=resolveVintedReference(local,prior);if(ref==null||ref<=0)ref=prior;
+            Integer total=effectiveLegacyTotal(d),shipping=d.shippingVerifiedCents!=null?d.shippingVerifiedCents:d.shippingCents;
+            Integer newOffer=null;Double newDiscount=null;String newTier=d.tier,newTierLabel=d.tierLabel;boolean filter=false;
+            if(ref==null||ref<=0){if(!"verify".equals(d.tier)){newTier="insufficient";newTierLabel="Pochi dati";}}
+            else if(total!=null){
+                newDiscount=(ref-total)*100.0/ref;
+                boolean allowGreat=local.count>=8||("hot".equals(d.tier)&&!languageDependent);
+                Integer q25=local.count>=8?local.q25Cents:null;
+                DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(d.itemPriceCents,total,ref,q25,allowGreat,null,null,shipping);
+                newOffer=evaluation.suggestedOfferCents;
+                if(!"verify".equals(d.tier)){if(evaluation.visible()){newTier=evaluation.storageTier();newTierLabel=evaluation.label;}else{newTier="filtered";newTierLabel="";filter=true;}}
             }
-            if(sameInt(d.benchmarkCents,newBenchmark)&&sameInt(d.offerCents,newOffer)&&sameDouble(d.discount,newDiscount)&&Objects.equals(d.tier,newTier)&&Objects.equals(d.tierLabel,newTierLabel))continue;
-            ContentValues v=new ContentValues();
-            if(newBenchmark==null)v.putNull("benchmark_cents");else v.put("benchmark_cents",newBenchmark);
-            v.putNull("offer_cents");
-            if(newDiscount==null)v.putNull("discount");else v.put("discount",newDiscount);
-            if(!Objects.equals(d.tier,newTier))v.put("tier",newTier);
-            if(!Objects.equals(d.tierLabel,newTierLabel))v.put("tier_label",newTierLabel);
+            if(sameInt(d.benchmarkCents,ref)&&sameInt(d.offerCents,newOffer)&&sameDouble(d.discount,newDiscount)&&Objects.equals(d.tier,newTier)&&Objects.equals(d.tierLabel,newTierLabel)&&!filter)continue;
+            ContentValues v=new ContentValues();if(ref==null||ref<=0)v.putNull("benchmark_cents");else v.put("benchmark_cents",ref);if(newOffer==null)v.putNull("offer_cents");else v.put("offer_cents",newOffer);if(newDiscount==null)v.putNull("discount");else v.put("discount",newDiscount);if(!Objects.equals(d.tier,newTier))v.put("tier",newTier);if(!Objects.equals(d.tierLabel,newTierLabel))v.put("tier_label",newTierLabel);
+            if(filter){v.put("lifecycle","REMOVED");v.put("verification_state","PRICE_FILTERED");v.put("verification_reason","Prezzo automaticamente escluso dopo ricalcolo del mercato");}
             signatures.add(d.signature);updates.add(v);
         }
-        if(updates.isEmpty()){reclassifyAutomaticVintedJobs();return 0;}
-        SQLiteDatabase db=helper.getWritableDatabase();int changed=0;db.beginTransaction();
-        try{for(int i=0;i<updates.size();i++)changed+=db.update("deals",updates.get(i),"signature=?",new String[]{signatures.get(i)});db.setTransactionSuccessful();}
-        finally{db.endTransaction();}
-        reclassifyAutomaticVintedJobs();
-        return changed;
+        if(updates.isEmpty()){reclassifyAutomaticVintedJobs();return 0;}SQLiteDatabase db=helper.getWritableDatabase();int changed=0;db.beginTransaction();try{for(int i=0;i<updates.size();i++)changed+=db.update("deals",updates.get(i),"signature=?",new String[]{signatures.get(i)});db.setTransactionSuccessful();}finally{db.endTransaction();}reclassifyAutomaticVintedJobs();return changed;
     }
 
     /** If price evidence changes, stale LIVE_DEAL jobs must not keep consuming the scarce network
@@ -2173,9 +2176,9 @@ public final class MarketStore {
             changed=db.update("processing_jobs",done,"job_type=? AND source='LIVE_DEAL' AND state IN (?,?,?) AND listing_id IN (SELECT l.id FROM market_listings l LEFT JOIN deals d ON d.signature=l.legacy_signature WHERE d.signature IS NULL OR d.lifecycle<>'ACTIVE' OR d.tier<>'hot' OR d.rating IS NULL OR d.rating<?)",new String[]{JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,String.valueOf(DealPolicy.MIN_BGG_RATING)});
             ContentValues def=new ContentValues();def.put("enrichment_state","DEFERRED_LINK");def.put("deferred_retry_at",0);
             db.update("market_listings",def,"lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='') AND game_id IN (SELECT id FROM games WHERE database_visible=1 AND rating>=?) AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.listing_id=market_listings.id AND j.job_type=? AND j.state IN (?,?,?))",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE});
-            // Clearly expensive normal listings are useful as local market observations but do not
-            // deserve scarce Vinted linking capacity. Manual/Hunt work can still promote them.
-            ContentValues local=new ContentValues();local.put("enrichment_state","LOCAL_ONLY");local.put("deferred_retry_at",0);db.update("market_listings",local,"lifecycle='ACTIVE' AND enrichment_state='DEFERRED_LINK' AND (vinted_url IS NULL OR vinted_url='') AND legacy_signature IN (SELECT signature FROM deals WHERE lifecycle='ACTIVE' AND tier='normal' AND benchmark_cents IS NOT NULL AND benchmark_cents>0 AND item_price_cents>=benchmark_cents*2.0 AND item_price_cents-benchmark_cents>=2500)",null);
+            // Filtered price rows remain useful market observations but never deserve scarce Vinted
+            // identity work. Keep the old extreme pre-network gate as a conservative fallback.
+            ContentValues local=new ContentValues();local.put("enrichment_state","LOCAL_ONLY");local.put("deferred_retry_at",0);db.update("market_listings",local,"lifecycle='ACTIVE' AND enrichment_state='DEFERRED_LINK' AND (vinted_url IS NULL OR vinted_url='') AND legacy_signature IN (SELECT signature FROM deals WHERE tier='filtered' OR (lifecycle='ACTIVE' AND tier='normal' AND benchmark_cents IS NOT NULL AND benchmark_cents>0 AND item_price_cents>=benchmark_cents*2.0 AND item_price_cents-benchmark_cents>=2500))",null);
             db.update("processing_jobs",done,"job_type=? AND state IN (?,?,?) AND source NOT IN (?,?) AND listing_id IN (SELECT id FROM market_listings WHERE enrichment_state='LOCAL_ONLY')",new String[]{JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,"MANUAL_PRIORITY","HUNT_PRIORITY"});
             db.setTransactionSuccessful();
         }finally{db.endTransaction();}if(changed>0)notifyQueueChanged();return changed;
@@ -2185,7 +2188,7 @@ public final class MarketStore {
     private static boolean sameDouble(Double a,Double b){if(a==null||b==null)return a==b;return Math.abs(a-b)<0.001;}
 
 
-    private static Integer effectiveLegacyTotal(DealRecord d){if(d==null)return null;if(d.shippingVerifiedCents!=null){int base=d.protectedPriceCents!=null?d.protectedPriceCents:d.itemPriceCents;return base+d.shippingVerifiedCents;}if(d.totalCents!=null&&d.totalCents>0)return d.totalCents;if(d.protectedPriceCents!=null&&d.protectedPriceCents>0)return d.protectedPriceCents;return d.itemPriceCents>0?d.itemPriceCents:null;}
+    private static Integer effectiveLegacyTotal(DealRecord d){if(d==null)return null;if(d.shippingVerifiedCents!=null){int base=d.protectedPriceCents!=null?d.protectedPriceCents:d.itemPriceCents+PurchaseMath.vintedFee(d.itemPriceCents);return base+d.shippingVerifiedCents;}if(d.totalCents!=null&&d.totalCents>0)return d.totalCents;if(d.protectedPriceCents!=null&&d.protectedPriceCents>0)return d.protectedPriceCents;return d.itemPriceCents>0?d.itemPriceCents:null;}
 
     /** Small batches of provisional games for local, zero-network BGG identity matching. Old review
      * rows are retried once whenever the matcher algorithm version advances. */
