@@ -287,11 +287,16 @@ public final class VintedAccessibilityService extends AccessibilityService {
         p.edit().putString("lastRoot", rootPkg == null ? "<no package>" : rootPkg.toString()).apply();
         if (rootPkg == null || !VINTED_PACKAGE.contentEquals(rootPkg)) return;
 
+        long productNow=System.currentTimeMillis();
+        MarketStore.ManualVintedRecovery opened=marketStore==null?null:marketStore.activeOpenedVintedTarget(productNow);
+        boolean exactOpened=opened!=null&&opened.active(productNow);
         ProductPage product = ProductPageParser.parse(root);
+        if(product==null&&exactOpened&&ProductPageParser.hasStrongUnavailableSignal(root)){
+            reconcileOpenedSold(null,opened.listingId,true,"strong-unavailable-signal");
+            return;
+        }
         DealRecord currentProductDeal=null;
         if (product != null) {
-            long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore==null?null:marketStore.activeOpenedVintedTarget(now);
-            boolean exactOpened=opened!=null&&opened.active(now);
             if(exactOpened)currentProductDeal=database.findBySignature(opened.signature);
             if(currentProductDeal==null)currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
             long exactListingId=exactOpened?opened.listingId:(currentProductDeal==null||marketStore==null?0L:marketStore.listingIdForSignature(currentProductDeal.signature));
@@ -306,14 +311,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
             diag().edit().putString("lastOpenedVintedPage","title="+product.title+";sold="+product.sold+";exact="+exactOpened+";listing="+exactListingId+";deal="+(currentProductDeal!=null)).apply();
             handleProductPage(product,currentProductDeal,exactListingId);
             if(product.sold&&(currentProductDeal!=null||exactListingId>0)){
-                String soldSig=currentProductDeal==null?"":currentProductDeal.signature;
-                if(TextUtils.isEmpty(soldSig)&&marketStore!=null&&exactListingId>0)soldSig=marketStore.signatureForListing(exactListingId);
-                if(!TextUtils.isEmpty(soldSig))database.markSold(soldSig);
-                if(marketStore!=null&&exactListingId>0)marketStore.markSold(exactListingId);
-                if(bundleDatabase!=null&&currentProductDeal!=null)bundleDatabase.invalidate(currentProductDeal);
-                diag().edit().putString("lastOpenedVintedReconcile","sold:"+(TextUtils.isEmpty(soldSig)?"listing#"+exactListingId:soldSig)+";exact="+exactOpened+";listing="+exactListingId).apply();
-                OperationCenter.done(this,"sold:"+(TextUtils.isEmpty(soldSig)?String.valueOf(exactListingId):soldSig),OperationCenter.LINK,"Articolo venduto · rimosso");
-                sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
+                reconcileOpenedSold(currentProductDeal,exactListingId,exactOpened,"product-parser");
+                return;
             }
             if(exactOpened&&marketStore!=null)marketStore.clearOpenedVintedTarget(opened.listingId);
             // The Vinted item page itself can expose a visible "Articoli dell'utente" rail.
@@ -963,6 +962,23 @@ public final class VintedAccessibilityService extends AccessibilityService {
         OperationCenter.doneIfActive(this,"deep:"+sellerId,OperationCenter.DEEP_SCAN,"chiuso · nessuna operazione pendente");
         OperationCenter.doneIfActive(this,"snapshot:"+sellerId,OperationCenter.SNAPSHOT,"chiuso · nessuna operazione pendente");
         if(nextDelay>0)handler.postDelayed(()->scanBundleBacklog(false),nextDelay);
+    }
+
+    private void reconcileOpenedSold(DealRecord deal,long listingId,boolean exactOpened,String source){
+        DealRecord resolved=deal;
+        if(resolved==null&&marketStore!=null&&listingId>0){
+            MarketListingRecord listing=marketStore.listing(listingId);
+            if(listing!=null){GameRecord game=marketStore.gameForListing(listing);resolved=listing.asDealRecord(game);String s=marketStore.signatureForListing(listingId);if(!TextUtils.isEmpty(s))resolved.signature=s;}
+        }
+        String soldSig=resolved==null?"":resolved.signature;
+        if(TextUtils.isEmpty(soldSig)&&marketStore!=null&&listingId>0)soldSig=marketStore.signatureForListing(listingId);
+        if(!TextUtils.isEmpty(soldSig))database.markSold(soldSig);
+        if(marketStore!=null&&listingId>0)marketStore.markSold(listingId);
+        if(bundleDatabase!=null&&resolved!=null)bundleDatabase.invalidate(resolved);
+        if(marketStore!=null&&listingId>0)marketStore.clearOpenedVintedTarget(listingId);
+        diag().edit().putString("lastOpenedVintedReconcile","sold:"+(TextUtils.isEmpty(soldSig)?"listing#"+listingId:soldSig)+";exact="+exactOpened+";listing="+listingId+";source="+source).apply();
+        OperationCenter.done(this,"sold:"+(TextUtils.isEmpty(soldSig)?String.valueOf(listingId):soldSig),OperationCenter.LINK,"Articolo venduto · rimosso");
+        sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
     }
 
     private void handleProductPage(ProductPage page,DealRecord exactDeal,long exactListingId) {
