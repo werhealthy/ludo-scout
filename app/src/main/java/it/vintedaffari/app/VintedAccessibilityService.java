@@ -138,7 +138,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     /** Durable enrichment pump. One Vinted resolver at a time, BGG independently serialized by BggEnricher. */
     private final Runnable marketPump=new Runnable(){@Override public void run(){
-        try{pumpPersistentMarketJobs();}catch(Throwable t){Log.e(TAG,"persistent market pump failed",t);diag().edit().putString("lastError","market-pump: "+String.valueOf(t.getMessage())).apply();}
+        try{pumpPersistentMarketJobs();if(!manualMetadataRefresh)resolveBacklog();}catch(Throwable t){Log.e(TAG,"persistent market pump failed",t);diag().edit().putString("lastError","market-pump: "+String.valueOf(t.getMessage())).apply();}
         finally{scheduleMarketPump(15_000L);}
     }};
 
