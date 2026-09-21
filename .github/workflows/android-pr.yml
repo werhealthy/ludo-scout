@@ -93,6 +93,13 @@ jobs:
         run: python3 regression/catalog_truth_card_layout_bundle_memory_v51233.py
       - name: Run global rating sweep regression
         run: python3 regression/global_rating_sweep_v51234.py
+      - name: Run pricing/bundle decision regression
+        run: python3 regression/pricing_bundle_decisions_v51235.py
+
+      - name: Run pricing unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:testDebugUnitTest
 
       - name: Compile debug Java
         run: |
