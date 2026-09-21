@@ -378,7 +378,7 @@ private void renderDatabase(){
             box.addView(filterRow("Prezzo",draft.maxPrice==null?"Qualsiasi":"Fino a "+money(draft.maxPrice),()->showPricePage("Prezzo massimo Vinted",draft.maxPrice,v->{draft.maxPrice=v;refresh[0].run();})));
             LinearLayout footer=new LinearLayout(this);footer.setPadding(0,dp(26),0,dp(12));Button apply=button("Mostra risultati",LIME);apply.setOnClickListener(v->{databaseScope=draft.scope;databaseMinRating=draft.rating;databaseActiveOnly=draft.active;databaseMaxPrice=draft.maxPrice;databaseVisible=24;dialog.dismiss();render();});footer.addView(apply,new LinearLayout.LayoutParams(-1,dp(52)));box.addView(footer);
         };
-        dialog.setOnShowListener(x->{Window w=dialog.getWindow();if(w!=null){w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}refresh[0].run();});setFullScreenPanelAction(dialog,()->{draft.reset();refresh[0].run();});dialog.show();
+        refresh[0].run();setFullScreenPanelAction(dialog,()->{draft.reset();refresh[0].run();});dialog.show();
     }
 
     private void loadMoreDatabase(){
@@ -560,7 +560,7 @@ private void showFilterSheet(){
             box.addView(filterRow("Altri filtri",draft.extras()==0?"Nessuno":draft.extras()+" attivi",()->showOtherFiltersPage(draft,refresh[0])));
             LinearLayout footer=new LinearLayout(this);footer.setPadding(0,dp(26),0,dp(12));Button apply=button("Mostra risultati",LIME);apply.setOnClickListener(v->{catalogMinRatingFilter=draft.rating;catalogMinDiscountFilter=draft.discount;languageFilter=draft.language;linkFilter=draft.link;typeFilter=draft.type;maxPriceFilter=draft.maxPrice;filterShipping=draft.shipping;filterBundle=draft.bundle;filterVerify=draft.verify;filterMode="all";catalogVisible=24;dialog.dismiss();render();});footer.addView(apply,new LinearLayout.LayoutParams(-1,dp(52)));box.addView(footer);
         };
-        dialog.setOnShowListener(x->{Window w=dialog.getWindow();if(w!=null){w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}refresh[0].run();});
+        refresh[0].run();
         setFullScreenPanelAction(dialog,()->{draft.reset();refresh[0].run();});dialog.show();
     }
 
