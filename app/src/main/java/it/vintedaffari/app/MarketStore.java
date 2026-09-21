@@ -1245,8 +1245,20 @@ public final class MarketStore {
     }
 
     public void markSold(long listingId) {
-        ContentValues v = new ContentValues(); v.put("lifecycle", "SOLD"); v.put("last_seen", System.currentTimeMillis());
-        helper.getWritableDatabase().update("market_listings", v, "id=?", new String[]{String.valueOf(listingId)});
+        if(listingId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        db.beginTransaction();try{
+            ContentValues v=new ContentValues();v.put("lifecycle","SOLD");v.put("enrichment_state","SOLD");v.put("last_seen",now);v.put("last_error","Articolo venduto su Vinted");v.put("manual_review_required",0);v.putNull("manual_review_reason");
+            db.update("market_listings",v,"id=?",new String[]{String.valueOf(listingId)});
+            // A sold listing must leave every active lane immediately; otherwise the queue can keep
+            // spending paced Vinted slots on a card that can no longer return to the catalog.
+            ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","sold: listing retired");
+            db.update("processing_jobs",j,"listing_id=? AND state IN (?,?,?,?)",new String[]{String.valueOf(listingId),PENDING,PROCESSING,FAILED_RETRYABLE,FAILED_PERMANENT});
+            db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+listingId});
+            db.delete("queue_controls","name=? AND value=?",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId)});
+            db.delete("queue_controls","name=? AND value=?",new String[]{OPENED_VINTED_TARGET,String.valueOf(listingId)});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        helper.invalidateActiveObservationSessionCache();notifyQueueChanged();
     }
 
     public void markUnavailable(long listingId,String reason){
