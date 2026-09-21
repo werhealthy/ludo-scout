@@ -677,11 +677,69 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void resolvePriority(DealRecord d){
-        if(d==null||linkNetworkInFlight)return;linkNetworkInFlight=true;lastPriorityLinkAttemptAt=System.currentTimeMillis();String type=TextUtils.isEmpty(d.vintedUrl)?OperationCenter.LINK:OperationCenter.SELLER;String id=(OperationCenter.LINK.equals(type)?"link:":"seller:")+d.signature;OperationCenter.running(this,id,type,d.vintedTitle);
+        if(d==null||linkNetworkInFlight)return;
+        linkNetworkInFlight=true;lastPriorityLinkAttemptAt=System.currentTimeMillis();
+        final boolean health=d.signature.equals(catalogHealthInFlightSignature);
+        String type=TextUtils.isEmpty(d.vintedUrl)?OperationCenter.LINK:OperationCenter.SELLER;
+        String id=(OperationCenter.LINK.equals(type)?"link:":"seller:")+d.signature;
+        OperationCenter.running(this,id,type,d.vintedTitle);
         linkResolver.resolve(d,new AutoLinkResolver.Callback(){
-            @Override public void onResolved(VintedLinkResolver.Result r){linkNetworkInFlight=false;if(r.sold){DealRecord sold=database.findBySignature(r.signature);database.markSold(r.signature);if(sold!=null)bundleDatabase.invalidate(sold);OperationCenter.done(VintedAccessibilityService.this,id,type,"Articolo venduto · rimosso da Ludo Scout");finishManualTargetIfNeeded(r.signature,true,"Articolo venduto rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);return;}database.applyResolvedLink(r.signature,r.itemId,r.url,r.imageUrl,r.confidence,r.reason,r.sellerId,r.sellerName,r.photosCsv,System.currentTimeMillis());if(!TextUtils.isEmpty(r.publishedLabel)){database.updatePublishedLabel(r.signature,r.publishedLabel);diag().edit().putString("lastPublishedLabel",r.publishedLabel).putLong("publishedMetadataResolved",diag().getLong("publishedMetadataResolved",0)+1).apply();}finishManualTargetIfNeeded(r.signature,true,"Dati annuncio aggiornati");if(!TextUtils.isEmpty(r.sellerId)){bundleDatabase.setDiagnostic(r.signature,r.sellerId,"SELLER_FOUND",0,0,0,null);bundleDatabase.increment("sellerFound");if(r.sellerSnapshot!=null){bundleDatabase.storeSnapshot(r.sellerId,r.itemId,"item-public-page",r.sellerSnapshot);bundleDatabase.setDiagnostic(r.signature,r.sellerId,r.sellerSnapshot.isEmpty()?"SNAPSHOT_EMPTY":"SNAPSHOT_FOUND",r.sellerSnapshot.size(),0,0,null);if(!TextUtils.isEmpty(r.snapshotParser))diag().edit().putString("bundleParser",r.snapshotParser).apply();}}else bundleDatabase.setDiagnostic(r.signature,null,"SELLER_UNKNOWN",0,0,0,"sellerId assente");OperationCenter.done(VintedAccessibilityService.this,id,type,r.matchedTitle);DealRecord fresh=database.findBySignature(r.signature);applyPendingSellerRail(r.signature,r.sellerId,r.sellerName);rebuildLocalBundlesForSeller(fresh);maybeScanBundles(fresh);if(r.imageUrl!=null&&!r.imageUrl.isEmpty())ThumbnailStore.downloadRemote(getApplicationContext(),r.signature,r.imageUrl);SharedPreferences pp=diag();pp.edit().putLong("linksResolved",pp.getLong("linksResolved",0)+1).putString("lastLinkResolution",r.matchedTitle+" → "+r.url+" ("+r.confidence+")").apply();sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);}
-            @Override public void onUnresolved(String signature,String reason){linkNetworkInFlight=false;boolean deferred="cooldown".equals(reason)||isRateLimited(reason);if(deferred){manualRefreshAttempted.remove(signature);long until=authoritativeVintedResumeAt(d);if(until<=System.currentTimeMillis())until=System.currentTimeMillis()+currentLinkGapMs(d);maintenancePauseReason=reason;if("cooldown".equals(reason))bundleDatabase.increment("linkCooldownDeferred");else bundleDatabase.increment("rateLimited");OperationCenter.paused(VintedAccessibilityService.this,id,type,"Vinted in pausa · riprovo al momento consentito");if(manualMetadataRefresh)setVintedPause(until,reason);}else{finishManualTargetIfNeeded(signature,false,"Dati Vinted ancora mancanti · "+reason);OperationCenter.error(VintedAccessibilityService.this,id,type,d.vintedTitle,reason);}SharedPreferences pp=diag();pp.edit().putLong("linkResolveMisses",pp.getLong("linkResolveMisses",0)+1).putString("lastLinkResolveMiss",reason).apply();if(!manualMetadataRefresh)handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,currentLinkGapMs(d));}
+            @Override public void onResolved(VintedLinkResolver.Result r){
+                linkNetworkInFlight=false;
+                if(r.sold){
+                    DealRecord sold=database.findBySignature(r.signature);
+                    if(sold!=null)removeUnavailableDeal(sold,true,"Controllo Vinted: articolo venduto");
+                    if(health)diag().edit().putLong("catalogHealthRemoved",diag().getLong("catalogHealthRemoved",0)+1).putString("catalogHealthLast",r.signature+" · SOLD").apply();
+                    finishManualTargetIfNeeded(r.signature,true,"Articolo venduto rimosso");catalogHealthInFlightSignature="";
+                    handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);return;
+                }
+                long now=System.currentTimeMillis();
+                database.applyResolvedLink(r.signature,r.itemId,r.url,r.imageUrl,r.confidence,r.reason,r.sellerId,r.sellerName,r.photosCsv,now);
+                if(r.exactPagePrice&&r.verifiedCurrentPriceCents!=null)database.updateVerifiedCurrentPrice(r.signature,r.verifiedCurrentPriceCents,r.verifiedProtectedPriceCents,now);
+                if(!TextUtils.isEmpty(r.publishedLabel)){database.updatePublishedLabel(r.signature,r.publishedLabel);diag().edit().putString("lastPublishedLabel",r.publishedLabel).putLong("publishedMetadataResolved",diag().getLong("publishedMetadataResolved",0)+1).apply();}
+                if(health)diag().edit().putLong("catalogHealthRefreshed",diag().getLong("catalogHealthRefreshed",0)+1).putString("catalogHealthLast",r.signature+" · OK").apply();
+                finishManualTargetIfNeeded(r.signature,true,"Dati annuncio aggiornati");
+                if(!TextUtils.isEmpty(r.sellerId)){
+                    bundleDatabase.setDiagnostic(r.signature,r.sellerId,"SELLER_FOUND",0,0,0,null);bundleDatabase.increment("sellerFound");
+                    if(r.sellerSnapshot!=null){bundleDatabase.storeSnapshot(r.sellerId,r.itemId,"item-public-page",r.sellerSnapshot);bundleDatabase.setDiagnostic(r.signature,r.sellerId,r.sellerSnapshot.isEmpty()?"SNAPSHOT_EMPTY":"SNAPSHOT_FOUND",r.sellerSnapshot.size(),0,0,null);if(!TextUtils.isEmpty(r.snapshotParser))diag().edit().putString("bundleParser",r.snapshotParser).apply();}
+                }else bundleDatabase.setDiagnostic(r.signature,null,"SELLER_UNKNOWN",0,0,0,"sellerId assente");
+                OperationCenter.done(VintedAccessibilityService.this,id,type,r.matchedTitle);
+                DealRecord fresh=database.findBySignature(r.signature);applyPendingSellerRail(r.signature,r.sellerId,r.sellerName);rebuildLocalBundlesForSeller(fresh);maybeScanBundles(fresh);
+                if(r.imageUrl!=null&&!r.imageUrl.isEmpty())ThumbnailStore.downloadRemote(getApplicationContext(),r.signature,r.imageUrl);
+                SharedPreferences pp=diag();pp.edit().putLong("linksResolved",pp.getLong("linksResolved",0)+1).putString("lastLinkResolution",r.matchedTitle+" → "+r.url+" ("+r.confidence+")").apply();
+                catalogHealthInFlightSignature="";sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);
+            }
+            @Override public void onUnresolved(String signature,String reason){
+                linkNetworkInFlight=false;boolean deferred="cooldown".equals(reason)||isRateLimited(reason);
+                if(health&&isGoneExactPage(reason)){
+                    DealRecord stale=database.findBySignature(signature);if(stale!=null)removeUnavailableDeal(stale,false,reason);
+                    diag().edit().putLong("catalogHealthRemoved",diag().getLong("catalogHealthRemoved",0)+1).putString("catalogHealthLast",signature+" · unavailable").apply();
+                    OperationCenter.done(VintedAccessibilityService.this,id,type,"Annuncio non più pubblico · rimosso");catalogHealthInFlightSignature="";
+                    handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);return;
+                }
+                if(deferred){
+                    manualRefreshAttempted.remove(signature);long until=authoritativeVintedResumeAt(d);if(until<=System.currentTimeMillis())until=System.currentTimeMillis()+currentLinkGapMs(d);maintenancePauseReason=reason;
+                    if("cooldown".equals(reason))bundleDatabase.increment("linkCooldownDeferred");else bundleDatabase.increment("rateLimited");
+                    OperationCenter.paused(VintedAccessibilityService.this,id,type,"Vinted in pausa · riprovo al momento consentito");if(manualMetadataRefresh)setVintedPause(until,reason);
+                }else{
+                    finishManualTargetIfNeeded(signature,false,"Dati Vinted ancora mancanti · "+reason);OperationCenter.error(VintedAccessibilityService.this,id,type,d.vintedTitle,reason);
+                }
+                if(health)diag().edit().putLong("catalogHealthDeferred",diag().getLong("catalogHealthDeferred",0)+1).putString("catalogHealthLast",signature+" · "+safeDiag(reason)).apply();
+                SharedPreferences pp=diag();pp.edit().putLong("linkResolveMisses",pp.getLong("linkResolveMisses",0)+1).putString("lastLinkResolveMiss",reason).apply();
+                catalogHealthInFlightSignature="";if(!manualMetadataRefresh)handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,currentLinkGapMs(d));
+            }
         });
+    }
+
+    private static boolean isGoneExactPage(String reason){if(reason==null)return false;String r=reason.toLowerCase(Locale.ROOT);return r.contains("404")&&r.contains("pagina vinted");}
+
+    private void removeUnavailableDeal(DealRecord d,boolean sold,String reason){
+        if(d==null)return;
+        if(sold){database.markSold(d.signature);if(marketStore!=null)marketStore.markSoldBySignature(d.signature);}
+        else{database.markUnavailable(d.signature,reason);if(marketStore!=null)marketStore.markUnavailableBySignature(d.signature,reason);}
+        if(bundleDatabase!=null)bundleDatabase.invalidate(d);rebuildLocalBundles();
+        OperationCenter.done(this,(sold?"sold:":"unavailable:")+d.signature,OperationCenter.LINK,sold?"Articolo venduto · rimosso":"Annuncio non più pubblico · rimosso");
+        sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
     }
 
     private static boolean isRateLimited(String reason){if(reason==null)return false;String r=reason.toLowerCase(Locale.ROOT);return r.contains("429")||r.contains("403")||r.contains("pausa")||r.contains("sospes")||r.contains("budget pubblico");}
