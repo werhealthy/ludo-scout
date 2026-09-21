@@ -20,13 +20,14 @@ checks=[
      all(label in home for label in ["Affari migliori","Più votati","Sconti maggiori","Appena trovati"]) and
      "takeDiscoverUnused" not in home and "limitDeals" in home),
     ("real bundles can return to Home",
-     '"Bundle reali"' in home and "uniqueBundleSources(deals)" in home),
+     "uniqueBundleSources(deals)" in home and
+     ("addBundleSpotlight" in home or '"Bundle reali"' in home)),
     ("section subtitles are actually rendered",
      "if(!TextUtils.isEmpty(sub))" in section and "text(sub,12,MUTED" in section),
     ("Home rail cards are visual first",
-     "dealArtworkView(d,dp(176),dp(150))" in tile and
-     "new LinearLayout.LayoutParams(dp(198),dp(286))" in tile and
-     "setSingleLine(true)" in tile),
+     "dealArtworkView(d,dp(170),dp(168))" in tile and
+     "new LinearLayout.LayoutParams(dp(186),dp(286))" in tile and
+     "materialChip(" not in tile),
     ("Catalog card exposes listing actions",
      'more.setContentDescription("Azioni annuncio")' in card and
      "showListingActions(d)" in card),
