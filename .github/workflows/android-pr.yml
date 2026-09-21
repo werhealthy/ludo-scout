@@ -99,6 +99,8 @@ jobs:
         run: python3 regression/ux_phase2_v51237.py
       - name: Run Home/manual sold UX regression
         run: python3 regression/home_manual_sold_v51238.py
+      - name: Run UX system v1 regression
+        run: python3 regression/ux_system_v1_v51239.py
 
       - name: Run pricing unit tests
         run: |
