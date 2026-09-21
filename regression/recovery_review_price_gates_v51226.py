@@ -54,8 +54,8 @@ checks=[
      scan.index("discovered.clear()") < scan.index("ThumbnailStore.captureMissing")),
     ("explicit price-comparison mode still exists",
      "activeMarketScanGame()" in radar and "Ricerca prezzi Vinted esplicita" in radar),
-    ("single-result recovery still requires exact URL",
-     "Anche se ne vedi uno solo" in ui and "serve l’URL esatto" in ui),
+    ("manual recovery still requires an exact Vinted item URL",
+     "incolla qui il link /items/" in ui and "vintedItemId(value)" in ui),
     ("review count is aligned to actionable inbox",
      "String attention=" in range_block and "manual_review_required" in range_block and
      "MATCH_UNCERTAIN" not in range_block[range_block.index("String attention="):range_block.index("String trustHold=")]),
