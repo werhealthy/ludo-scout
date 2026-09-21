@@ -7,6 +7,15 @@
 - The workflow builds a signed debug APK with the preserved developer signing identity, verifies the certificate fingerprint, uploads the artifact and distributes it through Firebase App Distribution.
 - CI requires the documented BGG, signing and Firebase GitHub Secrets; none are stored in the repository.
 
+## 5.12.29 — Motore network priority
+- Closed a remaining ETA/throughput gap visible in the 5.12.27 field debug: Bundle deep work could still run with `vintedActive=20` while Motore had unfinished scrolls because the old guard only deferred Bundle above 20 active Vinted jobs.
+- An unfinished Motore observation run now owns the public Vinted lane ahead of opportunistic background work, even when its next Vinted identity is parked/deferred and the durable queue is momentarily empty.
+- Automatic legacy metadata maintenance no longer starts while Motore owns a run.
+- Bundle backlog discovery, public snapshots, queued deep scans and ownership verification all re-check Motore ownership before starting network work.
+- Zero-network local seller-graph rebuilding is still allowed, so stale Bundle labels can be corrected without delaying Motore.
+- Added `bundleDeferredForMotore` diagnostics and `regression/motore_network_priority_v51229.py`.
+- No schema migration, request-rate increase, signing, applicationId, Firebase, secrets or CI versionCode-strategy change.
+
 ## 5.12.28 — Catalog freshness, bundle health and ETA truth
 - Fixed Motore ETA for parked current-run work. Exact Vinted identities still missing now remain in the estimate even when no durable Vinted job is currently materialised.
 - When a deferred scroll becomes the Motore owner again, its parked unresolved Vinted links can resume immediately instead of inheriting a long background retry timestamp.
