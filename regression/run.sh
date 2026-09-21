@@ -9,6 +9,10 @@ java_dir="${JAVA_HOME:+$JAVA_HOME/bin/}"
 "${java_dir}java" -cp "$output_dir:$GSON_JAR" Regression "$root_dir/regression/quality-fixtures.tsv"
 python3 "$root_dir/regression/migrations.py"
 python3 "$root_dir/regression/performance_stability_v5124.py"
+python3 "$root_dir/regression/pipeline_integrity_v51242.py"
+
+"${java_dir}javac" -d "$output_dir" "$root_dir/regression/PipelineIntegrityRegression.java" "$root_dir/app/src/main/java/it/vintedaffari/app/BggProductCompatibility.java"
+"${java_dir}java" -cp "$output_dir" PipelineIntegrityRegression
 
 "${java_dir}javac" -d "$output_dir" "$root_dir/regression/XmlRegression.java" "$root_dir/app/src/main/java/it/vintedaffari/app/SafeXml.java"
 "${java_dir}java" -cp "$output_dir" XmlRegression
