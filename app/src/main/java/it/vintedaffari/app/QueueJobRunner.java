@@ -359,7 +359,7 @@ public final class QueueJobRunner {
         // A 404 on the actual public item page is actionable information, not a network retry loop.
         // Current-run rows may enter the recovery station; historical catalog recovery is handled
         // above and is archived automatically.
-        if(MarketStore.JOB_VINTED.equals(job.type)&&isGoneVintedPage(reason)){
+        if(MarketStore.JOB_VINTED.equals(job.type)&&isGoneVintedPage(reason)&&job.attempt>=3&&!MarketStore.CATALOG_RECOVERY_SOURCE.equals(job.source)){
             settleAutomaticAmbiguity(market,job,reason);return;
         }
 
