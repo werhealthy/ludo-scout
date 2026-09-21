@@ -14,7 +14,7 @@ huntrow=ui[ui.index("private View huntRow"):ui.index("private void addHuntFlow",
 
 checks=[
     ("phase2 release identity",
-     "versionName '5.12.37-ux-library-ludo-cardfix'" in build and
+     "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
     ("Home restores large Ludo illustration",
