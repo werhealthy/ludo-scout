@@ -1257,6 +1257,18 @@ public final class MarketStore {
         helper.invalidateActiveObservationSessionCache();notifyQueueChanged();
     }
 
+    public void markUnavailableBySignature(String signature,String reason){
+        if(TextUtils.isEmpty(signature))return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        db.beginTransaction();try{
+            ContentValues v=new ContentValues();v.put("lifecycle","REMOVED");v.put("last_seen",now);v.put("last_error",safe(reason));
+            db.update("market_listings",v,"legacy_signature=? OR temp_fingerprint=?",new String[]{signature,signature});
+            ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("progress",100);done.put("updated_at",now);done.put("processing_started_at",0);done.put("last_error",safe(reason));
+            db.update("processing_jobs",done,"listing_id IN (SELECT id FROM market_listings WHERE legacy_signature=? OR temp_fingerprint=?) AND state IN (?,?,?)",new String[]{signature,signature,PENDING,PROCESSING,FAILED_RETRYABLE});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        helper.invalidateActiveObservationSessionCache();notifyQueueChanged();
+    }
+
     public void applyBggMetadata(BggMetadata m) {
         if (m == null || TextUtils.isEmpty(m.bggId)) return;
         SQLiteDatabase db = helper.getWritableDatabase();
