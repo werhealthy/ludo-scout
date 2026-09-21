@@ -112,7 +112,7 @@ public final class DealEvaluator {
     public static boolean isBundleProspect(DealRecord deal){
         if(deal==null||!"ACTIVE".equals(deal.lifecycle)||"verify".equals(deal.tier))return false;
         if(!DealPolicy.ratingEligible(deal)||empty(deal.sellerId)||empty(deal.vintedUrl)||empty(deal.bggId))return false;
-        Evaluation e=evaluate(deal);if(!e.visible()||e.decision==Decision.INSUFFICIENT_DATA)return false;
+        Evaluation e=evaluate(deal);if(!e.visible())return false;
         boolean strongGame=(deal.qualityScore!=null&&deal.qualityScore>=74)||(deal.rating!=null&&deal.rating>=7.4);
         return strongGame||e.discoverable();
     }
