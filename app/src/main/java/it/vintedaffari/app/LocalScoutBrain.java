@@ -30,7 +30,7 @@ public final class LocalScoutBrain {
     public static Snapshot analyze(List<DealRecord> input, BundleDatabase bundles, List<LibraryGame> library) {
         Snapshot s=new Snapshot();
         List<DealRecord> deals=new ArrayList<>();
-        if(input!=null)for(DealRecord d:input)if(d!=null&&!"verify".equals(d.tier))deals.add(d);
+        if(input!=null)for(DealRecord d:input)if(d!=null&&!"verify".equals(d.tier)&&DealEvaluator.evaluate(d).discoverable())deals.add(d);
         List<LibraryGame> owned=new ArrayList<>();
         if(library!=null)for(LibraryGame g:library)if(g!=null&&!"sold".equals(g.collectionState))owned.add(g);
         s.totalDeals=deals.size();s.libraryGames=owned.size();
@@ -108,8 +108,7 @@ public final class LocalScoutBrain {
         if(closest!=null&&closest.personalRating!=null){String common=firstCommon(cats,categories(closest.categories));out.append("Condivide ").append(common==null?"alcuni tratti":common).append(" con ").append(closest.name).append(", a cui hai dato ").append(closest.personalRating).append("/10. ");}
         else if(affinity(d,p)<=0.2&&scoutScore(d)>=7.5)out.append("È fuori dai segnali più forti della tua Libreria, ma la qualità BGG è abbastanza alta da meritare spazio come scoperta. ");
         else if(!cats.isEmpty())out.append("Il profilo BGG lo colloca soprattutto in ").append(cats.get(0)).append(cats.size()>1?" e "+cats.get(1):"").append(". ");
-        Integer sv=saving(d);if(sv!=null&&sv>=20)out.append("L'offerta è circa il ").append(sv).append("% sotto il riferimento disponibile. ");
-        else if(sv!=null&&sv>0)out.append("Il prezzo è sotto il riferimento, ma non è il solo motivo per cui te lo segnalo. ");
+        DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(d);if(!TextUtils.isEmpty(evaluation.reason))out.append(evaluation.reason).append(". ");
         if(d.rating!=null){out.append("BGG ").append(String.format(Locale.ITALY,"%.1f",d.rating));if(d.rank!=null)out.append(" · #").append(d.rank);out.append(".");}
         return out.toString().trim();
     }
@@ -128,10 +127,12 @@ public final class LocalScoutBrain {
     }
 
     private static double modelScore(DealRecord d,BundleDatabase bundles,Set<String> ownedNames,Set<String> ownedBgg,PreferenceProfile profile){
-        double q=scoutScore(d)*10.0;double rating=d.rating==null?6.0:d.rating;Integer sv=saving(d);double deal=sv==null?0:Math.max(-20,Math.min(80,sv));double ageH=Math.max(0,(System.currentTimeMillis()-d.firstSeen)/3_600_000.0);double fresh=Math.max(0,18-ageH);String lc=d.languageCode==null?"":d.languageCode.toUpperCase(Locale.ROOT);double friction=((lc.startsWith("IT")||lc.contains("IND"))?5:0)+(d.shippingVerifiedCents!=null&&d.shippingVerifiedCents<=300?5:0);boolean foreign=lc.startsWith("FR")||lc.startsWith("DE")||lc.startsWith("ES")||lc.startsWith("NL")||lc.startsWith("PT");double languagePenalty=foreign&&lc.contains("DEP")?170:foreign&&!lc.contains("IND")?35:0;double own=isOwned(d,ownedNames,ownedBgg)?-120:0;double personal=affinity(d,profile);return q*.45+deal*.29+rating*3.5+fresh*.35+friction+personal+own-languagePenalty;
+        double q=scoutScore(d)*10.0;double rating=d.rating==null?6.0:d.rating;double decision=decisionScore(d);double ageH=Math.max(0,(System.currentTimeMillis()-d.firstSeen)/3_600_000.0);double fresh=Math.max(0,18-ageH);String lc=d.languageCode==null?"":d.languageCode.toUpperCase(Locale.ROOT);double friction=((lc.startsWith("IT")||lc.contains("IND"))?5:0)+(d.shippingVerifiedCents!=null&&d.shippingVerifiedCents<=300?5:0);boolean foreign=lc.startsWith("FR")||lc.startsWith("DE")||lc.startsWith("ES")||lc.startsWith("NL")||lc.startsWith("PT");double languagePenalty=foreign&&lc.contains("DEP")?170:foreign&&!lc.contains("IND")?35:0;double own=isOwned(d,ownedNames,ownedBgg)?-120:0;double personal=affinity(d,profile);return decision+q*.35+rating*2.5+fresh*.30+friction+personal+own-languagePenalty;
     }
+    private static double decisionScore(DealRecord d){switch(DealEvaluator.evaluate(d).decision){case GREAT_BUY:return 115;case GOOD_PRICE:return 85;case OFFER:return 62;case FAIR:return 32;default:return 0;}}
+
     private static double scoutScore(DealRecord d){return d.qualityScore!=null?d.qualityScore/10.0:(d.rating!=null?d.rating:0);}
-    private static Integer effectiveTotal(DealRecord d){if(d.shippingVerifiedCents!=null){int base=d.protectedPriceCents!=null?d.protectedPriceCents:d.itemPriceCents;return base+d.shippingVerifiedCents;}return d.totalCents!=null?d.totalCents:d.protectedPriceCents;}
+    private static Integer effectiveTotal(DealRecord d){if(d.shippingVerifiedCents!=null){int base=d.protectedPriceCents!=null?d.protectedPriceCents:d.itemPriceCents+PurchaseMath.vintedFee(d.itemPriceCents);return base+d.shippingVerifiedCents;}return d.totalCents!=null?d.totalCents:d.protectedPriceCents;}
     private static Integer saving(DealRecord d){Integer t=effectiveTotal(d);if(t==null||d.benchmarkCents==null||d.benchmarkCents<=0)return null;return(int)Math.round(Math.max(-999,Math.min(99,(d.benchmarkCents-t)*100.0/d.benchmarkCents)));}
     private static String displayName(DealRecord d){return !TextUtils.isEmpty(d.displayName)?d.displayName:!TextUtils.isEmpty(d.gameName)?d.gameName:d.vintedTitle;}
     private static String norm(String s){return s==null?"":s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim();}
