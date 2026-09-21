@@ -1389,8 +1389,8 @@ public final class MarketStore {
                 "(SELECT AVG(p.price_cents) FROM price_observations p JOIN market_listings l ON l.id=p.listing_id WHERE l.game_id=g.id),"+
                 "(SELECT AVG(p.price_cents) FROM price_observations p JOIN market_listings l ON l.id=p.listing_id WHERE l.game_id=g.id AND p.observed_at>=?),"+
                 "(SELECT COUNT(*) FROM price_observations p JOIN market_listings l ON l.id=p.listing_id WHERE l.game_id=g.id) "+
-                "FROM games g WHERE "+where+" AND (g.normalized_name LIKE ? OR g.normalized_name LIKE ? OR EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.normalized_alias LIKE ?)) ORDER BY "+order+" LIMIT ?";
-        List<String> all=new ArrayList<>();all.add(String.valueOf(System.currentTimeMillis()-30L*24*60*60_000L));all.addAll(args);all.add(prefix);all.add(contains);all.add(contains);all.add(String.valueOf(Math.max(1,limit)));List<GameRecord> out=new ArrayList<>();try(Cursor c=helper.getReadableDatabase().rawQuery(sql,all.toArray(new String[0]))){while(c.moveToNext())out.add(readGameWithSummary(c));}return out;
+                "FROM games g WHERE "+where+" AND (g.normalized_name LIKE ? OR g.normalized_name LIKE ? OR EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.normalized_alias LIKE ?) OR LOWER(COALESCE(g.categories,'')) LIKE ? OR LOWER(COALESCE(g.mechanics,'')) LIKE ? OR LOWER(COALESCE(g.designers,'')) LIKE ? OR LOWER(COALESCE(g.publishers,'')) LIKE ? OR LOWER(COALESCE(g.families,'')) LIKE ?) ORDER BY "+order+" LIMIT ?";
+        List<String> all=new ArrayList<>();all.add(String.valueOf(System.currentTimeMillis()-30L*24*60*60_000L));all.addAll(args);all.add(prefix);all.add(contains);all.add(contains);for(int i=0;i<5;i++)all.add(contains);all.add(String.valueOf(Math.max(1,limit)));List<GameRecord> out=new ArrayList<>();try(Cursor c=helper.getReadableDatabase().rawQuery(sql,all.toArray(new String[0]))){while(c.moveToNext())out.add(readGameWithSummary(c));}return out;
     }
 
     public int countVisibleGamesAdvanced(String rawQuery,String scope,boolean activeOnly,Double minRating,Integer maxPrice){
@@ -1399,7 +1399,7 @@ public final class MarketStore {
         if(activeOnly)where.append(" AND EXISTS(SELECT 1 FROM market_listings lx WHERE lx.game_id=g.id AND lx.lifecycle='ACTIVE')");
         if(minRating!=null){where.append(" AND g.rating>=?");args.add(String.valueOf(minRating));}
         if(maxPrice!=null){where.append(" AND EXISTS(SELECT 1 FROM market_listings lx WHERE lx.game_id=g.id AND lx.lifecycle='ACTIVE' AND lx.current_price_cents<=?)");args.add(String.valueOf(maxPrice));}
-        String sql="SELECT COUNT(*) FROM games g WHERE "+where+" AND (g.normalized_name LIKE ? OR g.normalized_name LIKE ? OR EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.normalized_alias LIKE ?))";args.add(prefix);args.add(contains);args.add(contains);try(Cursor c=helper.getReadableDatabase().rawQuery(sql,args.toArray(new String[0]))){return c.moveToFirst()?c.getInt(0):0;}
+        String sql="SELECT COUNT(*) FROM games g WHERE "+where+" AND (g.normalized_name LIKE ? OR g.normalized_name LIKE ? OR EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.normalized_alias LIKE ?) OR LOWER(COALESCE(g.categories,'')) LIKE ? OR LOWER(COALESCE(g.mechanics,'')) LIKE ? OR LOWER(COALESCE(g.designers,'')) LIKE ? OR LOWER(COALESCE(g.publishers,'')) LIKE ? OR LOWER(COALESCE(g.families,'')) LIKE ?)";args.add(prefix);args.add(contains);args.add(contains);for(int i=0;i<5;i++)args.add(contains);try(Cursor c=helper.getReadableDatabase().rawQuery(sql,args.toArray(new String[0]))){return c.moveToFirst()?c.getInt(0):0;}
     }
 
 
