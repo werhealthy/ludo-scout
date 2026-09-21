@@ -743,7 +743,7 @@ private void openDetail(DealRecord d){
         LinkedHashMap<String,DealRecord> bySeller=new LinkedHashMap<>();
         if(input==null)return new ArrayList<>();
         for(DealRecord d:input){
-            if(d==null||!DealPolicy.ratingEligible(d)||bundleDb.countForSource(d.signature)<=0)continue;
+            if(d==null||!DealPolicy.ratingEligible(d)||!hasRealBundle(d))continue;
             String key=sellerKey(d);if(TextUtils.isEmpty(key))continue;
             if(bundleDealsForSource(d).size()<2)continue;
             DealRecord previous=bySeller.get(key);
