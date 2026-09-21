@@ -275,6 +275,8 @@ public final class QueueJobRunner {
                 try{new BundleDatabase(context).invalidate(legacy!=null?legacy:candidate);}catch(Throwable ignored){}
                 if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source))market.setDiagnosticState("catalog_health",2,"build=catalog-health-v1;state=SOLD;listing="+canonical);
                 if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source))market.setDiagnosticState("opened_vinted_verify",2,"state=SOLD;listing="+canonical);
+                market.clearVintedCandidates(job.listingId);
+                return;
             } else if (legacy != null) {
                 db.applyResolvedLink(legacy.signature, r.itemId, r.url, r.imageUrl, r.confidence, r.reason,
                         r.sellerId, r.sellerName, r.photosCsv, System.currentTimeMillis());
