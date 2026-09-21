@@ -619,8 +619,9 @@ public final class MarketStore {
                 }
             }
             boolean hasUrl=!TextUtils.isEmpty(scalarString(db,"SELECT vinted_url FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)}));
-            boolean liveResolve=shouldAutoResolveVinted(analysis)&&!hasUrl;
-            boolean eventualLink=!hasUrl && "MATCHED".equals(matchState) && analysis.averageRating!=null && analysis.averageRating>=DealPolicy.MIN_BGG_RATING && !analysis.languageBlocked;
+            DealEvaluator.Evaluation priceDecision=DealEvaluator.evaluate(card,analysis);
+            boolean liveResolve=priceDecision.visible()&&shouldAutoResolveVinted(analysis)&&!hasUrl;
+            boolean eventualLink=priceDecision.visible()&&!hasUrl && "MATCHED".equals(matchState) && analysis.averageRating!=null && analysis.averageRating>=DealPolicy.MIN_BGG_RATING && !analysis.languageBlocked;
             ContentValues v = new ContentValues();
             v.put("game_id", gameId); v.put("match_state", matchState); put(v, "match_confidence", analysis.matchConfidence);
             String detected=ListingLanguageDetector.detect(card.title,card.rawDescription,card.brand);
@@ -1319,7 +1320,7 @@ public final class MarketStore {
                 // Once BGG opens the quality gate, every valid listing may eventually receive its
                 // Vinted identity. Only hot rows enter the fast lane; the rest stay DEFERRED_LINK.
                 ContentValues deferred=new ContentValues();deferred.put("enrichment_state","DEFERRED_LINK");deferred.put("deferred_retry_at",0);
-                db.update("market_listings",deferred,"game_id=? AND lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='') AND enrichment_state IN ('LOCAL_ONLY','PENDING_ANALYSIS')",new String[]{String.valueOf(id)});
+                db.update("market_listings",deferred,"game_id=? AND lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='') AND enrichment_state IN ('LOCAL_ONLY','PENDING_ANALYSIS') AND NOT EXISTS (SELECT 1 FROM deals d WHERE d.signature=COALESCE(NULLIF(market_listings.legacy_signature,''),market_listings.temp_fingerprint) AND (d.tier='filtered' OR d.verification_state='PRICE_FILTERED'))",new String[]{String.valueOf(id)});
                 try(Cursor hot=db.rawQuery("SELECT l.id FROM market_listings l JOIN deals d ON d.signature=l.legacy_signature WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND (l.vinted_url IS NULL OR l.vinted_url='') AND d.lifecycle='ACTIVE' AND d.tier='hot'",new String[]{String.valueOf(id)})){
                     while(hot.moveToNext()){long listingId=hot.getLong(0);ContentValues st=new ContentValues();st.put("enrichment_state","PENDING_ENRICHMENT");db.update("market_listings",st,"id=?",new String[]{String.valueOf(listingId)});enqueueListingJob(db,listingId,JOB_VINTED,System.currentTimeMillis(),320,"LIVE_DEAL");}
                 }
