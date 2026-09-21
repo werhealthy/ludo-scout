@@ -23,7 +23,7 @@ checks=[
     ("Catalog preview is a true horizontal listing row",
      "new LinearLayout(this)" in catalog and
      "setOrientation(LinearLayout.HORIZONTAL)" in catalog and
-     "c.addView(info,new LinearLayout.LayoutParams(0,-1,1))" in catalog and
+     "row.addView(info,new LinearLayout.LayoutParams(0,-2,1))" in catalog and
      "LinearLayout c=verticalCard()" not in catalog),
     ("Library is collection-first with summary search and history scope",
      "La tua collezione, non un altro catalogo." in library and

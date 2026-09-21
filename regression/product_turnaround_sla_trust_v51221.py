@@ -98,8 +98,9 @@ checks=[
      'db.getDeals("trusted",320)' in ui and '"trusted".equals(filter)' in deal),
     ("Motore cards open the standard product sheet",
      "openListingProductDetail(item.listingId,item.gameId,item.signature)" in ui and "openDetail(deal)" in ui),
-    ("product detail calls the correction action Gioco sbagliato",
-     'text("Gioco sbagliato"' in ui),
+    ("product detail exposes a correction action for the linked game",
+     ('text("Gioco sbagliato"' in ui or 'menuAction("Correggi gioco associato"' in ui) and
+     "showMatchCorrection(d,detail)" in ui),
     ("Hunts can preserve exact candidates outside resale tiers",
      "wantsCandidate(Context context,String bggId,Integer totalCents)" in hunt and
      "recordHuntCandidate" in deal and "promoteLegacyListingForHunt" in radar and

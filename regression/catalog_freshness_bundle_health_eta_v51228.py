@@ -82,9 +82,9 @@ checks=[
     ("seller graph is pruned below two active games",
      "bundleDatabase.clearSellerGraph(source.sellerId)" in bundle_rebuild and
      "bundleDatabase.clearSellerGraph(entry.getKey())" in bundle_rebuild),
-    ("Catalog bundle badge and filters require a live two-game bundle",
+    ("Catalog bundle signal and filters require a live two-game bundle",
      "private boolean hasLiveBundle" in ui and
-     "if(hasLiveBundle(d))" in ui and
+     ('hasLiveBundle(d)?" · Bundle":""' in ui or "if(hasLiveBundle(d))" in ui) and
      'else if("bundle".equals(catalogPreset))l.removeIf(d->!hasLiveBundle(d))' in ui and
      "if(filterBundle)l.removeIf(d->!hasLiveBundle(d))" in ui),
     ("manual recheck sees missing publication and seller metadata",

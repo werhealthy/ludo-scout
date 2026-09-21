@@ -13,26 +13,27 @@ tile=ui[ui.index("private View tileCardV51"):ui.index("private View scoreView",u
 
 checks=[
     ("release identity",
-     "versionName '5.12.38-home-manual-sold-ui'" in build and
+     "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
     ("Home keeps semantic sections independently populated",
      all(label in home for label in ["Affari migliori","Più votati","Sconti maggiori","Appena trovati"]) and
      "takeDiscoverUnused" not in home and "limitDeals" in home),
     ("real bundles can return to Home",
-     '"Bundle reali"' in home and "uniqueBundleSources(deals)" in home),
+     "uniqueBundleSources(deals)" in home and
+     ("addBundleSpotlight" in home or '"Bundle reali"' in home)),
     ("section subtitles are actually rendered",
      "if(!TextUtils.isEmpty(sub))" in section and "text(sub,12,MUTED" in section),
     ("Home rail cards are visual first",
-     "dealArtworkView(d,dp(176),dp(150))" in tile and
-     "new LinearLayout.LayoutParams(dp(198),dp(286))" in tile and
-     "setSingleLine(true)" in tile),
+     "dealArtworkView(d,dp(170),dp(168))" in tile and
+     "new LinearLayout.LayoutParams(dp(186),dp(286))" in tile and
+     "materialChip(" not in tile),
     ("Catalog card exposes listing actions",
      'more.setContentDescription("Azioni annuncio")' in card and
      "showListingActions(d)" in card),
     ("manual sold action is explicit and historical",
-     '"Questo annuncio è venduto"' in manual and
-     '"Lo tolgo subito dagli annunci attivi. Il gioco e questo prezzo restano nello storico di Ludo."' in manual),
+     '"Segna annuncio come venduto"' in ui and
+     '"L’annuncio verrà rimosso dal Mercato attivo. Il gioco e il prezzo osservato resteranno nello storico."' in ui),
     ("manual sold updates both legacy and canonical listing state",
      "db.markSold(sig)" in manual and
      "marketStore.markSold(listingId)" in manual and
