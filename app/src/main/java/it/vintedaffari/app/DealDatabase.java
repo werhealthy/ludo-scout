@@ -155,8 +155,9 @@ public final class DealDatabase extends SQLiteOpenHelper {
         String verify=anomaly?"PRICE_ANOMALY":(listing.type==ListingClassifier.Type.EXPANSION?"EXPANSION_CHECK":"OK");
         String reason=anomaly?"Prezzo insolitamente basso: verificare che sia il gioco completo.":
                 (listing.type==ListingClassifier.Type.EXPANSION?"Espansione: verifica benchmark della stessa edizione.":null);
-        String tier=("OK".equals(verify)&&isFeedDeal(a))?a.tier:("OK".equals(verify)?"hunt":"verify");
-        upsertDeal(getWritableDatabase(),signature(card),card,a,listing,verify,reason,now,tier);
+        DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(card,a);
+        String tier=("OK".equals(verify)&&evaluation.discoverable())?evaluation.storageTier():("OK".equals(verify)?"hunt":"verify");
+        upsertDeal(getWritableDatabase(),signature(card),card,a,listing,verify,reason,now,tier,"OK".equals(verify)&&evaluation.discoverable()?evaluation.label:a.tierLabel);
     }
 
     public synchronized DealRecord recordSellerItem(SellerBundleScanner.SellerItem item,String seller,VintedCard card,GameAnalysis analysis){
