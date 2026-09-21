@@ -557,7 +557,7 @@ public final class MarketStore {
                     v.put("first_seen", now);
                     v.put("last_seen", now);
                     v.put("lifecycle", "ACTIVE");
-                    boolean allowed = listing == null || listing.allowPriceModel;
+                    boolean allowed = listing == null || listing.allowIdentityCandidate;
                     v.put("enrichment_state", allowed ? "PENDING_ANALYSIS" : "BLOCKED_CLASSIFIER");
                     v.put("match_state", allowed ? "PENDING_ANALYSIS" : "BLOCKED_CLASSIFIER");
                     id = db.insertOrThrow("market_listings", null, v);
