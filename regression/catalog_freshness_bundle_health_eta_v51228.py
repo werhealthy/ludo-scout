@@ -25,7 +25,8 @@ assert eta(0,0,1)==60_000
 
 promote=market[market.index("public int promoteDeferredVintedBatch"):market.index("public void deferBackgroundLink")]
 health=market[market.index("public int enqueueCatalogHealthCheckIfIdle"):market.index("public int reopenTechnicalBggReviewsForExactIndex")]
-product_scan=radar[radar.index("ProductPage product = ProductPageParser.parse"):radar.index("List<VintedCard> discovered",radar.index("ProductPage product = ProductPageParser.parse"))]
+product_scan=radar[radar.index("long productNow=System.currentTimeMillis()"):radar.index("List<VintedCard> discovered",radar.index("long productNow=System.currentTimeMillis()"))]
+sold_reconcile=radar[radar.index("private void reconcileOpenedSold"):radar.index("private void handleProductPage",radar.index("private void reconcileOpenedSold"))]
 bundle_rebuild=radar[radar.index("private void rebuildLocalBundlesForSeller"):radar.index("private void maybeScanBundles",radar.index("private void rebuildLocalBundlesForSeller"))]
 manual_counts=market[market.index("public int prioritizeIncompleteListings"):market.index("/** Active job for one legacy/feed card",market.index("public int prioritizeIncompleteListings"))]
 
@@ -56,11 +57,14 @@ checks=[
     ("exact-open provenance is separate from search recovery",
      'OPENED_VINTED_TARGET = "opened_vinted_target"' in market and
      'MANUAL_VINTED_RECOVERY = "manual_vinted_recovery"' in market and
-     "beginOpenedVintedTarget" in ui and "activeOpenedVintedTarget" in product_scan),
+     "beginOpenedVintedTarget" in ui and "activeOpenedVintedTarget" in product_scan and
+     "listingIdForVintedItemId(d.vintedItemId)" in ui),
     ("opened sold page updates exact legacy and canonical listing",
-     "database.markSold(soldSig)" in product_scan and
-     "marketStore.markSold(exactListingId)" in product_scan and
-     "bundleDatabase.invalidate(currentProductDeal)" in product_scan and
+     'reconcileOpenedSold(currentProductDeal,exactListingId,exactOpened,"product-parser")' in product_scan and
+     'reconcileOpenedSold(null,opened.listingId,true,"strong-unavailable-signal")' in product_scan and
+     "database.markSold(soldSig)" in sold_reconcile and
+     "marketStore.markSold(listingId)" in sold_reconcile and
+     "bundleDatabase.invalidate(resolved)" in sold_reconcile and
      "currentProductDeal==null&&exactListing!=null" in product_scan),
     ("exact opened product page refreshes publication seller and price",
      "handleProductPage(product,currentProductDeal,exactListingId)" in product_scan and
