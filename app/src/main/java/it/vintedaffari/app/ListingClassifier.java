@@ -10,9 +10,15 @@ public final class ListingClassifier {
     public static final class Result {
         public final Type type;
         public final String reason;
+        /** Whether bounded identity analysis may continue for this observation. */
+        public final boolean allowIdentityCandidate;
+        /** Whether this observation may enter price/deal evaluation. */
         public final boolean allowPriceModel;
-        Result(Type type, String reason, boolean allowPriceModel) {
-            this.type = type; this.reason = reason; this.allowPriceModel = allowPriceModel;
+        Result(Type type, String reason, boolean allowIdentityCandidate, boolean allowPriceModel) {
+            this.type = type; this.reason = reason; this.allowIdentityCandidate = allowIdentityCandidate; this.allowPriceModel = allowPriceModel;
+        }
+        public boolean hasPositiveBoardGameEvidence() {
+            return type == Type.BASE_GAME || type == Type.EXPANSION;
         }
     }
 
@@ -68,20 +74,21 @@ public final class ListingClassifier {
         // Strong category exclusions run before accessory/component classification: a Warhammer
         // miniature or a book containing the word "manuale" must be dropped, not stored as a
         // board-game accessory that later becomes another review.
-        if (BoardGameIntakeGate.isStrongNonGameText(card == null ? "" : card.title, card == null ? "" : card.rawDescription) || containsAny(title, NON_GAME) || containsAny(t, VIDEO_GAME) || containsWord(title,"cd")) return new Result(Type.NON_GAME, "Segnali forti di categoria non ludica o videogioco.", false);
+        if (BoardGameIntakeGate.isStrongNonGameText(card == null ? "" : card.title, card == null ? "" : card.rawDescription) || containsAny(title, NON_GAME) || containsAny(t, VIDEO_GAME) || containsWord(title,"cd")) return new Result(Type.NON_GAME, "Segnali forti di categoria non ludica o videogioco.", false, false);
         // Product decision: Warhammer marketplace results are overwhelmingly miniatures/parts for
         // this workflow. Treat the brand/name as a strong exclusion signal so it never fills BGG
         // review with modelling products. A future explicit allow-list can re-enable specific games.
-        if (containsWord(title,"warhammer")) return new Result(Type.NON_GAME, "Warhammer escluso: forte segnale di modellismo/miniature.", false);
-        if (containsAny(t, EMPTY_BOX)) return new Result(Type.EMPTY_BOX, "Annuncio di scatola vuota/sola confezione.", false);
-        if (containsAny(t, ACCESSORY)) return new Result(Type.ACCESSORY, "Termini tipici di accessorio/organizer.", false);
-        if (containsAny(t, COMPONENTS)) return new Result(Type.COMPONENTS, "L'annuncio sembra riferirsi a componenti separati.", false);
-        if (containsAny(t, BUNDLE)) return new Result(Type.BUNDLE, "Possibile lotto/bundle: il prezzo non va confrontato con un singolo gioco.", false);
-        if (containsAny(t, EXPANSION)) return new Result(Type.EXPANSION, "Possibile espansione: ammessa, ma con controllo prezzo più prudente.", true);
-        // "scatola/scatole" da sole sono abbastanza sospette da non creare una falsa Offertona.
-        if (t.contains("scatola") || t.contains("scatole") || t.contains("box "))
-            return new Result(Type.UNCERTAIN, "Riferimento a scatola/box: richiede verifica manuale.", false);
-        return new Result(Type.BASE_GAME, "Nessun segnale di accessorio/lotto.", true);
+        if (containsWord(title,"warhammer")) return new Result(Type.NON_GAME, "Warhammer escluso: forte segnale di modellismo/miniature.", false, false);
+        if (containsAny(t, EMPTY_BOX)) return new Result(Type.EMPTY_BOX, "Annuncio di scatola vuota/sola confezione.", false, false);
+        if (containsAny(t, ACCESSORY)) return new Result(Type.ACCESSORY, "Termini tipici di accessorio/organizer.", false, false);
+        if (containsAny(t, COMPONENTS)) return new Result(Type.COMPONENTS, "L'annuncio sembra riferirsi a componenti separati.", false, false);
+        if (containsAny(t, BUNDLE)) return new Result(Type.BUNDLE, "Possibile lotto/bundle: il prezzo non va confrontato con un singolo gioco.", false, false);
+        if (containsAny(t, EXPANSION)) return new Result(Type.EXPANSION, "Espansione esplicitamente indicata nell'annuncio.", true, true);
+        if (BoardGameIntakeGate.hasStrongBoardGameCue((card == null ? "" : card.title) + " " + (card == null ? "" : card.rawDescription) + " " + (card == null ? "" : card.brand)))
+            return new Result(Type.BASE_GAME, "Segnale esplicito di gioco da tavolo nell'annuncio.", true, true);
+        // Absence of a negative signal is not proof of a base game. Preserve the observation for
+        // bounded identity analysis, but never price or publish it without independent product evidence.
+        return new Result(Type.UNCERTAIN, "Manca un segnale positivo che l'oggetto sia un gioco da tavolo.", true, false);
     }
 
     public static boolean isExtremePriceAnomaly(GameAnalysis a) {
