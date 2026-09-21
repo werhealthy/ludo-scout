@@ -179,7 +179,7 @@ public final class QueueKeepAliveService extends Service {
                 boolean did=QueueJobRunner.processOneVinted(this,db,market,resolver);
                 market.touchLaneHeartbeat("vinted");
                 if(did)market.setLaneStatus("vinted","ACTIVE","attività completata o rimandata",0L);
-                else{market.reconcileQueue();market.setLaneStatus("vinted","IDLE","nessuna attività rivendicabile",market.nextRunnableVintedDueAt());sleep(1_500L);}
+                else{market.setLaneStatus("vinted","IDLE","nessuna attività rivendicabile",market.nextRunnableVintedDueAt());sleep(1_500L);}
             }catch(InterruptedException e){Thread.currentThread().interrupt();break;}
             catch(Throwable t){Log.e(TAG,"Vinted lane fault",t);try{market.setLaneStatus("vinted","FAULT",safe(t),System.currentTimeMillis());market.touchLaneHeartbeat("vinted");}catch(Throwable ignored){}sleepQuiet(2_000L);}
         }
@@ -195,7 +195,8 @@ public final class QueueKeepAliveService extends Service {
                 if(matching>0){market.setLaneStatus("bgg","MATCHING","Riconosco giochi · "+matching+" da abbinare",0L);resolveLocalBggMatches(8);market.touchLaneHeartbeat("bgg");}
 
                 int due=market.runnableBggDueCount(System.currentTimeMillis());
-                if(due<=0){market.reconcileQueue();due=market.runnableBggDueCount(System.currentTimeMillis());}
+                // Queue reconciliation has one serialized owner: the control pulse. Lanes only consume claimed work.
+                if(due<=0){due=market.runnableBggDueCount(System.currentTimeMillis());}
                 if(due>0){
                     market.setLaneStatus("bgg","CLAIMING",due+" schede pronte",0L);if(bgg==null)bgg=new BggEnricher(this,db,market);
                     int batch=QueueJobRunner.processBggBatch(this,market,bgg,20);market.touchLaneHeartbeat("bgg");if(batch>0)market.setLaneStatus("bgg","ACTIVE","batch "+batch+" schede",0L);else sleep(1_000L);
