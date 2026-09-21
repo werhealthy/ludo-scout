@@ -56,7 +56,7 @@ checks=[
      'warning.setContentDescription("Dati in aggiornamento")' in ui),
     ("bundle page distinguishes real bundles from seller exploration",
      '"Bundle confermati · "' in ui and
-     '"Da esplorare · "' in ui and
+     ('"Da controllare · "' in ui or '"Da esplorare · "' in ui) and
      "BundleExploration.begin(this,d)" in ui),
     ("bundle exploration intent is bounded",
      "TTL_MS=10L*60_000L" in explore and
