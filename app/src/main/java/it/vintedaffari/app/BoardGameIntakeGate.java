@@ -40,6 +40,8 @@ public final class BoardGameIntakeGate {
             "libro","libri","romanzo","romanzi","fumetto","fumetti","manga","dvd","blu ray","bluray","vinile","compact disc","audio cd","cd musicale",
             "funko","action figure","figurina","figurine","photocard","peluche","pupazzo","bambola","bambole","modellino","modellini","statuetta","statuette",
             "warhammer",
+            "videogioco","videogame","video game","playstation 5","playstation 4","playstation 3","ps5","ps4","ps3",
+            "xbox one","xbox series","xbox 360","nintendo switch","switch lite","nintendo 3ds","nintendo ds","wii u",
             "isbn","paperback","hardcover","copertina rigida","copertina flessibile","pagine","editore","autore",
             "biografia","saggio","enciclopedia","rivista","magazine","literature","world literature","letteratura",
             "hi hat","hihat","cymbal","cymbals","piatto batteria","piatti batteria","drum cymbal","crash cymbal","ride cymbal","musicassette","audiocassetta","music cd"
@@ -82,23 +84,23 @@ public final class BoardGameIntakeGate {
         if(isStrongNonGameText(title,raw))return new Decision(Action.QUARANTINE,"Segnali forti di categoria non gioco da tavolo");
         if(analysis==null)return new Decision(Action.QUARANTINE,"Nessuna evidenza BGG disponibile");
         if("excluded".equals(analysis.status))return new Decision(Action.QUARANTINE,"Il matcher locale classifica l'articolo come accessorio/lotto");
-        if(hasStrongBoardGameCue(title+" "+raw))return new Decision(Action.REVIEW,"Il testo dichiara esplicitamente un gioco/espansione");
         double score=analysis.matchConfidence==null?0.0:analysis.matchConfidence;
-        if(score>=58.0 && !empty(analysis.candidateName) && plausibleOverlap(title,analysis.candidateName))
-            return new Decision(Action.REVIEW,"Candidato BGG plausibile ("+Math.round(score)+")");
-        return new Decision(Action.QUARANTINE,"Nessun candidato BGG plausibile: scarto automatico, non fact-check");
+        // Human review is reserved for a narrow ambiguity band. Merely writing "gioco da tavolo"
+        // is not a reason to ask the user to do Ludo's matching work.
+        if(score>=78.0 && !empty(analysis.candidateName) && plausibleOverlap(title,analysis.candidateName))
+            return new Decision(Action.REVIEW,"Candidato BGG molto plausibile ma non abbastanza sicuro ("+Math.round(score)+")");
+        return new Decision(Action.QUARANTINE,"Nessun candidato BGG sufficientemente forte: scarto automatico, non fact-check");
     }
 
     /** Background matcher decision for unresolved provisional games. */
     public static Decision unresolvedTitle(String title,List<BggSearchClient.Game> candidates,boolean ambiguousExact){
         if(isStrongNonGameText(title,title))return new Decision(Action.QUARANTINE,"Titolo con segnali forti di categoria non gioco");
         if(ambiguousExact)return new Decision(Action.REVIEW,"Più giochi BGG condividono esattamente questo nome/alias");
-        if(hasStrongBoardGameCue(title))return new Decision(Action.REVIEW,"Il titolo dichiara esplicitamente un gioco/espansione");
         if(candidates!=null){
             int n=Math.min(3,candidates.size());
             for(int i=0;i<n;i++){
                 BggSearchClient.Game g=candidates.get(i);if(g==null)continue;
-                if(g.searchScore>=560 && plausibleGame(title,g))return new Decision(Action.REVIEW,"Candidato BGG plausibile ma non abbastanza sicuro per auto-match");
+                if(g.searchScore>=820 && plausibleGame(title,g))return new Decision(Action.REVIEW,"Candidato BGG forte ma ancora ambiguo");
             }
         }
         return new Decision(Action.QUARANTINE,"Nessuna evidenza sufficiente che l'articolo sia un gioco BGG");

@@ -50,7 +50,13 @@ public final class ProductPageParser {
             Double v=firstPrice(text); if(v!=null)p.itemPrice=v;
         }
         String combined=(text+" "+desc).trim();
-        String lower=combined.toLowerCase(Locale.ROOT);if(lower.matches(".*\\b(venduto|venduta|sold)\\b.*"))p.sold=true;
+        String lower=combined.toLowerCase(Locale.ROOT);
+        if(lower.matches(".*\\b(venduto|venduta|sold)\\b.*")
+                ||lower.contains("non più disponibile")
+                ||lower.contains("non e più disponibile")
+                ||lower.contains("non è disponibile")
+                ||lower.contains("articolo non disponibile")
+                ||lower.contains("item unavailable"))p.sold=true;
         if(!combined.isEmpty() && combined.toLowerCase(Locale.ROOT).contains("spedizione") && combined.contains("€")){
             Double v=firstPrice(combined); if(v!=null)p.shippingPrice=v;
         }

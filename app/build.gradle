@@ -12,8 +12,12 @@ android {
         applicationId 'it.vintedaffari.app'
         minSdk 28
         targetSdk 35
-        versionCode 118
-        versionName '5.12.3-engine-correctness'
+
+        // Local builds keep the source baseline. CI supplies a monotonic build number
+        // via LUDO_VERSION_CODE so every distributed beta can update the previous one.
+        def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
+        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 148
+        versionName '5.12.34-global-rating-sweep'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')
@@ -26,6 +30,23 @@ android {
         def rawToken = globalToken ? globalToken : (envToken ? envToken : fileToken)
         def bggToken = rawToken.replace('\\', '\\\\').replace('"', '\\"')
         buildConfigField 'String', 'BGG_TOKEN', '"' + bggToken + '"'
+    }
+
+    signingConfigs {
+        debug {
+            // CI restores the same long-lived debug keystore used by the installed beta.
+            // Use an explicit path so Gradle cannot silently fall back to a runner-local key.
+            storeFile file(System.getenv('ANDROID_DEBUG_KEYSTORE') ?: "${System.getProperty('user.home')}/.android/debug.keystore")
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
     }
 
     buildFeatures { buildConfig true }

@@ -11,14 +11,21 @@ public final class RelativeTime{
   */
  public static String fromLabel(String label,long referenceAt,long now){
   if(label==null||label.trim().isEmpty())return"";
-  String s=label.trim().toLowerCase(Locale.ITALY);long anchor=referenceAt>0?referenceAt:now;
-  Matcher m=Pattern.compile("(\\d+)\\s*(min|minute|minuti|h|ora|ore|g|giorno|giorni)").matcher(s);
+  String s=label.trim().toLowerCase(Locale.ITALY).replace('\u00a0',' ').replaceAll("\\s+"," ");long anchor=referenceAt>0?referenceAt:now;
+  if(s.equals("oggi")||s.equals("pubblicato oggi"))return compact(anchor,now);
+  if(s.equals("ieri")||s.equals("pubblicato ieri"))return compact(Math.max(0,anchor-24L*60L*60_000L),now);
+  Matcher m=Pattern.compile("(?:(\\d+)|(un|una))\\s*(min|minuto|minuti|minute|h|ora|ore|g|giorno|giorni|settimana|settimane|mese|mesi|anno|anni)").matcher(s);
   if(m.find()){
-   long n=Long.parseLong(m.group(1));String u=m.group(2);long delta;
-   if(u.startsWith("min"))delta=n*60_000L;else if(u.equals("h")||u.startsWith("or"))delta=n*60*60_000L;else delta=n*24*60*60_000L;
+   long n=m.group(1)!=null?Long.parseLong(m.group(1)):1L;String u=m.group(3);
+   if(u.startsWith("settim"))return n+(n==1?" settimana fa":" settimane fa");
+   if(u.startsWith("mes"))return n+(n==1?" mese fa":" mesi fa");
+   if(u.startsWith("ann"))return n+(n==1?" anno fa":" anni fa");
+   long delta;if(u.startsWith("min"))delta=n*60_000L;else if(u.equals("h")||u.startsWith("or"))delta=n*60L*60_000L;else delta=n*24L*60L*60_000L;
    return compact(Math.max(0,anchor-delta),now);
   }
   for(String p:new String[]{"dd/MM/yyyy HH:mm","dd/MM/yyyy","dd/MM/yy","yyyy-MM-dd'T'HH:mm:ss","yyyy-MM-dd"})try{SimpleDateFormat f=new SimpleDateFormat(p,Locale.ITALY);f.setLenient(false);Date d=f.parse(label.replace("Pubblicato il ","").replace("pubblicato il ","").trim());if(d!=null)return compact(d.getTime(),now);}catch(Exception ignored){}
-  return label.length()<=12?label:"";
+  // Vinted may introduce new human-readable labels. Preserve a short source label rather than
+  // turning valid metadata into a false "unknown" state.
+  return s.length()<=32?s:"";
  }
 }

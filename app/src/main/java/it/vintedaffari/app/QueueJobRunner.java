@@ -20,24 +20,32 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class QueueJobRunner {
     private static final String TAG = "LudoBackground";
+    private static final AtomicBoolean BGG_IDENTITY_RUNNING = new AtomicBoolean(false);
     private QueueJobRunner() {}
 
-    /** Zero-network BGG identity stage. It first reuses aliases Ludo Scout has already learned,
-     * then tries conservative title cleanup, exact BGG aliases and finally high-confidence fuzzy
+    /** Zero-network BGG identity stage. It first reuses only authoritative BGG/manual aliases,
+     * never seller-authored Vinted aliases, then tries conservative title cleanup, exact BGG aliases and finally high-confidence fuzzy
      * ranking. Reviews from older matcher versions are eligible once; true ambiguities do not loop. */
     public static int matchBggIdentities(Context context,MarketStore market,BggSearchClient matcher,int limit){
         if(market==null||matcher==null||market.isBggPaused())return 0;
+        if(!BGG_IDENTITY_RUNNING.compareAndSet(false,true)){
+            market.setDiagnosticState("bgg_local_match",0,"build=bgg-local-match-v4;state=BUSY;singleFlight=true;"+matcher.localIndexSummary());
+            return 0;
+        }
+        long batchStarted=android.os.SystemClock.elapsedRealtime();
+        try{
         List<GameRecord> pending=market.provisionalGamesForMatching(Math.max(1,Math.min(40,limit)));
-        int handled=0;
+        int handled=0,fuzzySearches=0,matched=0,reviewDecisions=0,reviewWrites=0,reviewWriteMisses=0,quarantined=0,timedOut=0;
         for(GameRecord g:pending){
             if(g==null)continue;
             try{
+                matcher.resetQueueSearchBudget();
                 market.setLaneStatus("bgg","MATCHING",g.name,0L);
                 BggSearchClient.Game chosen=null; double confidence=0; String reviewReason=null; List<BggSearchClient.Game> fuzzyCandidates=java.util.Collections.emptyList();
                 List<String> variants=BggTitleNormalizer.variants(g.name);
                 if(variants.isEmpty())variants=java.util.Collections.singletonList(g.name);
 
-                // 1) Local memory: a unique alias previously confirmed by the user/app is strongest.
+                // 1) Local memory: only authoritative BGG/manual provenance may shortcut identity.
                 for(String q:variants){
                     String learned=market.learnedBggIdForTitle(q);
                     if(TextUtils.isEmpty(learned))continue;
@@ -46,21 +54,26 @@ public final class QueueJobRunner {
                 }
 
                 // 2) Exact primary-name/alias match after conservative marketplace cleanup.
-                boolean sawAmbiguousExact=false;
+                boolean sawAmbiguousExact=false,searchTimedOut=false;
                 if(chosen==null){
                     for(String q:variants){
                         List<BggSearchClient.Game> exact=matcher.localExactCandidates(q);
+                        if(matcher.queueSearchTimedOut()){searchTimedOut=true;reviewReason="Ricerca BGG locale oltre il budget di stabilità";break;}
                         if(exact.size()==1){chosen=exact.get(0);confidence=q.equals(BggTitleNormalizer.clean(g.name))?99:98;break;}
                         if(exact.size()>1)sawAmbiguousExact=true;
                     }
                 }
 
-                // 3) Fuzzy only when there is a clear winner. Cleanup raises recall without
-                // accepting same-title collisions; expansions/sequel words were never stripped.
-                if(chosen==null&&!sawAmbiguousExact){
+                // 3) Fuzzy only when there is a clear winner. A local scan that exceeds the bounded
+                // CPU budget is never trusted partially: it becomes review instead of stalling/crashing
+                // the queue process or manufacturing a winner before the catalog was fully scanned.
+                if(chosen==null&&!sawAmbiguousExact&&!searchTimedOut){
                     String q=variants.get(variants.size()-1);
-                    fuzzyCandidates=matcher.localCandidates(q);
-                    if(!fuzzyCandidates.isEmpty()){
+                    fuzzySearches++;
+                    fuzzyCandidates=matcher.localCandidatesIndexed(q);
+                    searchTimedOut=matcher.queueSearchTimedOut();
+                    if(searchTimedOut)reviewReason="Ricerca BGG fuzzy oltre il budget di stabilità";
+                    else if(!fuzzyCandidates.isEmpty()){
                         BggSearchClient.Game best=fuzzyCandidates.get(0);
                         int second=fuzzyCandidates.size()>1?fuzzyCandidates.get(1).searchScore:0;
                         int gap=best.searchScore-second;
@@ -68,20 +81,39 @@ public final class QueueJobRunner {
                             chosen=best; confidence=Math.min(98,92+(best.searchScore-920)/20.0);
                         }else reviewReason=fuzzyCandidates.size()>1?"Più match BGG plausibili":"Match BGG non abbastanza sicuro";
                     }else reviewReason="Nessun candidato BGG locale";
-                }else if(chosen==null){
+                }else if(chosen==null&&!searchTimedOut){
                     reviewReason="Più giochi BGG hanno lo stesso titolo";
                 }
 
-                if(chosen!=null)market.assignAutoBggMatch(g.id,chosen,confidence);
-                else {
+                if(chosen!=null&&!searchTimedOut){market.assignAutoBggMatch(g.id,chosen,confidence);matched++;}
+                else if(searchTimedOut){
+                    // A CPU/index timeout is a technical failure, not an ambiguity the user can
+                    // meaningfully resolve. Keep it out of review and out of trusted surfaces.
+                    timedOut++;market.autoQuarantineGame(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason);quarantined++;
+                }else {
                     BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.unresolvedTitle(g.name,fuzzyCandidates,sawAmbiguousExact);
-                    if(gate.action==BoardGameIntakeGate.Action.REVIEW)market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);
-                    else market.autoQuarantineGame(g.id,gate.reason);
+                    if(gate.action==BoardGameIntakeGate.Action.REVIEW){
+                        reviewDecisions++;int changed=market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);
+                        if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;
+                    }
+                    else{market.autoQuarantineGame(g.id,gate.reason);quarantined++;}
                 }
                 handled++;market.touchLaneHeartbeat("bgg");
-            }catch(Throwable t){market.markBggMatchReview(g.id,"Errore match locale: "+safe(t));handled++;}
+            }catch(Throwable t){
+                // Infrastructure/parser faults must not become human review work. Preserve the raw
+                // observation, quarantine the provisional identity and surface the fault in diagnostics.
+                market.autoQuarantineGame(g.id,"Errore tecnico match locale: "+safe(t));quarantined++;handled++;
+                market.setDiagnosticState("bgg_match_technical_drop",1,"game="+g.id+";name="+g.name+";error="+safe(t));
+            }
         }
+        long elapsed=android.os.SystemClock.elapsedRealtime()-batchStarted;
+        int remainingRequired=market.bggMatchRequiredCount();
+        market.setDiagnosticState("bgg_local_match",handled,
+                "build=bgg-local-match-v4;state=DONE;singleFlight=true;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
+                        ";reviewDecisions="+reviewDecisions+";reviewWrites="+reviewWrites+";reviewWriteMisses="+reviewWriteMisses+
+                        ";quarantined="+quarantined+";timedOut="+timedOut+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
         return handled;
+        }finally{BGG_IDENTITY_RUNNING.set(false);}
     }
 
     public static boolean processOneBgg(Context context, MarketStore market, BggEnricher bgg) {
@@ -144,9 +176,9 @@ public final class QueueJobRunner {
             if(local>0)return true;
         }
         if (VintedPublicSession.nextAllowedAt(context) > now) return false;
-        // If a live/hunt/manual identity is waiting for its own retry time, intentionally leave the
-        // public-page lane idle rather than spend the next permit on backlog work.
-        if(!test2bOwner && market.urgentVintedWorkCount(now)>0 && market.urgentVintedDueCount(now)==0) return false;
+        // Reserve at most one public-page slot for near-due LIVE/HUNT/MANUAL work. A retry that is
+        // still minutes away must not freeze already-runnable Motore jobs.
+        if(!test2bOwner && market.urgentVintedReservationUntil(now)>now) return false;
         // Keep only a tiny network window. Deferred listings live outside processing_jobs until the
         // lane is actually available, so thousands of eventual links never block a fresh deal.
         if(market.coreVintedActiveCount()<6&&market.deferredVintedCount()>0)market.promoteDeferredVintedBatch(6-market.coreVintedActiveCount());
@@ -167,8 +199,14 @@ public final class QueueJobRunner {
             // Local inference is intentionally independent from the Vinted HTTP gate.
             market.inferDeferredLanguages(120);
             if(now-last>=30*60_000L){
-                int canonical=market.enqueueIncompleteListingsBackground(120);
-                int legacy=market.enqueueMissingLegacyDeals();
+                // Ordinary missing-link work exists to complete the current scroll, not to create an
+                // invisible permanent backlog while Motore is idle. LIVE/HUNT/MANUAL enqueue their
+                // own priority jobs and are unaffected.
+                int canonical=0,legacy=0;
+                if(market.hasActiveObservationRun()){
+                    canonical=market.enqueueIncompleteListingsBackground(120);
+                    legacy=market.enqueueMissingLegacyDeals();
+                }
                 auto.edit().putLong("last_missing_sweep",now).putInt("last_missing_scheduled",canonical+legacy).apply();
             }
         } catch(Throwable t){ Log.d(TAG,"automatic missing-data sweep skipped",t); }
@@ -234,6 +272,11 @@ public final class QueueJobRunner {
             if (r.sold) {
                 market.markSold(canonical);
                 if (legacy != null) db.markSold(legacy.signature);
+                try{new BundleDatabase(context).invalidate(legacy!=null?legacy:candidate);}catch(Throwable ignored){}
+                if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source))market.setDiagnosticState("catalog_health",2,"build=catalog-health-v1;state=SOLD;listing="+canonical);
+                if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source))market.setDiagnosticState("opened_vinted_verify",2,"state=SOLD;listing="+canonical);
+                market.clearVintedCandidates(job.listingId);
+                return;
             } else if (legacy != null) {
                 db.applyResolvedLink(legacy.signature, r.itemId, r.url, r.imageUrl, r.confidence, r.reason,
                         r.sellerId, r.sellerName, r.photosCsv, System.currentTimeMillis());
@@ -261,7 +304,9 @@ public final class QueueJobRunner {
             market.setJobProgress(job, 96); // optional thumbnail scheduled
             market.clearVintedCandidates(job.listingId);
             market.completeJob(job);
-            if(canonical>0 && TextUtils.isEmpty(r.publishedLabel)){
+            if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source))market.setDiagnosticState("catalog_health",1,"build=catalog-health-v1;state=REFRESHED;listing="+canonical+";published="+(!TextUtils.isEmpty(r.publishedLabel))+";seller="+(!TextUtils.isEmpty(r.sellerId)));
+            if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source))market.setDiagnosticState("opened_vinted_verify",1,"state=REFRESHED;listing="+canonical+";sold=false");
+            if(canonical>0 && TextUtils.isEmpty(r.publishedLabel) && !MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source)){
                 // Publication time is core information for this product. It is very low priority and
                 // can never jump ahead of fresh identities; seller/photo are no longer requirements.
                 market.enqueueDeepMetadata(canonical);
@@ -271,12 +316,37 @@ public final class QueueJobRunner {
 
         String reason = TextUtils.isEmpty(failure.get()) ? "nessun risultato" : failure.get();
 
-        // Deep metadata is optional: once the core id/url is known it must never clog the user-visible
-        // queue. Two deterministic misses are enough; keep the core listing and stop retrying.
-        if(MarketStore.JOB_VINTED_DEEP.equals(job.type)&&isDeterministicMiss(reason)&&job.attempt>=2){
+        // A user explicitly opened this exact item from Ludo. If the same public URL is now gone,
+        // retire it immediately instead of treating the check as optional metadata.
+        if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source)&&isGoneVintedPage(reason)){
+            market.markUnavailable(job.listingId,reason);
+            if(candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.markUnavailable(candidate.signature,reason);
+            try{new BundleDatabase(context).invalidate(candidate);}catch(Throwable ignored){}
+            market.completeJob(job);market.setDiagnosticState("opened_vinted_verify",2,"state=REMOVED;listing="+job.listingId+";reason="+(reason==null?"":reason));
+            return;
+        }
+
+        // Catalog health owns an exact already-known item URL. A 404/non-available exact page is
+        // sufficient to remove it from the active catalog without creating a human review task.
+        if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source)&&isGoneVintedPage(reason)){
+            market.markUnavailable(job.listingId,reason);
+            if(candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.markUnavailable(candidate.signature,reason);
+            try{new BundleDatabase(context).invalidate(candidate);}catch(Throwable ignored){}
+            market.completeJob(job);market.setDiagnosticState("catalog_health",2,"build=catalog-health-v1;state=REMOVED;listing="+job.listingId+";reason="+(reason==null?"":reason));
+            return;
+        }
+
+        // Deep metadata is optional for ordinary automatic work. A card explicitly resumed from
+        // the recovery station is different: its exact-page pass is part of the user's repair flow
+        // and therefore gets the same three-attempt confidence gate as core recovery.
+        if(MarketStore.JOB_VINTED_DEEP.equals(job.type)&&isDeterministicMiss(reason)&&job.attempt>=2&&!MarketStore.MANUAL_RECOVERY_SOURCE.equals(job.source)){
+            if(!market.isBggVariantPending(job.listingId)){market.completeJob(job);return;}
             String variantReason="Pagina Vinted non ha fornito abbastanza testo per confermare la variante BGG";
-            if(market.flagPendingBggVariantReview(job.listingId,variantReason)&&candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.flagBggVariantReview(candidate.signature,variantReason);
-            market.completeJob(job);return;
+            if(market.hasExplicitUserPriorityHistory(job.listingId)){
+                if(market.flagPendingBggVariantReview(job.listingId,variantReason)&&candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.flagBggVariantReview(candidate.signature,variantReason);
+                market.completeJob(job);
+            }else market.autoExcludeJob(job,variantReason);
+            return;
         }
 
         // Eventual background linking must never create a giant human review queue. A real remote
@@ -284,22 +354,33 @@ public final class QueueJobRunner {
         // go back to the deferred pool for a later fresh attempt.
         if("DEFERRED_LINK".equals(job.source) && isDeterministicMiss(reason)){
             if(market.listingBelongsToActiveRun(job.listingId)){
-                if(job.attempt>=2){market.needsReview(job,reason);return;}
-                market.retryJob(job,reason,System.currentTimeMillis()+5L*60_000L);return;
+                if(job.attempt>=3){settleAutomaticAmbiguity(market,job,reason);return;}
+                market.retryJob(job,reason,System.currentTimeMillis()+2L*60_000L);return;
             }
             market.deferBackgroundLink(job,reason,System.currentTimeMillis()+24L*60*60_000L);return;
         }
 
+        // Historical catalog recovery is intentionally self-cleaning. It gets three real,
+        // deterministic attempts, but it must never flood the user's new recovery inbox.
+        if(MarketStore.CATALOG_RECOVERY_SOURCE.equals(job.source)&&isDeterministicMiss(reason)&&job.attempt>=3){
+            String sig=market.archiveUnresolvedListing(job.listingId,"Catalogo storico: annuncio non identificabile dopo 3 tentativi");
+            if(!TextUtils.isEmpty(sig))db.markUnavailable(sig,"Catalogo storico: annuncio Vinted non più identificabile");
+            try{DealRecord legacy=TextUtils.isEmpty(sig)?null:db.findBySignature(sig);if(legacy!=null)new BundleDatabase(context).invalidate(legacy);}catch(Throwable ignored){}
+            market.setDiagnosticState("catalog_health",2,"build=catalog-health-v2;state=ARCHIVED_UNRESOLVED;listing="+job.listingId+";attempts="+job.attempt);
+            return;
+        }
+
         // A 404 on the actual public item page is actionable information, not a network retry loop.
-        // Surface it immediately so the user can archive the stale listing or explicitly retry it.
-        if(MarketStore.JOB_VINTED.equals(job.type)&&isGoneVintedPage(reason)){
-            market.needsReview(job,reason);return;
+        // Current-run rows may enter the recovery station; historical catalog recovery is handled
+        // above and is archived automatically.
+        if(MarketStore.JOB_VINTED.equals(job.type)&&isGoneVintedPage(reason)&&job.attempt>=3&&!MarketStore.CATALOG_RECOVERY_SOURCE.equals(job.source)){
+            settleAutomaticAmbiguity(market,job,reason);return;
         }
 
         // A core search that repeatedly returns equally plausible candidates is not a network outage.
         // Give fresh data one second chance, then surface it as a manual-review case.
-        if (isDeterministicMiss(reason) && job.attempt >= 2) {
-            market.needsReview(job, reason);
+        if (isDeterministicMiss(reason) && job.attempt >= 3) {
+            settleAutomaticAmbiguity(market,job,reason);
             return;
         }
 
@@ -308,18 +389,24 @@ public final class QueueJobRunner {
             next = Math.max(VintedPublicSession.nextAllowedAt(context), resolver.nextAllowedAt(candidate));
             if (next <= System.currentTimeMillis()) next = System.currentTimeMillis() + 60_000L;
         } else if (isDeterministicMiss(reason)) {
-            next = System.currentTimeMillis() + 5 * 60_000L;
+            next = System.currentTimeMillis() + 2 * 60_000L;
         } else if (job.attempt >= 6) {
-            // Six unsuccessful full searches is enough evidence that automatic matching is not
-            // making progress. Keep the listing/history, stop burning network, let a later fresh
-            // sighting reopen the deduplicated job automatically.
-            market.needsReview(job, reason);
+            // Repeated automatic failure is not a request for user labour. Explicit Hunt/manual
+            // intent can still ask for help; ordinary discovery is parked quietly.
+            settleAutomaticAmbiguity(market,job,reason);
             return;
         } else {
             long base = Math.min(6 * 60 * 60_000L, 10 * 60_000L * (1L << Math.min(5, Math.max(0, job.attempt - 1))));
             next = System.currentTimeMillis() + base;
         }
         market.retryJob(job, reason, next);
+    }
+
+    private static void settleAutomaticAmbiguity(MarketStore market,MarketStore.Job job,String reason){
+        // A current Motore card reaches the human station only after repeated deterministic misses.
+        // Background/history ambiguity remains automatic so the inbox cannot grow without bound.
+        if(market.listingBelongsToActiveRun(job.listingId)||MarketStore.isExplicitUserPriority(job))market.needsReview(job,reason);
+        else market.autoExcludeJob(job,reason);
     }
 
     private static boolean isGoneVintedPage(String reason){return reason!=null&&reason.toLowerCase(java.util.Locale.ROOT).contains("pagina vinted non disponibile (404)");}

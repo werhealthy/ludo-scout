@@ -1,8 +1,7 @@
-name: Android beta
+name: Android PR validation
 
 on:
-  workflow_dispatch:
-  push:
+  pull_request:
     branches:
       - beta
 
@@ -10,10 +9,10 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build signed debug APK
+  validate:
+    name: Regressions and Java compile
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -30,39 +29,10 @@ jobs:
         run: |
           test -n "$ANDROID_HOME" || (echo "ANDROID_HOME is not set" && exit 1)
           test -d "$ANDROID_HOME" || (echo "Android SDK directory not found: $ANDROID_HOME" && exit 1)
-          echo "Using Android SDK at $ANDROID_HOME"
-
-      - name: Validate required secrets
-        env:
-          BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
-          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
-        run: |
-          test -n "$BGG_TOKEN" || (echo "Missing GitHub secret: BGG_TOKEN" && exit 1)
-          test -n "$ANDROID_DEBUG_KEYSTORE_BASE64" || (echo "Missing GitHub secret: ANDROID_DEBUG_KEYSTORE_BASE64" && exit 1)
-          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON" || (echo "Missing GitHub secret: FIREBASE_SERVICE_ACCOUNT_JSON" && exit 1)
-          test -n "$FIREBASE_APP_ID" || (echo "Missing GitHub secret: FIREBASE_APP_ID" && exit 1)
-          test -n "$FIREBASE_TESTERS" || (echo "Missing GitHub secret: FIREBASE_TESTERS" && exit 1)
-
-      - name: Restore existing Android debug signing key
-        env:
-          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          mkdir -p "$HOME/.android"
-          printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
-
-      - name: Show signing certificate fingerprint
-        run: |
-          keytool -list -v \
-            -keystore "$HOME/.android/debug.keystore" \
-            -storepass android \
-            | grep -E 'Alias name:|SHA256:' || true
 
       - name: Run performance stability regression
         run: python3 regression/performance_stability_v5124.py
+
       - name: Run BGG identity provenance regression
         run: python3 regression/bgg_identity_provenance_v5125.py
       - name: Run historical BGG revalidation regression
@@ -124,50 +94,7 @@ jobs:
       - name: Run global rating sweep regression
         run: python3 regression/global_rating_sweep_v51234.py
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
-
-      - name: Build debug APK
-        env:
-          BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
-          ANDROID_DEBUG_KEYSTORE: ${{ runner.temp }}/ludo-debug.keystore
-          # 1,000,000 + GitHub's monotonically increasing run number.
-          # This stays safely above the historical local versionCode 118.
-          LUDO_VERSION_CODE: ${{ github.run_number }}
+      - name: Compile debug Java
         run: |
-          cp "$HOME/.android/debug.keystore" "$ANDROID_DEBUG_KEYSTORE"
-          echo "Building beta run number=$LUDO_VERSION_CODE"
-          ./gradlew --no-daemon clean assembleDebug
-
-      - name: Verify built APK signing certificate
-        run: |
-          EXPECTED_SHA256="C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710"
-          ACTUAL_SHA256="$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs app/build/outputs/apk/debug/app-debug.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:lower:]' '[:upper:]')"
-          echo "Built APK signer SHA256: $ACTUAL_SHA256"
-          test "$ACTUAL_SHA256" = "$EXPECTED_SHA256" || (echo "Unexpected APK signing certificate" && exit 1)
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ludo-scout-beta-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Prepare Firebase credentials
-        env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
-          chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
-
-      - name: Distribute beta to Firebase App Distribution
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
-        run: |
-          npx --yes firebase-tools@latest appdistribution:distribute app/build/outputs/apk/debug/app-debug.apk \
-            --app "$FIREBASE_APP_ID" \
-            --testers "$FIREBASE_TESTERS" \
-            --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac

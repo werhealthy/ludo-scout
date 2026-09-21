@@ -49,8 +49,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private static final String VINTED_PACKAGE = "fr.vinted";
     private static final String PREFS_DIAG = "va_v3_diag";
     private static final long SCAN_DEBOUNCE_MS = 70;
-    private static final long REANALYZE_SAME_CARD_MS = 45_000;
-    private static final long RESIGHT_SAME_CARD_MS = 4_000;
+    // Accessibility can emit the same visible Compose cards repeatedly on focus/window changes.
+    // Keep a generous in-process guard so returning to Vinted does not manufacture another Motore job
+    // from the exact same title/brand/price rows. A changed price changes the signature and is fresh.
+    private static final long REANALYZE_SAME_CARD_MS = 10 * 60_000L;
+    private static final long RESIGHT_SAME_CARD_MS = 10 * 60_000L;
     private static final Pattern VINTED_ABSOLUTE_ITEM=Pattern.compile("https?://(?:www\\.)?vinted\\.[^\\s/]+/items/(\\d{5,})(?:-[^\\s,;]*)?",Pattern.CASE_INSENSITIVE);
     private static final Pattern VINTED_RELATIVE_ITEM=Pattern.compile("(?:^|[^A-Za-z0-9])/?items/(\\d{5,})(?:[-/?#][^\\s,;]*)?",Pattern.CASE_INSENSITIVE);
 
@@ -67,6 +70,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private final LinkedHashMap<String,List<String>> pendingSellerRails = new LinkedHashMap<>();
     /** Diagnostic-only dedupe for the Accessibility identity probe. This never determines listing identity. */
     private final LinkedHashSet<String> accessibilityIdentityProbeSeen = new LinkedHashSet<>();
+    private String lastBundleExploreIntent="";
+    private int bundleExploreHintsThisIntent=0;
 
     private JsGameEngine engine;
     private DealDatabase database;
@@ -79,7 +84,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private BundleDatabase bundleDatabase;
     private SellerBundleScanner bundleScanner;
     private boolean scanScheduled = false;
-    private volatile long lastVintedEventAt=0L;
+    private volatile long lastVintedEventAt=0L;private long pendingVintedEventDiag=0L,lastVintedEventDiagFlushAt=0L;
     private boolean retryRegistered = false;
     private volatile boolean manualMetadataRefresh=false;
     private volatile String manualRefreshTargetSignature=null;
@@ -156,6 +161,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
         QueueWorkScheduler.schedule(this);
         database = new DealDatabase(getApplicationContext());
         marketStore = new MarketStore(getApplicationContext(),database);
+        long serviceConnectedAt=System.currentTimeMillis();
+        marketStore.setDiagnosticState("radar_service",1,"build="+BuildConfig.VERSION_NAME+";state=CONNECTED;at="+serviceConnectedAt);
+        marketStore.setDiagnosticState("engine_runtime",0,"build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=CONNECTING;serviceConnectedAt="+serviceConnectedAt);
         marketStore.resetStaleProcessingOlderThan(15 * 60_000L);
         linkResolver = new AutoLinkResolver(getApplicationContext());
         bggEnricher = new BggEnricher(getApplicationContext(), database, marketStore);
@@ -197,16 +205,26 @@ public final class VintedAccessibilityService extends AccessibilityService {
         WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         engine = new JsGameEngine(getApplicationContext(), wm);
         engine.start(new JsGameEngine.ReadyListener() {
+            @Override public void onState(String state,String detail) {
+                if(marketStore!=null){
+                    String payload="build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state="+safeDiag(state)+";"+safeDiag(detail);
+                    marketStore.setDiagnosticState("engine_runtime",0,payload);
+                }
+            }
+
             @Override public void onReady(int gameCount) {
                 diag().edit()
                         .putBoolean("engineReady", true)
                         .putInt("engineGames", gameCount)
                         .putString("lastError", "")
                         .apply();
-                // Restore analysis work that existed only in RAM in v5.10. Keep the batch bounded
-                // so the WebView engine is never flooded after a long offline period.
+                if(marketStore!=null)marketStore.setDiagnosticState("engine_runtime",Math.max(1,gameCount),
+                        "build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=READY;games="+gameCount);
+                // Persisted MarketStore state owns classifier ordering. Clear stale RAM hints
+                // so a newer waiting scroll cannot jump ahead of the oldest active Motore run.
+                pendingForAnalysis.clear();
                 if(marketStore!=null){for(VintedCard c:marketStore.pendingAnalysisCards(40))pendingForAnalysis.put(DealDatabase.signature(c),c);}
-                Log.i(TAG, "Motore pronto: " + gameCount + " giochi. Flush coda=" + pendingForAnalysis.size());
+                Log.i(TAG, "Motore pronto: " + gameCount + " giochi. Flush coda attiva=" + pendingForAnalysis.size());
                 flushPendingAnalysis();
                 rebuildLocalBundles();
                 scheduleScan(0);
@@ -218,6 +236,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
             @Override public void onError(String message) {
                 String safe = message == null ? "errore motore" : message;
                 diag().edit().putBoolean("engineReady", false).putString("lastError", safe).apply();
+                if(marketStore!=null)marketStore.setDiagnosticState("engine_runtime",-1,
+                        "build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=ERROR;message="+safeDiag(safe));
                 Log.e(TAG, safe);
             }
         });
@@ -228,14 +248,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
         CharSequence pkg = event.getPackageName();
         if (pkg == null || !VINTED_PACKAGE.contentEquals(pkg)) return;
 
-        SharedPreferences p = diag();
-        p.edit()
-                .putLong("vintedEvents", p.getLong("vintedEvents", 0) + 1)
-                .putLong("lastEventAt", System.currentTimeMillis())
-                .putInt("lastEventType", event.getEventType())
-                .apply();
+        long eventNow=System.currentTimeMillis();pendingVintedEventDiag++;
+        if(lastVintedEventDiagFlushAt==0L||eventNow-lastVintedEventDiagFlushAt>=2_000L||pendingVintedEventDiag>=64L){
+            SharedPreferences p=diag();long delta=pendingVintedEventDiag;pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
+            p.edit().putLong("vintedEvents",p.getLong("vintedEvents",0)+delta).putLong("lastEventAt",eventNow).putInt("lastEventType",event.getEventType()).apply();
+        }
 
-        int type = event.getEventType();lastVintedEventAt=System.currentTimeMillis();
+        int type = event.getEventType();lastVintedEventAt=eventNow;
         if (type == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
                 type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
                 type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
@@ -271,9 +290,32 @@ public final class VintedAccessibilityService extends AccessibilityService {
         ProductPage product = ProductPageParser.parse(root);
         DealRecord currentProductDeal=null;
         if (product != null) {
-            handleProductPage(product);
-            currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
-            if(product.sold&&currentProductDeal!=null){database.markSold(currentProductDeal.signature);bundleDatabase.invalidate(currentProductDeal);OperationCenter.done(this,"sold:"+currentProductDeal.signature,OperationCenter.LINK,"Articolo venduto · rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;}
+            long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore==null?null:marketStore.activeOpenedVintedTarget(now);
+            boolean exactOpened=opened!=null&&opened.active(now);
+            if(exactOpened)currentProductDeal=database.findBySignature(opened.signature);
+            if(currentProductDeal==null)currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
+            long exactListingId=exactOpened?opened.listingId:(currentProductDeal==null||marketStore==null?0L:marketStore.listingIdForSignature(currentProductDeal.signature));
+            MarketListingRecord exactListing=marketStore!=null&&exactListingId>0?marketStore.listing(exactListingId):null;
+            // Canonical listings can exist even when their older DealRecord mirror no longer does.
+            // Reconstruct enough identity from the exact listing so sold reconciliation never depends
+            // on the legacy feed row being present.
+            if(currentProductDeal==null&&exactListing!=null){
+                GameRecord exactGame=marketStore.gameForListing(exactListing);currentProductDeal=exactListing.asDealRecord(exactGame);
+                String exactSig=marketStore.signatureForListing(exactListingId);if(!TextUtils.isEmpty(exactSig))currentProductDeal.signature=exactSig;
+            }
+            diag().edit().putString("lastOpenedVintedPage","title="+product.title+";sold="+product.sold+";exact="+exactOpened+";listing="+exactListingId+";deal="+(currentProductDeal!=null)).apply();
+            handleProductPage(product,currentProductDeal,exactListingId);
+            if(product.sold&&(currentProductDeal!=null||exactListingId>0)){
+                String soldSig=currentProductDeal==null?"":currentProductDeal.signature;
+                if(TextUtils.isEmpty(soldSig)&&marketStore!=null&&exactListingId>0)soldSig=marketStore.signatureForListing(exactListingId);
+                if(!TextUtils.isEmpty(soldSig))database.markSold(soldSig);
+                if(marketStore!=null&&exactListingId>0)marketStore.markSold(exactListingId);
+                if(bundleDatabase!=null&&currentProductDeal!=null)bundleDatabase.invalidate(currentProductDeal);
+                diag().edit().putString("lastOpenedVintedReconcile","sold:"+(TextUtils.isEmpty(soldSig)?"listing#"+exactListingId:soldSig)+";exact="+exactOpened+";listing="+exactListingId).apply();
+                OperationCenter.done(this,"sold:"+(TextUtils.isEmpty(soldSig)?String.valueOf(exactListingId):soldSig),OperationCenter.LINK,"Articolo venduto · rimosso");
+                sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
+            }
+            if(exactOpened&&marketStore!=null)marketStore.clearOpenedVintedTarget(opened.listingId);
             // The Vinted item page itself can expose a visible "Articoli dell'utente" rail.
             // Capture that rail as a zero-request seller snapshot only when the source seller is
             // already verified and the section boundary is narrow enough to be unambiguous.
@@ -283,15 +325,53 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 if(TextUtils.isEmpty(currentProductDeal.sellerId)&&!railSignatures.isEmpty()){pendingSellerRails.put(currentProductDeal.signature,railSignatures);while(pendingSellerRails.size()>120){String first=pendingSellerRails.keySet().iterator().next();pendingSellerRails.remove(first);}}
                 while(contextualSellerHints.size()>600){String first=contextualSellerHints.keySet().iterator().next();contextualSellerHints.remove(first);}
                 if(!railSignatures.isEmpty())diag().edit().putInt("bundleAccessibilitySnapshot",railSignatures.size()).putString("bundleStrategy",TextUtils.isEmpty(currentProductDeal.sellerId)?"accessibility-seller-rail-pending":"accessibility-seller-rail").apply();
+                BundleExploration.State explore=BundleExploration.current(this);
+                if(explore!=null&&explore.matches(currentProductDeal)){
+                    String exploreKey=explore.sourceSignature+"|"+explore.expiresAt;
+                    if(!exploreKey.equals(lastBundleExploreIntent)){
+                        lastBundleExploreIntent=exploreKey;bundleExploreHintsThisIntent=hinted;
+                        diag().edit().putBoolean("bundleExploreActive",true).putString("bundleExploreSource",currentProductDeal.signature).putString("bundleExploreSeller",currentProductDeal.sellerId==null?"":currentProductDeal.sellerId).putInt("bundleExploreRailHints",hinted).putLong("bundleExploreSeenAt",System.currentTimeMillis()).apply();
+                        final DealRecord exploreSource=currentProductDeal;handler.postDelayed(()->maybeScanBundles(exploreSource,true),180L);
+                    }
+                }
             }
         }
 
         List<VintedCard> discovered = new ArrayList<>();
+        MarketStore.ManualVintedRecovery recovery=marketStore==null?null:marketStore.activeManualVintedRecovery(System.currentTimeMillis());
+        boolean recoveryActive=recovery!=null&&recovery.active(System.currentTimeMillis());
         // A Vinted item-detail page contains seller/recommendation rails that may be shoes, books,
         // glasses, etc. The product itself is already handled above by ProductPageParser; those
         // rails must not become new catalog games just because they are visible on the same page.
-        if (product == null) collectCards(root, discovered);
-        else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
+        if (product == null) {
+            collectCards(root, discovered);
+            if(recoveryActive){
+                int visible=discovered.size();boolean exactHintApplied=false;
+                // Recovery is target-only. We may consume an explicit /items/<id> if Vinted happens
+                // to expose it for the exact original signature, but never persist the surrounding
+                // search results as new Motore observations.
+                if(!TextUtils.isEmpty(recovery.signature))for(VintedCard card:discovered){
+                    String sig=DealDatabase.signature(card);if(!recovery.signature.equals(sig))continue;
+                    long before=p.getLong("vintedIdsCapturedFromAccessibility",0L);applyExplicitVintedIdentityHint(card,sig);
+                    if(diag().getLong("vintedIdsCapturedFromAccessibility",0L)>before)exactHintApplied=true;
+                }
+                p.edit().putLong("manualRecoverySuppressedCards",p.getLong("manualRecoverySuppressedCards",0L)+visible)
+                        .putInt("manualRecoveryLastVisible",visible).putBoolean("manualRecoveryExactHintApplied",exactHintApplied)
+                        .putString("manualRecoveryTarget",recovery.title).apply();
+                discovered.clear();
+            }else{
+                BundleExploration.State sellerExplore=BundleExploration.current(this);
+                if(sellerExplore!=null&&sellerExplore.canTagVisibleSellerCards()&&!TextUtils.isEmpty(sellerExplore.sellerId)){
+                    int tagged=0;
+                    for(VintedCard card:discovered){
+                        if(bundleExploreHintsThisIntent>=40)break;
+                        String sig=DealDatabase.signature(card);contextualSellerHints.put(sig,new String[]{sellerExplore.sellerId,null});bundleExploreHintsThisIntent++;tagged++;
+                    }
+                    while(contextualSellerHints.size()>600){String first=contextualSellerHints.keySet().iterator().next();contextualSellerHints.remove(first);}
+                    if(tagged>0)diag().edit().putBoolean("bundleExploreActive",true).putString("bundleStrategy","explicit-seller-exploration").putInt("bundleExploreVisibleHints",bundleExploreHintsThisIntent).apply();
+                }
+            }
+        } else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
         p.edit()
                 .putInt("lastCardsParsed", discovered.size())
                 .putLong("cardsParsedTotal", p.getLong("cardsParsedTotal", 0) + discovered.size())
@@ -303,8 +383,6 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
         long now = System.currentTimeMillis();
         if(now-lastBacklogAttemptAt>30_000L){lastBacklogAttemptAt=now;handler.post(this::resolveBacklog);}
-        List<VintedCard> freshForAnalysis = new ArrayList<>();
-
         for (VintedCard card : discovered) {
             String sig = DealDatabase.signature(card);
             ListingClassifier.Result listingNow = ListingClassifier.classify(card);
@@ -326,23 +404,23 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 if (!listingNow.allowPriceModel) {
                     SharedPreferences pp = diag();
                     pp.edit().putLong("classifierBlocked", pp.getLong("classifierBlocked", 0) + 1)
-                            .putString("lastClassifierBlock", listingNow.type.name() + ": " + listingNow.reason + " | " + card.title).apply();
+                            .putString("lastClassifierBlock", listingNow.type.name() + ": " + listingNow.reason + " | " + card.title)
+                            .putLong("lastClassifierBlockAt",now).putString("lastClassifierBlockBuild",BuildConfig.VERSION_NAME).apply();
                 }
             }
 
             if (listingNow.allowPriceModel) {
-                pendingForAnalysis.put(sig, card);
-                if (pendingForAnalysis.size() > 500) {
-                    String first = pendingForAnalysis.keySet().iterator().next();
-                    pendingForAnalysis.remove(first);
-                }
-
                 Long lastAnalyzed = recentlyAnalyzed.get(sig);
-                if (engine != null && engine.isReady() &&
-                        (lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS)) {
-                    freshForAnalysis.add(card);
-                    recentlyAnalyzed.put(sig, now);
-                }
+                boolean analysisDue=lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS;
+                if(analysisDue){
+                    // This map is a wake/cache hint only. Actual batch selection below always comes
+                    // from MarketStore, which is scoped to the oldest active Motore run.
+                    pendingForAnalysis.put(sig, card);
+                    if (pendingForAnalysis.size() > 500) {
+                        String first = pendingForAnalysis.keySet().iterator().next();
+                        pendingForAnalysis.remove(first);
+                    }
+                }else pendingForAnalysis.remove(sig);
             }
 
             if (!card.rawDescription.isEmpty()) {
@@ -353,15 +431,19 @@ public final class VintedAccessibilityService extends AccessibilityService {
         trimOld(recentlySighted, now, 10 * 60_000L, 1600);
         trimOld(recentlyAnalyzed, now, 10 * 60_000L, 1600);
 
-        if (!freshForAnalysis.isEmpty()) analyzeBatch(freshForAnalysis);
+        if (engine != null && engine.isReady()) continuePersistentAnalysis();
     }
 
     private void flushPendingAnalysis() {
-        if (engine == null || !engine.isReady() || pendingForAnalysis.isEmpty()) return;
-        List<VintedCard> batch = new ArrayList<>(pendingForAnalysis.values());
-        pendingForAnalysis.clear();
+        if (engine == null || !engine.isReady()) return;
+        List<VintedCard> batch = marketStore==null?new ArrayList<>(pendingForAnalysis.values()):marketStore.pendingAnalysisCards(40);
+        if(batch.isEmpty())return;
         long now = System.currentTimeMillis();
-        for (VintedCard card : batch) recentlyAnalyzed.put(DealDatabase.signature(card), now);
+        for (VintedCard card : batch) {
+            String sig=DealDatabase.signature(card);
+            pendingForAnalysis.remove(sig);
+            recentlyAnalyzed.put(sig, now);
+        }
         analyzeBatch(batch);
     }
 
@@ -421,13 +503,16 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     }
                     database.record(card, ga, analyzedListing, t);
                     if(marketStore!=null){marketStore.applyAnalysis(card,ga,analyzedListing,t);if(localRef!=null&&ga!=null&&!TextUtils.isEmpty(ga.bggId))marketStore.refreshLocalVintedBenchmarksForBgg(ga.bggId);}
+                    boolean huntCandidate=ga!=null&&"matched".equals(ga.status)&&!TextUtils.isEmpty(ga.bggId)
+                            &&HuntDatabase.wantsCandidate(getApplicationContext(),ga.bggId,ga.totalCents);
+                    if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);
                     DealRecord stored=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                     String[] sellerHint=contextualSellerHints.remove(DealDatabase.signature(card));
                     if(stored!=null&&sellerHint!=null&&sellerHint.length>0&&!TextUtils.isEmpty(sellerHint[0])){
                         database.applySellerHint(stored.signature,sellerHint[0],sellerHint.length>1?sellerHint[1]:null);
                         stored=database.findBySignature(stored.signature);bundleDatabase.increment("accessibilitySellerHints");rebuildLocalBundlesForSeller(stored);maybeScanBundles(stored);
                     }
-                    if(stored!=null){boolean huntHit=HuntDatabase.evaluateAndNotify(getApplicationContext(),ga,stored);if(huntHit&&marketStore!=null)marketStore.promoteLegacyListingForHunt(stored.signature);DealAlertNotifier.evaluateAndNotify(getApplicationContext(),stored);}
+                    if(stored!=null){boolean huntHit=HuntDatabase.evaluateAndNotify(getApplicationContext(),ga,stored);if((huntCandidate||huntHit)&&marketStore!=null)marketStore.promoteLegacyListingForHunt(stored.signature);DealAlertNotifier.evaluateAndNotify(getApplicationContext(),stored);}
                     // applyAnalysis already enqueues BGG/Vinted durable jobs. :radar only observes
                     // and produces work; the queue process owns network consumption and can batch BGG.
                     maybeResolveLink(card);
@@ -454,8 +539,17 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     private void continuePersistentAnalysis(){
         if(analysisBatchInFlight||engine==null||!engine.isReady()||marketStore==null)return;
-        if(!pendingForAnalysis.isEmpty()){flushPendingAnalysis();return;}
-        List<VintedCard> next=marketStore.pendingAnalysisCards(40);if(!next.isEmpty())analyzeBatch(next);
+        List<VintedCard> next=marketStore.pendingAnalysisCards(40);
+        if(!next.isEmpty()){
+            long now=System.currentTimeMillis();
+            for(VintedCard card:next){String sig=DealDatabase.signature(card);pendingForAnalysis.remove(sig);recentlyAnalyzed.put(sig,now);}
+            analyzeBatch(next);
+            return;
+        }
+        // A newer captured scroll stays waiting until the current run finishes all automatic work.
+        // Re-check without requiring the user to revisit Vinted.
+        if(database!=null&&database.waitingObservationSessionCount()>0)
+            handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L);
     }
 
 
@@ -484,9 +578,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
         QueueKeepAliveService.ensureRunning(this);
         QueueWorkScheduler.schedule(this);
     }
+    private boolean motoreOwnsPublicVintedLane(){return marketStore!=null&&marketStore.hasActiveObservationRun();}
     private void scanBundleBacklog(){scanBundleBacklog(false);}
     private void scanBundleBacklog(boolean force){
-        if(manualBulkMode)return;
+        if(manualBulkMode||motoreOwnsPublicVintedLane()){if(bundleDatabase!=null)bundleDatabase.increment("bundleDeferredForMotore");return;}
         if(marketStore!=null&&marketStore.vintedActiveCount()>20)return;
         if(database==null||bundleDatabase==null)return;Set<String>seen=new HashSet<>();DealRecord best=null;double bestScore=-1;
         for(DealRecord d:database.getDeals("all_with_review",240)){if(d==null||d.sellerId==null||d.sellerId.isEmpty()||!seen.add(d.sellerId)||bundleDatabase.countForSource(d.signature)>0)continue;if(!force&&!networkPriority(d))continue;long last=bundleDatabase.lastAttemptForSeller(d.sellerId);if(!force&&System.currentTimeMillis()-last<2*60*60_000L)continue;double score=bundlePriority(d);if(score>bestScore){bestScore=score;best=d;}}
@@ -498,7 +593,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     private void resolveBacklog(){
         if(database==null||linkResolver==null||linkNetworkInFlight)return;
-        if(!manualMetadataRefresh&&marketStore!=null&&marketStore.jobSummary().active()>0)return;
+        if(!manualMetadataRefresh&&marketStore!=null&&(marketStore.jobSummary().active()>0||marketStore.hasActiveObservationRun()))return;
         long now=System.currentTimeMillis();
         DealRecord chosen=null;
         if(manualMetadataRefresh&&!TextUtils.isEmpty(manualRefreshTargetSignature)){
@@ -618,7 +713,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private void resolvePriority(DealRecord d){
         if(d==null||linkNetworkInFlight)return;linkNetworkInFlight=true;lastPriorityLinkAttemptAt=System.currentTimeMillis();String type=TextUtils.isEmpty(d.vintedUrl)?OperationCenter.LINK:OperationCenter.SELLER;String id=(OperationCenter.LINK.equals(type)?"link:":"seller:")+d.signature;OperationCenter.running(this,id,type,d.vintedTitle);
         linkResolver.resolve(d,new AutoLinkResolver.Callback(){
-            @Override public void onResolved(VintedLinkResolver.Result r){linkNetworkInFlight=false;if(r.sold){DealRecord sold=database.findBySignature(r.signature);database.markSold(r.signature);if(sold!=null)bundleDatabase.invalidate(sold);OperationCenter.done(VintedAccessibilityService.this,id,type,"Articolo venduto · rimosso da Ludo Scout");finishManualTargetIfNeeded(r.signature,true,"Articolo venduto rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);return;}database.applyResolvedLink(r.signature,r.itemId,r.url,r.imageUrl,r.confidence,r.reason,r.sellerId,r.sellerName,r.photosCsv,System.currentTimeMillis());if(!TextUtils.isEmpty(r.publishedLabel)){database.updatePublishedLabel(r.signature,r.publishedLabel);diag().edit().putString("lastPublishedLabel",r.publishedLabel).putLong("publishedMetadataResolved",diag().getLong("publishedMetadataResolved",0)+1).apply();}finishManualTargetIfNeeded(r.signature,true,"Dati annuncio aggiornati");if(!TextUtils.isEmpty(r.sellerId)){bundleDatabase.setDiagnostic(r.signature,r.sellerId,"SELLER_FOUND",0,0,0,null);bundleDatabase.increment("sellerFound");if(r.sellerSnapshot!=null){bundleDatabase.storeSnapshot(r.sellerId,r.itemId,"item-public-page",r.sellerSnapshot);bundleDatabase.setDiagnostic(r.signature,r.sellerId,r.sellerSnapshot.isEmpty()?"SNAPSHOT_EMPTY":"SNAPSHOT_FOUND",r.sellerSnapshot.size(),0,0,null);if(!TextUtils.isEmpty(r.snapshotParser))diag().edit().putString("bundleParser",r.snapshotParser).apply();}}else bundleDatabase.setDiagnostic(r.signature,null,"SELLER_UNKNOWN",0,0,0,"sellerId assente");OperationCenter.done(VintedAccessibilityService.this,id,type,r.matchedTitle);DealRecord fresh=database.findBySignature(r.signature);applyPendingSellerRail(r.signature,r.sellerId,r.sellerName);rebuildLocalBundlesForSeller(fresh);maybeScanBundles(fresh);if(r.imageUrl!=null&&!r.imageUrl.isEmpty())ThumbnailStore.downloadRemote(getApplicationContext(),r.signature,r.imageUrl);SharedPreferences pp=diag();pp.edit().putLong("linksResolved",pp.getLong("linksResolved",0)+1).putString("lastLinkResolution",r.matchedTitle+" → "+r.url+" ("+r.confidence+")").apply();sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);}
+            @Override public void onResolved(VintedLinkResolver.Result r){linkNetworkInFlight=false;if(r.sold){DealRecord sold=database.findBySignature(r.signature);database.markSold(r.signature);if(marketStore!=null){long listingId=marketStore.listingIdForSignature(r.signature);if(listingId>0)marketStore.markSold(listingId);}if(sold!=null)bundleDatabase.invalidate(sold);OperationCenter.done(VintedAccessibilityService.this,id,type,"Articolo venduto · rimosso da Ludo Scout");finishManualTargetIfNeeded(r.signature,true,"Articolo venduto rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);return;}database.applyResolvedLink(r.signature,r.itemId,r.url,r.imageUrl,r.confidence,r.reason,r.sellerId,r.sellerName,r.photosCsv,System.currentTimeMillis());if(!TextUtils.isEmpty(r.publishedLabel)){database.updatePublishedLabel(r.signature,r.publishedLabel);diag().edit().putString("lastPublishedLabel",r.publishedLabel).putLong("publishedMetadataResolved",diag().getLong("publishedMetadataResolved",0)+1).apply();}finishManualTargetIfNeeded(r.signature,true,"Dati annuncio aggiornati");if(!TextUtils.isEmpty(r.sellerId)){bundleDatabase.setDiagnostic(r.signature,r.sellerId,"SELLER_FOUND",0,0,0,null);bundleDatabase.increment("sellerFound");if(r.sellerSnapshot!=null){bundleDatabase.storeSnapshot(r.sellerId,r.itemId,"item-public-page",r.sellerSnapshot);bundleDatabase.setDiagnostic(r.signature,r.sellerId,r.sellerSnapshot.isEmpty()?"SNAPSHOT_EMPTY":"SNAPSHOT_FOUND",r.sellerSnapshot.size(),0,0,null);if(!TextUtils.isEmpty(r.snapshotParser))diag().edit().putString("bundleParser",r.snapshotParser).apply();}}else bundleDatabase.setDiagnostic(r.signature,null,"SELLER_UNKNOWN",0,0,0,"sellerId assente");OperationCenter.done(VintedAccessibilityService.this,id,type,r.matchedTitle);DealRecord fresh=database.findBySignature(r.signature);applyPendingSellerRail(r.signature,r.sellerId,r.sellerName);rebuildLocalBundlesForSeller(fresh);maybeScanBundles(fresh);if(r.imageUrl!=null&&!r.imageUrl.isEmpty())ThumbnailStore.downloadRemote(getApplicationContext(),r.signature,r.imageUrl);SharedPreferences pp=diag();pp.edit().putLong("linksResolved",pp.getLong("linksResolved",0)+1).putString("lastLinkResolution",r.matchedTitle+" → "+r.url+" ("+r.confidence+")").apply();sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,1000L);}
             @Override public void onUnresolved(String signature,String reason){linkNetworkInFlight=false;boolean deferred="cooldown".equals(reason)||isRateLimited(reason);if(deferred){manualRefreshAttempted.remove(signature);long until=authoritativeVintedResumeAt(d);if(until<=System.currentTimeMillis())until=System.currentTimeMillis()+currentLinkGapMs(d);maintenancePauseReason=reason;if("cooldown".equals(reason))bundleDatabase.increment("linkCooldownDeferred");else bundleDatabase.increment("rateLimited");OperationCenter.paused(VintedAccessibilityService.this,id,type,"Vinted in pausa · riprovo al momento consentito");if(manualMetadataRefresh)setVintedPause(until,reason);}else{finishManualTargetIfNeeded(signature,false,"Dati Vinted ancora mancanti · "+reason);OperationCenter.error(VintedAccessibilityService.this,id,type,d.vintedTitle,reason);}SharedPreferences pp=diag();pp.edit().putLong("linkResolveMisses",pp.getLong("linkResolveMisses",0)+1).putString("lastLinkResolveMiss",reason).apply();if(!manualMetadataRefresh)handler.postDelayed(VintedAccessibilityService.this::resolveBacklog,currentLinkGapMs(d));}
         });
     }
@@ -648,7 +743,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(source==null||bundleDatabase==null||TextUtils.isEmpty(source.sellerId))return;
         List<DealRecord> same=new ArrayList<>();
         for(DealRecord d:database.getDeals("all_with_review",1200))if(d!=null&&source.sellerId.equals(d.sellerId))same.add(d);
-        if(same.size()<2){bundleDatabase.replace(source.signature,source.sellerId,Collections.emptyList());return;}
+        if(same.size()<2){bundleDatabase.clearSellerGraph(source.sellerId);bundleDatabase.setDiagnostic(source.signature,source.sellerId,"NO_BOARDGAMES",same.size(),0,0,"Seller graph sceso sotto due giochi attivi");return;}
         for(DealRecord d:same){List<BundleSuggestion> out=BundlePlanner.forSource(d,same);bundleDatabase.replace(d.signature,d.sellerId,out);bundleDatabase.setDiagnostic(d.signature,d.sellerId,out.isEmpty()?"NO_BOARDGAMES":"BUNDLE_READY",same.size(),out.size(),out.size(),out.isEmpty()?"Seller graph senza coppie eleggibili":"Seller graph locale");}
     }
 
@@ -657,8 +752,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
         Map<String,List<DealRecord>> bySeller=new LinkedHashMap<>();
         for(DealRecord d:database.getDeals("all_with_review",1500))if(d!=null&&!TextUtils.isEmpty(d.sellerId))bySeller.computeIfAbsent(d.sellerId,k->new ArrayList<>()).add(d);
         int sellers=0,bundles=0;
-        for(List<DealRecord> group:bySeller.values()){
-            if(group.size()<2)continue;sellers++;
+        for(Map.Entry<String,List<DealRecord>> entry:bySeller.entrySet()){
+            List<DealRecord> group=entry.getValue();
+            if(group.size()<2){bundleDatabase.clearSellerGraph(entry.getKey());continue;}sellers++;
             for(DealRecord d:group){List<BundleSuggestion> out=BundlePlanner.forSource(d,group);bundleDatabase.replace(d.signature,d.sellerId,out);bundleDatabase.setDiagnostic(d.signature,d.sellerId,out.isEmpty()?"NO_BOARDGAMES":"BUNDLE_READY",group.size(),out.size(),out.size(),out.isEmpty()?"Seller graph senza coppie eleggibili":"Seller graph locale");bundles+=out.size();}
         }
         diag().edit().putInt("bundleLocalGraphSellers",sellers).putInt("bundleLocalGraphSuggestions",bundles).apply();
@@ -686,8 +782,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
             OperationCenter.done(this,"bundle:"+source.sellerId,OperationCenter.BUNDLE,cachedLocalBundles.size()+" bundle · dati locali verificati");
             finishBundleSeller(source.sellerId,1000L);sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
         }
-        // Bundle discovery is opportunistic. Never spend the same public Vinted budget while the
-        // core listing-enrichment lane has a meaningful backlog; local seller graph above still works.
+        // The local seller graph above is zero-request. Network bundle discovery waits until
+        // no Motore run owns the public Vinted lane, even if its next core job is still deferred.
+        if(motoreOwnsPublicVintedLane()){
+            bundleDatabase.increment("bundleDeferredForMotore");
+            bundleDatabase.setDiagnostic(source.signature,source.sellerId,"RATE_LIMITED",0,0,0,"Motore ha priorità sulla corsia Vinted");
+            finishBundleSeller(source.sellerId,60_000L);return;
+        }
         if(marketStore!=null&&marketStore.vintedActiveCount()>20){
             bundleDatabase.setDiagnostic(source.signature,source.sellerId,"RATE_LIMITED",0,0,0,"core Vinted queue has priority");
             finishBundleSeller(source.sellerId,60_000L);
@@ -757,6 +858,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void startDeepScan(DealRecord source,String sourceSignature,String sellerId,int snapshotCount,int snapshotMatches,String deepTask){
+        if(motoreOwnsPublicVintedLane()){bundleDatabase.increment("bundleDeferredForMotore");OperationCenter.doneIfActive(this,deepTask,OperationCenter.DEEP_SCAN,"rimandato · Motore ha priorità");finishBundleSeller(sellerId,60_000L);return;}
         if(marketStore!=null&&marketStore.vintedActiveCount()>20){OperationCenter.doneIfActive(this,deepTask,OperationCenter.DEEP_SCAN,"rimandato · priorità dati annunci");finishBundleSeller(sellerId,60_000L);return;}
         if(manualBulkMode){OperationCenter.doneIfActive(this,deepTask,OperationCenter.DEEP_SCAN,"rimandato · priorità aggiornamento dati");finishBundleSeller(sellerId,5*60_000L);return;}
         synchronized(bundleSellersInFlight){
@@ -817,6 +919,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void verifyBundleMatches(DealRecord source,String sig,String sid,int profileCount,List<SellerBundleScanner.SellerItem> matchedItems){
+        if(motoreOwnsPublicVintedLane()){bundleDatabase.increment("bundleDeferredForMotore");bundleDatabase.setDiagnostic(sig,sid,"RATE_LIMITED",profileCount,matchedItems==null?0:matchedItems.size(),0,"Motore ha priorità sulla verifica bundle");finishBundleSeller(sid,60_000L);return;}
         String verifyTask="verify:"+sid;OperationCenter.running(this,verifyTask,OperationCenter.SELLER,matchedItems.size()+" match BGG · max 3 verifiche pubbliche");
         bundleScanner.verifyMatches(source,matchedItems,3,new SellerBundleScanner.Callback(){
             @Override public void onItems(String signature,String seller,List<SellerBundleScanner.SellerItem> verified){
@@ -862,18 +965,24 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(nextDelay>0)handler.postDelayed(()->scanBundleBacklog(false),nextDelay);
     }
 
-    private void handleProductPage(ProductPage page) {
+    private void handleProductPage(ProductPage page,DealRecord exactDeal,long exactListingId) {
         if (page == null || database == null) return;
         int priceCents=(int)Math.round(page.itemPrice*100.0);
         Integer ship=page.shippingPrice==null?null:(int)Math.round(page.shippingPrice*100.0);
-        database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,System.currentTimeMillis());
-        DealRecord d=database.findByTitlePrice(page.title,priceCents);
+        DealRecord d=exactDeal;
+        if(d==null){database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,System.currentTimeMillis());d=database.findByTitlePrice(page.title,priceCents);}
         String sig=d==null?"":d.signature;
+        if(d!=null){
+            if(!TextUtils.isEmpty(page.publishedLabel))database.updatePublishedLabel(sig,page.publishedLabel);
+            if(!TextUtils.isEmpty(page.sellerName))database.updateSellerNameHint(sig,page.sellerName);
+            if(page.itemPrice>0)database.updateVerifiedCurrentPrice(sig,priceCents,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0),System.currentTimeMillis());
+            if(marketStore!=null&&exactListingId>0)marketStore.updateExactProductMetadata(exactListingId,page.sellerName,page.publishedLabel,page.itemPrice>0?priceCents:null,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0));
+        }
         SharedPreferences.Editor e=diag().edit().putString("lastProductTitle",page.title).putInt("lastProductPriceCents",priceCents);
         if(ship!=null)e.putInt("lastProductShippingCents",ship);else e.remove("lastProductShippingCents");
         if(sig!=null && !sig.isEmpty()){
             e.putString("lastProductSignature",sig);ThumbnailStore.captureProduct(this,page,sig);
-            long listingId=marketStore==null?0L:marketStore.listingIdForSignature(sig);
+            long listingId=exactListingId>0?exactListingId:(marketStore==null?0L:marketStore.listingIdForSignature(sig));
             if(!TextUtils.isEmpty(page.sellerName)){
                 database.updateSellerNameHint(sig,page.sellerName);
                 if(marketStore!=null&&listingId>0)marketStore.setSellerHint(listingId,page.sellerName);
@@ -925,10 +1034,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
             if(card!=null&&!containsSignature(out,card)){
                 out.add(card);
                 String signature=DealDatabase.signature(card);
-                String probeKey=signature+"|"+Integer.toHexString(card.rawDescription==null?0:card.rawDescription.hashCode());
-                boolean uniqueProbeCard=accessibilityIdentityProbeSeen.add(probeKey);
-                if(accessibilityIdentityProbeSeen.size()>1200){String first=accessibilityIdentityProbeSeen.iterator().next();accessibilityIdentityProbeSeen.remove(first);}
-                String[] identity=explicitVintedIdentityHint(node,uniqueProbeCard);
+                // Test 1 conclusively found no usable ID in Vinted's Compose semantics. Keep only a
+                // cheap opportunistic explicit-URL check; the old 96-node diagnostic probe was
+                // production overhead and could make scrolling visibly heavy.
+                String[] identity=explicitVintedIdentityHintFast(node);
                 if(identity!=null)contextualVintedIdentityHints.put(signature,identity);
             } else if(card==null&&candidate.length()<700)diag().edit().putString("lastUnparsedCardSample",truncate(candidate,600)).apply();
         }
@@ -951,6 +1060,37 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if("url_span".equals(source))ed.putLong("a11yIdsFromUrlSpan",p.getLong("a11yIdsFromUrlSpan",0L)+1L);
         else ed.putLong("a11yIdsFromOtherExplicitField",p.getLong("a11yIdsFromOtherExplicitField",0L)+1L);
         ed.apply();
+    }
+
+    /** Production fast path: accept only a literal Vinted item URL/ID already exposed in a
+     * small nearby accessibility surface. No Compose extra-data requests and no diagnostic tree
+     * walk. This preserves the conservative opportunistic shortcut without paying Test-1 costs. */
+    private String[] explicitVintedIdentityHintFast(AccessibilityNodeInfo root){
+        if(root==null)return null;
+        java.util.ArrayDeque<AccessibilityNodeInfo> q=new java.util.ArrayDeque<>();q.add(root);int seen=0;
+        while(!q.isEmpty()&&seen++<12){
+            AccessibilityNodeInfo n=q.removeFirst();String[] h=identityFromNodeFast(n,"");if(h!=null)return h;
+            if(seen<=4)for(int i=0;i<n.getChildCount()&&i<6;i++){AccessibilityNodeInfo c=n.getChild(i);if(c!=null)q.addLast(c);}
+        }
+        AccessibilityNodeInfo parent=null;try{parent=root.getParent();}catch(Throwable ignored){}
+        for(int depth=0;parent!=null&&depth<2;depth++){
+            String[] h=identityFromNodeFast(parent,"ancestor_");if(h!=null)return h;
+            AccessibilityNodeInfo next=null;try{next=parent.getParent();}catch(Throwable ignored){}parent=next;
+        }
+        return null;
+    }
+
+    private String[] identityFromNodeFast(AccessibilityNodeInfo n,String sourcePrefix){
+        if(n==null)return null;IdentityProbeStats stats=new IdentityProbeStats();String[] h=identityFromSpans(n,stats);
+        if(h!=null&&sourcePrefix.length()>0)h[2]=sourcePrefix+h[2];
+        if(h==null)h=identityFromValue(n.getText(),sourcePrefix+"text");
+        if(h==null)h=identityFromValue(n.getContentDescription(),sourcePrefix+"content_description");
+        if(h==null)h=identityFromValue(n.getViewIdResourceName(),sourcePrefix+"view_id_resource_name");
+        if(h==null&&Build.VERSION.SDK_INT>=33)try{h=identityFromValue(n.getUniqueId(),sourcePrefix+"unique_id");}catch(Throwable ignored){}
+        if(h==null)try{h=identityFromValue(n.getHintText(),sourcePrefix+"hint_text");}catch(Throwable ignored){}
+        if(h==null&&Build.VERSION.SDK_INT>=28)try{h=identityFromValue(n.getTooltipText(),sourcePrefix+"tooltip_text");}catch(Throwable ignored){}
+        if(h==null&&Build.VERSION.SDK_INT>=30)try{h=identityFromValue(n.getStateDescription(),sourcePrefix+"state_description");}catch(Throwable ignored){}
+        return h;
     }
 
     /** Look for an explicit /items/<id> token already present in the Accessibility subtree.
@@ -1182,6 +1322,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private static String firstLine(String s){if(s==null)return"";int n=s.indexOf('\n');String x=n>=0?s.substring(0,n):s;return x.length()>240?x.substring(0,240):x;}
+    private static String safeDiag(String s){if(s==null)return"";String x=s.replace('\n',' ').replace('\r',' ').replace(';',',');return x.length()>320?x.substring(0,320):x;}
 
     public static String diagnostics(Context context) {
         DealDatabase db = new DealDatabase(context);
@@ -1196,6 +1337,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         MarketStore.JobSummary queueSummary=marketDiag.jobSummary();
         long queueNow=System.currentTimeMillis();
         int queueVintedDue=marketDiag.runnableVintedDueCount(queueNow),queueBggDue=marketDiag.runnableBggDueCount(queueNow);
+        int queueUrgentVinted=marketDiag.urgentVintedWorkCount(queueNow),queueUrgentVintedDue=marketDiag.urgentVintedDueCount(queueNow);
+        long queueUrgentNext=marketDiag.nextUrgentVintedDueAt(queueNow),queueUrgentReserve=marketDiag.urgentVintedReservationUntil(queueNow);
         int queueDueNow=queueVintedDue+queueBggDue;
         int queueVinted=marketDiag.vintedActiveCount();
         int queueVintedCore=marketDiag.coreVintedActiveCount(),queueVintedDeep=marketDiag.deepMetadataActiveCount(),queueBgg=marketDiag.bggActiveCount(),queueBggBlocked=marketDiag.bggUnrunnableCount(),queueBggMatchRequired=marketDiag.bggMatchRequiredCount(),queueBggMatchReview=marketDiag.bggMatchReviewCount();
@@ -1208,19 +1351,78 @@ public final class VintedAccessibilityService extends AccessibilityService {
         MarketStore.RuntimeStatus a11yCross=marketDiag.diagnosticState("a11y_probe");
         long a11yCrossAgeMs=a11yCross.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-a11yCross.updatedAt);
         String a11yCrossPayload=TextUtils.isEmpty(a11yCross.detail)?"":a11yCross.detail;
+        MarketStore.RuntimeStatus radarService=marketDiag.diagnosticState("radar_service");
+        long radarServiceAgeMs=radarService.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-radarService.updatedAt);
+        MarketStore.RuntimeStatus engineRuntime=marketDiag.diagnosticState("engine_runtime");
+        long engineRuntimeAgeMs=engineRuntime.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-engineRuntime.updatedAt);
+        String engineRuntimePayload=TextUtils.isEmpty(engineRuntime.detail)?"":engineRuntime.detail;
         MarketStore.RuntimeStatus priceRefresh=marketDiag.diagnosticState("verified_price_refresh");
         String priceRefreshSummary=priceRefresh.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-priceRefresh.updatedAt)+", "+priceRefresh.detail);
+        String bggIdentityTrustSummary=marketDiag.bggIdentityTrustSummary();
+        String bggMatchBreakdownSummary=marketDiag.bggMatchRequiredBreakdown();
+        String reviewBreakdownSummary=marketDiag.currentReviewBreakdown();
+        long engineEpochForExit=db.engineEpochStart();
+        String processCrashSummary=ProcessCrashJournal.fileSummary(context);
+        String systemExitSummary=ProcessCrashJournal.systemExitSummary(context,engineEpochForExit);
+        MarketStore.RuntimeStatus bggLocalMatch=marketDiag.diagnosticState("bgg_local_match");
+        String bggLocalMatchSummary=bggLocalMatch.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggLocalMatch.updatedAt)+", "+bggLocalMatch.detail);
+        MarketStore.RuntimeStatus bggReviewWrite=marketDiag.diagnosticState("bgg_match_review_write");
+        String bggReviewWriteSummary=bggReviewWrite.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggReviewWrite.updatedAt)+", "+bggReviewWrite.detail);
+        MarketStore.RuntimeStatus engineSla=marketDiag.diagnosticState("engine_sla");
+        String engineSlaSummary=engineSla.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-engineSla.updatedAt)+", "+engineSla.detail);
+        MarketStore.RuntimeStatus engineFairness=marketDiag.diagnosticState("engine_fairness");
+        String engineFairnessSummary=engineFairness.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-engineFairness.updatedAt)+", "+engineFairness.detail);
+        MarketStore.RuntimeStatus bggExactCutover=marketDiag.diagnosticState("bgg_exact_index_cutover");
+        String bggExactCutoverSummary=bggExactCutover.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggExactCutover.updatedAt)+", "+bggExactCutover.detail);
+        MarketStore.RuntimeStatus historicalReviewCutover=marketDiag.diagnosticState("historical_review_cutover");
+        String historicalReviewCutoverSummary=historicalReviewCutover.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-historicalReviewCutover.updatedAt)+", "+historicalReviewCutover.detail);
+        MarketStore.RuntimeStatus vintedIdleParking=marketDiag.diagnosticState("vinted_idle_parking");
+        String vintedIdleParkingSummary=vintedIdleParking.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-vintedIdleParking.updatedAt)+", "+vintedIdleParking.detail);
+        MarketStore.RuntimeStatus earlyPriceFilter=marketDiag.diagnosticState("early_price_filter");
+        String earlyPriceFilterSummary=earlyPriceFilter.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-earlyPriceFilter.updatedAt)+", "+earlyPriceFilter.detail);
+        MarketStore.RuntimeStatus manualRecoveryState=marketDiag.diagnosticState("manual_vinted_recovery");
+        String manualRecoveryStateSummary=manualRecoveryState.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-manualRecoveryState.updatedAt)+", "+manualRecoveryState.detail);
+        MarketStore.RuntimeStatus openedVintedTarget=marketDiag.diagnosticState("opened_vinted_target");
+        String openedVintedTargetSummary=openedVintedTarget.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedTarget.updatedAt)+", "+openedVintedTarget.detail);
+        MarketStore.RuntimeStatus openedVintedVerify=marketDiag.diagnosticState("opened_vinted_verify");
+        String openedVintedVerifySummary=openedVintedVerify.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedVerify.updatedAt)+", "+openedVintedVerify.detail);
+        MarketStore.RuntimeStatus catalogHealth=marketDiag.diagnosticState("catalog_health");
+        String catalogHealthSummary=catalogHealth.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-catalogHealth.updatedAt)+", "+catalogHealth.detail);
+        MarketStore.RuntimeStatus catalogRatingSweep=marketDiag.diagnosticState("catalog_rating_sweep");
+        String catalogRatingSweepSummary=catalogRatingSweep.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-catalogRatingSweep.updatedAt)+", "+catalogRatingSweep.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
-        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
+        long engineEpochStart=engineEpochForExit;long engineDiagNow=System.currentTimeMillis();
+        String engineEpochSummary="build=engine-epoch-v1;start="+engineEpochStart+";vintedReview="+marketDiag.vintedReviewCount()+";bggReview="+marketDiag.bggMatchReviewCount();
+        long runAgeMs=engineRun==null?0L:Math.max(0L,engineDiagNow-engineRun.startAt),runSinceEndMs=engineRun==null?0L:Math.max(0L,engineDiagNow-engineRun.endAt);
+        long runTargetMs=engineRun==null?0L:DealDatabase.engineTargetMs(engineRun);
+        long runTargetRemainingMs=engineRun==null?0L:Math.max(0L,runTargetMs-runSinceEndMs);
+        long runEtaMs=engineRun==null?0L:DealDatabase.engineEtaMs(engineRun);
+        int runReviewPct=engineRun==null||engineRun.validListings<=0?0:Math.round(engineRun.reviewListings*100f/engineRun.validListings);
+        String engineRunSummary=engineRun==null?"state=IDLE;waitingRuns=0":("state=ACTIVE;start="+engineRun.startAt+";end="+engineRun.endAt+";ageMs="+runAgeMs+";sinceEndMs="+runSinceEndMs+";targetMs="+runTargetMs+";targetRemainingMs="+runTargetRemainingMs+";etaMs="+runEtaMs+";coreWork="+engineRun.coreWorkListings+";corePending="+engineRun.corePendingListings+";coreRemaining="+engineRun.coreRemainingListings+";timingNonDestructive=true;reviewPct="+runReviewPct+";observations="+engineRun.observations+";unique="+engineRun.uniqueListings+";games="+engineRun.validListings+";bgg="+engineRun.bggMatchedListings+";vinted="+engineRun.vintedLinkedListings+";ready="+engineRun.completeListings+";review="+engineRun.reviewListings+";held="+engineRun.heldListings+";analysisPending="+engineRun.analysisPendingListings+";waitingRuns="+engineWaitingRuns);
+        DealDatabase.ObservationSession firstWaiting=null;
+        if(engineRun!=null&&engineWaitingRuns>0){
+            for(DealDatabase.ObservationSession candidate:db.recentObservationSessions(engineEpochStart,80)){
+                if(candidate.startAt==engineRun.startAt||DealDatabase.engineAutomaticDone(candidate,engineDiagNow))continue;
+                if(firstWaiting==null||candidate.startAt<firstWaiting.startAt)firstWaiting=candidate;
+            }
+        }
+        String waitingState=firstWaiting==null?"NONE":(engineRun!=null&&firstWaiting.startAt<engineRun.startAt?"DEFERRED":"WAITING");
+        String engineWaitingSummary=firstWaiting==null?"state=NONE":("state="+waitingState+";start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";etaMs="+DealDatabase.engineEtaMs(firstWaiting)+";coreWork="+firstWaiting.coreWorkListings+";corePending="+firstWaiting.corePendingListings+";coreRemaining="+firstWaiting.coreRemainingListings+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";held="+firstWaiting.heldListings+";analysisPending="+firstWaiting.analysisPendingListings);
+        String engineCoreRemainingSummary=marketDiag.engineCoreRemainingSummary();
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
         SharedPreferences p = context.getSharedPreferences(PREFS_DIAG, MODE_PRIVATE);
+        boolean serviceConnectedAuthoritative=radarService.updatedAt>0?radarService.value==1:p.getBoolean("serviceConnected",false);
+        boolean engineReadyAuthoritative=engineRuntime.updatedAt>0?engineRuntime.value>0:p.getBoolean("engineReady",false);
+        int engineGamesAuthoritative=engineRuntime.value>0?(int)Math.min(Integer.MAX_VALUE,engineRuntime.value):p.getInt("engineGames",0);
         return "LUDO SCOUT V5 — RADAR + BUNDLE\n" +
                 "mode=observer-only (no visual overlays)\n" +
-                "serviceConnected=" + p.getBoolean("serviceConnected", false) + "\n" +
-                "engineReady=" + p.getBoolean("engineReady", false) + "\n" +
-                "engineGames=" + p.getInt("engineGames", 0) + "\n" +
+                "serviceConnected=" + serviceConnectedAuthoritative + "\n" +
+                "engineReady=" + engineReadyAuthoritative + "\n" +
+                "engineGames=" + engineGamesAuthoritative + "\n" +
+                "engineRuntime={authoritative="+(engineRuntime.updatedAt>0)+", ageMs="+engineRuntimeAgeMs+", value="+engineRuntime.value+", payload="+engineRuntimePayload+"}\n" +
+                "radarService={authoritative="+(radarService.updatedAt>0)+", ageMs="+radarServiceAgeMs+", value="+radarService.value+", payload="+radarService.detail+"}\n" +
                 "vintedEvents=" + p.getLong("vintedEvents", 0) + "\n" +
                 "scans=" + p.getLong("scans", 0) + "\n" +
                 "lastRoot=" + p.getString("lastRoot", "") + "\n" +
@@ -1232,6 +1434,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "analysesStored=" + p.getLong("analysesStored", 0) + "\n" +
                 "classifierBlocked=" + p.getLong("classifierBlocked", 0) + "\n" +
                 "lastClassifierBlock=" + p.getString("lastClassifierBlock", "") + "\n" +
+                "lastClassifierBlockMeta=ageMs=" + (p.getLong("lastClassifierBlockAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("lastClassifierBlockAt",0))) + "; build=" + p.getString("lastClassifierBlockBuild","unknown") + "\n" +
                 "catalogStored="+p.getInt("catalogStored",-1)+"\n"+"catalogFiltered="+p.getInt("catalogFiltered",-1)+"\n"+"catalogPreset="+p.getString("catalogPreset","")+"\n"+"catalogFeed=" + all + "\n" +
                 "hot=" + hot + "\n" +
                 "good=" + good + "\n" +
@@ -1309,9 +1512,33 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "vintedPublicRequestsLocal="+p.getLong("vintedPublicRequests",0)+"\n"+
                 "vintedPublicCacheHitsLocal="+p.getLong("vintedPublicCacheHits",0)+"\n"+
                 "vintedRequestLedger={"+VintedPublicSession.requestLedgerSummary(context)+"}\n"+
+                "engineEpoch={"+engineEpochSummary+"}\n"+
                 "engineRun={"+engineRunSummary+"}\n"+
+                "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
+                "engineWaiting={"+engineWaitingSummary+"}\n"+
+                "engineSla={"+engineSlaSummary+"}\n"+
+                "engineFairness={"+engineFairnessSummary+"}\n"+
+                "bggExactIndexCutover={"+bggExactCutoverSummary+"}\n"+
+                "historicalReviewCutover={"+historicalReviewCutoverSummary+"}\n"+
+                "vintedIdleParking={"+vintedIdleParkingSummary+"}\n"+
+                "earlyPriceFilter={"+earlyPriceFilterSummary+"}\n"+
+                "manualRecoveryState={"+manualRecoveryStateSummary+"}\n"+
+                "openedVintedTarget={"+openedVintedTargetSummary+"}\n"+
+                "openedVintedVerify={"+openedVintedVerifySummary+"}\n"+
+                "catalogHealth={"+catalogHealthSummary+"}\n"+
+                "catalogRatingSweep={"+catalogRatingSweepSummary+"}\n"+
+                "lastOpenedVintedPage="+p.getString("lastOpenedVintedPage","")+"\n"+
+                "lastOpenedVintedReconcile="+p.getString("lastOpenedVintedReconcile","")+"\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+
+                "bggIdentityTrust={"+bggIdentityTrustSummary+"}\n"+
+                "bggMatchBreakdown={"+bggMatchBreakdownSummary+"}\n"+
+                "reviewBreakdown={"+reviewBreakdownSummary+"}\n"+
+                "bggHistoricalRevalidation={"+marketDiag.historicalBggRevalidationSummary()+"}\n"+
+                "bggLocalMatch={"+bggLocalMatchSummary+"}\n"+
+                "bggReviewWrite={"+bggReviewWriteSummary+"}\n"+
+                "processCrashJournal={"+processCrashSummary+"}\n"+
+                "systemExitHistory={"+systemExitSummary+"}\n"+
                 "vintedPriceRefresh={"+priceRefreshSummary+"}\n"+
                 "vintedCandidateSnapshotStore={"+VintedCandidateSnapshotStore.summary(context)+"}\n"+
                 "vintedPublicHourlyBudget="+VintedPublicSession.hourlyBudget()+"\n"+
@@ -1327,7 +1554,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "publishedMetadataResolved="+p.getLong("publishedMetadataResolved",0)+"\n"+
                 "lastPublishedLabel="+p.getString("lastPublishedLabel","")+"\n"+
                 "a11yProbeCrossProcess={authoritative=true, ageMs="+a11yCrossAgeMs+", writes="+a11yCross.value+", payload="+a11yCrossPayload+"}\n"+
-                "a11yIdentityProbe={build="+BuildConfig.VERSION_NAME+", probe=1d-local-cache, uniqueCards="+p.getLong("a11yProbeUniqueCards",0)+", runs="+p.getLong("a11yProbeRuns",0)+", nodes="+p.getLong("a11yProbeNodes",0)+", ancestorNodes="+p.getLong("a11yProbeAncestorNodes",0)+", spannedTextNodes="+p.getLong("a11yProbeSpannedTextNodes",0)+", urlSpans="+p.getLong("a11yProbeUrlSpans",0)+", clickableSpans="+p.getLong("a11yProbeClickableSpans",0)+", actionLabels="+p.getLong("a11yProbeActionLabels",0)+", extraKeys="+p.getLong("a11yProbeExtraKeys",0)+", availableExtraKeys="+p.getLong("a11yProbeAvailableExtraKeys",0)+", extraRefresh="+p.getLong("a11yProbeExtraRefreshHits",0)+"/"+p.getLong("a11yProbeExtraRefreshRequests",0)+", ancestorExplicitHits="+p.getLong("a11yProbeAncestorExplicitHits",0)+"}\n"+
+                "a11yIdentityProbe={build="+BuildConfig.VERSION_NAME+", probe=fast-explicit-only; historical1dUniqueCards="+p.getLong("a11yProbeUniqueCards",0)+", runs="+p.getLong("a11yProbeRuns",0)+", nodes="+p.getLong("a11yProbeNodes",0)+", ancestorNodes="+p.getLong("a11yProbeAncestorNodes",0)+", spannedTextNodes="+p.getLong("a11yProbeSpannedTextNodes",0)+", urlSpans="+p.getLong("a11yProbeUrlSpans",0)+", clickableSpans="+p.getLong("a11yProbeClickableSpans",0)+", actionLabels="+p.getLong("a11yProbeActionLabels",0)+", extraKeys="+p.getLong("a11yProbeExtraKeys",0)+", availableExtraKeys="+p.getLong("a11yProbeAvailableExtraKeys",0)+", extraRefresh="+p.getLong("a11yProbeExtraRefreshHits",0)+"/"+p.getLong("a11yProbeExtraRefreshRequests",0)+", ancestorExplicitHits="+p.getLong("a11yProbeAncestorExplicitHits",0)+"}\n"+
                 "a11yIdentityResult={idsTotal="+p.getLong("vintedIdsCapturedFromAccessibility",0)+", idsFromUrlSpan="+p.getLong("a11yIdsFromUrlSpan",0)+", idsFromOtherExplicitField="+p.getLong("a11yIdsFromOtherExplicitField",0)+", lastSource="+p.getString("a11yIdentityLastSource","")+", lastProbeCaptureSource="+p.getString("a11yProbeLastCaptureSource","")+"}\n"+
                 "a11yProbeLastUrlSpan="+p.getString("a11yProbeLastUrlSpan","")+"\n"+
                 "a11yProbeLastAvailableExtra="+p.getString("a11yProbeLastAvailableExtra","")+"\n"+
@@ -1336,12 +1563,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "a11yProbeLastAncestorExplicit="+p.getString("a11yProbeLastAncestorExplicit","")+"\n"+
                 "vintedIdsCapturedFromAccessibility="+p.getLong("vintedIdsCapturedFromAccessibility",0)+" / cardsParsed="+p.getLong("cardsParsedTotal",0)+"\n"+
                 "lastAccessibilityVintedId="+p.getString("lastAccessibilityVintedId","")+"\n"+
+                "manualRecovery={suppressedCards="+p.getLong("manualRecoverySuppressedCards",0)+", lastVisible="+p.getInt("manualRecoveryLastVisible",0)+", exactHintApplied="+p.getBoolean("manualRecoveryExactHintApplied",false)+", target="+safeDiag(p.getString("manualRecoveryTarget",""))+"}\n"+
                 "libraryLastError="+p.getString("libraryLastError","")+"\n"+
                 "refreshBulkRequested="+p.getBoolean("manualBulkRequested",false)+"\n"+
                  "refreshBulkMode="+p.getBoolean("refreshBulkMode",false)+"; total="+p.getInt("refreshBulkTotal",0)+"; completed="+p.getInt("refreshBulkCompleted",0)+"; queued="+p.getInt("refreshBulkQueued",0)+"; current="+p.getString("refreshBulkCurrent","")+"\n"+
                 "refreshPausedUntil="+p.getLong("refreshPausedUntil",0)+"; authoritative="+p.getLong("refreshVintedAuthoritativeUntil",0)+"; gapMs="+p.getLong("refreshVintedGapMs",0)+"; reason="+p.getString("refreshPauseReason","")+"\n"+
                 "persistentJobs={PENDING="+queueSummary.pending+", PROCESSING="+queueSummary.processing+", FAILED_RETRYABLE="+queueSummary.retryable+", FAILED_PERMANENT="+queueSummary.permanent+"}\n"+
-                "queueRunnable={vinted="+queueVintedDue+", bgg="+queueBggDue+", total="+queueDueNow+"}; nextDueAt="+queueNextDue+"; vintedActive="+queueVinted+"; vintedCore="+queueVintedCore+"; vintedDeep="+queueVintedDeep+"; bggActive="+queueBgg+"; bggUnrunnable="+queueBggBlocked+"; bggMatchRequired="+queueBggMatchRequired+"; bggMatchReview="+queueBggMatchReview+"; historicalActive="+queueHistorical+"; vintedPaused="+queueVintedPaused+"; bggPaused="+queueBggPaused+"; historicalPaused="+queueHistoricalPaused+"\n"+
+                "queueRunnable={vinted="+queueVintedDue+", bgg="+queueBggDue+", total="+queueDueNow+"}; nextDueAt="+queueNextDue+"; vintedActive="+queueVinted+"; vintedCore="+queueVintedCore+"; vintedDeep="+queueVintedDeep+"; bggActive="+queueBgg+"; bggUnrunnable="+queueBggBlocked+"; bggMatchRequired="+queueBggMatchRequired+"; bggMatchReview="+queueBggMatchReview+"; historicalActive="+queueHistorical+"; vintedPaused="+queueVintedPaused+"; bggPaused="+queueBggPaused+"; historicalPaused="+queueHistoricalPaused+"\n"+                "vintedUrgent={active="+queueUrgentVinted+", due="+queueUrgentVintedDue+", nextDueAt="+queueUrgentNext+", reserveUntil="+queueUrgentReserve+"}\n"+
                 "vintedData={missingLink="+queueMissingVinted+", partialMetadata="+queuePartialVinted+"}\n"+
                 "bggBatch={lastSize="+p.getInt("bggBatchLastSize",0)+", requests="+p.getLong("bggBatchRequests",0)+", items="+p.getLong("bggBatchItems",0)+"}\n"+
                 "queueLanes={vinted="+vintedLane.state+", detail="+firstLine(vintedLane.detail)+", heartbeatAgeMs="+(vintedLaneHeartbeat<=0?-1:Math.max(0,queueNow-vintedLaneHeartbeat))+", bgg="+bggLane.state+", detail="+firstLine(bggLane.detail)+", heartbeatAgeMs="+(bggLaneHeartbeat<=0?-1:Math.max(0,queueNow-bggLaneHeartbeat))+"}\n"+
@@ -1358,7 +1586,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
     @Override public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         if(retryRegistered)try{unregisterReceiver(retryReceiver);}catch(Exception ignored){}
-        diag().edit().putBoolean("serviceConnected", false).apply();
+        diag().edit().putBoolean("serviceConnected", false).putBoolean("engineReady",false).apply();
+        if(marketStore!=null){
+            marketStore.setDiagnosticState("radar_service",0,"build="+BuildConfig.VERSION_NAME+";state=DISCONNECTED;at="+System.currentTimeMillis());
+            marketStore.setDiagnosticState("engine_runtime",0,"build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=STOPPED");
+        }
         if (engine != null) engine.destroy();
         if (database != null) database.close();
         if (bundleScanner != null) bundleScanner.close();

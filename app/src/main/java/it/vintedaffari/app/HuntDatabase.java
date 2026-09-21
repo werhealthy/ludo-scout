@@ -35,6 +35,17 @@ public final class HuntDatabase extends SQLiteOpenHelper {
     }
     public synchronized void markNotified(long id,long now){ContentValues v=new ContentValues();v.put("last_notified_at",now);getWritableDatabase().update("hunts",v,"id=?",new String[]{String.valueOf(id)});}
 
+    /** A Hunt is explicit intent: an otherwise valid exact game may enter the Vinted fast lane
+     * even when it is not a resale bargain. An explicit max price is still respected. */
+    public static boolean wantsCandidate(Context context,String bggId,Integer totalCents){
+        if(context==null||bggId==null||bggId.isEmpty())return false;
+        int total=totalCents==null?Integer.MAX_VALUE:Math.max(0,totalCents);
+        HuntDatabase db=new HuntDatabase(context);boolean hit=false;
+        try(Cursor c=db.getReadableDatabase().rawQuery("SELECT 1 FROM hunts WHERE bgg_id=? AND (target_cents IS NULL OR ?<=target_cents) LIMIT 1",new String[]{bggId,String.valueOf(total)})){hit=c.moveToFirst();}
+        finally{db.close();}
+        return hit;
+    }
+
     public static boolean evaluateAndNotify(Context context,GameAnalysis a,DealRecord d){if(a==null||a.bggId==null)return false;return evaluateAndNotifyLinked(context,d,a.bggId);}
     public static boolean evaluateAndNotifyLinked(Context context,DealRecord d){return evaluateAndNotifyLinked(context,d,d==null?null:d.bggId);}
     private static boolean evaluateAndNotifyLinked(Context context,DealRecord d,String bggId){
