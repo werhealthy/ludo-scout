@@ -322,9 +322,10 @@ public final class QueueJobRunner {
             return;
         }
 
-        // Deep metadata is optional: once the core id/url is known it must never clog the user-visible
-        // queue. Two deterministic misses are enough; keep the core listing and stop retrying.
-        if(MarketStore.JOB_VINTED_DEEP.equals(job.type)&&isDeterministicMiss(reason)&&job.attempt>=2){
+        // Deep metadata is optional for ordinary automatic work. A card explicitly resumed from
+        // the recovery station is different: its exact-page pass is part of the user's repair flow
+        // and therefore gets the same three-attempt confidence gate as core recovery.
+        if(MarketStore.JOB_VINTED_DEEP.equals(job.type)&&isDeterministicMiss(reason)&&job.attempt>=2&&!MarketStore.MANUAL_RECOVERY_SOURCE.equals(job.source)){
             if(!market.isBggVariantPending(job.listingId)){market.completeJob(job);return;}
             String variantReason="Pagina Vinted non ha fornito abbastanza testo per confermare la variante BGG";
             if(market.hasExplicitUserPriorityHistory(job.listingId)){
@@ -339,21 +340,32 @@ public final class QueueJobRunner {
         // go back to the deferred pool for a later fresh attempt.
         if("DEFERRED_LINK".equals(job.source) && isDeterministicMiss(reason)){
             if(market.listingBelongsToActiveRun(job.listingId)){
-                if(job.attempt>=2){settleAutomaticAmbiguity(market,job,reason);return;}
+                if(job.attempt>=3){settleAutomaticAmbiguity(market,job,reason);return;}
                 market.retryJob(job,reason,System.currentTimeMillis()+2L*60_000L);return;
             }
             market.deferBackgroundLink(job,reason,System.currentTimeMillis()+24L*60*60_000L);return;
         }
 
+        // Historical catalog recovery is intentionally self-cleaning. It gets three real,
+        // deterministic attempts, but it must never flood the user's new recovery inbox.
+        if(MarketStore.CATALOG_RECOVERY_SOURCE.equals(job.source)&&isDeterministicMiss(reason)&&job.attempt>=3){
+            String sig=market.archiveUnresolvedListing(job.listingId,"Catalogo storico: annuncio non identificabile dopo 3 tentativi");
+            if(!TextUtils.isEmpty(sig))db.markUnavailable(sig,"Catalogo storico: annuncio Vinted non più identificabile");
+            try{DealRecord legacy=TextUtils.isEmpty(sig)?null:db.findBySignature(sig);if(legacy!=null)new BundleDatabase(context).invalidate(legacy);}catch(Throwable ignored){}
+            market.setDiagnosticState("catalog_health",2,"build=catalog-health-v2;state=ARCHIVED_UNRESOLVED;listing="+job.listingId+";attempts="+job.attempt);
+            return;
+        }
+
         // A 404 on the actual public item page is actionable information, not a network retry loop.
-        // Surface it immediately so the user can archive the stale listing or explicitly retry it.
+        // Current-run rows may enter the recovery station; historical catalog recovery is handled
+        // above and is archived automatically.
         if(MarketStore.JOB_VINTED.equals(job.type)&&isGoneVintedPage(reason)){
             settleAutomaticAmbiguity(market,job,reason);return;
         }
 
         // A core search that repeatedly returns equally plausible candidates is not a network outage.
         // Give fresh data one second chance, then surface it as a manual-review case.
-        if (isDeterministicMiss(reason) && job.attempt >= 2) {
+        if (isDeterministicMiss(reason) && job.attempt >= 3) {
             settleAutomaticAmbiguity(market,job,reason);
             return;
         }
@@ -377,7 +389,9 @@ public final class QueueJobRunner {
     }
 
     private static void settleAutomaticAmbiguity(MarketStore market,MarketStore.Job job,String reason){
-        if(MarketStore.isExplicitUserPriority(job))market.needsReview(job,reason);
+        // A current Motore card reaches the human station only after repeated deterministic misses.
+        // Background/history ambiguity remains automatic so the inbox cannot grow without bound.
+        if(market.listingBelongsToActiveRun(job.listingId)||MarketStore.isExplicitUserPriority(job))market.needsReview(job,reason);
         else market.autoExcludeJob(job,reason);
     }
 
