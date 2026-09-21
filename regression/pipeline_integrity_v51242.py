@@ -58,7 +58,7 @@ checks = [
     ("category incompatibility beats title match",
      "CATEGORY_INCOMPATIBLE" in market and "isExplicitNonGameCategory" in listing),
     ("catalog count is derived from rendered base query",
-     "final int catalogEligible=list.size();" in catalog and "catalogEligible+" annunci pronti" in catalog),
+     "final int catalogEligible=list.size();" in catalog and 'catalogEligible+" annunci pronti' in catalog),
     ("catalog empty state no longer reports all stored rows",
      'db.countDeals(null)+" annunci salvati' not in catalog),
     ("activity wake has no UI-thread reconciliation",
