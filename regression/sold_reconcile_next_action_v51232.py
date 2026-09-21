@@ -15,7 +15,8 @@ core_summary=market[market.index("public String engineCoreRemainingSummary"):mar
 resume=ui[ui.index("@Override protected void onResume"):ui.index("@Override protected void onPause")]
 
 checks=[
-    ("release identity", "5.12.32-sold-reconcile-next-action" in build),
+    ("sold/next-action release lineage keeps app identity",
+     "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
     ("sold parser recognizes sold and unavailable wording",
      "venduto|venduta|sold" in parser and "non più disponibile" in parser and "item unavailable" in parser),
     ("accessibility sold reconciliation does not require legacy mirror",

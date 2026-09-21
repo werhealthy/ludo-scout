@@ -187,6 +187,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
                     "(l.legacy_signature=deals.signature OR (deals.vinted_item_id IS NOT NULL AND l.vinted_item_id=deals.vinted_item_id)) "+
                     "AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' "+
                     "AND COALESCE(l.manual_review_required,0)=0 AND g.match_state='MATCHED' AND g.bgg_id=deals.bgg_id "+
+                    "AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
                     "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')))";
         }
         a.add(String.valueOf(Math.max(1,limit)));
