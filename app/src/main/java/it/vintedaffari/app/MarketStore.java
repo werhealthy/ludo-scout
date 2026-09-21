@@ -52,6 +52,7 @@ public final class MarketStore {
     public static final String CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH";
     public static final String CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY";
     public static final String MANUAL_RECOVERY_SOURCE = "MANUAL_RECOVERY";
+    public static final String OPENED_VERIFY_SOURCE = "OPENED_VERIFY";
     private static final long CATALOG_HEALTH_MAX_AGE_MS=24L*60L*60_000L;
     private static final long CATALOG_RECOVERY_MIN_AGE_MS=30L*60_000L;
     private static final String BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:";
@@ -1252,7 +1253,7 @@ public final class MarketStore {
         db.beginTransaction();try{
             try(Cursor c=db.rawQuery("SELECT lifecycle,vinted_url FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)})){
                 if(c.moveToFirst()&&"ACTIVE".equals(c.getString(0))&&!TextUtils.isEmpty(c.getString(1))){
-                    enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,245,"OPENED_VERIFY");queued=true;
+                    enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,245,OPENED_VERIFY_SOURCE);queued=true;
                 }
             }
             db.setTransactionSuccessful();
