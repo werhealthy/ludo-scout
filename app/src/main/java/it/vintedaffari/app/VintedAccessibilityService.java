@@ -494,12 +494,12 @@ public final class VintedAccessibilityService extends AccessibilityService {
                             continue;
                         }
                     }
-                    // Once the local database knows another valid listing of the same game, Vinted
-                    // becomes the primary used-market benchmark. The current card is excluded.
+                    // Local Vinted asking prices refine the used-market prior. With a small sample
+                    // they are blended with BGG; only a mature local sample may stand alone.
                     Integer localRef=null;
                     if(marketStore!=null&&ga!=null&&!TextUtils.isEmpty(ga.bggId)){
-                        localRef=marketStore.localVintedReferenceCents(ga.bggId,DealDatabase.signature(card),ga.languageCode);
-                        if(localRef!=null&&localRef>0)ga=ga.withUsedMarketBenchmark(localRef,"vinted_local_median","Vinted · prezzo tipico tra annunci comparabili");
+                        localRef=marketStore.localVintedReferenceCents(ga.bggId,DealDatabase.signature(card),ga.languageCode,ga.benchmarkCents);
+                        if(localRef!=null&&localRef>0)ga=ga.withUsedMarketBenchmark(localRef,"vinted_local_evidence","Vinted locale + riferimento usato");
                     }
                     database.record(card, ga, analyzedListing, t);
                     if(marketStore!=null){marketStore.applyAnalysis(card,ga,analyzedListing,t);if(localRef!=null&&ga!=null&&!TextUtils.isEmpty(ga.bggId))marketStore.refreshLocalVintedBenchmarksForBgg(ga.bggId);}
