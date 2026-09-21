@@ -1,5 +1,17 @@
 # Ludo Scout — Changelog
 
+## 5.12.35 — Pricing decisions + bundle exploration
+- Added a single pricing decision layer: **Offertona**, **Buon prezzo**, **Prova un'offerta**, **Prezzo giusto** and **Pochi dati**. Overpriced rows use an internal reject state and leave product surfaces automatically; raw market history is preserved.
+- Used-market semantics are now explicit: the BGG median is the typical used value, while Q25 remains a lower market band used only for stronger deal evidence. The compact offline BGG index now reads its median column instead of the lower-band column.
+- Local Vinted asking-price evidence no longer takes over from only three observations. Samples of 3–7 comparables are blended with the BGG/prior reference; from 8 comparable listings onward the local median may stand alone.
+- Offer suggestions are solved backwards from the all-in purchase target and are shown only for plausible 5–15% reductions.
+- Discover remains selective to Offertona / Buon prezzo / Prova un'offerta. Catalog can retain fair/insufficient-data rows; price-rejected rows remain market evidence but do not consume ordinary Vinted identity work.
+- Bundle suggestions now include promising sellers surfaced from a strong game as well as economic leads. Opening Vinted from Bundle keeps the existing short-lived seller-exploration intent used by Accessibility.
+- Unknown bundle shipping is no longer presented as a precise all-in total or saving. The UI shows the suggested bundle offer and asks to verify the final shipping on Vinted.
+- Recommendation ranking and high-signal notifications consume the same central pricing decision instead of separate raw-discount thresholds. Notifications keep the stricter 30% all-in gate.
+- Added JUnit pricing cases plus `regression/pricing_bundle_decisions_v51235.py`; PR/beta CI run both before compilation/build.
+- No database schema migration, request-rate increase, signing/applicationId change or CI versionCode-strategy change.
+
 ## Git workflow / CI bootstrap
 - Published the Git-ready 5.12.3 baseline to private GitHub repository `werhealthy/ludo-scout`.
 - Created `beta` from `main` for test-build integration.
