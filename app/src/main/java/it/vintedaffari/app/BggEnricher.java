@@ -144,7 +144,7 @@ public final class BggEnricher {
     }
 
     private static BggMetadata parseMetadata(String bggId,Element item){
-        BggMetadata m=new BggMetadata();m.bggId=bggId;m.thumbnailUrl=text(item,"thumbnail");m.imageUrl=text(item,"image");m.description=text(item,"description");
+        BggMetadata m=new BggMetadata();m.bggId=bggId;m.itemType=item.getAttribute("type");m.thumbnailUrl=text(item,"thumbnail");m.imageUrl=text(item,"image");m.description=text(item,"description");
         m.year=intAttr(item,"yearpublished");m.minPlayers=intAttr(item,"minplayers");m.maxPlayers=intAttr(item,"maxplayers");m.playtime=intAttr(item,"playingtime");m.minAge=intAttr(item,"minage");
         LinkedHashSet<String> alt=new LinkedHashSet<>();NodeList names=item.getElementsByTagName("name");
         for(int i=0;i<names.getLength();i++){Element e=(Element)names.item(i);String v=e.getAttribute("value");if(TextUtils.isEmpty(v))continue;if("primary".equals(e.getAttribute("type"))&&TextUtils.isEmpty(m.name))m.name=v;else alt.add(v);}
