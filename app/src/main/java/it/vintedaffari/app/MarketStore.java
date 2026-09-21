@@ -2923,7 +2923,17 @@ public final class MarketStore {
 
     private long upsertMatchedGame(SQLiteDatabase db, GameAnalysis a, String observedTitle, long now) {
         Long id=scalarLong(db,"SELECT id FROM games WHERE bgg_id=?",new String[]{a.bggId});
-        if(id==null){ContentValues v=new ContentValues();v.put("bgg_id",a.bggId);String name=!TextUtils.isEmpty(a.gameName)?a.gameName:observedTitle;v.put("canonical_name",safe(name));v.put("normalized_name",normalize(name));put(v,"rating",a.averageRating);put(v,"voters",a.voters);put(v,"bgg_rank",a.rank);v.put("bgg_url","https://boardgamegeek.com/boardgame/"+a.bggId);v.put("match_state","MATCHED");put(v,"match_confidence",a.matchConfidence);v.put("first_seen",now);v.put("last_seen",now);id=db.insertOrThrow("games",null,v);}else{ContentValues v=new ContentValues();if(!TextUtils.isEmpty(a.gameName)){v.put("canonical_name",a.gameName);v.put("normalized_name",normalize(a.gameName));}put(v,"rating",a.averageRating);put(v,"voters",a.voters);put(v,"bgg_rank",a.rank);put(v,"match_confidence",a.matchConfidence);v.put("match_state","MATCHED");v.put("last_seen",now);v.put("database_visible",1);v.putNull("filter_reason");db.update("games",v,"id=?",new String[]{String.valueOf(id)});}return id;
+        boolean knownLow=a.averageRating!=null&&a.averageRating<DealPolicy.MIN_BGG_RATING;
+        if(id==null){
+            ContentValues v=new ContentValues();v.put("bgg_id",a.bggId);String name=!TextUtils.isEmpty(a.gameName)?a.gameName:observedTitle;v.put("canonical_name",safe(name));v.put("normalized_name",normalize(name));put(v,"rating",a.averageRating);put(v,"voters",a.voters);put(v,"bgg_rank",a.rank);v.put("bgg_url","https://boardgamegeek.com/boardgame/"+a.bggId);v.put("match_state","MATCHED");put(v,"match_confidence",a.matchConfidence);v.put("first_seen",now);v.put("last_seen",now);
+            if(a.averageRating!=null){v.put("database_visible",knownLow?0:1);if(knownLow)v.put("filter_reason","BGG_RATING_BELOW_6");else v.putNull("filter_reason");}
+            id=db.insertOrThrow("games",null,v);
+        }else{
+            ContentValues v=new ContentValues();if(!TextUtils.isEmpty(a.gameName)){v.put("canonical_name",a.gameName);v.put("normalized_name",normalize(a.gameName));}put(v,"rating",a.averageRating);put(v,"voters",a.voters);put(v,"bgg_rank",a.rank);put(v,"match_confidence",a.matchConfidence);v.put("match_state","MATCHED");v.put("last_seen",now);
+            if(a.averageRating!=null){v.put("database_visible",knownLow?0:1);if(knownLow)v.put("filter_reason","BGG_RATING_BELOW_6");else v.putNull("filter_reason");}
+            db.update("games",v,"id=?",new String[]{String.valueOf(id)});
+        }
+        return id;
     }
 
     private long upsertProvisionalGame(SQLiteDatabase db,String title,String state,Double confidence,long now){
