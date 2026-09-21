@@ -62,8 +62,8 @@ checks=[
     ("historical uncertainty is a hold, not a fake question",
      "String trustHold=" in range_block and "MATCH_UNCERTAIN" in range_block and
      "heldListings" in deal and "s.completeListings+s.reviewListings+s.heldListings" in deal),
-    ("Motore UI separates actions from held results",
-     "Da controllare · facoltativo" in ui and "nessuna azione richiesta" in ui and
+    ("Motore UI separates recovery actions from held results",
+     'renderEngineHeader("Da completare"' in ui and "nessuna azione richiesta" in ui and
      "Non pubblicata automaticamente" in ui),
     ("extreme price filter runs before deferred Vinted promotion",
      "filterClearlyOverpricedAutomaticListings(now);" in promotion and

@@ -187,7 +187,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
                     "(l.legacy_signature=deals.signature OR (deals.vinted_item_id IS NOT NULL AND l.vinted_item_id=deals.vinted_item_id)) "+
                     "AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' "+
                     "AND COALESCE(l.manual_review_required,0)=0 AND g.match_state='MATCHED' AND g.bgg_id=deals.bgg_id "+
-                    "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.job_type<>'VINTED_DEEP_ENRICHMENT' AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')))";
+                    "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')))";
         }
         a.add(String.valueOf(Math.max(1,limit)));
         Cursor c=getReadableDatabase().rawQuery("SELECT "+COLS+" FROM deals WHERE "+where+" ORDER BY last_seen DESC LIMIT ?",a.toArray(new String[0]));
@@ -243,7 +243,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         // holds stay non-publishable, but must not masquerade as a question for the user.
         String attention="("+eligible+" AND (COALESCE(l.manual_review_required,0)=1 OR (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id=''))))";
         String trustHold="("+eligible+" AND NOT "+attention+" AND (l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')))";
-        String ready=vinted+" AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT "+trustHold+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.job_type<>'VINTED_DEEP_ENRICHMENT' AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
+        String ready=vinted+" AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT "+trustHold+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
         // Product truth, independent from queue materialisation: a BGG-ready listing whose exact
         // Vinted id/url is still missing remains remote work even while temporarily DEFERRED_LINK.
         String coreRemaining=bgg+" AND NOT "+attention+" AND NOT "+trustHold+" AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='')";
