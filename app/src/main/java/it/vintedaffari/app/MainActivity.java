@@ -516,13 +516,34 @@ private void showFilterSheet(){
 
     private void renderBundles(){
         LinearLayout h=new LinearLayout(this);h.setGravity(Gravity.CENTER_VERTICAL);h.setPadding(0,dp(8),0,dp(8));h.addView(text("Bundle",32,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));body.addView(h);
-        List<DealRecord> sources=uniqueBundleSources(db.getDeals("all",900));sortBundleSources(sources);
+        List<DealRecord> allBundleDeals=db.getDeals("trusted_any_price",900);List<DealRecord> sources=uniqueBundleSources(allBundleDeals);sources.removeIf(d->bundleDealsForSource(d).size()<2);sortBundleSources(sources);List<DealRecord> prospects=bundleProspects(allBundleDeals,sources);
         FrameLayout hero=new FrameLayout(this);hero.setClipChildren(true);ImageView scenic=new ImageView(this);scenic.setImageResource(R.drawable.ludo_bg_bundle_glow);scenic.setScaleType(ImageView.ScaleType.CENTER_CROP);scenic.setAlpha(.38f);hero.addView(scenic,new FrameLayout.LayoutParams(-1,-1));View veil=new View(this);veil.setBackground(verticalGradient(Color.argb(30,7,19,25),Color.argb(180,7,19,25)));hero.addView(veil,new FrameLayout.LayoutParams(-1,-1));LinearLayout heroCopy=new LinearLayout(this);heroCopy.setOrientation(LinearLayout.VERTICAL);heroCopy.setPadding(dp(18),dp(12),dp(150),dp(18));TextView heroSub=text(sources.isEmpty()?"Qui compariranno solo bundle con almeno due giochi solidi.":"Prima la qualità dei giochi, poi il risparmio.",14,MUTED,Typeface.NORMAL);heroSub.setPadding(0,dp(6),0,0);heroCopy.addView(heroSub);hero.addView(heroCopy,new FrameLayout.LayoutParams(-1,-1));ImageView art=new ImageView(this);art.setImageResource(R.drawable.ludo_bundle_gift);art.setScaleType(ImageView.ScaleType.FIT_CENTER);FrameLayout.LayoutParams ap=new FrameLayout.LayoutParams(dp(128),dp(128),Gravity.END|Gravity.BOTTOM);ap.rightMargin=dp(4);ap.bottomMargin=dp(-2);hero.addView(art,ap);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,dp(154));hp.leftMargin=-dp(18);hp.rightMargin=-dp(18);hp.bottomMargin=dp(8);body.addView(hero,hp);
         HorizontalScrollView bundleFilterScroll=new HorizontalScrollView(this);bundleFilterScroll.setHorizontalScrollBarEnabled(false);LinearLayout chips=new LinearLayout(this);chips.setPadding(0,dp(6),0,dp(10));addBundleSortChip(chips,"Convenienza","deal");addBundleSortChip(chips,"Prezzo","price");addBundleSortChip(chips,"Più giochi","size");bundleFilterScroll.addView(chips);body.addView(bundleFilterScroll,new LinearLayout.LayoutParams(-1,dp(54)));
-        if(sources.isEmpty()){
-            LinearLayout empty=verticalCard();empty.setGravity(Gravity.CENTER);empty.setPadding(dp(18),dp(14),dp(18),dp(14));ImageView art2=new ImageView(this);art2.setImageResource(R.drawable.ludo_bundle_gift);art2.setScaleType(ImageView.ScaleType.FIT_CENTER);empty.addView(art2,new LinearLayout.LayoutParams(-1,dp(150)));TextView title=text("Ancora niente qui",21,TEXT,Typeface.BOLD);title.setGravity(Gravity.CENTER);empty.addView(title);TextView sub=text("Apri Vinted, scorri qualche annuncio e poi torna qui: Ludo ricontrollerà seller, link e dati mancanti.",13,MUTED,Typeface.NORMAL);sub.setGravity(Gravity.CENTER);empty.addView(sub);LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);Button retry=button("Ricontrolla dati",CYAN);retry.setOnClickListener(v->startMissingDataRefresh());actions.addView(retry,new LinearLayout.LayoutParams(0,dp(48),1));Button activity=button("Impostazioni / attività",SURFACE2);activity.setTextColor(TEXT);activity.setOnClickListener(v->settings());LinearLayout.LayoutParams ap2=new LinearLayout.LayoutParams(0,dp(48),1);ap2.leftMargin=dp(8);actions.addView(activity,ap2);LinearLayout.LayoutParams alp=new LinearLayout.LayoutParams(-1,dp(48));alp.topMargin=dp(12);empty.addView(actions,alp);LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(-1,-2);body.addView(empty,ep);
-        }else for(DealRecord d:sources)body.addView(bundleStrip(d));
+        if(!sources.isEmpty()){sectionTitle("Bundle trovati",null);for(DealRecord d:sources)body.addView(bundleStrip(d));}
+        if(!prospects.isEmpty()){sectionTitle("Venditori da esplorare",null);TextView hint=text("Giochi forti con un venditore noto: apri Vinted e guarda se nel suo catalogo c’è un secondo gioco interessante.",13,MUTED,Typeface.NORMAL);hint.setPadding(0,0,0,dp(10));body.addView(hint);for(DealRecord d:prospects)body.addView(bundleProspectCard(d));}
+        if(sources.isEmpty()&&prospects.isEmpty()){
+            LinearLayout empty=verticalCard();empty.setGravity(Gravity.CENTER);empty.setPadding(dp(18),dp(14),dp(18),dp(14));ImageView art2=new ImageView(this);art2.setImageResource(R.drawable.ludo_bundle_gift);art2.setScaleType(ImageView.ScaleType.FIT_CENTER);empty.addView(art2,new LinearLayout.LayoutParams(-1,dp(150)));TextView title=text("Ancora niente qui",21,TEXT,Typeface.BOLD);title.setGravity(Gravity.CENTER);empty.addView(title);TextView sub=text("Ludo mostrerà sia bundle reali sia venditori interessanti da esplorare, senza inventare combinazioni.",13,MUTED,Typeface.NORMAL);sub.setGravity(Gravity.CENTER);empty.addView(sub);body.addView(empty,new LinearLayout.LayoutParams(-1,-2));
+        }
     }
+
+    private List<DealRecord> bundleProspects(List<DealRecord> deals,List<DealRecord> confirmed){
+        Set<String> confirmedSellers=new HashSet<>();if(confirmed!=null)for(DealRecord d:confirmed)if(!TextUtils.isEmpty(d.sellerId))confirmedSellers.add(d.sellerId);
+        Map<String,DealRecord> best=new LinkedHashMap<>();if(deals!=null)for(DealRecord d:deals){
+            if(d==null||TextUtils.isEmpty(d.sellerId)||TextUtils.isEmpty(d.vintedUrl)||confirmedSellers.contains(d.sellerId)||!bundleGameEligible(d))continue;
+            boolean strong=(d.rating!=null&&d.rating>=7.2)||personalDealEligible(d);if(!strong)continue;
+            DealRecord old=best.get(d.sellerId);if(old==null||relevance(d)>relevance(old))best.put(d.sellerId,d);
+        }
+        List<DealRecord> out=new ArrayList<>(best.values());out.sort((a,b)->Double.compare(relevance(b),relevance(a)));return out.size()>8?new ArrayList<>(out.subList(0,8)):out;
+    }
+
+    private View bundleProspectCard(DealRecord d){
+        LinearLayout card=verticalCard();card.setPadding(dp(12),dp(12),dp(12),dp(12));LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(dealArtworkView(d,dp(78),dp(102)),new LinearLayout.LayoutParams(dp(78),dp(102)));
+        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(14),0,dp(8),0);copy.addView(materialChip("ESPLORA VENDITORE",SURFACE2,CYAN,true),new LinearLayout.LayoutParams(-2,dp(32)));TextView title=text(name(d),17,TEXT,Typeface.BOLD);title.setMaxLines(2);copy.addView(title);String seller=TextUtils.isEmpty(d.sellerName)?"Venditore Vinted":"@"+d.sellerName;copy.addView(text(seller+" · ★ "+scoreLabel(d),12,MUTED,Typeface.BOLD));copy.addView(text("Questo gioco è abbastanza interessante da giustificare un controllo del catalogo del venditore.",12,MUTED,Typeface.NORMAL));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));TextView action=text("Apri  ›",14,CYAN,Typeface.BOLD);action.setGravity(Gravity.CENTER);row.addView(action,new LinearLayout.LayoutParams(dp(70),dp(48)));card.addView(row);card.setOnClickListener(v->openBundleProspect(d));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);card.setLayoutParams(lp);return card;
+    }
+
+    private void openBundleProspect(DealRecord d){if(d==null)return;BundleExploration.begin(this,d);getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("bundleExploreSource",d.signature==null?"":d.signature).putString("bundleExploreSeller",d.sellerId==null?"":d.sellerId).putLong("bundleExploreStartedAt",System.currentTimeMillis()).apply();recordAction("bundle:explore:"+d.signature);openVinted(d);}
+
+
     private void sortBundleSources(List<DealRecord> sources){
         if(sources==null)return;
         if("price".equals(bundleSort))sources.sort(Comparator.comparingInt(d->bundlePlan(bundleDealsForSource(d)).totalCents));
@@ -1114,45 +1135,6 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         for(int i=0;i<sessions.size();i++){DealDatabase.ObservationSession s=sessions.get(i);LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(LinearLayout.VERTICAL);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(13),0,dp(13));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.addView(text("Scroll · "+engineTime(s.startAt),16,TEXT,Typeface.BOLD));copy.addView(text(s.observations+" card · "+s.validListings+" giochi trovati",12,MUTED,Typeface.NORMAL));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));boolean isWaiting=db.isObservationSessionWaiting(s),isDeferred=db.isObservationSessionDeferred(s);boolean isActive=activeRun!=null&&activeRun.startAt==s.startAt;String status=isDeferred?"In pausa · riprenderà":(isWaiting?"In attesa":(isActive?((s.completeListings+s.reviewListings+s.heldListings)+" / "+s.validListings+" elaborati · in corso"):(s.completeListings+" pronte"+(s.reviewListings>0?" · "+s.reviewListings+" da controllare":"")+(s.heldListings>0?" · "+s.heldListings+" trattenute":""))));int statusColor=(isWaiting||isDeferred)?MUTED:(isActive&&!DealDatabase.engineContentSettled(s)?YELLOW:(DealDatabase.engineContentSettled(s)?TEAL:YELLOW));TextView st=text(status,12,statusColor,Typeface.BOLD);st.setGravity(Gravity.RIGHT);row.addView(st);TextView arrow=text("›",28,MUTED,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(34),dp(48)));row.setOnClickListener(v->openObservationSession(s));wrap.addView(row);if(i<sessions.size()-1)wrap.addView(engineDivider());body.addView(wrap);}
     }
 
-    private void renderOperationsLegacyPage(){
-        lastQueueUiRenderAt=System.currentTimeMillis();
-        int incomplete=marketStore.incompleteListingCount(),unqueued=marketStore.unqueuedIncompleteCount();
-        LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);TextView back=text("‹",40,TEXT,Typeface.NORMAL);back.setGravity(Gravity.CENTER);back.setOnClickListener(v->onBackPressed());head.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));head.addView(text("Attività",30,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));
-        TextView missingAction=text(unqueued>0?"↻":"✓",22,unqueued>0?CYAN:MUTED,Typeface.BOLD);missingAction.setGravity(Gravity.CENTER);missingAction.setContentDescription(unqueued>0?"Aggiungi i dati mancanti alle attività":(incomplete>0?"Tutti i dati mancanti sono già nelle attività":"Nessun dato mancante"));if(unqueued>0)missingAction.setOnClickListener(v->startMissingDataRefresh());head.addView(missingAction,new LinearLayout.LayoutParams(dp(44),dp(48)));
-        TextView prefs=text("⚙",24,CYAN,Typeface.NORMAL);prefs.setGravity(Gravity.CENTER);prefs.setContentDescription("Impostazioni");prefs.setOnClickListener(v->settings());head.addView(prefs,new LinearLayout.LayoutParams(dp(48),dp(48)));body.addView(head);
-
-        addQueueControlPanels();
-        addLocalBacklogOptimizer();
-        uiUpdates.removeCallbacks(activityStatusPulse);uiUpdates.postDelayed(activityStatusPulse,4_000L);
-
-        List<MarketStore.Job> priorityJobs=marketStore.activePriorityJobs(12);
-        if(!priorityJobs.isEmpty()){List<MarketStore.Job> runningJobs=new ArrayList<>(),queuedJobs=new ArrayList<>();for(MarketStore.Job job:priorityJobs){if(MarketStore.JOB_BGG.equals(job.type))continue;if(MarketStore.PROCESSING.equals(job.state))runningJobs.add(job);else queuedJobs.add(job);}if(!runningJobs.isEmpty()){sectionHeader("","Vinted · in corso","",null,null);for(MarketStore.Job job:runningJobs)body.addView(persistentJobCard(job,false));}if(!queuedJobs.isEmpty()){sectionHeader("",runningJobs.isEmpty()?"Vinted · in coda":"Vinted · prossime","",null,null);for(MarketStore.Job job:queuedJobs)body.addView(persistentJobCard(job,false));}}
-
-        List<MarketStore.Job> bggJobs=marketStore.activeBggJobs(6);if(!bggJobs.isEmpty()){List<MarketStore.Job> bggRunning=new ArrayList<>(),bggQueued=new ArrayList<>();for(MarketStore.Job job:bggJobs){if(MarketStore.PROCESSING.equals(job.state))bggRunning.add(job);else bggQueued.add(job);}if(!bggRunning.isEmpty()){sectionHeader("","BGG · in corso","",null,null);for(MarketStore.Job job:bggRunning)body.addView(persistentJobCard(job,false));}if(!bggQueued.isEmpty()){sectionHeader("",bggRunning.isEmpty()?"BGG · in coda":"BGG · prossime","",null,null);for(MarketStore.Job job:bggQueued)body.addView(persistentJobCard(job,false));}}
-
-        List<MarketStore.Job> reviewJobs=marketStore.reviewJobs(8);
-        if(!reviewJobs.isEmpty()){sectionHeader("","Da verificare · Vinted","",null,null);for(MarketStore.Job job:reviewJobs)body.addView(reviewJobCard(job));}
-        List<GameRecord> bggReview=marketStore.bggMatchReviewGames(4);
-        if(!bggReview.isEmpty()){sectionHeader("","Da verificare · BGG","",null,null);for(GameRecord game:bggReview)body.addView(bggMatchReviewCard(game));}
-
-        int historical=marketStore.historicalActiveCount();
-        if(historical>0){
-            sectionHeader("","Database · "+historical,"",null,null);
-            for(MarketStore.Job job:marketStore.historicalJobs(0,databaseJobsVisible))body.addView(persistentJobCard(job,true));
-            if(databaseJobsVisible<historical){Button more=button("Mostra altri",SURFACE2);more.setTextColor(CYAN);more.setOnClickListener(v->{databaseJobsVisible=Math.min(historical,databaseJobsVisible+6);render();});LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-1,dp(44));mp.bottomMargin=dp(8);body.addView(more,mp);}
-        }
-
-        List<OperationCenter.Task> tasks=OperationCenter.userTasks(this);
-        addOperationGroup("Altre attività",tasks,OperationCenter.RUNNING,6);
-        addOperationGroup("In attesa",tasks,OperationCenter.PAUSED,6);
-        addOperationGroup("Da avviare",tasks,OperationCenter.QUEUED,6);
-        addOperationGroup("Serve attenzione",tasks,OperationCenter.ERROR,6);
-
-        int durableDone=marketStore.userVisibleCompletedSince(System.currentTimeMillis()-24L*60*60_000L);int otherDone=0;for(OperationCenter.Task t:tasks)if(OperationCenter.DONE.equals(t.state))otherDone++;int doneTotal=durableDone+otherDone;
-        if(doneTotal>0){TextView toggle=text("Completate · "+doneTotal+(showActivityHistory?"  ⌃":"  ⌄"),14,MUTED,Typeface.BOLD);toggle.setGravity(Gravity.CENTER_VERTICAL);toggle.setPadding(dp(4),dp(8),0,dp(8));toggle.setMinHeight(dp(46));toggle.setContentDescription((showActivityHistory?"Comprimi":"Espandi")+" attività completate");toggle.setOnClickListener(v->{showActivityHistory=!showActivityHistory;render();});body.addView(toggle);if(showActivityHistory){List<MarketStore.Job> completedJobs=marketStore.recentCompletedJobs(8);for(MarketStore.Job job:completedJobs)body.addView(persistentJobCard(job,MarketStore.HISTORICAL_SOURCE.equals(job.source)));addOperationGroup("Altre completate",tasks,OperationCenter.DONE,10);}}
-        TextView debugToggle=text(showBundleDebug?"Nascondi diagnostica":"Diagnostica tecnica",13,MUTED,Typeface.NORMAL);debugToggle.setGravity(Gravity.CENTER_VERTICAL);debugToggle.setMinHeight(dp(44));debugToggle.setOnClickListener(v->{showBundleDebug=!showBundleDebug;render();});body.addView(debugToggle);
-        if(showBundleDebug){addBundleDiagnostics(body);Map<String,Integer> states=bundleDb.statusCounts();StringBuilder stateText=new StringBuilder();for(String k:BundleDatabase.STATUSES){Integer n=states.get(k);if(n!=null&&n>0){if(stateText.length()>0)stateText.append("  ·  ");stateText.append(k).append(' ').append(n);}}if(stateText.length()>0)body.addView(text(stateText.toString(),12,MUTED,Typeface.NORMAL));Button copy=button("Copia diagnostica",SURFACE2);copy.setTextColor(MUTED);copy.setOnClickListener(v->{((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Ludo Scout",VintedAccessibilityService.diagnostics(this)));Toast.makeText(this,"Diagnostica copiata",Toast.LENGTH_SHORT).show();});LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-1,dp(44));clp.topMargin=dp(8);body.addView(copy,clp);}
-    }
 
     private void addQueueControlPanels(){
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,dp(12),0,dp(4));View v=queueControlPanel(true);View b=queueControlPanel(false);row.addView(v,new LinearLayout.LayoutParams(0,dp(138),1));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,dp(138),1);bp.leftMargin=dp(10);row.addView(b,bp);body.addView(row);
