@@ -998,7 +998,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
             if(!TextUtils.isEmpty(page.publishedLabel))database.updatePublishedLabel(sig,page.publishedLabel);
             if(!TextUtils.isEmpty(page.sellerName))database.updateSellerNameHint(sig,page.sellerName);
             if(page.itemPrice>0)database.updateVerifiedCurrentPrice(sig,priceCents,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0),System.currentTimeMillis());
-            if(marketStore!=null&&exactListingId>0)marketStore.updateExactProductMetadata(exactListingId,page.sellerName,page.publishedLabel,page.itemPrice>0?priceCents:null,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0));
+            if(marketStore!=null&&exactListingId>0){
+                marketStore.updateExactProductMetadata(exactListingId,page.sellerName,page.publishedLabel,page.itemPrice>0?priceCents:null,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0));
+                marketStore.updateVintedCategoryEvidence(exactListingId,page.categoryRaw,page.categoryNormalized,page.categorySource,page.categoryConfidence);
+            }
         }
         SharedPreferences.Editor e=diag().edit().putString("lastProductTitle",page.title).putInt("lastProductPriceCents",priceCents);
         if(ship!=null)e.putInt("lastProductShippingCents",ship);else e.remove("lastProductShippingCents");
