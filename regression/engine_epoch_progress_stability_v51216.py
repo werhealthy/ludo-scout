@@ -71,7 +71,7 @@ checks=[
  ("archived provisional can revive on fresh evidence", '"EPOCH_ARCHIVED_REVIEW".equals(currentState)' in market),
  ("review inbox is epoch-scoped", "last_seen>=?" in market[market.index("public int vintedReviewCount"):market.index("public boolean retryNow")]),
  ("hero is progress-first", 'automaticDone+" / "+run.validListings' in ui and '" elaborati"' in ui),
- ("human recovery is separate from automatic completion", 'renderEngineHeader("Da completare"' in ui and "Card ferme solo dopo più tentativi automatici" in ui),
+ ("human recovery is separate from automatic completion", 'renderEngineHeader("Da completare"' in ui and "Qui Ludo ti chiede solo una decisione precisa" in ui),
  ("queue startup records phases instead of throwing through Service", "queue:onCreate:database" in service and "queue:onCreate:lanes" in service and "START_NOT_STICKY" in service),
  ("crash journal exposes root cause and handled phase", "recordHandled" in crash and "root=" in crash and "phase=" in crash),
 ]
