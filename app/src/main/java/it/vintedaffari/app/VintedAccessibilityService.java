@@ -408,7 +408,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 }
             }
 
-            if (listingNow.allowPriceModel) {
+            if (listingNow.allowIdentityCandidate) {
                 Long lastAnalyzed = recentlyAnalyzed.get(sig);
                 boolean analysisDue=lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS;
                 if(analysisDue){
@@ -471,7 +471,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     // It must show positive board-game evidence; otherwise keep it in a reversible
                     // auto-filtered quarantine and let the fast discovery pipeline continue.
                     if(ga==null||!"matched".equals(ga.status)||TextUtils.isEmpty(ga.bggId)){
-                        BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,ga);
+                        BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
                         if(gate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                             if(noisy!=null)database.exclude(noisy,"Scarto automatico pre-BGG: "+gate.reason);
@@ -484,7 +484,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         // game Watergate vs books titled Watergate). For titles with learned/seeded
                         // cross-category collisions require a second board-game signal.
                         boolean collisionRisk=marketStore!=null&&marketStore.isCollisionRiskTitle(card.title);
-                        BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,ga,collisionRisk);
+                        BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,analyzedListing,ga,collisionRisk);
                         if(matchedGate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                             if(noisy!=null)database.exclude(noisy,"Scarto automatico post-match: "+matchedGate.reason);
