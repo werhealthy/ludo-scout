@@ -26,6 +26,9 @@ public final class ThumbnailStore {
     private static final String TAG = "VintedThumbs";
     private static long lastCaptureAt = 0L;
     private static final ExecutorService DOWNLOADS = Executors.newSingleThreadExecutor();
+    // Screenshot callbacks may be delivered on an Accessibility/handler thread. Decode/crop/file I/O
+    // must stay on one bounded worker so an incoming scroll cannot retain a fan-out of bitmaps.
+    private static final ExecutorService CAPTURES = Executors.newSingleThreadExecutor();
     private static final AtomicBoolean SCREENSHOT_IN_FLIGHT = new AtomicBoolean(false);
     private ThumbnailStore() { }
 
@@ -53,9 +56,12 @@ public final class ThumbnailStore {
                             try{
                                 hb=result.getHardwareBuffer();ColorSpace cs=result.getColorSpace();Bitmap hw=Bitmap.wrapHardwareBuffer(hb,cs);
                                 if(hw==null)return;full=hw.copy(Bitmap.Config.RGB_565,false);if(full==null)return;
-                                for(VintedCard c:missing)saveCrop(service,full,c);
-                            }catch(Throwable t){Log.w(TAG,"Screenshot processing failed",t);}
-                            finally{try{if(hb!=null)hb.close();}catch(Throwable ignored){}try{if(full!=null&&!full.isRecycled())full.recycle();}catch(Throwable ignored){}SCREENSHOT_IN_FLIGHT.set(false);}
+                                final Bitmap captured=full;full=null;
+                                CAPTURES.execute(()->{try{for(VintedCard c:missing)saveCrop(service,captured,c);}
+                                    catch(Throwable t){Log.w(TAG,"Screenshot crop failed",t);}
+                                    finally{try{if(!captured.isRecycled())captured.recycle();}catch(Throwable ignored){}SCREENSHOT_IN_FLIGHT.set(false);}});
+                            }catch(Throwable t){Log.w(TAG,"Screenshot processing failed",t);SCREENSHOT_IN_FLIGHT.set(false);}
+                            finally{try{if(hb!=null)hb.close();}catch(Throwable ignored){}try{if(full!=null&&!full.isRecycled())full.recycle();}catch(Throwable ignored){}}
                         }
                         @Override public void onFailure(int errorCode) {
                             SCREENSHOT_IN_FLIGHT.set(false);Log.w(TAG, "takeScreenshot failure=" + errorCode);
@@ -94,9 +100,11 @@ public final class ThumbnailStore {
             service.takeScreenshot(android.view.Display.DEFAULT_DISPLAY, direct, new AccessibilityService.TakeScreenshotCallback() {
                 @Override public void onSuccess(AccessibilityService.ScreenshotResult result) {
                     HardwareBuffer hb=null;Bitmap full=null;
-                    try{hb=result.getHardwareBuffer();Bitmap hw=Bitmap.wrapHardwareBuffer(hb,result.getColorSpace());if(hw==null)return;full=hw.copy(Bitmap.Config.RGB_565,false);if(full==null)return;saveRect(service,full,page.imageBounds,signature);}
-                    catch(Throwable t){Log.w(TAG,"product screenshot processing failed",t);}
-                    finally{try{if(hb!=null)hb.close();}catch(Throwable ignored){}try{if(full!=null&&!full.isRecycled())full.recycle();}catch(Throwable ignored){}SCREENSHOT_IN_FLIGHT.set(false);}
+                    try{hb=result.getHardwareBuffer();Bitmap hw=Bitmap.wrapHardwareBuffer(hb,result.getColorSpace());if(hw==null)return;full=hw.copy(Bitmap.Config.RGB_565,false);if(full==null)return;final Bitmap captured=full;full=null;
+                        CAPTURES.execute(()->{try{saveRect(service,captured,page.imageBounds,signature);}catch(Throwable t){Log.w(TAG,"product screenshot crop failed",t);}
+                            finally{try{if(!captured.isRecycled())captured.recycle();}catch(Throwable ignored){}SCREENSHOT_IN_FLIGHT.set(false);}});}
+                    catch(Throwable t){Log.w(TAG,"product screenshot processing failed",t);SCREENSHOT_IN_FLIGHT.set(false);}
+                    finally{try{if(hb!=null)hb.close();}catch(Throwable ignored){}try{if(full!=null&&!full.isRecycled())full.recycle();}catch(Throwable ignored){}}
                 }
                 @Override public void onFailure(int errorCode) { SCREENSHOT_IN_FLIGHT.set(false);Log.w(TAG, "product screenshot failure=" + errorCode); }
             });
