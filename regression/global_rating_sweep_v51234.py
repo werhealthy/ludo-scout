@@ -12,7 +12,7 @@ end=market.index("public int reconcileQueue()",start)
 sweep=market[start:end]
 
 checks=[
-    ("release identity","5.12.34-global-rating-sweep" in build),
+    ("release identity","applicationId 'it.vintedaffari.app'" in build and "ciVersionCode ? (1000000 + ciVersionCode.toInteger())" in build),
     ("sweep is global and threshold-driven",
      "rating IS NOT NULL AND rating<?" in sweep and "DealPolicy.MIN_BGG_RATING" in sweep),
     ("sweep contains no game-name special cases",

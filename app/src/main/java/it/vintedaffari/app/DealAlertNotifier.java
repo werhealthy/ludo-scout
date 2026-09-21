@@ -16,9 +16,8 @@ import java.text.NumberFormat;
 import java.util.Locale;
 
 /**
- * High-signal deal alerts only. This intentionally reuses Ludo Scout's existing product rules:
- * a confirmed BGG game, BGG rating >= 6, an eligible language, a real used-market benchmark,
- * and at least 30% below that benchmark. Each listing is de-duplicated locally.
+ * High-signal deal alerts only. A notification requires the central Offertona decision plus the
+ * stricter 30% all-in saving gate, exact identities, eligible language and freshness.
  */
 public final class DealAlertNotifier {
     public static final String CHANNEL="ludo_super_deals";
@@ -43,6 +42,7 @@ public final class DealAlertNotifier {
         if(!languageEligible(d.languageCode))return;
         Integer total=effectiveTotal(d);
         if(total==null||total<=0||d.benchmarkCents==null||d.benchmarkCents<=0)return;
+        if(DealEvaluator.evaluate(d).decision!=DealEvaluator.Decision.GREAT_BUY)return;
         int pct=(int)Math.round((d.benchmarkCents-total)*100.0/d.benchmarkCents);
         if(pct<MIN_DISCOUNT_PCT)return;
         if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
@@ -87,7 +87,7 @@ public final class DealAlertNotifier {
     }
 
     private static Integer effectiveTotal(DealRecord d){
-        if(d.shippingVerifiedCents!=null){int base=d.protectedPriceCents!=null?d.protectedPriceCents:d.itemPriceCents;return base+d.shippingVerifiedCents;}
+        if(d.shippingVerifiedCents!=null){int base=d.protectedPriceCents!=null?d.protectedPriceCents:d.itemPriceCents+PurchaseMath.vintedFee(d.itemPriceCents);return base+d.shippingVerifiedCents;}
         if(d.totalCents!=null)return d.totalCents;
         return d.protectedPriceCents!=null?d.protectedPriceCents:d.itemPriceCents;
     }
