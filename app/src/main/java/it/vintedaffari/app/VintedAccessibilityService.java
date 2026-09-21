@@ -554,9 +554,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     private void resolveBacklog(){
         if(database==null||linkResolver==null||linkNetworkInFlight)return;
-        if(!manualMetadataRefresh&&marketStore!=null&&marketStore.jobSummary().active()>0)return;
+        if(!manualMetadataRefresh&&marketStore!=null&&(marketStore.jobSummary().active()>0||marketStore.hasActiveObservationRun()))return;
         long now=System.currentTimeMillis();
-        DealRecord chosen=null;
+        DealRecord chosen=null;catalogHealthInFlightSignature="";
         if(manualMetadataRefresh&&!TextUtils.isEmpty(manualRefreshTargetSignature)){
             DealRecord target=database.findBySignature(manualRefreshTargetSignature);
             if(targetNeedsVinted(target))chosen=target;
@@ -566,11 +566,16 @@ public final class VintedAccessibilityService extends AccessibilityService {
             for(DealRecord d:database.getDealsNeedingLinkMetadata(12))if(networkPriority(d)){chosen=d;break;}
             if(chosen==null)for(DealRecord d:database.getUnresolvedDeals(20))if(networkPriority(d)){chosen=d;break;}
             if(chosen==null)for(DealRecord d:database.getDealsNeedingPublishedTime(8))if(networkPriority(d)){chosen=d;break;}
+            if(chosen==null){
+                DealRecord health=database.nextCatalogHealthCandidate(now-CATALOG_HEALTH_SUCCESS_TTL,now-CATALOG_HEALTH_RETRY_TTL);
+                if(health!=null){chosen=health;catalogHealthInFlightSignature=health.signature;}
+            }
         }
         if(chosen==null)return;
         long allowed=Math.max(linkResolver.nextAllowedAt(chosen),lastPriorityLinkAttemptAt+currentLinkGapMs(chosen));
         if(now<allowed){if(manualMetadataRefresh)setVintedPause(allowed,"attesa protettiva Vinted");return;}
         if(manualMetadataRefresh){manualRefreshAttempted.add(chosen.signature);OperationCenter.running(this,manualMaintenanceTask,OperationCenter.MAINTENANCE,refreshTaskDetail(chosen,"Controllo Vinted"));OperationCenter.progress(this,manualMaintenanceTask,refreshSessionProgress(chosen,chosen.signature),0L);updateMasterProgress();}
+        if(!TextUtils.isEmpty(catalogHealthInFlightSignature)&&marketStore!=null)marketStore.recordCatalogHealthAttempt(chosen.signature,"START");
         resolvePriority(chosen);
     }
 
