@@ -7,8 +7,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.28-catalog-freshness-bundle-health-eta`
-- versionCode: `142`
+- Baseline version: `5.12.29-motore-network-priority`
+- versionCode: `143`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -47,6 +47,7 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Catalog health is maintenance, not discovery: when no Motore scroll owns the Vinted lane, at most one exact already-linked catalog item is rechecked through the existing paced public-page lane. Sold/404 items leave the active catalog while history remains.
 - Opening a known Vinted item from a Ludo card creates short-lived exact provenance separate from manual search recovery. The opened product page may safely update that exact listing's sold state, publication metadata and price.
 - Bundle labels represent current seller inventory, not historical suggestions. A sold/hidden/corrected member invalidates the seller graph; a seller with fewer than two active eligible games must expose no bundle.
+- Public Vinted network ownership is strict: while any Motore observation run is unfinished, opportunistic Catalog metadata maintenance and Bundle snapshot/deep/ownership verification must not start. Zero-network local Bundle reconstruction remains allowed.
 
 ## 5.12.3 correctness changes
 - Motore run detail uses a dedicated observations -> market_listings -> games view rather than Catalogo.
@@ -112,6 +113,16 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Bulk revalidation suppresses per-game queue broadcasts and emits one coalesced update per slice, preventing faster cleanup from creating an OperationCenter/UI rebuild storm.
 - Regression: `regression/historical_bgg_drain_scheduling_v5129.py` protects current-before-history priority, liveness, bounded bursts and notification coalescing.
 - No schema/data reset, no Vinted/BGG request-rate change, no signing/applicationId/versionCode-strategy change.
+
+## 5.12.29 Motore network priority
+- Field debug on 5.12.27 showed `vintedActive=20` together with `DEEP_SCAN_RUNNING=1`: the old Bundle guard deferred network work only above 20 active Vinted jobs, so Bundle could still consume the same paced public-page lane while a Motore run was unfinished.
+- 5.12.28 fixed ETA accounting and Catalog health, but the legacy Accessibility metadata resolver and Bundle pipeline still used queue-size heuristics rather than Motore ownership.
+- An unfinished Motore run is now the authoritative network-priority signal. Automatic legacy metadata maintenance returns immediately while a run exists; Bundle backlog, snapshot discovery, queued deep scan, and ownership verification all re-check Motore ownership before starting public requests.
+- Zero-network seller-graph rebuilding remains allowed during Motore work so stale Bundle labels can disappear immediately without costing a Vinted request.
+- Manual user-requested metadata refresh keeps its explicit behavior; the new guard targets opportunistic background work.
+- Diagnostic counter `bundleDeferredForMotore` records Bundle work yielded for Motore.
+- Regression: `regression/motore_network_priority_v51229.py`.
+- No schema migration, request-rate increase, signing/applicationId/Firebase/secrets/CI-versionCode-strategy change.
 
 ## 5.12.28 Catalog freshness, bundle health and Motore ETA truth
 
