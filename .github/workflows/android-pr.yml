@@ -105,6 +105,12 @@ jobs:
         run: python3 regression/connected_product_graph_v51240.py
       - name: Run invisible-interaction UX regression
         run: python3 regression/invisible_interaction_v51241.py
+      - name: Run pipeline integrity regression
+        run: |
+          python3 regression/pipeline_integrity_v51242.py
+          mkdir -p .regression-build
+          javac -d .regression-build regression/PipelineIntegrityRegression.java app/src/main/java/it/vintedaffari/app/BggProductCompatibility.java
+          java -cp .regression-build PipelineIntegrityRegression
 
       - name: Run pricing unit tests
         run: |
