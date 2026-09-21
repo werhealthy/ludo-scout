@@ -1327,17 +1327,21 @@ public final class MarketStore {
             ListingClassifier.Type listingType=ListingClassifier.Type.UNCERTAIN;
             try{ if(!TextUtils.isEmpty(listingTypeRaw))listingType=ListingClassifier.Type.valueOf(listingTypeRaw); }catch(Throwable ignored){}
             BggProductCompatibility.Verdict typeVerdict=BggProductCompatibility.validate(listingType.name(),m.itemType);
-            if(typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE){
-                String reason="Tipo BGG incompatibile: annuncio "+listingType+" / BGG "+safe(m.itemType);
-                ContentValues hidden=new ContentValues();hidden.put("database_visible",0);hidden.put("filter_reason",reason);hidden.put("match_state","TYPE_MISMATCH");
+            if(typeVerdict!=BggProductCompatibility.Verdict.COMPATIBLE){
+                String state=typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE?"TYPE_MISMATCH":"TYPE_UNVERIFIED";
+                String reason=typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE
+                        ?"Tipo BGG incompatibile: annuncio "+listingType+" / BGG "+safe(m.itemType)
+                        :"Tipo prodotto non verificabile: annuncio "+listingType+" / BGG "+safe(m.itemType);
+                ContentValues hidden=new ContentValues();hidden.put("database_visible",0);hidden.put("filter_reason",reason);hidden.put("match_state",state);
                 db.update("games",hidden,"id=?",new String[]{String.valueOf(id)});
-                ContentValues filtered=new ContentValues();filtered.put("lifecycle","AUTO_FILTERED");filtered.put("enrichment_state","AUTO_FILTERED");filtered.put("match_state","TYPE_MISMATCH");filtered.put("last_error",reason);
+                ContentValues filtered=new ContentValues();filtered.put("enrichment_state",state);filtered.put("match_state",state);filtered.put("last_error",reason);
+                if(typeVerdict==BggProductCompatibility.Verdict.INCOMPATIBLE)filtered.put("lifecycle","AUTO_FILTERED");
                 db.update("market_listings",filtered,"game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(id)});
-                ContentValues legacy=new ContentValues();legacy.put("verification_state","TYPE_MISMATCH");legacy.put("verification_reason",reason);
+                ContentValues legacy=new ContentValues();legacy.put("verification_state",state);legacy.put("verification_reason",reason);
                 db.update("deals",legacy,"bgg_id=? AND lifecycle='ACTIVE'",new String[]{m.bggId});
                 ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("updated_at",System.currentTimeMillis());done.put("next_attempt_at",0);done.put("last_error",reason);done.put("progress",100);
                 db.update("processing_jobs",done,"game_id=? AND job_type=?",new String[]{String.valueOf(id),JOB_BGG});
-                setDiagnosticState("bgg_product_type",1,"state=INCOMPATIBLE;game="+id+";listingType="+listingType+";bggType="+safe(m.itemType));
+                setDiagnosticState("bgg_product_type",1,"state="+state+";game="+id+";listingType="+listingType+";bggType="+safe(m.itemType));
                 db.setTransactionSuccessful();return;
             }
             ContentValues v = new ContentValues();
