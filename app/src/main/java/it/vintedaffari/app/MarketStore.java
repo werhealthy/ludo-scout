@@ -1525,7 +1525,7 @@ public final class MarketStore {
         int gamesHidden=0,gamesRestored=0,dealsSynced=0,jobsClosed=0;
         db.beginTransaction();try{
             ContentValues hide=new ContentValues();hide.put("database_visible",0);hide.put("filter_reason","BGG_RATING_BELOW_6");
-            gamesHidden=db.update("games",hide,"rating IS NOT NULL AND rating<? AND (database_visible<>0 OR COALESCE(filter_reason,'')<>'BGG_RATING_BELOW_6')",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)});
+            gamesHidden=db.update("games",hide,"rating IS NOT NULL AND rating<? AND database_visible<>0",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)});
 
             ContentValues restore=new ContentValues();restore.put("database_visible",1);restore.putNull("filter_reason");
             gamesRestored=db.update("games",restore,"rating IS NOT NULL AND rating>=? AND database_visible=0 AND filter_reason='BGG_RATING_BELOW_6'",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)});
