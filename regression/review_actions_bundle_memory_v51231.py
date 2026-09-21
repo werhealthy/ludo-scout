@@ -49,8 +49,9 @@ checks=[
     ("confirmed bundles are visually primary",
      '"Bundle confermati · "+sources.size()' in bundles and
      '"Questi sono bundle reali' in bundles and
-     '"Da esplorare · "+prospects.size()' in bundles and
-     bundles.index('"Bundle confermati · "+sources.size()') < bundles.index('"Da esplorare · "+prospects.size()')),
+     ('"Da controllare · "+prospects.size()' in bundles or '"Da esplorare · "+prospects.size()' in bundles) and
+     bundles.index('"Bundle confermati · "+sources.size()') <
+        (bundles.index('"Da controllare · "+prospects.size()') if '"Da controllare · "+prospects.size()' in bundles else bundles.index('"Da esplorare · "+prospects.size()'))),
     ("bundle sort controls only appear with confirmed bundles",
      "if(!sources.isEmpty())" in bundles and
      bundles.index("addBundleSortChip") > bundles.index("if(!sources.isEmpty())")),

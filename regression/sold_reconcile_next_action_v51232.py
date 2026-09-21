@@ -19,6 +19,15 @@ checks=[
      "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
     ("sold parser recognizes sold and unavailable wording",
      "venduto|venduta|sold" in parser and "non più disponibile" in parser and "item unavailable" in parser),
+    ("sold product stays recognizable when Vinted suppresses normal title/price nodes",
+     "hasProductStructure()" in (ROOT/"app/src/main/java/it/vintedaffari/app/ProductPage.java").read_text(encoding="utf-8") and
+     "(sold && (hasTitle || hasProductStructure()))" in (ROOT/"app/src/main/java/it/vintedaffari/app/ProductPage.java").read_text(encoding="utf-8")),
+    ("exact opened page has strong unavailable fallback",
+     "ProductPageParser.hasStrongUnavailableSignal(root)" in radar and
+     'reconcileOpenedSold(null,opened.listingId,true,"strong-unavailable-signal")' in radar),
+    ("opening a catalog deal falls back to exact Vinted item id",
+     "listingIdForVintedItemId(d.vintedItemId)" in ui and
+     "public long listingIdForVintedItemId" in market),
     ("accessibility sold reconciliation does not require legacy mirror",
      "currentProductDeal==null&&exactListing!=null" in radar and
      "product.sold&&(currentProductDeal!=null||exactListingId>0)" in radar and

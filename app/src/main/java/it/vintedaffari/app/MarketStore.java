@@ -1184,6 +1184,7 @@ public final class MarketStore {
 
     public String signatureForListing(long id){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?",new String[]{String.valueOf(id)})){return c.moveToFirst()?c.getString(0):null;}}
     public long listingIdForSignature(String signature){if(TextUtils.isEmpty(signature))return 0L;Long id=scalarLong(helper.getReadableDatabase(),"SELECT id FROM market_listings WHERE legacy_signature=? OR temp_fingerprint=? LIMIT 1",new String[]{signature,signature});return id==null?0L:id;}
+    public long listingIdForVintedItemId(String itemId){if(TextUtils.isEmpty(itemId))return 0L;Long id=scalarLong(helper.getReadableDatabase(),"SELECT id FROM market_listings WHERE vinted_item_id=? ORDER BY CASE WHEN lifecycle='ACTIVE' THEN 0 ELSE 1 END,id DESC LIMIT 1",new String[]{itemId.trim()});return id==null?0L:id;}
 
     /** Refresh the current asking price only from an exact public item page. Historical observations
      * stay immutable: a new price point is appended instead of rewriting what Accessibility saw.
