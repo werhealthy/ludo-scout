@@ -14,7 +14,7 @@ db=ui[ui.index("private void renderDatabase()"):ui.index("private String databas
 
 checks=[
     ("release identity",
-     "versionName '5.12.40-connected-product-graph'" in build and
+     "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build),
     ("connected product UX contract exists",
      "listings, games and tags form a connected graph" in system and
@@ -25,11 +25,12 @@ checks=[
      'publicationText(d,12,Typeface.NORMAL)' in detail and
      '" · "+languageShort(d.languageCode)+" · "+publicationDisplay(d)' not in detail),
     ("listing detail exposes canonical game navigation",
-     "entityLinkCard(game)" in detail and
-     "openDatabaseGame(game.id,tab)" in detail),
+     'roundIconButton("▦",CYAN)' in detail and
+     "openGameDetailOverlay(game.id)" in detail),
     ("listing detail keeps provider identity",
      'provider_vinted_logo,"Vinted"' in detail and
-     'provider_bgg_logo,"BoardGameGeek"' in detail),
+     "bggPill(d)" in detail and
+     "provider_bgg_logo" in ui),
     ("correction affordance is immediate",
      'roundIconButton("?",CYAN)' in detail and
      "showMatchCorrection(d,dialog)" in detail),
@@ -39,8 +40,8 @@ checks=[
      "rank 55% · geek 20% · votanti 15% · media 10%" in ui),
     ("tags navigate into game database",
      "openGameTag(String tag)" in ui and
-     'addLinkedMetaSection("Categorie"' in game and
-     'addLinkedMetaSection("Meccaniche"' in game),
+     'addLinkedMetaSection(host,"Categorie"' in game and
+     'addLinkedMetaSection(host,"Meccaniche"' in game),
     ("game search includes taxonomy and creators",
      "LOWER(COALESCE(g.categories,'')) LIKE ?" in market and
      "LOWER(COALESCE(g.mechanics,'')) LIKE ?" in market and
@@ -52,8 +53,8 @@ checks=[
     ("game detail surfaces similar games",
      "similarGames(g,8)" in game and "similarGameCard" in ui),
     ("advanced filters are full-screen tasks",
-     'fullScreenPanel("Filtri annunci")' in filters and
-     'fullScreenPanel("Filtri giochi")' in ui),
+     'fullScreenPanel("Filtri","Azzera"' in filters and
+     'fullScreenPanel("Filtri giochi","Azzera"' in ui),
     ("game database shell has no quick-filter wall",
      "marketToolbarButton(databaseAdvancedFilterCount()" in db and
      'materialChip(("review".equals(databaseScope)' not in db),

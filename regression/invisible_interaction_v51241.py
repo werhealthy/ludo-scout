@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
+build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
+system=(ROOT/"UX_SYSTEM_V3_INVISIBLE_INTERACTION.md").read_text(encoding="utf-8")
+
+detail=ui[ui.index("private void openDetail(DealRecord d)"):ui.index("private TextView detailSecondaryAction",ui.index("private void openDetail(DealRecord d)"))]
+filters=ui[ui.index("private void showFilterSheet()"):ui.index("private void renderBundles()",ui.index("private void showFilterSheet()"))]
+catalog=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
+overlay=ui[ui.index("private void openGameDetailOverlay"):ui.index("private View marketListingCard",ui.index("private void openGameDetailOverlay"))]
+panel=ui[ui.index("private Dialog fullScreenPanel(String title)"):ui.index("private TextView filterIntro",ui.index("private Dialog fullScreenPanel(String title)"))]
+
+checks=[
+    ("release identity",
+     "versionName '5.12.41-invisible-interactions'" in build),
+    ("invisible interaction contract exists",
+     "The interface should explain itself by shape, placement and behavior" in system and
+     "Never place all chips, checkboxes and inputs on the same filter screen" in system),
+    ("listing detail has no instructional tag heading",
+     '"Esplora per tag"' not in detail and
+     "linkedDealTagStrip(d,game)" in detail),
+    ("listing detail does not duplicate game identity card",
+     "entityLinkCard(game)" not in detail and
+     'roundIconButton("▦",CYAN)' in detail),
+    ("listing detail removes market history",
+     '"Contesto prezzo"' not in detail and
+     "localVintedReferenceStats" not in detail and
+     '"Annunci di questo gioco"' not in detail),
+    ("listing detail keeps distinct signals",
+     'scorePill("Ludo "+scoreLabel(d),LIME)' in detail and
+     "langChip(d.languageCode)" in detail and
+     "bggPill(d)" in detail and
+     "publicationText(d,12,Typeface.NORMAL)" in detail),
+    ("listing can transition to game by overscroll",
+     "installPullToGame(sc,pullHint,game.id,dialog)" in detail and
+     '"Rilascia per aprire il gioco"' in ui),
+    ("game detail opens directly without catalog routing",
+     "uiDataIo.execute" in overlay and
+     'tab="database"' not in overlay and
+     "renderDatabaseDetailInto(host,ready,dialog::dismiss)" in overlay),
+    ("UI data has dedicated executor",
+     "ExecutorService uiDataIo=Executors.newSingleThreadExecutor()" in ui and
+     "uiDataIo.shutdownNow()" in ui),
+    ("filters use progressive rows",
+     'filterRow("Voto BGG"' in filters and
+     'filterRow("Lingua"' in filters and
+     "showChoicePage" in filters and
+     "choiceChips(" not in filters),
+    ("full-screen filters respect insets",
+     "setOnApplyWindowInsetsListener" in panel and
+     "getSystemWindowInsetTop()" in panel and
+     "getSystemWindowInsetBottom()" in panel),
+    ("catalog metadata is not serialized into one sentence",
+     "languageCompact(d.languageCode)" in catalog and
+     "publicationText(d,11,Typeface.NORMAL)" in catalog and
+     'languageShort(d.languageCode)+" · "+publicationDisplay(d)' not in catalog),
+    ("Library action is contextual",
+     'menuAction("Aggiungi alla Libreria",TEXT)' in ui and
+     '"＋ Libreria"' not in detail),
+]
+
+for name,ok in checks:
+    print(("PASS " if ok else "FAIL ")+name)
+failed=[name for name,ok in checks if not ok]
+if failed:
+    raise SystemExit("5.12.41 invisible interaction regression failed: "+", ".join(failed))
+print(f"PASS {len(checks)}/{len(checks)} invisible-interaction guards")
