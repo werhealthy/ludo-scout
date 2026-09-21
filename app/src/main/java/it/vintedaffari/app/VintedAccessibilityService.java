@@ -96,6 +96,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private volatile long maintenancePausedUntil=0L;
     private volatile String maintenancePauseReason="";
     private static final String MAINTENANCE_TASK="maintenance:missing-data";
+    private static final long CATALOG_HEALTH_SUCCESS_TTL=7L*24L*60L*60_000L;
+    private static final long CATALOG_HEALTH_RETRY_TTL=12L*60L*60_000L;
+    private volatile String catalogHealthInFlightSignature="";
     private final Runnable maintenancePump=new Runnable(){@Override public void run(){if(!manualMetadataRefresh)return;sweepCompletedQueuedTargets();if(TextUtils.isEmpty(manualRefreshTargetSignature))startNextManualRefreshTarget();updateMaintenanceTask();enrichBacklog();resolveBacklog();sweepCompletedQueuedTargets();maybeFinishCurrentManualTarget();if(manualMetadataRefresh)handler.postDelayed(this,1500L);}};
     private final BroadcastReceiver retryReceiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){
         if(i!=null&&OperationCenter.REFRESH_MISSING.equals(i.getAction())){
@@ -288,9 +291,12 @@ public final class VintedAccessibilityService extends AccessibilityService {
         ProductPage product = ProductPageParser.parse(root);
         DealRecord currentProductDeal=null;
         if (product != null) {
-            handleProductPage(product);
-            currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
-            if(product.sold&&currentProductDeal!=null){database.markSold(currentProductDeal.signature);bundleDatabase.invalidate(currentProductDeal);OperationCenter.done(this,"sold:"+currentProductDeal.signature,OperationCenter.LINK,"Articolo venduto · rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;}
+            long productNow=System.currentTimeMillis();MarketStore.OpenedVintedDeal opened=marketStore==null?null:marketStore.activeOpenedVintedDeal(productNow);
+            if(opened!=null&&opened.active(productNow))currentProductDeal=database.findBySignature(opened.signature);
+            if(currentProductDeal==null)currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
+            handleProductPage(product,currentProductDeal);
+            if(opened!=null&&opened.active(productNow)&&marketStore!=null)marketStore.clearOpenedVintedDeal();
+            if(product.sold&&currentProductDeal!=null){removeUnavailableDeal(currentProductDeal,true,"Pagina Vinted aperta: articolo venduto");return;}
             // The Vinted item page itself can expose a visible "Articoli dell'utente" rail.
             // Capture that rail as a zero-request seller snapshot only when the source seller is
             // already verified and the section boundary is narrow enough to be unambiguous.
@@ -911,12 +917,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(nextDelay>0)handler.postDelayed(()->scanBundleBacklog(false),nextDelay);
     }
 
-    private void handleProductPage(ProductPage page) {
+    private void handleProductPage(ProductPage page,DealRecord exact) {
         if (page == null || database == null) return;
-        int priceCents=(int)Math.round(page.itemPrice*100.0);
+        int priceCents=(int)Math.round(page.itemPrice*100.0);long now=System.currentTimeMillis();
         Integer ship=page.shippingPrice==null?null:(int)Math.round(page.shippingPrice*100.0);
-        database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,System.currentTimeMillis());
-        DealRecord d=database.findByTitlePrice(page.title,priceCents);
+        DealRecord d=exact;
+        if(d!=null){database.updateProductContextForSignature(d.signature,ship,page.publishedLabel,now);if(priceCents>0)database.updateVerifiedCurrentPrice(d.signature,priceCents,page.protectedPrice==null?null:(int)Math.round(page.protectedPrice*100.0),now);}
+        else{database.updateProductContext(page.title,priceCents,ship,page.publishedLabel,now);d=database.findByTitlePrice(page.title,priceCents);}
         String sig=d==null?"":d.signature;
         SharedPreferences.Editor e=diag().edit().putString("lastProductTitle",page.title).putInt("lastProductPriceCents",priceCents);
         if(ship!=null)e.putInt("lastProductShippingCents",ship);else e.remove("lastProductShippingCents");
