@@ -36,7 +36,11 @@ public final class BundleExploration {
 
     public static State current(Context context){
         if(context==null)return null;SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);long expires=p.getLong("expires_at",0L);
-        if(expires<=System.currentTimeMillis()){p.edit().clear().apply();return null;}
+        if(expires<=System.currentTimeMillis()){
+            // Expiring the short capture window must never erase the durable "already explored"
+            // seller memory, otherwise old prospects reappear a few minutes later.
+            clear(context);return null;
+        }
         return new State(p.getString("source_signature",""),p.getString("item_id",""),p.getString("seller_id",""),p.getLong("started_at",0L),expires);
     }
 
