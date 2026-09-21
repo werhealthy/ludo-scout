@@ -274,6 +274,9 @@ public final class QueueJobRunner {
                 if (legacy != null) db.markSold(legacy.signature);
                 try{new BundleDatabase(context).invalidate(legacy!=null?legacy:candidate);}catch(Throwable ignored){}
                 if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source))market.setDiagnosticState("catalog_health",2,"build=catalog-health-v1;state=SOLD;listing="+canonical);
+                if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source))market.setDiagnosticState("opened_vinted_verify",2,"state=SOLD;listing="+canonical);
+                market.clearVintedCandidates(job.listingId);
+                return;
             } else if (legacy != null) {
                 db.applyResolvedLink(legacy.signature, r.itemId, r.url, r.imageUrl, r.confidence, r.reason,
                         r.sellerId, r.sellerName, r.photosCsv, System.currentTimeMillis());
@@ -302,6 +305,7 @@ public final class QueueJobRunner {
             market.clearVintedCandidates(job.listingId);
             market.completeJob(job);
             if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source))market.setDiagnosticState("catalog_health",1,"build=catalog-health-v1;state=REFRESHED;listing="+canonical+";published="+(!TextUtils.isEmpty(r.publishedLabel))+";seller="+(!TextUtils.isEmpty(r.sellerId)));
+            if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source))market.setDiagnosticState("opened_vinted_verify",1,"state=REFRESHED;listing="+canonical+";sold=false");
             if(canonical>0 && TextUtils.isEmpty(r.publishedLabel) && !MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source)){
                 // Publication time is core information for this product. It is very low priority and
                 // can never jump ahead of fresh identities; seller/photo are no longer requirements.
@@ -311,6 +315,16 @@ public final class QueueJobRunner {
         }
 
         String reason = TextUtils.isEmpty(failure.get()) ? "nessun risultato" : failure.get();
+
+        // A user explicitly opened this exact item from Ludo. If the same public URL is now gone,
+        // retire it immediately instead of treating the check as optional metadata.
+        if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source)&&isGoneVintedPage(reason)){
+            market.markUnavailable(job.listingId,reason);
+            if(candidate!=null&&!TextUtils.isEmpty(candidate.signature))db.markUnavailable(candidate.signature,reason);
+            try{new BundleDatabase(context).invalidate(candidate);}catch(Throwable ignored){}
+            market.completeJob(job);market.setDiagnosticState("opened_vinted_verify",2,"state=REMOVED;listing="+job.listingId+";reason="+(reason==null?"":reason));
+            return;
+        }
 
         // Catalog health owns an exact already-known item URL. A 404/non-available exact page is
         // sufficient to remove it from the active catalog without creating a human review task.

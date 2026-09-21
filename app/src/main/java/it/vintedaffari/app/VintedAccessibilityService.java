@@ -295,13 +295,27 @@ public final class VintedAccessibilityService extends AccessibilityService {
             if(exactOpened)currentProductDeal=database.findBySignature(opened.signature);
             if(currentProductDeal==null)currentProductDeal=product.itemPrice>0?database.findByTitlePrice(product.title,(int)Math.round(product.itemPrice*100.0)):database.findByVintedTitle(product.title);
             long exactListingId=exactOpened?opened.listingId:(currentProductDeal==null||marketStore==null?0L:marketStore.listingIdForSignature(currentProductDeal.signature));
-            handleProductPage(product,currentProductDeal,exactListingId);
-            if(exactOpened&&marketStore!=null)marketStore.clearOpenedVintedTarget(opened.listingId);
-            if(product.sold&&currentProductDeal!=null){
-                database.markSold(currentProductDeal.signature);if(marketStore!=null&&exactListingId>0)marketStore.markSold(exactListingId);bundleDatabase.invalidate(currentProductDeal);
-                diag().edit().putString("lastOpenedVintedReconcile","sold:"+currentProductDeal.signature+";exact="+exactOpened).apply();
-                OperationCenter.done(this,"sold:"+currentProductDeal.signature,OperationCenter.LINK,"Articolo venduto · rimosso");sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
+            MarketListingRecord exactListing=marketStore!=null&&exactListingId>0?marketStore.listing(exactListingId):null;
+            // Canonical listings can exist even when their older DealRecord mirror no longer does.
+            // Reconstruct enough identity from the exact listing so sold reconciliation never depends
+            // on the legacy feed row being present.
+            if(currentProductDeal==null&&exactListing!=null){
+                GameRecord exactGame=marketStore.gameForListing(exactListing);currentProductDeal=exactListing.asDealRecord(exactGame);
+                String exactSig=marketStore.signatureForListing(exactListingId);if(!TextUtils.isEmpty(exactSig))currentProductDeal.signature=exactSig;
             }
+            diag().edit().putString("lastOpenedVintedPage","title="+product.title+";sold="+product.sold+";exact="+exactOpened+";listing="+exactListingId+";deal="+(currentProductDeal!=null)).apply();
+            handleProductPage(product,currentProductDeal,exactListingId);
+            if(product.sold&&(currentProductDeal!=null||exactListingId>0)){
+                String soldSig=currentProductDeal==null?"":currentProductDeal.signature;
+                if(TextUtils.isEmpty(soldSig)&&marketStore!=null&&exactListingId>0)soldSig=marketStore.signatureForListing(exactListingId);
+                if(!TextUtils.isEmpty(soldSig))database.markSold(soldSig);
+                if(marketStore!=null&&exactListingId>0)marketStore.markSold(exactListingId);
+                if(bundleDatabase!=null&&currentProductDeal!=null)bundleDatabase.invalidate(currentProductDeal);
+                diag().edit().putString("lastOpenedVintedReconcile","sold:"+(TextUtils.isEmpty(soldSig)?"listing#"+exactListingId:soldSig)+";exact="+exactOpened+";listing="+exactListingId).apply();
+                OperationCenter.done(this,"sold:"+(TextUtils.isEmpty(soldSig)?String.valueOf(exactListingId):soldSig),OperationCenter.LINK,"Articolo venduto · rimosso");
+                sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
+            }
+            if(exactOpened&&marketStore!=null)marketStore.clearOpenedVintedTarget(opened.listingId);
             // The Vinted item page itself can expose a visible "Articoli dell'utente" rail.
             // Capture that rail as a zero-request seller snapshot only when the source seller is
             // already verified and the section boundary is narrow enough to be unambiguous.
@@ -1370,6 +1384,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String manualRecoveryStateSummary=manualRecoveryState.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-manualRecoveryState.updatedAt)+", "+manualRecoveryState.detail);
         MarketStore.RuntimeStatus openedVintedTarget=marketDiag.diagnosticState("opened_vinted_target");
         String openedVintedTargetSummary=openedVintedTarget.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedTarget.updatedAt)+", "+openedVintedTarget.detail);
+        MarketStore.RuntimeStatus openedVintedVerify=marketDiag.diagnosticState("opened_vinted_verify");
+        String openedVintedVerifySummary=openedVintedVerify.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-openedVintedVerify.updatedAt)+", "+openedVintedVerify.detail);
         MarketStore.RuntimeStatus catalogHealth=marketDiag.diagnosticState("catalog_health");
         String catalogHealthSummary=catalogHealth.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-catalogHealth.updatedAt)+", "+catalogHealth.detail);
         DealDatabase.ObservationSession engineRun=db.activeObservationSession();int engineWaitingRuns=db.waitingObservationSessionCount();
@@ -1506,7 +1522,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "earlyPriceFilter={"+earlyPriceFilterSummary+"}\n"+
                 "manualRecoveryState={"+manualRecoveryStateSummary+"}\n"+
                 "openedVintedTarget={"+openedVintedTargetSummary+"}\n"+
+                "openedVintedVerify={"+openedVintedVerifySummary+"}\n"+
                 "catalogHealth={"+catalogHealthSummary+"}\n"+
+                "lastOpenedVintedPage="+p.getString("lastOpenedVintedPage","")+"\n"+
                 "lastOpenedVintedReconcile="+p.getString("lastOpenedVintedReconcile","")+"\n"+
                 "vintedBatchEngine={"+VintedBatchEngine.summary(context)+"}\n"+
                 "bggVariantGuard={"+BggVariantReconciler.summary(context)+"}\n"+

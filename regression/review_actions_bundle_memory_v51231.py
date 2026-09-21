@@ -13,8 +13,8 @@ resolution=ui[ui.index("private void openVintedResolution"):ui.index("private Vi
 bundles=ui[ui.index("private void renderBundles()"):ui.index("private void sortBundleSources")]
 
 checks=[
-    ("release identity",
-     "5.12.31-review-actions-bundle-memory" in build),
+    ("review/bundle release lineage keeps app identity",
+     "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
     ("review inbox separates Vinted, BGG identity and BGG variant",
      '"Collegamento Vinted"' in review and
      '"Gioco BGG"' in review and

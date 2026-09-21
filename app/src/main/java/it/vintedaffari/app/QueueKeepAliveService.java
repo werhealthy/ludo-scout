@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 public final class QueueKeepAliveService extends Service {
     private static final String TAG="LudoQueueService";
     private static final String CHANNEL="ludo_background_processing";
-    private static final String ENGINE_CHANNEL="ludo_engine_complete";
+    private static final String NEXT_ACTION_CHANNEL="ludo_next_action_v1";
     private static final int NOTIFICATION_ID=5113;
     private static final int ENGINE_COMPLETE_ID=5114;
     private static final long ENGINE_RUN_IDLE_MS=3L*60_000L;
@@ -227,7 +227,7 @@ public final class QueueKeepAliveService extends Service {
     private static void sleepQuiet(long ms){try{Thread.sleep(Math.max(300L,ms));}catch(InterruptedException e){Thread.currentThread().interrupt();}}
     private static String safe(Throwable t){String s=t==null?"errore":t.getClass().getSimpleName()+": "+String.valueOf(t.getMessage());return s.length()>180?s.substring(0,180):s;}
 
-    private void createChannel(){if(Build.VERSION.SDK_INT<26)return;NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);NotificationChannel ch=new NotificationChannel(CHANNEL,"Attività di Ludo Scout",NotificationManager.IMPORTANCE_LOW);ch.setShowBadge(false);ch.setDescription("Stato delle elaborazioni in background");nm.createNotificationChannel(ch);NotificationChannel done=new NotificationChannel(ENGINE_CHANNEL,"Scroll completati",NotificationManager.IMPORTANCE_DEFAULT);done.setShowBadge(true);done.setDescription("Avvisa quando Ludo ha finito di elaborare uno scroll Vinted");nm.createNotificationChannel(done);}
+    private void createChannel(){if(Build.VERSION.SDK_INT<26)return;NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);NotificationChannel ch=new NotificationChannel(CHANNEL,"Attività di Ludo Scout",NotificationManager.IMPORTANCE_LOW);ch.setShowBadge(false);ch.setDescription("Stato delle elaborazioni in background");nm.createNotificationChannel(ch);NotificationChannel next=new NotificationChannel(NEXT_ACTION_CHANNEL,"Prossimo passo",NotificationManager.IMPORTANCE_LOW);next.setShowBadge(true);next.enableVibration(false);next.setSound(null,null);next.setDescription("Suggerimenti discreti quando puoi fare un nuovo scroll o quando serve una conferma manuale");nm.createNotificationChannel(next);}
 
     /** Notify completed scrolls in chronological order. A newer scroll never announces completion
      * while an older automatic run is still unfinished. */
@@ -239,10 +239,23 @@ public final class QueueKeepAliveService extends Service {
 
     private void maybeNotifyRunComplete(long now,DealDatabase.ObservationSession run){
         if(run==null||now-run.endAt<ENGINE_RUN_IDLE_MS||run.analysisPendingListings>0)return;
-        boolean automaticDone=run.validListings==0||run.completeListings+run.reviewListings>=run.validListings;if(!automaticDone)return;
+        if(!DealDatabase.engineContentSettled(run))return;
         SharedPreferences p=getSharedPreferences("ludo_engine_notifications",MODE_PRIVATE);if(p.getLong("last_completed_run_end",0L)==run.endAt)return;
-        String title,copy;if(run.validListings==0){title="Scroll elaborato";copy="Nessun gioco valido trovato · puoi fare un nuovo scroll";}else if(run.reviewListings>0){title=run.completeListings+" giochi pronti · "+run.reviewListings+" da verificare";copy="Ludo ha finito il lavoro automatico · puoi fare un nuovo scroll";}else{title=run.completeListings+(run.completeListings==1?" gioco pronto":" giochi pronti");copy="Ludo ha finito questo scroll · puoi fare un nuovo scroll";}
-        Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("open_engine",true);PendingIntent pi=PendingIntent.getActivity(this,ENGINE_COMPLETE_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);NotificationCompat.Builder b=new NotificationCompat.Builder(this,ENGINE_CHANNEL).setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pi).setContentTitle(title).setContentText(copy).setStyle(new NotificationCompat.BigTextStyle().bigText(copy)).setAutoCancel(true).setOnlyAlertOnce(true).setCategory(NotificationCompat.CATEGORY_STATUS).setPriority(NotificationCompat.PRIORITY_DEFAULT);try{((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(ENGINE_COMPLETE_ID,b.build());p.edit().putLong("last_completed_run_end",run.endAt).apply();}catch(SecurityException ignored){}
+        int manual=market==null?Math.max(0,run.reviewListings):Math.max(0,market.vintedReviewCount()+market.bggMatchReviewCount());
+        String title,copy;Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if(manual>0){
+            title=manual+(manual==1?" gioco da confermare":" giochi da confermare");
+            copy="Ludo ha finito il lavoro automatico · tocca per aprire Da completare";
+            open.putExtra("open_engine_review",true);
+        }else{
+            title="Puoi fare un nuovo scroll";
+            if(run.validListings==0)copy="Lo scroll precedente è stato elaborato · nessun gioco valido rimasto in attesa";
+            else copy=run.completeListings+(run.completeListings==1?" gioco pronto":" giochi pronti")+" · il Motore è libero";
+            open.putExtra("open_engine",true);
+        }
+        PendingIntent pi=PendingIntent.getActivity(this,ENGINE_COMPLETE_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder b=new NotificationCompat.Builder(this,NEXT_ACTION_CHANNEL).setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pi).setContentTitle(title).setContentText(copy).setStyle(new NotificationCompat.BigTextStyle().bigText(copy)).setAutoCancel(true).setOnlyAlertOnce(true).setSilent(true).setCategory(NotificationCompat.CATEGORY_STATUS).setPriority(NotificationCompat.PRIORITY_LOW);
+        try{((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(ENGINE_COMPLETE_ID,b.build());p.edit().putLong("last_completed_run_end",run.endAt).putInt("last_manual_count",manual).apply();}catch(SecurityException ignored){}
     }
 
     private Notification notification(){

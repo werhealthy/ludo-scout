@@ -58,9 +58,10 @@ checks=[
      'MANUAL_VINTED_RECOVERY = "manual_vinted_recovery"' in market and
      "beginOpenedVintedTarget" in ui and "activeOpenedVintedTarget" in product_scan),
     ("opened sold page updates exact legacy and canonical listing",
-     "database.markSold(currentProductDeal.signature)" in product_scan and
+     "database.markSold(soldSig)" in product_scan and
      "marketStore.markSold(exactListingId)" in product_scan and
-     "bundleDatabase.invalidate(currentProductDeal)" in product_scan),
+     "bundleDatabase.invalidate(currentProductDeal)" in product_scan and
+     "currentProductDeal==null&&exactListing!=null" in product_scan),
     ("exact opened product page refreshes publication seller and price",
      "handleProductPage(product,currentProductDeal,exactListingId)" in product_scan and
      "updateExactProductMetadata" in radar and

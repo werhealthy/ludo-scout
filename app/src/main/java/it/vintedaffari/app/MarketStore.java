@@ -52,6 +52,7 @@ public final class MarketStore {
     public static final String CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH";
     public static final String CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY";
     public static final String MANUAL_RECOVERY_SOURCE = "MANUAL_RECOVERY";
+    public static final String OPENED_VERIFY_SOURCE = "OPENED_VERIFY";
     private static final long CATALOG_HEALTH_MAX_AGE_MS=24L*60L*60_000L;
     private static final long CATALOG_RECOVERY_MIN_AGE_MS=30L*60_000L;
     private static final String BGG_REVALIDATION_PREFIX = "bgg_revalidation_v1:";
@@ -1244,9 +1245,37 @@ public final class MarketStore {
         QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);notifyQueueChanged();
     }
 
+    /** Exact fallback after the user has opened a known Vinted item from Ludo. Accessibility normally
+     * reconciles the item page immediately; if Vinted hides the sold/unavailable label from the
+     * accessibility tree, this rechecks the same exact URL through the existing paced public lane. */
+    public void enqueueOpenedListingVerification(long listingId){
+        if(listingId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();boolean queued=false;
+        db.beginTransaction();try{
+            try(Cursor c=db.rawQuery("SELECT lifecycle,vinted_url FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)})){
+                if(c.moveToFirst()&&"ACTIVE".equals(c.getString(0))&&!TextUtils.isEmpty(c.getString(1))){
+                    enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,245,OPENED_VERIFY_SOURCE);queued=true;
+                }
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(queued){setDiagnosticState("opened_vinted_verify",1,"state=QUEUED;listing="+listingId);QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);notifyQueueChanged();}
+    }
+
     public void markSold(long listingId) {
-        ContentValues v = new ContentValues(); v.put("lifecycle", "SOLD"); v.put("last_seen", System.currentTimeMillis());
-        helper.getWritableDatabase().update("market_listings", v, "id=?", new String[]{String.valueOf(listingId)});
+        if(listingId<=0)return;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        db.beginTransaction();try{
+            ContentValues v=new ContentValues();v.put("lifecycle","SOLD");v.put("enrichment_state","SOLD");v.put("last_seen",now);v.put("last_error","Articolo venduto su Vinted");v.put("manual_review_required",0);v.putNull("manual_review_reason");
+            db.update("market_listings",v,"id=?",new String[]{String.valueOf(listingId)});
+            // A sold listing must leave every active lane immediately; otherwise the queue can keep
+            // spending paced Vinted slots on a card that can no longer return to the catalog.
+            ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","sold: listing retired");
+            db.update("processing_jobs",j,"listing_id=? AND state IN (?,?,?,?)",new String[]{String.valueOf(listingId),PENDING,PROCESSING,FAILED_RETRYABLE,FAILED_PERMANENT});
+            db.delete("queue_controls","name=?",new String[]{"vinted_candidates:"+listingId});
+            db.delete("queue_controls","name=? AND value=?",new String[]{MANUAL_VINTED_RECOVERY,String.valueOf(listingId)});
+            db.delete("queue_controls","name=? AND value=?",new String[]{OPENED_VINTED_TARGET,String.valueOf(listingId)});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        helper.invalidateActiveObservationSessionCache();notifyQueueChanged();
     }
 
     public void markUnavailable(long listingId,String reason){
@@ -2473,10 +2502,12 @@ public final class MarketStore {
     public String engineCoreRemainingSummary(){
         DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return"state=NONE";SQLiteDatabase db=helper.getReadableDatabase();StringBuilder out=new StringBuilder();int n=0;
         String sql="SELECT l.id,COALESCE(l.vinted_title,g.canonical_name,''),COALESCE(l.enrichment_state,''),COALESCE(j.attempt,0),COALESCE(j.state,''),COALESCE(j.last_error,'') "+
-                "FROM market_listings l JOIN games g ON g.id=l.game_id LEFT JOIN processing_jobs j ON j.id=(SELECT jj.id FROM processing_jobs jj WHERE jj.listing_id=l.id AND jj.job_type=? ORDER BY jj.updated_at DESC,jj.id DESC LIMIT 1) "+
+                "FROM market_listings l JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) LEFT JOIN processing_jobs j ON j.id=(SELECT jj.id FROM processing_jobs jj WHERE jj.listing_id=l.id AND jj.job_type=? ORDER BY jj.updated_at DESC,jj.id DESC LIMIT 1) "+
                 "WHERE l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=? AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
                 "AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) "+
-                "AND COALESCE(l.manual_review_required,0)=0 AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='') ORDER BY l.last_seen ASC LIMIT 8";
+                "AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(l.enrichment_state,'')<>'NEEDS_REVIEW' AND COALESCE(l.match_state,'')<>'BGG_VARIANT_REVIEW' "+
+                "AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') "+
+                "AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='') ORDER BY l.last_seen ASC LIMIT 8";
         try(Cursor x=db.rawQuery(sql,new String[]{JOB_VINTED,String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(run.startAt),String.valueOf(run.endAt)})){
             while(x.moveToNext()){if(n++>0)out.append(" | ");out.append("#").append(x.getLong(0)).append(" ").append(safe(x.getString(1))).append(" [").append(x.getString(2)).append(";attempt=").append(x.getInt(3)).append(";job=").append(x.getString(4));String err=x.getString(5);if(!TextUtils.isEmpty(err))out.append(";why=").append(safe(err));out.append("]");}
         }
