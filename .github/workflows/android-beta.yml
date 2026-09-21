@@ -119,6 +119,8 @@ jobs:
         run: python3 regression/review_actions_bundle_memory_v51231.py
       - name: Run sold reconciliation/next-action regression
         run: python3 regression/sold_reconcile_next_action_v51232.py
+      - name: Run catalog truth/card layout/bundle memory regression
+        run: python3 regression/catalog_truth_card_layout_bundle_memory_v51233.py
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
