@@ -16,6 +16,7 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.*;
 
 /** Ludo Scout v5 — branded dashboard/catalog/library shell over the stable V4 observer stack. */
