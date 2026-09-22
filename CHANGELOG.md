@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.46 — Activity ready-state recovery (2026-09-22)
+
+- Corregge il ciclo di caricamento infinito introdotto dalla 5.12.45: la freschezza dello snapshot parte dalla fine delle query SQLite, non dal loro inizio.
+- Uno snapshot scaduto resta visibile durante l'aggiornamento asincrono invece di essere sostituito dal placeholder.
+- L'overview materializza solo i tre giorni di cronologia effettivamente mostrati, riducendo query e contention.
+- La regressione riproduce una lettura più lenta del TTL e protegge il comportamento stale-while-revalidate.
+
+
 
 ## 5.12.45 — Activity snapshot recovery (2026-09-22)
 
