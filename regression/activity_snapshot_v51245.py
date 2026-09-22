@@ -6,7 +6,7 @@ overview=ui[ui.index("private void renderEngineOverview()"):ui.index("private Vi
 hero=ui[ui.index("private View engineCurrentRunHero"):ui.index("\n    private ",ui.index("private View engineCurrentRunHero")+30)]
 loader=ui[ui.index("private EngineOverviewSnapshot loadEngineOverviewSnapshot()"):ui.index("private void requestEngineOverviewSnapshot()",ui.index("private EngineOverviewSnapshot loadEngineOverviewSnapshot()"))]
 snapshot_ctor=loader.index("new EngineOverviewSnapshot")
-completion_clock=loader.rfind("System.currentTimeMillis()",0,snapshot_ctor)
+completion_clock=loader.rfind("System.currentTimeMillis()")
 last_read=max(loader.rfind("db.",0,snapshot_ctor),loader.rfind("marketStore.",0,snapshot_ctor))
 null_guard=overview.index("if(snapshot==null){") if "if(snapshot==null){" in overview else -1
 null_return=overview.index("return;",null_guard) if null_guard>=0 else -1
