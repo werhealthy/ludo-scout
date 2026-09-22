@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.os.Build;
 import android.os.IBinder;
 import android.text.TextUtils;
@@ -181,6 +182,13 @@ public final class QueueKeepAliveService extends Service {
                 if(did)market.setLaneStatus("vinted","ACTIVE","attività completata o rimandata",0L);
                 else{market.setLaneStatus("vinted","IDLE","nessuna attività rivendicabile",market.nextRunnableVintedDueAt());sleep(1_500L);}
             }catch(InterruptedException e){Thread.currentThread().interrupt();break;}
+            catch(SQLiteDatabaseLockedException e){
+                // Cross-process WAL writers can overlap for a few milliseconds. Treat SQLITE_BUSY
+                // as backpressure, not as a broken lane, and retry after a short bounded pause.
+                long retryAt=System.currentTimeMillis()+3_000L;
+                try{market.setLaneStatus("vinted","WAITING","database occupato · riprovo",retryAt);market.touchLaneHeartbeat("vinted");}catch(Throwable ignored){}
+                sleepQuiet(3_000L);
+            }
             catch(Throwable t){Log.e(TAG,"Vinted lane fault",t);try{market.setLaneStatus("vinted","FAULT",safe(t),System.currentTimeMillis());market.touchLaneHeartbeat("vinted");}catch(Throwable ignored){}sleepQuiet(2_000L);}
         }
     }
