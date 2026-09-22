@@ -79,7 +79,7 @@ checks=[
      "verifica Vinted evitata" in market),
     ("queue reconciliation is no longer synchronous in Activity onCreate",
      "marketStore.reconcileQueue()" not in oncreate and "buildShell();startPostCreateMaintenance()" in oncreate and
-     "maintenanceIo.execute" in ui[ui.index("private void startPostCreateMaintenance"):ui.index("private void applyUxFreshStartIfNeeded")]),
+     "QueueKeepAliveService.ensureRunning(this);" in ui[ui.index("private void startPostCreateMaintenance"):ui.index("private void applyUxFreshStartIfNeeded")]),
     ("Home remains trusted-only",
      'db.getDeals("trusted",320)' in ui and '"trusted".equals(filter)' in deal),
     ("diagnostics expose recovery, held and early price filtering",

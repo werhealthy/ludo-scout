@@ -1,6 +1,13 @@
 # Ludo Scout — Changelog
 
 
+## 5.12.44 — Queue ownership stability (2026-09-22)
+
+- Il processo UI non esegue più reconciliation, cleanup e conteggi della coda SQLite: avvia soltanto il servizio queue, proprietario della manutenzione seriale.
+- La pagina Attività non forza più un rebuild completo ogni sei secondi; gli aggiornamenti arrivano dagli eventi semantici della coda.
+- Aggiunta regressione per ownership SQLite e cadence UI.
+
+
 ## 5.12.43 — Runtime catalog unblock (2026-09-22)
 
 - Corregge la regressione 5.12.42: un candidato BGG con titolo esattamente uguale dopo normalizzazione può raggiungere la lane Vinted a basso ritmo per acquisire la categoria strutturata, ma resta UNCERTAIN e non catalogabile finché categoria Vinted e compatibilità tipo BGG non sono entrambe verificate.
