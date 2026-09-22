@@ -34,6 +34,8 @@ jobs:
         run: python3 regression/pipeline_integrity_v51242.py
       - name: Run queue ownership/activity cadence regression
         run: python3 regression/runtime_ownership_v51244.py
+      - name: Run Activity snapshot regression
+        run: python3 regression/activity_snapshot_v51245.py
       - name: Run pipeline BGG compatibility fixtures
         run: |
           mkdir -p .regression-build
