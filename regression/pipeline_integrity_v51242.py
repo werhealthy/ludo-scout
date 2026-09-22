@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression guards for the 5.12 pipeline-integrity recovery.
+"""Regression guards for the 5.12 pipeline-integrity recovery and runtime unblock.
 
 These checks intentionally combine executable type-contract fixtures with source guards for
 Android-bound code. Android compilation remains the integration check; this script makes the
@@ -41,8 +41,12 @@ bgg_loop = queue[queue.index("private void bggLoop()"):queue.index("private stat
 checks = [
     ("unknown is not BASE_GAME fallback",
      'return new Result(Type.UNCERTAIN, "Manca un segnale positivo' in listing),
-    ("matched BGG requires independent marketplace evidence",
-     "!product.hasPositiveBoardGameEvidence()" in gate and "titolo coincide con BGG" in gate),
+    ("matched BGG requires independent marketplace evidence or exact verification routing",
+     "!product.hasPositiveBoardGameEvidence()" in gate and "isExactIdentityCandidate" in gate and "titolo coincide con BGG" in gate),
+    ("Marrakech Music is not an exact candidate for Marrakech",
+     "observed.equals(expected)" in gate and "isExactIdentityCandidate(title,candidate)" in gate),
+    ("exact candidate remains non-published pending category verification",
+     "attendo verifica strutturata della categoria Vinted" in gate and "UNCERTAIN listings ineligible" in gate),
     ("Marrakech Music cannot publish from title alone",
      "Nessuna prova positiva di prodotto gioco da tavolo" in gate),
     ("explicit board-game cue remains admissible",
@@ -65,16 +69,13 @@ checks = [
      "maintenanceIo.execute" in kick and "marketStore.reconcileQueue();" in kick),
     ("queue lanes do not reconcile concurrently",
      "market.reconcileQueue();" not in vinted_loop and "market.reconcileQueue();" not in bgg_loop),
-    ("screenshot work is bounded for a 200-card scroll",
-     "thumbnailCandidates.size()>=8" in a11y and "private static final ExecutorService CAPTURES" in thumbs),
+    ("feed scroll performs no full-frame screenshot capture",
+     "ThumbnailStore.captureMissing(this, thumbnailCandidates)" not in a11y and "framebuffer" in a11y and "private static final ExecutorService CAPTURES" in thumbs),
 ]
 
-# Deterministic local stress model: 200 observed cards may exist, but only eight image candidates
-# are retained and crop work has one owner. This mirrors the code guard above.
+# Deterministic local stress model: a 200-card feed does no full-frame capture at all.
 observed = list(range(200))
-candidate_cap = 8
-selected = observed[:candidate_cap]
-checks.append(("200-card stress harness respects thumbnail cap", len(selected) == 8 and len(observed) == 200))
+checks.append(("200-card stress harness allocates no feed screenshots", len(observed) == 200 and "ThumbnailStore.captureMissing(this, thumbnailCandidates)" not in a11y))
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

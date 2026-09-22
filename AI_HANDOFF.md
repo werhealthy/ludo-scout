@@ -399,3 +399,8 @@ State explicitly:
 - automated checks run and results;
 - one simple manual test for the user, including exact pass/fail criteria;
 - remaining risks/open questions.
+
+
+## 5.12.43 runtime catalog unblock (2026-09-22)
+
+Follow-up della 5.12.42. Il gate post-match non deve confondere “nessun cue nel testo feed” con “non inviare alla verifica categoria”. Solo uguaglianza esatta normalizzata titolo osservato/candidato BGG, e mai titolo collision-prone, può creare un candidato UNCERTAIN instradato alla lane Vinted; nessuna card Catalogo è pubblicabile da questo passaggio. La categoria strutturata Vinted e la compatibilità BGG rimangono i requisiti di promozione. Le catture screenshot full-frame del feed sono disabilitate per ridurre il rischio OOM/ANR su scroll 150–250 card.

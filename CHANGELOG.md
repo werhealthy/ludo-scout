@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+
+## 5.12.43 — Runtime catalog unblock (2026-09-22)
+
+- Corregge la regressione 5.12.42: un candidato BGG con titolo esattamente uguale dopo normalizzazione può raggiungere la lane Vinted a basso ritmo per acquisire la categoria strutturata, ma resta UNCERTAIN e non catalogabile finché categoria Vinted e compatibilità tipo BGG non sono entrambe verificate.
+- Un titolo soltanto simile (ad esempio Marrakech Music → Marrakech) resta quarantinato; titoli collision-prone continuano a richiedere evidenza ludica indipendente.
+- Rimuove le catture screenshot full-frame nel feed Accessibility: erano un tie-break opzionale ma aumentavano la pressione heap durante scroll lunghi. Restano thumbnail da pagina prodotto/remota dopo prova di idoneità.
+- Estende la regressione di integrità con la route esatta non-pubblicante e l'harness da 200 card senza screenshot feed.
+
 ## 5.12.42 — Pipeline integrity recovery
 
 - Replaced the implicit BASE_GAME fallback with an UNCERTAIN state. A BGG-like title now needs independent marketplace evidence before it can become a price/publication candidate; unknown observations remain reversible rather than becoming title-collision cards.
