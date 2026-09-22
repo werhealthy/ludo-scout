@@ -1164,9 +1164,13 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private boolean engineRunSettled(DealDatabase.ObservationSession run,long now){return DealDatabase.engineAutomaticDone(run,now);}
 
     private EngineOverviewSnapshot loadEngineOverviewSnapshot(){
-        long at=System.currentTimeMillis();
-        return new EngineOverviewSnapshot(at,db.activeObservationSession(),db.waitingObservationSessionCount(),
-                marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount(),db.recentObservationDays(7));
+        DealDatabase.ObservationSession run=db.activeObservationSession();
+        int waitingRuns=db.waitingObservationSessionCount();
+        int recoveryCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();
+        List<DealDatabase.ObservationDay> days=db.recentObservationDays(3);
+        // Freshness starts when every read has completed. Using the start time made any load slower
+        // than the TTL arrive already expired and trapped Activity in a refresh/placeholder loop.
+        return new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,days);
     }
     private void requestEngineOverviewSnapshot(){
         if(!engineOverviewLoading.compareAndSet(false,true))return;
@@ -1186,11 +1190,13 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private void renderEngineOverview(){
         long now=System.currentTimeMillis();EngineOverviewSnapshot snapshot=engineOverviewSnapshot;
         renderEngineHeader("Motore","Il lavoro di Ludo, senza il rumore della coda tecnica",false);
-        if(snapshot==null||now-snapshot.loadedAt>5_000L){
+        if(snapshot==null){
             requestEngineOverviewSnapshot();
             body.addView(text("Aggiorno lo stato del Motore…",14,MUTED,Typeface.BOLD));
             return;
         }
+        // Stale-while-revalidate: never replace usable Activity data with an empty loading page.
+        if(now-snapshot.loadedAt>30_000L)requestEngineOverviewSnapshot();
         DealDatabase.ObservationSession run=snapshot.run;int waitingRuns=snapshot.waitingRuns;int recoveryCount=snapshot.recoveryCount;int review=run==null?recoveryCount:run.reviewListings;
         body.addView(engineCurrentRunHero(run,now,waitingRuns));
         if(waitingRuns>0){TextView waiting=text(waitingRuns+(waitingRuns==1?" altro scroll acquisito":" altri scroll acquisiti")+" · il Motore ruota tra i job senza scartare card",12,MUTED,Typeface.BOLD);waiting.setPadding(dp(2),dp(10),0,0);body.addView(waiting);}
