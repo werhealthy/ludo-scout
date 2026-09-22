@@ -1,5 +1,13 @@
 # Ludo Scout — AI handoff
 
+## 5.12.47 stability + intake recovery (pending Pixel validation)
+- Cross-process SQLite contention is expected between :radar, default queue and :ui. DealDatabase configures an 8-second busy timeout; the Vinted lane treats SQLiteDatabaseLockedException as bounded backpressure instead of a FAULT state.
+- ListingClassifier accepts a narrow allow-list of known board-game publishers/brands as positive marketplace evidence. This only opens the existing identity/verification pipeline; BGG identity and structured marketplace checks still gate publication.
+- Explicit expansions are retained as observations but are not identity/price/publication candidates and must not create human review work.
+- Regression: pipeline_integrity_v51242.py guards publisher evidence, expansion suppression and SQLite busy timeout.
+- Pixel validation should compare queueLanes.vinted, processCrashJournal SQLite locks, catalog growth after a controlled scroll, review composition and systemExitHistory ANR/memory counters.
+
+
 ## Source of truth
 The private GitHub repository `werhealthy/ludo-scout` is now the source of truth.
 Do not reconstruct the project from an older ZIP when the repository is available.

@@ -1,5 +1,14 @@
 # Ludo Scout — Changelog
 
+## 5.12.47 — Stability + intake recovery (2026-09-23)
+
+- Riduce i fault della corsia Vinted su contention SQLite multiprocesso: ogni connessione usa un `busy_timeout` di 8 s e `SQLITE_BUSY` viene trattato come backpressure con retry breve, non come lane fault.
+- Gli annunci con publisher/brand chiaramente ludico (ad esempio Kosmos) ottengono finalmente evidenza marketplace positiva e possono proseguire verso identità BGG + verifica Vinted, senza pubblicazione basata sul solo brand.
+- Espansioni esplicite restano osservabili ma non entrano più nel pricing/catalogo automatico né nella coda di revisione utente.
+- Mantiene invariati rate limit Vinted, signing, applicationId, strategia CI e dati esistenti.
+- Estesa la regressione pipeline con guard per brand ludici, esclusione espansioni e timeout SQLite.
+
+
 ## 5.12.46 — Activity ready-state recovery (2026-09-22)
 
 - Corregge il ciclo di caricamento infinito introdotto dalla 5.12.45: la freschezza dello snapshot parte dalla fine delle query SQLite, non dal loro inizio.

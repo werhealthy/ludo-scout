@@ -19,12 +19,14 @@ thumbs = (SRC / "ThumbnailStore.java").read_text(encoding="utf-8")
 page = (SRC / "ProductPage.java").read_text(encoding="utf-8")
 parser = (SRC / "ProductPageParser.java").read_text(encoding="utf-8")
 normalizer = (SRC / "BggTitleNormalizer.java").read_text(encoding="utf-8")
+deal_db = (SRC / "DealDatabase.java").read_text(encoding="utf-8")
+
 
 # Fixture intent: a candidate title alone is not product evidence.
 fixtures = [
     ("Marrakech Music", "no_boardgame_cue", "quarantine"),
     ("Marrakech – gioco da tavolo", "boardgame_cue", "base_candidate"),
-    ("Marrakech espansione", "expansion_cue", "expansion_candidate"),
+    ("Marrakech espansione", "expansion_cue", "filtered_expansion"),
     ("Unknown title", "no_boardgame_cue", "uncertain"),
 ]
 assert len(fixtures) == 4
@@ -51,8 +53,13 @@ checks = [
      "Nessuna prova positiva di prodotto gioco da tavolo" in gate),
     ("explicit board-game cue remains admissible",
      'return new Result(Type.BASE_GAME, "Segnale esplicito di gioco da tavolo' in listing),
-    ("expansion cue remains admissible",
-     'return new Result(Type.EXPANSION, "Espansione esplicitamente indicata' in listing),
+    ("known board-game publisher is positive marketplace evidence",
+     "BOARD_GAME_BRANDS" in listing and '"kosmos"' in listing and "Publisher/brand ludico riconoscibile" in listing),
+    ("expansion cue is retained but excluded from automatic catalog/review",
+     'return new Result(Type.EXPANSION, "Espansione esplicitamente indicata: esclusa dal catalogo automatico.", false, false)' in listing and
+     "return type == Type.BASE_GAME;" in listing),
+    ("cross-process SQLite uses bounded busy timeout",
+     'PRAGMA busy_timeout=8000' in deal_db),
     ("normalized BGG variants retain semantic expansion terms",
      "espansione" in normalizer.lower() and "expansion" in normalizer.lower()),
     ("type validation precedes BGG publication",

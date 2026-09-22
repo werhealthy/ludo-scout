@@ -104,6 +104,12 @@ public final class DealDatabase extends SQLiteOpenHelper {
 
     private static void createOverrides(SQLiteDatabase db){db.execSQL("CREATE TABLE IF NOT EXISTS listing_overrides(signature TEXT PRIMARY KEY,item_id TEXT,payload TEXT,excluded INTEGER NOT NULL DEFAULT 0,reason TEXT)");}
     public DealDatabase(Context c){super(c,DB_NAME,null,DB_VERSION);try{setWriteAheadLoggingEnabled(true);}catch(Throwable ignored){}}
+    @Override public void onConfigure(SQLiteDatabase db){
+        super.onConfigure(db);
+        // Radar, queue and UI are separate processes sharing the same WAL database. A transient
+        // writer collision should wait briefly instead of immediately faulting the Vinted lane.
+        try(Cursor c=db.rawQuery("PRAGMA busy_timeout=8000",null)){if(c.moveToFirst())c.getInt(0);}catch(Throwable ignored){}
+    }
     @Override public void onCreate(SQLiteDatabase db){createOverrides(db);
         db.execSQL("CREATE TABLE observations(id INTEGER PRIMARY KEY AUTOINCREMENT,signature TEXT NOT NULL,observed_at INTEGER NOT NULL,vinted_title TEXT,brand TEXT,item_condition TEXT,item_price_cents INTEGER,protected_price_cents INTEGER,favorites INTEGER,analysis_status TEXT,bgg_id TEXT,game_name TEXT,display_name TEXT,rating REAL,geek_rating REAL,bgg_rank INTEGER,voters INTEGER,quality_score INTEGER,tier TEXT,tier_label TEXT,total_cents INTEGER,benchmark_cents INTEGER,offer_cents INTEGER,shipping_cents INTEGER,discount REAL,language_code TEXT,match_reason TEXT,listing_type TEXT,verification_state TEXT,verification_reason TEXT)");
         db.execSQL("CREATE INDEX idx_observations_bgg_time ON observations(bgg_id,observed_at)");
