@@ -376,15 +376,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 .putLong("cardsParsedTotal", p.getLong("cardsParsedTotal", 0) + discovered.size())
                 .apply();
         if (discovered.isEmpty()) return;
-        // Screenshot/crop work is optional identity evidence, not a prerequisite for discovery.
-        // Bound it to a small set of viable candidates before allocating a full-screen bitmap.
-        List<VintedCard> thumbnailCandidates=new ArrayList<>();
-        for(VintedCard candidate:discovered){
-            ListingClassifier.Result classified=ListingClassifier.classify(candidate);
-            if(classified.type!=ListingClassifier.Type.NON_GAME&&classified.allowIdentityCandidate)thumbnailCandidates.add(candidate);
-            if(thumbnailCandidates.size()>=8)break;
-        }
-        ThumbnailStore.captureMissing(this, thumbnailCandidates);
+        // Feed screenshots were an optional visual tie-break, but each capture allocates a full
+        // framebuffer. Under a 150–250 card scroll that is unsafe after an OOM/ANR report.
+        // Product-page and remote thumbnails remain available after a listing is proven viable.
 
         long now = System.currentTimeMillis();
         if(now-lastBacklogAttemptAt>30_000L){lastBacklogAttemptAt=now;handler.post(this::resolveBacklog);}
