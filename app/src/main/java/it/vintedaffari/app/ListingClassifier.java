@@ -18,7 +18,9 @@ public final class ListingClassifier {
             this.type = type; this.reason = reason; this.allowIdentityCandidate = allowIdentityCandidate; this.allowPriceModel = allowPriceModel;
         }
         public boolean hasPositiveBoardGameEvidence() {
-            return type == Type.BASE_GAME || type == Type.EXPANSION;
+            // Ludo Scout's automatic catalog is base-game only. Expansions are retained as
+            // observations, but they must not become pricing/publication evidence or human review.
+            return type == Type.BASE_GAME;
         }
     }
 
@@ -52,6 +54,15 @@ public final class ListingClassifier {
     private static final String[] BUNDLE = {
             "lotto", "bundle", "stock", "set di giochi", "giochi in blocco", "blocco giochi", "collezione giochi"
     };
+    /** Publisher/brand evidence visible directly on Vinted cards. This is intentionally narrow:
+     * it only upgrades an otherwise non-negative observation to a base-game candidate. BGG identity
+     * and structured Vinted verification still have to agree before catalog publication. */
+    private static final String[] BOARD_GAME_BRANDS = {
+            "kosmos", "asmodee", "ravensburger", "devir", "cranio creations", "giochi uniti",
+            "matagot", "lookout games", "goliath games", "stonemaier games", "days of wonder",
+            "czech games edition", "cge", "lucky duck games", "iello", "horrible guild",
+            "blue orange", "pegasus spiele", "queen games", "alea", "repos production"
+    };
     /** Strong negative evidence. Keep this list category-based rather than brand-based: a title such
      * as "Scarpe Adidas" should never become a provisional BGG game, while an obscure board game
      * with an unfamiliar proper name must still be allowed through to the BGG matcher. */
@@ -83,7 +94,10 @@ public final class ListingClassifier {
         if (containsAny(t, ACCESSORY)) return new Result(Type.ACCESSORY, "Termini tipici di accessorio/organizer.", false, false);
         if (containsAny(t, COMPONENTS)) return new Result(Type.COMPONENTS, "L'annuncio sembra riferirsi a componenti separati.", false, false);
         if (containsAny(t, BUNDLE)) return new Result(Type.BUNDLE, "Possibile lotto/bundle: il prezzo non va confrontato con un singolo gioco.", false, false);
-        if (containsAny(t, EXPANSION)) return new Result(Type.EXPANSION, "Espansione esplicitamente indicata nell'annuncio.", true, true);
+        if (containsAny(t, EXPANSION)) return new Result(Type.EXPANSION, "Espansione esplicitamente indicata: esclusa dal catalogo automatico.", false, false);
+        String brand = norm(card == null ? "" : card.brand);
+        if (containsAny(brand, BOARD_GAME_BRANDS))
+            return new Result(Type.BASE_GAME, "Publisher/brand ludico riconoscibile nell'annuncio.", true, true);
         if (BoardGameIntakeGate.hasStrongBoardGameCue((card == null ? "" : card.title) + " " + (card == null ? "" : card.rawDescription) + " " + (card == null ? "" : card.brand)))
             return new Result(Type.BASE_GAME, "Segnale esplicito di gioco da tavolo nell'annuncio.", true, true);
         // Absence of a negative signal is not proof of a base game. Preserve the observation for
