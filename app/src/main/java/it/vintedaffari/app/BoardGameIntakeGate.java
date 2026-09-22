@@ -63,11 +63,16 @@ public final class BoardGameIntakeGate {
     public static Decision matchedAnalysis(VintedCard card,ListingClassifier.Result product,GameAnalysis analysis,boolean learnedCollisionRisk){
         String title=card==null?"":card.title,raw=card==null?"":card.rawDescription;
         if(isStrongNonGameText(title,raw))return new Decision(Action.QUARANTINE,"Segnali forti di categoria non gioco da tavolo");
-        // BGG title equality identifies a candidate, not the marketplace product. Only an
-        // independently positive marketplace classification can publish automatically.
-        if(product==null||!product.hasPositiveBoardGameEvidence())
-            return new Decision(Action.QUARANTINE,"Il titolo coincide con BGG ma manca una prova indipendente che l'oggetto sia un gioco da tavolo");
         boolean risky=seededCollisionTitle(title)||learnedCollisionRisk;
+        // An exact, normalized identity may progress only to the paced Vinted verification lane.
+        // It is deliberately not product proof: MarketStore keeps UNCERTAIN listings ineligible
+        // until structured Vinted category evidence and BGG-type compatibility both agree.
+        if(product==null||!product.hasPositiveBoardGameEvidence()){
+            String candidate=analysis==null?"":analysis.candidateName;
+            if(!risky&&isExactIdentityCandidate(title,candidate))
+                return new Decision(Action.ACCEPT,"Identità BGG esatta: attendo verifica strutturata della categoria Vinted");
+            return new Decision(Action.QUARANTINE,"Il titolo coincide con BGG ma manca una prova indipendente che l'oggetto sia un gioco da tavolo");
+        }
         if(!risky)return new Decision(Action.ACCEPT,"Match BGG con contesto marketplace non a rischio");
         String publisher=analysis==null?"":analysis.productPublisher;
         String brand=card==null?"":card.brand;
@@ -124,6 +129,13 @@ public final class BoardGameIntakeGate {
 
     public static boolean hasStrongBoardGameCue(String text){
         String n=norm(text);for(String x:BOARD_GAME_CUES)if(containsPhrase(n,norm(x)))return true;return false;
+    }
+
+    /** Equality after punctuation/diacritic cleanup is only a routing signal. It never changes
+     * ListingClassifier.Type and cannot publish a catalogue card by itself. */
+    private static boolean isExactIdentityCandidate(String title,String candidate){
+        String observed=norm(title), expected=norm(candidate);
+        return !observed.isEmpty()&&!expected.isEmpty()&&observed.equals(expected);
     }
 
     private static boolean plausibleGame(String query,BggSearchClient.Game game){
