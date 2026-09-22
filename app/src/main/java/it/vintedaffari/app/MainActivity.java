@@ -32,6 +32,15 @@ public final class MainActivity extends Activity {
     private static final long UI_SESSION_TTL=2*60*60_000L;
     private DealDatabase db;private MarketStore marketStore;private BundleDatabase bundleDb;private LibraryDatabase libraryDb;private AccessoryDatabase accessoryDb;private HuntDatabase huntDb;private BggSearchClient bggSearch;
     private String pendingLibraryQuery="";private List<BggSearchClient.Game> pendingLibraryResults=new ArrayList<>();private boolean pendingLibraryRunning=false;private int catalogVisible=24,databaseVisible=24,databaseJobsVisible=6;private boolean databaseLoadingMore=false,catalogLoadingMore=false;private String databaseScope="verified",databaseSort="alpha";private boolean databaseActiveOnly=false;private Double databaseMinRating=null;private Integer databaseMaxPrice=null;private LinearLayout databaseResultsHost,catalogResultsHost;private List<DealRecord> catalogResultSnapshot=new ArrayList<>();private final Handler uiUpdates=new Handler(Looper.getMainLooper());private final Runnable refreshData=()->{if(!isDestroyed())render();};private final Runnable deferredRender=()->{if(!isDestroyed())render();};private boolean renderInProgress=false,openingPreset=false,showActivityHistory=false,showBundleDebug=false;private String engineSection="overview";private long engineDayStart=0L,engineDayEnd=0L,engineRunStart=0L,engineRunEnd=0L;private String engineRunFilter="all";private Set<String> catalogBatchSignatures=null;private String catalogBatchLabel="";private Dialog libraryWizardDialog;private String libraryWizardStep="",libraryWizardSource="",libraryWizardQuery="",wizardPaidText="",wizardShippingText="",wizardFeeText="",wizardDateText="",wizardSessionId="";private BggSearchClient.Game libraryWizardGame;private boolean restoringLibraryWizard=false;private int restoredScrollY=0;private LinearLayout body,nav;private ScrollView scroll;private PullRefreshScrollView refreshHost;private View activityButton,companionFab;private TextView globalProgressLabel;private String tab="discover",returnTab="discover",sort="relevance",query="",filterMode="all",catalogPreset="all",bundleSort="deal",databaseQuery="",databaseDetailReturnTab="",libraryScope="owned",libraryQuery="",companionSection="for_you";private long selectedGameId=0L;private boolean receiverRegistered,gateVisible;private volatile boolean marketReferenceRefreshInFlight;private long lastMarketReferenceRefreshAt=0L;private final ArrayDeque<String> tabHistory=new ArrayDeque<>();private final Map<String,Integer> tabScrollPositions=new HashMap<>();private String activeDealSignature="";private long activeVintedResolutionListingId=0L;private Dialog activeDetailDialog,activeResolutionDialog,activeGameOverlay;private boolean suppressDetailDismissState=false,suppressResolutionDismissState=false;private final Map<String,Integer> libraryMarketCache=new HashMap<>();private final Map<String,Double> libraryScoreCache=new HashMap<>();private Thread.UncaughtExceptionHandler previousCrashHandler,installedCrashHandler;private long lastQueueUiRenderAt=0L,activityWakeRequestedAt=0L;private int engineRunPage=0;private volatile boolean operationReconcileInFlight=false,operationReconcilePending=false;private volatile long lastOperationReconcileAt=0L;private final Runnable activityStatusPulse=()->{};
+    private static final class EngineOverviewSnapshot {
+        final long loadedAt; final DealDatabase.ObservationSession run; final int waitingRuns,recoveryCount;
+        final List<DealDatabase.ObservationDay> days;
+        EngineOverviewSnapshot(long at,DealDatabase.ObservationSession r,int w,int recovery,List<DealDatabase.ObservationDay> d){
+            loadedAt=at;run=r;waitingRuns=w;recoveryCount=recovery;days=d==null?Collections.emptyList():d;
+        }
+    }
+    private volatile EngineOverviewSnapshot engineOverviewSnapshot;
+    private final AtomicBoolean engineOverviewLoading=new AtomicBoolean(false);
     private static final class PhotoMatch {BggSearchClient.Game game;double visual,text,score;PhotoMatch(BggSearchClient.Game g,double v,double t,double s){game=g;visual=v;text=t;score=s;}}
     private static final class LibrarySearchJob {String id,label;Uri uri;boolean running=true;String error="";final List<BggSearchClient.Game> results=new ArrayList<>();LibrarySearchJob(String i,String l,Uri u){id=i;label=l;uri=u;}}
     private static final List<LibrarySearchJob> librarySearchJobs=Collections.synchronizedList(new ArrayList<>());private String activeLibrarySearchJobId="";private final List<BggSearchClient.Game> wizardBundleGames=new ArrayList<>();private final Set<String> libraryBackfillInFlight=Collections.synchronizedSet(new HashSet<>());private final Set<String> libraryBackfillAttempted=Collections.synchronizedSet(new HashSet<>());
@@ -1153,10 +1162,36 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private boolean engineScrollActive(DealDatabase.ObservationSession run,long now){return run!=null&&now-run.endAt<DealDatabase.ENGINE_SESSION_GAP_MS;}
     private boolean engineRunSettled(DealDatabase.ObservationSession run,long now){return DealDatabase.engineAutomaticDone(run,now);}
 
+    private EngineOverviewSnapshot loadEngineOverviewSnapshot(){
+        long at=System.currentTimeMillis();
+        return new EngineOverviewSnapshot(at,db.activeObservationSession(),db.waitingObservationSessionCount(),
+                marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount(),db.recentObservationDays(7));
+    }
+    private void requestEngineOverviewSnapshot(){
+        if(!engineOverviewLoading.compareAndSet(false,true))return;
+        uiDataIo.execute(()->{
+            EngineOverviewSnapshot loaded=null;
+            try{loaded=loadEngineOverviewSnapshot();}
+            catch(Throwable t){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activitySnapshotError",String.valueOf(t)).apply();}
+            final EngineOverviewSnapshot ready=loaded;
+            runOnUiThread(()->{
+                engineOverviewLoading.set(false);
+                if(ready!=null)engineOverviewSnapshot=ready;
+                if("activity".equals(tab)&&"overview".equals(engineSection)&&!isDestroyed())scheduleRender(0);
+            });
+        });
+    }
+
     private void renderEngineOverview(){
-        long now=System.currentTimeMillis();DealDatabase.ObservationSession run=db.activeObservationSession();int waitingRuns=db.waitingObservationSessionCount();int recoveryCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();int review=run==null?recoveryCount:run.reviewListings;
+        long now=System.currentTimeMillis();EngineOverviewSnapshot snapshot=engineOverviewSnapshot;
         renderEngineHeader("Motore","Il lavoro di Ludo, senza il rumore della coda tecnica",false);
-        body.addView(engineCurrentRunHero(run,now));
+        if(snapshot==null||now-snapshot.loadedAt>5_000L){
+            requestEngineOverviewSnapshot();
+            body.addView(text("Aggiorno lo stato del Motore…",14,MUTED,Typeface.BOLD));
+            return;
+        }
+        DealDatabase.ObservationSession run=snapshot.run;int waitingRuns=snapshot.waitingRuns;int recoveryCount=snapshot.recoveryCount;int review=run==null?recoveryCount:run.reviewListings;
+        body.addView(engineCurrentRunHero(run,now,waitingRuns));
         if(waitingRuns>0){TextView waiting=text(waitingRuns+(waitingRuns==1?" altro scroll acquisito":" altri scroll acquisiti")+" · il Motore ruota tra i job senza scartare card",12,MUTED,Typeface.BOLD);waiting.setPadding(dp(2),dp(10),0,0);body.addView(waiting);}
 
         if(run!=null){
@@ -1172,13 +1207,13 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if(run!=null&&run.heldListings>0){TextView held=text(run.heldListings+(run.heldListings==1?" risultato non pubblicato automaticamente":" risultati non pubblicati automaticamente")+" · nessuna azione richiesta",12,MUTED,Typeface.BOLD);held.setPadding(dp(2),dp(10),0,0);body.addView(held);}
 
         LinearLayout histHead=new LinearLayout(this);histHead.setGravity(Gravity.CENTER_VERTICAL);histHead.setPadding(2,dp(26),0,dp(8));TextView ht=text("Cronologia",17,TEXT,Typeface.BOLD);histHead.addView(ht,new LinearLayout.LayoutParams(0,-2,1));TextView all=text("Vedi tutto",13,CYAN,Typeface.BOLD);all.setOnClickListener(v->{engineSection="history";render();});histHead.addView(all);body.addView(histHead);
-        List<DealDatabase.ObservationDay> days=db.recentObservationDays(7);if(days.isEmpty())body.addView(text("La cronologia partirà dal prossimo scroll su Vinted.",13,MUTED,Typeface.NORMAL));else for(int i=0;i<Math.min(3,days.size());i++)body.addView(engineDayRow(days.get(i),i==Math.min(3,days.size())-1));
+        List<DealDatabase.ObservationDay> days=snapshot.days;if(days.isEmpty())body.addView(text("La cronologia partirà dal prossimo scroll su Vinted.",13,MUTED,Typeface.NORMAL));else for(int i=0;i<Math.min(3,days.size());i++)body.addView(engineDayRow(days.get(i),i==Math.min(3,days.size())-1));
         // Queue broadcasts already trigger semantic refreshes. A timed full rebuild here made
         // the Activity consume CPU even when no visible state changed.
         uiUpdates.removeCallbacks(activityStatusPulse);
     }
 
-    private View engineCurrentRunHero(DealDatabase.ObservationSession run,long now){
+    private View engineCurrentRunHero(DealDatabase.ObservationSession run,long now,int waitingRuns){
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(20),dp(20),dp(20),dp(18));boolean active=engineScrollActive(run,now),settled=engineRunSettled(run,now);boolean automaticSettled=run!=null&&DealDatabase.engineContentSettled(run);boolean fullyReady=run!=null&&(run.validListings==0||run.completeListings>=run.validListings);int accent=run==null||automaticSettled?TEAL:(active?CYAN:YELLOW);hero.setBackground(round(SURFACE,26,1,accent));
         if(run==null){
             TextView eyebrow=text("PRONTO",12,TEAL,Typeface.BOLD);hero.addView(eyebrow);TextView title=text("Puoi fare un nuovo scroll",28,TEXT,Typeface.BOLD);title.setPadding(0,dp(8),0,0);hero.addView(title);hero.addView(text("Apri Vinted e scorri normalmente. Ludo creerà un nuovo lavoro separato da tutto ciò che c'era prima.",14,MUTED,Typeface.NORMAL));SharedPreferences p=getSharedPreferences("va_v3_diag",MODE_PRIVATE);if(p.getBoolean("v5121FreshStartApplied",false)){String reset="Ripartenza pulita · vecchio backlog rimosso";TextView note=text(reset,12,MUTED,Typeface.BOLD);note.setPadding(0,dp(18),0,0);hero.addView(note);}return hero;
@@ -1191,7 +1226,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         int remoteRemaining=Math.max(run.corePendingListings,run.coreRemainingListings);if(remoteRemaining>0)workMeta+=" · "+remoteRemaining+" verifiche online";
         hero.addView(text(workMeta,13,MUTED,Typeface.NORMAL));
         ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,dp(7));pp.topMargin=dp(18);if(active&&run.validListings==0){progress.setIndeterminate(true);}else{progress.setIndeterminate(false);progress.setMax(Math.max(1,run.validListings));progress.setProgress(Math.min(run.validListings,automaticDone));}hero.addView(progress,pp);
-        String state;if(active)state="Sto ancora acquisendo questo scroll";else if(run.analysisPendingListings>0)state=run.analysisPendingListings+" card devono ancora essere classificate";else if(automaticRemaining>0){if(remoteRemaining>0){long wait=VintedPublicSession.waitUntil(this);state=remoteRemaining+" verifiche Vinted rimaste"+(wait>now?" · prossima richiesta "+retryCountdown(wait):"")+(db.waitingObservationSessionCount()>0?" · alterno gli scroll":"");}else state=automaticRemaining+" risultati da consolidare";}else state="Lavoro automatico concluso";TextView status=text(state,14,automaticSettled?TEAL:(active?CYAN:YELLOW),Typeface.BOLD);status.setPadding(0,dp(10),0,0);hero.addView(status);
+        String state;if(active)state="Sto ancora acquisendo questo scroll";else if(run.analysisPendingListings>0)state=run.analysisPendingListings+" card devono ancora essere classificate";else if(automaticRemaining>0){if(remoteRemaining>0){long wait=VintedPublicSession.waitUntil(this);state=remoteRemaining+" verifiche Vinted rimaste"+(wait>now?" · prossima richiesta "+retryCountdown(wait):"")+(waitingRuns>0?" · alterno gli scroll":"");}else state=automaticRemaining+" risultati da consolidare";}else state="Lavoro automatico concluso";TextView status=text(state,14,automaticSettled?TEAL:(active?CYAN:YELLOW),Typeface.BOLD);status.setPadding(0,dp(10),0,0);hero.addView(status);
         if(run.completeListings>0){TextView open=text("Apri le "+run.completeListings+" card pronte  ›",14,CYAN,Typeface.BOLD);open.setGravity(Gravity.CENTER_VERTICAL);open.setMinHeight(dp(46));open.setPadding(0,dp(8),0,0);open.setOnClickListener(v->openEngineRun(run,"ready"));hero.addView(open);}
         hero.setOnClickListener(v->openEngineRun(run,"all"));
         hero.setContentDescription("Apri tutte le card del job attivo");
