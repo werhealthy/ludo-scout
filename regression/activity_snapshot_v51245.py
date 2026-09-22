@@ -2,6 +2,7 @@
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
 ui=(root/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
+diagnostics=(root/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
 overview=ui[ui.index("private void renderEngineOverview()"):ui.index("private View engineCurrentRunHero",ui.index("private void renderEngineOverview()"))]
 hero=ui[ui.index("private View engineCurrentRunHero"):ui.index("\n    private ",ui.index("private View engineCurrentRunHero")+30)]
 render=ui[ui.index("private void render()"):ui.index("private void cancelImageRequests",ui.index("private void render()"))]
@@ -23,6 +24,7 @@ checks=[
  ("Activity render skips SQLite-backed indicator while its button is hidden",'if(!"activity".equals(tab))updateActivityIndicator();' in render),
  ("Activity queue broadcasts skip the SQLite-backed indicator",'if(!"activity".equals(tab))updateActivityIndicator();' in receiver),
  ("snapshot failures use bounded backoff","engineOverviewRetryAt" in ui and "activitySnapshotRetry" in ui),
+ ("snapshot state is visible in copied diagnostics",'activitySnapshot={state=' in diagnostics and 'activitySnapshotError' in diagnostics),
 ]
 failed=[n for n,ok in checks if not ok]
 for n,ok in checks: print(("PASS " if ok else "FAIL ")+n)
