@@ -28,6 +28,12 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - `Android beta` runs on pushes to `beta` and can also be triggered manually (`workflow_dispatch`). It builds the signed debug APK, verifies the preserved signing certificate, uploads the APK artifact and distributes it through Firebase App Distribution.
 - CI versionCode remains `1,000,000 + github.run_number`; do not change the signing key, package/applicationId or versionCode strategy without explicit user approval.
 
+## 5.12.46 Activity ready-state recovery (pending Pixel validation)
+- A database snapshot is fresh from completion, never from query start. Slow SQLite reads must not arrive already expired and recursively trigger another placeholder/load cycle.
+- Activity uses stale-while-revalidate: once a coherent snapshot exists, background refresh never replaces it with an empty loading page.
+- The overview fetches only the three history days it renders. Full history remains a separate explicit surface.
+- Regression: `regression/activity_snapshot_v51245.py` covers main-thread ownership, completion-time freshness and stale-snapshot visibility.
+
 ## 5.12.42 pipeline integrity recovery (pending beta validation)
 - Repository baseline inspected for this recovery: main and beta had the same source tree at 5.12.41. The field build 5.12.37-ux-library-ludo-cardfix predates this branch and must not be used as proof that later GitHub UX changes fixed a pipeline defect.
 - Product type, BGG identity, exact Vinted identity and publication eligibility are now distinct gates. A title match only nominates BGG identity; automatic publication additionally requires positive marketplace game evidence and compatible authoritative BGG item type.
