@@ -404,3 +404,8 @@ State explicitly:
 ## 5.12.43 runtime catalog unblock (2026-09-22)
 
 Follow-up della 5.12.42. Il gate post-match non deve confondere “nessun cue nel testo feed” con “non inviare alla verifica categoria”. Solo uguaglianza esatta normalizzata titolo osservato/candidato BGG, e mai titolo collision-prone, può creare un candidato UNCERTAIN instradato alla lane Vinted; nessuna card Catalogo è pubblicabile da questo passaggio. La categoria strutturata Vinted e la compatibilità BGG rimangono i requisiti di promozione. Le catture screenshot full-frame del feed sono disabilitate per ridurre il rischio OOM/ANR su scroll 150–250 card.
+
+
+## 5.12.44 queue ownership stability (2026-09-22)
+
+Il processo UI non deve invocare MarketStore.reconcileQueue né sweep/cleanup sul database condiviso. QueueKeepAliveService è l'unico owner della manutenzione seriale; Radar resta produttore di osservazioni. La pagina Attività non deve ricostruire tutta la gerarchia a timer: render solo su navigazione o evento semantico.
