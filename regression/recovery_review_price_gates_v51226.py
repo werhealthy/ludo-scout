@@ -51,7 +51,7 @@ checks=[
      ui.index("marketStore.beginManualVintedRecovery") < ui.index("launchVintedSearch(searchTitle)")),
     ("recovery search cards do not become ordinary observations",
      "manualRecoverySuppressedCards" in scan and "discovered.clear()" in scan and
-     scan.index("discovered.clear()") < scan.index("ThumbnailStore.captureMissing")),
+     "ThumbnailStore.captureMissing(this, thumbnailCandidates)" not in scan),
     ("explicit price-comparison mode still exists",
      "activeMarketScanGame()" in radar and "Ricerca prezzi Vinted esplicita" in radar),
     ("manual recovery still requires an exact Vinted item URL",
