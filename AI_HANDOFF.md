@@ -409,3 +409,8 @@ Follow-up della 5.12.42. Il gate post-match non deve confondere “nessun cue ne
 ## 5.12.44 queue ownership stability (2026-09-22)
 
 Il processo UI non deve invocare MarketStore.reconcileQueue né sweep/cleanup sul database condiviso. QueueKeepAliveService è l'unico owner della manutenzione seriale; Radar resta produttore di osservazioni. La pagina Attività non deve ricostruire tutta la gerarchia a timer: render solo su navigazione o evento semantico.
+
+
+## 5.12.45 Activity snapshot recovery (2026-09-22)
+
+Invariante UI: renderEngineOverview ed engineCurrentRunHero non devono accedere direttamente a DealDatabase o MarketStore. Tutte le letture per Attività passano da EngineOverviewSnapshot caricato su uiDataIo con single-flight; il main thread mostra un placeholder e renderizza solo dati già pronti.

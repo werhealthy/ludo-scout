@@ -1,6 +1,14 @@
 # Ludo Scout — Changelog
 
 
+## 5.12.45 — Activity snapshot recovery (2026-09-22)
+
+- La pagina Attività non legge più sessioni, review e cronologia SQLite sul main thread.
+- Un executor UI dedicato carica uno snapshot coerente; il main thread costruisce solo le view da dati già materializzati.
+- Lo snapshot usa single-flight e placeholder immediato, evitando blocchi input durante contention con Radar/Queue.
+- Regressione dedicata impedisce il ritorno di query DB nei metodi di render overview/hero.
+
+
 ## 5.12.44 — Queue ownership stability (2026-09-22)
 
 - Il processo UI non esegue più reconciliation, cleanup e conteggi della coda SQLite: avvia soltanto il servizio queue, proprietario della manutenzione seriale.
