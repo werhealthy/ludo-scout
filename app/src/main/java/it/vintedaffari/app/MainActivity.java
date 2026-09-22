@@ -42,7 +42,10 @@ public final class MainActivity extends Activity {
     }
     private volatile EngineOverviewSnapshot engineOverviewSnapshot;
     private final AtomicBoolean engineOverviewLoading=new AtomicBoolean(false);
+    private volatile long engineOverviewRetryAt=0L;
+    private volatile String engineOverviewLoadError="";
     private static final class PhotoMatch {BggSearchClient.Game game;double visual,text,score;PhotoMatch(BggSearchClient.Game g,double v,double t,double s){game=g;visual=v;text=t;score=s;}}
+    private final Runnable activitySnapshotRetry=()->{if(!isDestroyed()&&"activity".equals(tab)&&"overview".equals(engineSection))scheduleRender(0);};
     private static final class LibrarySearchJob {String id,label;Uri uri;boolean running=true;String error="";final List<BggSearchClient.Game> results=new ArrayList<>();LibrarySearchJob(String i,String l,Uri u){id=i;label=l;uri=u;}}
     private static final List<LibrarySearchJob> librarySearchJobs=Collections.synchronizedList(new ArrayList<>());private String activeLibrarySearchJobId="";private final List<BggSearchClient.Game> wizardBundleGames=new ArrayList<>();private final Set<String> libraryBackfillInFlight=Collections.synchronizedSet(new HashSet<>());private final Set<String> libraryBackfillAttempted=Collections.synchronizedSet(new HashSet<>());
     private static final ExecutorService LIBRARY_SEARCH_NET=Executors.newFixedThreadPool(2);
@@ -56,7 +59,7 @@ public final class MainActivity extends Activity {
     private final LocalIntelligenceBackend intelligence=new LocalIntelligenceBackend.Rules();
     private final ExecutorService net=Executors.newFixedThreadPool(2);private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();private final ExecutorService uiDataIo=Executors.newSingleThreadExecutor();private final ExecutorService galleryNet=Executors.newSingleThreadExecutor();private final android.util.LruCache<String,Bitmap> imageCache=new android.util.LruCache<String,Bitmap>(4*1024*1024){protected int sizeOf(String k,Bitmap b){return b.getByteCount();}};
     private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){
-        updateActivityIndicator();
+        if(!"activity".equals(tab))updateActivityIndicator();
         long now=System.currentTimeMillis();
         if(OperationCenter.CHANGED.equals(i.getAction())){
             // Queue updates can be very frequent. Keep the overview alive, but do not rebuild a
@@ -173,7 +176,7 @@ private View makeCompanionFab(){
 
     private void render(){
         if(body==null||renderInProgress)return;renderInProgress=true;long started=System.currentTimeMillis();
-        try{updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp(18),dp(4),dp(18),"discover".equals(tab)?0:dp(24));if(activityButton!=null)activityButton.setVisibility("activity".equals(tab)?View.GONE:View.VISIBLE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
+        try{if(!"activity".equals(tab))updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp(18),dp(4),dp(18),"discover".equals(tab)?0:dp(24));if(activityButton!=null)activityButton.setVisibility("activity".equals(tab)?View.GONE:View.VISIBLE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
         finally{renderInProgress=false;long elapsed=System.currentTimeMillis()-started;getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putLong("uiLastRenderMs",elapsed).putString("uiLastRenderTab",tab).apply();}
     }
     private void cancelImageRequests(View view){if(view==null)return;if(view instanceof ImageView)view.setTag(new Object());if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)cancelImageRequests(group.getChildAt(i));}}
@@ -1164,21 +1167,42 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private boolean engineRunSettled(DealDatabase.ObservationSession run,long now){return DealDatabase.engineAutomaticDone(run,now);}
 
     private EngineOverviewSnapshot loadEngineOverviewSnapshot(){
-        long at=System.currentTimeMillis();
-        return new EngineOverviewSnapshot(at,db.activeObservationSession(),db.waitingObservationSessionCount(),
-                marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount(),db.recentObservationDays(7));
+        DealDatabase.ObservationSession run=db.activeObservationSession();
+        int waitingRuns=db.waitingObservationSessionCount();
+        int recoveryCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();
+        List<DealDatabase.ObservationDay> days=db.recentObservationDays(3);
+        // Freshness starts when every read has completed. Using the start time made any load slower
+        // than the TTL arrive already expired and trapped Activity in a refresh/placeholder loop.
+        return new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,days);
     }
     private void requestEngineOverviewSnapshot(){
-        if(!engineOverviewLoading.compareAndSet(false,true))return;
+        long requestedAt=System.currentTimeMillis();
+        if(requestedAt<engineOverviewRetryAt||!engineOverviewLoading.compareAndSet(false,true))return;
         uiDataIo.execute(()->{
-            EngineOverviewSnapshot loaded=null;
+            long startedAt=System.currentTimeMillis();EngineOverviewSnapshot loaded=null;
             try{loaded=loadEngineOverviewSnapshot();}
-            catch(Throwable t){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activitySnapshotError",String.valueOf(t)).apply();}
+            catch(Throwable t){
+                engineOverviewLoadError=String.valueOf(t);
+                engineOverviewRetryAt=System.currentTimeMillis()+5_000L;
+                getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit()
+                        .putString("activitySnapshotError",engineOverviewLoadError)
+                        .putString("activitySnapshotState","ERROR;retryAt="+engineOverviewRetryAt+";elapsedMs="+(System.currentTimeMillis()-startedAt)).apply();
+            }
             final EngineOverviewSnapshot ready=loaded;
             runOnUiThread(()->{
                 engineOverviewLoading.set(false);
-                if(ready!=null)engineOverviewSnapshot=ready;
-                if("activity".equals(tab)&&"overview".equals(engineSection)&&!isDestroyed())scheduleRender(0);
+                if(ready!=null){
+                    engineOverviewSnapshot=ready;engineOverviewRetryAt=0L;engineOverviewLoadError="";
+                    getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().remove("activitySnapshotError")
+                            .putString("activitySnapshotState","READY;elapsedMs="+(System.currentTimeMillis()-startedAt)).apply();
+                }
+                if("activity".equals(tab)&&"overview".equals(engineSection)&&!isDestroyed()){
+                    scheduleRender(0);
+                    if(ready==null){
+                        uiUpdates.removeCallbacks(activitySnapshotRetry);
+                        uiUpdates.postDelayed(activitySnapshotRetry,Math.max(250L,engineOverviewRetryAt-System.currentTimeMillis()));
+                    }
+                }
             });
         });
     }
@@ -1186,11 +1210,16 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private void renderEngineOverview(){
         long now=System.currentTimeMillis();EngineOverviewSnapshot snapshot=engineOverviewSnapshot;
         renderEngineHeader("Motore","Il lavoro di Ludo, senza il rumore della coda tecnica",false);
-        if(snapshot==null||now-snapshot.loadedAt>5_000L){
+        if(snapshot==null){
             requestEngineOverviewSnapshot();
-            body.addView(text("Aggiorno lo stato del Motore…",14,MUTED,Typeface.BOLD));
+            String loadingCopy=!TextUtils.isEmpty(engineOverviewLoadError)&&now<engineOverviewRetryAt
+                    ?"Stato del Motore temporaneamente non disponibile · riprovo automaticamente"
+                    :"Aggiorno lo stato del Motore…";
+            body.addView(text(loadingCopy,14,MUTED,Typeface.BOLD));
             return;
         }
+        // Stale-while-revalidate: never replace usable Activity data with an empty loading page.
+        if(now-snapshot.loadedAt>30_000L)requestEngineOverviewSnapshot();
         DealDatabase.ObservationSession run=snapshot.run;int waitingRuns=snapshot.waitingRuns;int recoveryCount=snapshot.recoveryCount;int review=run==null?recoveryCount:run.reviewListings;
         body.addView(engineCurrentRunHero(run,now,waitingRuns));
         if(waitingRuns>0){TextView waiting=text(waitingRuns+(waitingRuns==1?" altro scroll acquisito":" altri scroll acquisiti")+" · il Motore ruota tra i job senza scartare card",12,MUTED,Typeface.BOLD);waiting.setPadding(dp(2),dp(10),0,0);body.addView(waiting);}
