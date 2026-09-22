@@ -33,6 +33,7 @@ public final class MainActivity extends Activity {
     private static final long UI_SESSION_TTL=2*60*60_000L;
     private DealDatabase db;private MarketStore marketStore;private BundleDatabase bundleDb;private LibraryDatabase libraryDb;private AccessoryDatabase accessoryDb;private HuntDatabase huntDb;private BggSearchClient bggSearch;
     private String pendingLibraryQuery="";private List<BggSearchClient.Game> pendingLibraryResults=new ArrayList<>();private boolean pendingLibraryRunning=false;private int catalogVisible=24,databaseVisible=24,databaseJobsVisible=6;private boolean databaseLoadingMore=false,catalogLoadingMore=false;private String databaseScope="verified",databaseSort="alpha";private boolean databaseActiveOnly=false;private Double databaseMinRating=null;private Integer databaseMaxPrice=null;private LinearLayout databaseResultsHost,catalogResultsHost;private List<DealRecord> catalogResultSnapshot=new ArrayList<>();private final Handler uiUpdates=new Handler(Looper.getMainLooper());private final Runnable refreshData=()->{if(!isDestroyed())render();};private final Runnable deferredRender=()->{if(!isDestroyed())render();};private boolean renderInProgress=false,openingPreset=false,showActivityHistory=false,showBundleDebug=false;private String engineSection="overview";private long engineDayStart=0L,engineDayEnd=0L,engineRunStart=0L,engineRunEnd=0L;private String engineRunFilter="all";private Set<String> catalogBatchSignatures=null;private String catalogBatchLabel="";private Dialog libraryWizardDialog;private String libraryWizardStep="",libraryWizardSource="",libraryWizardQuery="",wizardPaidText="",wizardShippingText="",wizardFeeText="",wizardDateText="",wizardSessionId="";private BggSearchClient.Game libraryWizardGame;private boolean restoringLibraryWizard=false;private int restoredScrollY=0;private LinearLayout body,nav;private ScrollView scroll;private PullRefreshScrollView refreshHost;private View activityButton,companionFab;private TextView globalProgressLabel;private String tab="discover",returnTab="discover",sort="relevance",query="",filterMode="all",catalogPreset="all",bundleSort="deal",databaseQuery="",databaseDetailReturnTab="",libraryScope="owned",libraryQuery="",companionSection="for_you";private long selectedGameId=0L;private boolean receiverRegistered,gateVisible;private volatile boolean marketReferenceRefreshInFlight;private long lastMarketReferenceRefreshAt=0L;private final ArrayDeque<String> tabHistory=new ArrayDeque<>();private final Map<String,Integer> tabScrollPositions=new HashMap<>();private String activeDealSignature="";private long activeVintedResolutionListingId=0L;private Dialog activeDetailDialog,activeResolutionDialog,activeGameOverlay;private boolean suppressDetailDismissState=false,suppressResolutionDismissState=false;private final Map<String,Integer> libraryMarketCache=new HashMap<>();private final Map<String,Double> libraryScoreCache=new HashMap<>();private Thread.UncaughtExceptionHandler previousCrashHandler,installedCrashHandler;private long lastQueueUiRenderAt=0L,activityWakeRequestedAt=0L;private int engineRunPage=0;private volatile boolean operationReconcileInFlight=false,operationReconcilePending=false;private volatile long lastOperationReconcileAt=0L;private final Runnable activityStatusPulse=()->{};
+    private final Runnable activitySnapshotRetry=()->{if(!isDestroyed()&&"activity".equals(tab)&&"overview".equals(engineSection))scheduleRender(0);};
     private static final class EngineOverviewSnapshot {
         final long loadedAt; final DealDatabase.ObservationSession run; final int waitingRuns,recoveryCount;
         final List<DealDatabase.ObservationDay> days;
@@ -42,6 +43,8 @@ public final class MainActivity extends Activity {
     }
     private volatile EngineOverviewSnapshot engineOverviewSnapshot;
     private final AtomicBoolean engineOverviewLoading=new AtomicBoolean(false);
+    private volatile long engineOverviewRetryAt=0L;
+    private volatile String engineOverviewLoadError="";
     private static final class PhotoMatch {BggSearchClient.Game game;double visual,text,score;PhotoMatch(BggSearchClient.Game g,double v,double t,double s){game=g;visual=v;text=t;score=s;}}
     private static final class LibrarySearchJob {String id,label;Uri uri;boolean running=true;String error="";final List<BggSearchClient.Game> results=new ArrayList<>();LibrarySearchJob(String i,String l,Uri u){id=i;label=l;uri=u;}}
     private static final List<LibrarySearchJob> librarySearchJobs=Collections.synchronizedList(new ArrayList<>());private String activeLibrarySearchJobId="";private final List<BggSearchClient.Game> wizardBundleGames=new ArrayList<>();private final Set<String> libraryBackfillInFlight=Collections.synchronizedSet(new HashSet<>());private final Set<String> libraryBackfillAttempted=Collections.synchronizedSet(new HashSet<>());
@@ -56,7 +59,7 @@ public final class MainActivity extends Activity {
     private final LocalIntelligenceBackend intelligence=new LocalIntelligenceBackend.Rules();
     private final ExecutorService net=Executors.newFixedThreadPool(2);private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();private final ExecutorService uiDataIo=Executors.newSingleThreadExecutor();private final ExecutorService galleryNet=Executors.newSingleThreadExecutor();private final android.util.LruCache<String,Bitmap> imageCache=new android.util.LruCache<String,Bitmap>(4*1024*1024){protected int sizeOf(String k,Bitmap b){return b.getByteCount();}};
     private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){
-        updateActivityIndicator();
+        if(!"activity".equals(tab))updateActivityIndicator();
         long now=System.currentTimeMillis();
         if(OperationCenter.CHANGED.equals(i.getAction())){
             // Queue updates can be very frequent. Keep the overview alive, but do not rebuild a
@@ -173,7 +176,7 @@ private View makeCompanionFab(){
 
     private void render(){
         if(body==null||renderInProgress)return;renderInProgress=true;long started=System.currentTimeMillis();
-        try{updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp(18),dp(4),dp(18),"discover".equals(tab)?0:dp(24));if(activityButton!=null)activityButton.setVisibility("activity".equals(tab)?View.GONE:View.VISIBLE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
+        try{if(!"activity".equals(tab))updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp(18),dp(4),dp(18),"discover".equals(tab)?0:dp(24));if(activityButton!=null)activityButton.setVisibility("activity".equals(tab)?View.GONE:View.VISIBLE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
         finally{renderInProgress=false;long elapsed=System.currentTimeMillis()-started;getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putLong("uiLastRenderMs",elapsed).putString("uiLastRenderTab",tab).apply();}
     }
     private void cancelImageRequests(View view){if(view==null)return;if(view instanceof ImageView)view.setTag(new Object());if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)cancelImageRequests(group.getChildAt(i));}}
@@ -1173,16 +1176,33 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         return new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,days);
     }
     private void requestEngineOverviewSnapshot(){
-        if(!engineOverviewLoading.compareAndSet(false,true))return;
+        long requestedAt=System.currentTimeMillis();
+        if(requestedAt<engineOverviewRetryAt||!engineOverviewLoading.compareAndSet(false,true))return;
         uiDataIo.execute(()->{
-            EngineOverviewSnapshot loaded=null;
+            long startedAt=System.currentTimeMillis();EngineOverviewSnapshot loaded=null;
             try{loaded=loadEngineOverviewSnapshot();}
-            catch(Throwable t){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activitySnapshotError",String.valueOf(t)).apply();}
+            catch(Throwable t){
+                engineOverviewLoadError=String.valueOf(t);
+                engineOverviewRetryAt=System.currentTimeMillis()+5_000L;
+                getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit()
+                        .putString("activitySnapshotError",engineOverviewLoadError)
+                        .putString("activitySnapshotState","ERROR;retryAt="+engineOverviewRetryAt+";elapsedMs="+(System.currentTimeMillis()-startedAt)).apply();
+            }
             final EngineOverviewSnapshot ready=loaded;
             runOnUiThread(()->{
                 engineOverviewLoading.set(false);
-                if(ready!=null)engineOverviewSnapshot=ready;
-                if("activity".equals(tab)&&"overview".equals(engineSection)&&!isDestroyed())scheduleRender(0);
+                if(ready!=null){
+                    engineOverviewSnapshot=ready;engineOverviewRetryAt=0L;engineOverviewLoadError="";
+                    getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().remove("activitySnapshotError")
+                            .putString("activitySnapshotState","READY;elapsedMs="+(System.currentTimeMillis()-startedAt)).apply();
+                }
+                if("activity".equals(tab)&&"overview".equals(engineSection)&&!isDestroyed()){
+                    scheduleRender(0);
+                    if(ready==null){
+                        uiUpdates.removeCallbacks(activitySnapshotRetry);
+                        uiUpdates.postDelayed(activitySnapshotRetry,Math.max(250L,engineOverviewRetryAt-System.currentTimeMillis()));
+                    }
+                }
             });
         });
     }
@@ -1192,7 +1212,10 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         renderEngineHeader("Motore","Il lavoro di Ludo, senza il rumore della coda tecnica",false);
         if(snapshot==null){
             requestEngineOverviewSnapshot();
-            body.addView(text("Aggiorno lo stato del Motore…",14,MUTED,Typeface.BOLD));
+            String loadingCopy=!TextUtils.isEmpty(engineOverviewLoadError)&&now<engineOverviewRetryAt
+                    ?"Stato del Motore temporaneamente non disponibile · riprovo automaticamente"
+                    :"Aggiorno lo stato del Motore…";
+            body.addView(text(loadingCopy,14,MUTED,Typeface.BOLD));
             return;
         }
         // Stale-while-revalidate: never replace usable Activity data with an empty loading page.
