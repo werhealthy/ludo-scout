@@ -67,15 +67,9 @@ public final class MainActivity extends Activity {
     /** SQLite reconciliation can contend with :radar. Keep it off the UI thread so a queue pulse
      * cannot turn app launch/navigation into an input-dispatch ANR. */
     private void startPostCreateMaintenance(){
-        maintenanceIo.execute(()->{
-            try{
-                int hidden=marketStore.autoHideStrongNonGameReviews();if(hidden>0)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("v51122AutoHidden",hidden).apply();
-                SharedPreferences clean=getSharedPreferences("va_v3_diag",MODE_PRIVATE);if(!clean.getBoolean("v51127MatchedNoiseCleanup",false)){int matchedHidden=marketStore.autoHideStrongNonGameListings();clean.edit().putBoolean("v51127MatchedNoiseCleanup",true).putInt("v51127MatchedNoiseHidden",matchedHidden).apply();}
-                marketStore.reconcileQueue();
-                boolean has=marketStore.jobSummary().active()>0||marketStore.deferredVintedCount()>0||marketStore.bggMatchRequiredCount()>0;
-                if(has)QueueKeepAliveService.ensureRunning(this);
-            }catch(Throwable t){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("postCreateMaintenanceError",String.valueOf(t)).apply();}
-        });
+        // The foreground queue process owns reconciliation and maintenance writes. Running the
+        // same sweeps from :ui competed with :radar/:queue for the single SQLite writer.
+        QueueKeepAliveService.ensureRunning(this);
     }
 
     private void applyUxFreshStartIfNeeded(){
@@ -1179,7 +1173,9 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
 
         LinearLayout histHead=new LinearLayout(this);histHead.setGravity(Gravity.CENTER_VERTICAL);histHead.setPadding(2,dp(26),0,dp(8));TextView ht=text("Cronologia",17,TEXT,Typeface.BOLD);histHead.addView(ht,new LinearLayout.LayoutParams(0,-2,1));TextView all=text("Vedi tutto",13,CYAN,Typeface.BOLD);all.setOnClickListener(v->{engineSection="history";render();});histHead.addView(all);body.addView(histHead);
         List<DealDatabase.ObservationDay> days=db.recentObservationDays(7);if(days.isEmpty())body.addView(text("La cronologia partirà dal prossimo scroll su Vinted.",13,MUTED,Typeface.NORMAL));else for(int i=0;i<Math.min(3,days.size());i++)body.addView(engineDayRow(days.get(i),i==Math.min(3,days.size())-1));
-        uiUpdates.removeCallbacks(activityStatusPulse);uiUpdates.postDelayed(activityStatusPulse,6_000L);
+        // Queue broadcasts already trigger semantic refreshes. A timed full rebuild here made
+        // the Activity consume CPU even when no visible state changed.
+        uiUpdates.removeCallbacks(activityStatusPulse);
     }
 
     private View engineCurrentRunHero(DealDatabase.ObservationSession run,long now){
