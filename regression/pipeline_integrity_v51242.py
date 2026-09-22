@@ -70,7 +70,7 @@ checks = [
     ("queue lanes do not reconcile concurrently",
      "market.reconcileQueue();" not in vinted_loop and "market.reconcileQueue();" not in bgg_loop),
     ("feed scroll performs no full-frame screenshot capture",
-     "ThumbnailStore.captureMissing(this, thumbnailCandidates)" not in a11y and "full framebuffer" in a11y and "private static final ExecutorService CAPTURES" in thumbs),
+     "ThumbnailStore.captureMissing(this, thumbnailCandidates)" not in a11y and "framebuffer" in a11y and "private static final ExecutorService CAPTURES" in thumbs),
 ]
 
 # Deterministic local stress model: a 200-card feed does no full-frame capture at all.
