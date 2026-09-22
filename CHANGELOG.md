@@ -5,7 +5,9 @@
 - Corregge il ciclo di caricamento infinito introdotto dalla 5.12.45: la freschezza dello snapshot parte dalla fine delle query SQLite, non dal loro inizio.
 - Uno snapshot scaduto resta visibile durante l'aggiornamento asincrono invece di essere sostituito dal placeholder.
 - L'overview materializza solo i tre giorni di cronologia effettivamente mostrati, riducendo query e contention.
-- La regressione riproduce una lettura più lenta del TTL e protegge il comportamento stale-while-revalidate.
+- Il percorso Motore non calcola più il badge nascosto tramite query SQLite sul main thread; anche i broadcast di coda saltano quel lavoro quando Motore è aperto.
+- Gli errori di snapshot hanno backoff di 5 secondi e stato diagnostico esplicito, evitando retry serrati su SQLITE_BUSY.
+- La regressione riproduce una lettura più lenta del TTL e protegge freshness, stale-while-revalidate, ownership transitive e osservabilità.
 
 
 
