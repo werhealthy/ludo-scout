@@ -9,6 +9,9 @@ public class CategoryRecoveryPolicyTest {
         assertTrue(ListingClassifier.isExplicitBoardGameCategory("Jeux de société"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Giochi da tavolo > Accessori"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Board games > Expansions"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Juegos de mesa > Accesorios"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Jeux de société > Accessoires"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Jeux de société > Extensions"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Musica"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Categoria non disponibile"));
     }
