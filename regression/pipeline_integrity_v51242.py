@@ -61,6 +61,12 @@ checks = [
      "activeObservationSession()" not in market[market.index("public List<VintedCard> pendingAnalysisCards"):market.index("/** Imports current legacy feed rows")] and
      "Math.min(8,limit)" in market and
      "pendingAnalysisCards(8)" in a11y),
+    ("fresh remote runs get bounded 90s fairness slice",
+     "ENGINE_RUN_FAIRNESS_SLICE_MS=90_000L" in deal_db and
+     "nextUnfinishedObservationSessionAfter" in market),
+    ("catalog pipeline exposes precise link and BGG stage counts",
+     "catalogPipelineFunnel()" in market and "exactVintedLink" in market and
+     "catalogPipeline={" in a11y),
     ("daily Activity summary avoids per-session N+1 joins",
      "d.sessions=countObservationBursts(start,end)" in deal_db and
      "List<ObservationSession> sessions=observationSessionsBetween(start,end,100)" not in deal_db),
