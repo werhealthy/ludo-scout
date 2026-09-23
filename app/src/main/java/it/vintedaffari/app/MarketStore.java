@@ -1333,8 +1333,8 @@ public final class MarketStore {
             while(c.moveToNext())if(ListingClassifier.isExplicitBoardGameCategory(c.getString(4))){ids.add(c.getLong(0));signatures.add(c.getString(1));urls.add(c.getString(2));itemIds.add(c.getString(3));}
         }
         for(int i=0;i<ids.size();i++){
-            boolean categoryConfirmed=ListingClassifier.isExplicitBoardGameCategory(
-                    scalarString(db,"SELECT category_normalized FROM market_listings WHERE id=?",new String[]{String.valueOf(ids.get(i))}));
+            // The id list is built only from rows with this exact structured category evidence.
+            boolean categoryConfirmed=true;
             boolean exactIdentity=!TextUtils.isEmpty(urls.get(i))&&!TextUtils.isEmpty(itemIds.get(i));
             String recoveredState=CategoryRecoveryPolicy.enrichmentState(categoryConfirmed,rating,exactIdentity);
             if(recoveredState==null)continue;
