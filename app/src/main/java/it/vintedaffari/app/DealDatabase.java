@@ -352,9 +352,26 @@ public final class DealDatabase extends SQLiteOpenHelper {
         if(current!=null&&out.size()<limit){current.uniqueListings=unique.size();fillEngineCounts(current);out.add(current);}return out;
     }
 
+    /** Count only the temporal boundaries needed by the daily overview. Do not materialize and
+     * individually join 100 session detail rows just to display a daily session count: that
+     * old N+1 path amplified SQLite contention and CPU while :ui, :radar and queue were active. */
+    private int countObservationBursts(long startAt,long endAt){
+        int sessions=0;long previous=-1L;
+        try(Cursor c=getReadableDatabase().rawQuery(
+                "SELECT observed_at FROM observations WHERE observed_at>=? AND observed_at<=? ORDER BY observed_at ASC",
+                new String[]{String.valueOf(startAt),String.valueOf(endAt)})){
+            while(c.moveToNext()){
+                long at=c.getLong(0);
+                if(previous<0||at-previous>=ENGINE_SESSION_GAP_MS)sessions++;
+                previous=at;
+            }
+        }
+        return sessions;
+    }
+
     public synchronized List<ObservationDay> recentObservationDays(int days){
         List<ObservationDay> out=new ArrayList<>();Calendar cal=Calendar.getInstance();cal.set(Calendar.HOUR_OF_DAY,0);cal.set(Calendar.MINUTE,0);cal.set(Calendar.SECOND,0);cal.set(Calendar.MILLISECOND,0);
-        long epoch=engineEpochStart();for(int i=0;i<Math.max(1,days);i++){long dayStart=cal.getTimeInMillis(),end=dayStart+24L*60L*60_000L-1;if(epoch>0&&end<epoch){cal.add(Calendar.DAY_OF_YEAR,-1);continue;}long start=Math.max(dayStart,epoch);int observations=0,unique=0;try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*),COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(start),String.valueOf(end)})){if(c.moveToFirst()){observations=c.getInt(0);unique=c.getInt(1);}}if(observations>0){ObservationDay d=new ObservationDay(start,end);d.observations=observations;d.uniqueListings=unique;List<ObservationSession> sessions=observationSessionsBetween(start,end,100);d.sessions=sessions.size();int[] n=engineRangeCounts(start,end);d.validListings=n[0];d.bggMatchedListings=n[1];d.vintedLinkedListings=n[2];d.completeListings=n[3];d.reviewListings=n[4];d.heldListings=n[5];out.add(d);}cal.add(Calendar.DAY_OF_YEAR,-1);}
+        long epoch=engineEpochStart();for(int i=0;i<Math.max(1,days);i++){long dayStart=cal.getTimeInMillis(),end=dayStart+24L*60L*60_000L-1;if(epoch>0&&end<epoch){cal.add(Calendar.DAY_OF_YEAR,-1);continue;}long start=Math.max(dayStart,epoch);int observations=0,unique=0;try(Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*),COUNT(DISTINCT signature) FROM observations WHERE observed_at>=? AND observed_at<=?",new String[]{String.valueOf(start),String.valueOf(end)})){if(c.moveToFirst()){observations=c.getInt(0);unique=c.getInt(1);}}if(observations>0){ObservationDay d=new ObservationDay(start,end);d.observations=observations;d.uniqueListings=unique;d.sessions=countObservationBursts(start,end);int[] n=engineRangeCounts(start,end);d.validListings=n[0];d.bggMatchedListings=n[1];d.vintedLinkedListings=n[2];d.completeListings=n[3];d.reviewListings=n[4];d.heldListings=n[5];out.add(d);}cal.add(Calendar.DAY_OF_YEAR,-1);}
         return out;
     }
 
