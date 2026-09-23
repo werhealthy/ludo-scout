@@ -2029,6 +2029,25 @@ public final class MarketStore {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND (enrichment_state IN ('PENDING_ANALYSIS','PENDING_ENRICHMENT','FAILED_RETRYABLE') OR ((vinted_url IS NOT NULL AND vinted_url<>'') AND ((published_label IS NULL OR published_label='') OR (seller_id IS NULL OR seller_id=''))))",null)){return c.moveToFirst()?c.getInt(0):0;}
     }
 
+    /** On-demand, single-pass funnel for the exact catalog eligibility gates. These are
+     * state counts, not publication promises: multiple blockers can overlap. */
+    public String catalogPipelineFunnel() {
+        String sql="SELECT COUNT(*),"+
+            "SUM(CASE WHEN l.enrichment_state='PENDING_ANALYSIS' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN g.id IS NOT NULL AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND g.rating>=6.0 AND g.database_visible=1 THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN l.enrichment_state='LOCAL_ONLY' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN l.enrichment_state='DEFERRED_LINK' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN g.id IS NOT NULL AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND g.rating>=6.0 AND g.database_visible=1 AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND COALESCE(l.manual_review_required,0)=0 THEN 1 ELSE 0 END)"+
+            " FROM market_listings l LEFT JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE'";
+        try(Cursor c=helper.getReadableDatabase().rawQuery(sql,null)){
+            if(!c.moveToFirst())return "state=EMPTY";
+            return "active="+c.getInt(0)+";pendingAnalysis="+c.getInt(1)+";bggQualified="+c.getInt(2)+
+                ";localOnly="+c.getInt(3)+";deferredLink="+c.getInt(4)+";exactVintedLink="+c.getInt(5)+
+                ";coreQualified="+c.getInt(6);
+        }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
+    }
+
     public int pendingAnalysisCount() {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS'",null)){return c.moveToFirst()?c.getInt(0):0;}
     }
