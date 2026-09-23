@@ -169,6 +169,10 @@ checks.extend([
      "uiDataIo.execute" in engine_run_load and "db.engineRunItems(run.startAt,run.endAt,filter,220)" in engine_run_load),
     ("Activity run thumbnail rendering does not decode local bitmaps synchronously",
      "decodeLocalBitmap(" not in engine_thumbnail and "loadEngineRunThumbnail(" in engine_thumbnail),
+    ("Activity snapshot IO failures schedule a delayed retry",
+     "engineHistoryRetryAt-System.currentTimeMillis()" in engine_history_load and
+     "engineDayRetryAt-System.currentTimeMillis()" in engine_day_load and
+     "engineRunRetryAt-System.currentTimeMillis()" in engine_run_load),
 ])
 
 failed = [name for name, ok in checks if not ok]
