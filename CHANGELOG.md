@@ -1,5 +1,14 @@
 # Ludo Scout — Changelog
 
+## 5.12.49 — UI indicator ANR guard (2026-09-23)
+
+- Field evidence from 5.12.48 showed the Motore cursor advancing correctly after the LOCAL_ONLY fix, but three UI ANRs immediately after install.
+- The Activity status badge no longer runs queue/review SQLite queries synchronously from the Android main thread during app startup or navigation.
+- Queue/review badge state is loaded through the existing UI-data executor and rendered from a cached snapshot; stale/empty cache never blocks touch dispatch.
+- Diagnostics now expose `activityIndicator={...}` with background-load elapsed time/error.
+- No change to Vinted pacing, matching, publication rules or queue ownership.
+
+
 ## 5.12.48 — Local-only run unblock (2026-09-23)
 
 - Fixes the Motore ownership deadlock observed with four Marracash `LOCAL_ONLY` listings: those listings are deliberately local and non-published, so they count as settled holds instead of indefinitely missing Vinted remote work.

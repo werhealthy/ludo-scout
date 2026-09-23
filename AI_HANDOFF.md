@@ -1,5 +1,13 @@
 # Ludo Scout — AI handoff
 
+## 5.12.49 UI indicator ANR guard (pending Pixel validation)
+- 5.12.48 field debug proves LOCAL_ONLY run unblocking worked: active Motore run moved forward from the Marracash run to start=1790003455573.
+- The same debug recorded 3 post-install UI ANRs. `activitySnapshot` took 6685 ms but already executes on `uiDataIo`, so that number is background latency rather than direct proof of main-thread blocking.
+- A separate synchronous path remained: `updateActivityIndicator()` called `jobSummary`, review counts, pause state and priority count on the main thread. It is invoked during `makeActivityButton()` at startup and on navigation to Activity.
+- 5.12.49 replaces those synchronous DB reads with a cached `ActivityIndicatorSnapshot` loaded on `uiDataIo`. Initial/stale UI paints immediately from cache/default state; DB completion updates the badge later.
+- Diagnostics expose `activityIndicatorState`; regression prevents SQLite-backed MarketStore reads from re-entering the main-thread indicator method.
+
+
 ## 5.12.48 local-only session recovery (pending Pixel validation)
 - Root cause from 5.12.47 field debug: the active Motore scroll contained four `LOCAL_ONLY` Marracash listings, which are explicitly not runnable remote jobs; the engineRangeCounts query nevertheless counted them as outstanding Vinted identity work, trapping the oldest run while ten later scrolls waited.
 - A `LOCAL_ONLY` listing is now a non-published, non-actionable hold for Motore progress. It remains in market history and can be re-projected to `DEFERRED_LINK` if eligibility changes during later analysis. `DEFERRED_LINK` remains active remote work, never time-completed.
