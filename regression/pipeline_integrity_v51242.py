@@ -102,18 +102,33 @@ checks.append(("200-card stress harness allocates no feed screenshots", len(obse
 # A successful BGG title match is not enough for an uncertain marketplace product.
 # When a user opens that exact listing, an explicit board-game category must unlock a
 # reversible revalidation path; one newer uncertain listing must not poison a known base game.
+recovery_start = market.index("private void restoreCategoryConfirmedListings")
+recovery_end = market.index("public void applyBggMetadata", recovery_start)
+recovery = market[recovery_start:recovery_end]
+category_update_start = market.index("public boolean updateVintedCategoryEvidence")
+category_update_end = market.index("/** One-time UX cut-over", category_update_start)
+category_update = market[category_update_start:category_update_end]
+
 checks.extend([
-    ("explicit board-game category is recognized separately from non-game categories",
-     "isExplicitBoardGameCategory" in listing and "giochi da tavolo" in listing.lower()),
-    ("positive product-page category can recover a TYPE_UNVERIFIED listing",
-     "isExplicitBoardGameCategory(normalized)" in market and
-     "TYPE_UNVERIFIED" in market and "PENDING_ANALYSIS" in market),
-    ("category recovery updates its exact legacy listing and schedules BGG revalidation",
-     "UPDATE_DEAL_LISTING_TYPE_BASE_GAME" in market and "enqueueGameJob(db" in market),
+    ("category recovery behavior is covered by executable Android unit tests",
+     "CategoryRecoveryPolicyTest" in (ROOT / "app/src/test/java/it/vintedaffari/app/CategoryRecoveryPolicyTest.java").read_text(encoding="utf-8")),
+    ("recovery policy waits for a real rating and enforces the six-point gate",
+     "if (bggRating == null) return \"PENDING_ANALYSIS\";" in (SRC / "CategoryRecoveryPolicy.java").read_text(encoding="utf-8") and
+     "bggRating >= DealPolicy.MIN_BGG_RATING" in (SRC / "CategoryRecoveryPolicy.java").read_text(encoding="utf-8")),
+    ("category recovery queries only active listings for the matched game",
+     "WHERE game_id=? AND lifecycle='ACTIVE'" in recovery and
+     "if(ListingClassifier.isExplicitBoardGameCategory(c.getString(4)))" in recovery),
+    ("listing recovery update is scoped to that active listing id",
+     'db.update("market_listings",listing,"id=? AND lifecycle=\'ACTIVE\'' in recovery),
+    ("deal hold is cleared only for the same listing signature and BGG identity",
+     'db.update("deals",deal,"signature=? AND bgg_id=? AND lifecycle=\'ACTIVE\' AND verification_state=\'TYPE_UNVERIFIED\'' in recovery),
+    ("positive category evidence reopens only its exact legacy listing",
+     "UPDATE_DEAL_LISTING_TYPE_BASE_GAME" in category_update and
+     '"id=? AND lifecycle=\'ACTIVE\'"' in category_update and "enqueueGameJob(db" in category_update),
     ("BGG compatibility prefers independent base-game evidence over a newer uncertain listing",
      "ORDER BY CASE listing_type WHEN 'BASE_GAME' THEN 0" in market),
     ("recovery is additive and leaves observations and history intact",
-     "DELETE FROM observations" not in market[market.index("public boolean updateVintedCategoryEvidence"):market.index("/** One-time UX cut-over")]),
+     "DELETE FROM observations" not in category_update),
 ])
 
 failed = [name for name, ok in checks if not ok]
