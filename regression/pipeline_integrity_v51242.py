@@ -154,11 +154,11 @@ checks.extend([
      all(token not in engine_day_render for token in
          ("db.observationSessionsBetween(", "db.activeObservationSession()",
           "db.isObservationSessionWaiting(", "db.isObservationSessionDeferred(")) and
-     "requestEngineDaySnapshot()" in engine_day_render),
+     "requestEngineDaySnapshot(" in engine_day_render),
     ("Activity run detail renders from an asynchronous snapshot",
      "db.engineRunItems(" not in engine_run_render and
      "engineSelectedRun()" not in engine_run_render and
-     "requestEngineRunSnapshot()" in engine_run_render and
+     "requestEngineRunSnapshot(" in engine_run_render and
      "db.observationSessionsBetween(" not in engine_run_selector),
     ("Activity history query runs inside the background executor",
      "uiDataIo.execute" in engine_history_load and "db.recentObservationDays(30)" in engine_history_load),
