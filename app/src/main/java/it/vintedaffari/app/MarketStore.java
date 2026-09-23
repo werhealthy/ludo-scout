@@ -193,7 +193,7 @@ public final class MarketStore {
      * Vinted category wins over a title match and leaves the row reversible in AUTO_FILTERED. */
     public boolean updateVintedCategoryEvidence(long listingId,String raw,String normalized,String source,int confidence) {
         if(listingId<=0||TextUtils.isEmpty(raw)||TextUtils.isEmpty(normalized))return false;
-        long now=System.currentTimeMillis();SQLiteDatabase db=helper.getWritableDatabase();db.beginTransaction();
+        long now=System.currentTimeMillis();SQLiteDatabase db=helper.getWritableDatabase();boolean requeuedBgg=false;db.beginTransaction();
         try{
             ContentValues v=new ContentValues();v.put("category_raw",raw.trim());v.put("category_normalized",normalized.trim());v.put("category_source",safe(source));v.put("category_confidence",Math.max(0,Math.min(100,confidence)));v.put("category_observed_at",now);
             int changed=db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
@@ -203,9 +203,25 @@ public final class MarketStore {
                 db.update("market_listings",hidden,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
                 ContentValues legacy=new ContentValues();legacy.put("verification_state","CATEGORY_INCOMPATIBLE");legacy.put("verification_reason",reason);
                 db.update("deals",legacy,"signature=(SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?)",new String[]{String.valueOf(listingId)});
+            }else if(changed>0&&ListingClassifier.isExplicitBoardGameCategory(normalized)){
+                long gameId=0L;String signature="",matchState="";
+                try(Cursor c=db.rawQuery("SELECT COALESCE(game_id,0),COALESCE(NULLIF(legacy_signature,''),temp_fingerprint),COALESCE(match_state,'') FROM market_listings WHERE id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)})){
+                    if(c.moveToFirst()){gameId=c.getLong(0);signature=c.getString(1);matchState=c.getString(2);}
+                }
+                if(gameId>0&&"TYPE_UNVERIFIED".equals(matchState)){
+                    // UPDATE_DEAL_LISTING_TYPE_BASE_GAME: category evidence belongs to this exact listing.
+                    ContentValues corrected=new ContentValues();corrected.put("match_state","BGG_MATCH_REQUIRED");corrected.put("enrichment_state","PENDING_ANALYSIS");corrected.put("last_error","");
+                    db.update("market_listings",corrected,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
+                    ContentValues legacy=new ContentValues();legacy.put("listing_type","BASE_GAME");legacy.put("verification_reason",""); 
+                    db.update("deals",legacy,"signature=? AND lifecycle='ACTIVE' AND verification_state='TYPE_UNVERIFIED'",new String[]{signature});
+                    enqueueGameJob(db,gameId,JOB_BGG,now);requeuedBgg=true;
+                    setDiagnosticState("category_recovery",1,"state=BGG_REVALIDATION_QUEUED;listing="+listingId+";game="+gameId);
+                }
             }
-            db.setTransactionSuccessful();return changed>0;
+            db.setTransactionSuccessful();
         }finally{db.endTransaction();}
+        if(requeuedBgg){QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);notifyQueueChanged();}
+        return changed>0;
     }
 
     /** One-time UX cut-over. Old incomplete observations are removed from the active product so the
@@ -1311,6 +1327,21 @@ public final class MarketStore {
         notifyQueueChanged();
     }
 
+    private void restoreCategoryConfirmedListings(SQLiteDatabase db,long gameId,Double rating,String bggId){
+        List<Long> ids=new ArrayList<>();List<String> signatures=new ArrayList<>();List<String> urls=new ArrayList<>();List<String> itemIds=new ArrayList<>();
+        try(Cursor c=db.rawQuery("SELECT id,COALESCE(NULLIF(legacy_signature,''),temp_fingerprint),COALESCE(vinted_url,''),COALESCE(vinted_item_id,''),COALESCE(category_normalized,'') FROM market_listings WHERE game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(gameId)})){
+            while(c.moveToNext())if(ListingClassifier.isExplicitBoardGameCategory(c.getString(4))){ids.add(c.getLong(0));signatures.add(c.getString(1));urls.add(c.getString(2));itemIds.add(c.getString(3));}
+        }
+        for(int i=0;i<ids.size();i++){
+            ContentValues listing=new ContentValues();listing.put("match_state","MATCHED");listing.put("last_error","");
+            if(!TextUtils.isEmpty(urls.get(i))&&!TextUtils.isEmpty(itemIds.get(i)))listing.put("enrichment_state","CORE_COMPLETE");
+            else if(rating!=null&&rating>=DealPolicy.MIN_BGG_RATING){listing.put("enrichment_state","DEFERRED_LINK");listing.put("deferred_retry_at",0);}
+            db.update("market_listings",listing,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(ids.get(i))});
+            ContentValues deal=new ContentValues();deal.put("verification_state","OK");deal.putNull("verification_reason");
+            db.update("deals",deal,"signature=? AND bgg_id=? AND lifecycle='ACTIVE' AND verification_state='TYPE_UNVERIFIED'",new String[]{signatures.get(i),bggId});
+        }
+    }
+
     public void applyBggMetadata(BggMetadata m) {
         if (m == null || TextUtils.isEmpty(m.bggId)) return;
         SQLiteDatabase db = helper.getWritableDatabase();
@@ -1318,7 +1349,7 @@ public final class MarketStore {
         try {
             Long id = scalarLong(db, "SELECT id FROM games WHERE bgg_id=?", new String[]{m.bggId});
             if (id == null) { db.setTransactionSuccessful(); return; }
-            String listingTypeRaw=scalarString(db,"SELECT listing_type FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE' ORDER BY last_seen DESC LIMIT 1",new String[]{m.bggId});
+            String listingTypeRaw=scalarString(db,"SELECT listing_type FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE' ORDER BY CASE listing_type WHEN 'BASE_GAME' THEN 0 WHEN 'EXPANSION' THEN 1 ELSE 2 END,last_seen DESC LIMIT 1",new String[]{m.bggId});
             ListingClassifier.Type listingType=ListingClassifier.Type.UNCERTAIN;
             try{ if(!TextUtils.isEmpty(listingTypeRaw))listingType=ListingClassifier.Type.valueOf(listingTypeRaw); }catch(Throwable ignored){}
             BggProductCompatibility.Verdict typeVerdict=BggProductCompatibility.validate(listingType.name(),m.itemType);
@@ -1355,6 +1386,7 @@ public final class MarketStore {
                 if (eligible) v.putNull("filter_reason"); else v.put("filter_reason", "BGG_RATING_BELOW_6");
             }
             db.update("games", v, "id=?", new String[]{String.valueOf(id)});
+            restoreCategoryConfirmedListings(db,id,m.rating,m.bggId);
             if(typeVerdict==BggProductCompatibility.Verdict.COMPATIBLE && listingType==ListingClassifier.Type.EXPANSION){
                 ContentValues verified=new ContentValues();verified.put("verification_state","OK");verified.putNull("verification_reason");
                 db.update("deals",verified,"bgg_id=? AND lifecycle='ACTIVE' AND verification_state='EXPANSION_CHECK'",new String[]{m.bggId});
