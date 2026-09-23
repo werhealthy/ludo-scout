@@ -1,5 +1,14 @@
 # Ludo Scout — Changelog
 
+## 5.12.50 — Local intake and Activity daily summary (2026-09-23)
+
+- 5.12.49 field debug: 2 new post-install UI ANRs, 1 low-memory exit and excessive :ui CPU despite a 371-ms asynchronous badge. Snapshot history load still took 5.9 seconds.
+- Replace day-summary N+1 session detail loads (up to 100 × expensive joins per day) with a simple ordered observation burst count. Daily outcome totals remain calculated separately.
+- Remove the active remote-run restriction from purely local analysis. Freshly acquired Vinted observations from newer scrolls are analyzed newest-first in batches of 8 while older runs retain remote Vinted ownership and pacing.
+- Continue local batches every 1.5 seconds rather than immediately saturating :radar; capture last completed batch age/size in diagnostics.
+- Add publisher evidence for 999 Games, Z-Man Games, Keymaster Games and Just Games; no title-specific bypass or relaxation of BGG/product proof.
+
+
 ## 5.12.49 — UI indicator ANR guard (2026-09-23)
 
 - Field evidence from 5.12.48 showed the Motore cursor advancing correctly after the LOCAL_ONLY fix, but three UI ANRs immediately after install.
