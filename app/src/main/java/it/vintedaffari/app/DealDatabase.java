@@ -250,10 +250,12 @@ public final class DealDatabase extends SQLiteOpenHelper {
         // Actionable review must describe the inbox the user can actually open. Historical/trust
         // holds stay non-publishable, but must not masquerade as a question for the user.
         String attention="("+eligible+" AND (COALESCE(l.manual_review_required,0)=1 OR (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id=''))))";
-        String trustHold="("+eligible+" AND NOT "+attention+" AND (l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')))";
+        String trustHold="("+eligible+" AND NOT "+attention+" AND (l.enrichment_state IN ('NEEDS_REVIEW','LOCAL_ONLY') OR l.match_state='BGG_VARIANT_REVIEW' OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')))";
         String ready=vinted+" AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND NOT "+attention+" AND NOT "+trustHold+" AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
         // Product truth, independent from queue materialisation: a BGG-ready listing whose exact
-        // Vinted id/url is still missing remains remote work even while temporarily DEFERRED_LINK.
+        // Vinted id/url is still missing remains remote work even while temporarily DEFERRED_LINK. Explicitly
+        // LOCAL_ONLY listings count as non-published holds, never as missing remote jobs; otherwise
+        // price-filtered historical observations can monopolize the Motore cursor indefinitely.
         String coreRemaining=bgg+" AND NOT "+attention+" AND NOT "+trustHold+" AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='')";
         String sql="SELECT COUNT(DISTINCT CASE WHEN "+eligible+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+bgg+" THEN l.id END),"+
