@@ -1,5 +1,14 @@
 # Ludo Scout — Changelog
 
+## 5.12.52 — Recupero da categoria Vinted esplicita (2026-09-23)
+
+- Un match BGG poteva nascondere un gioco come `TYPE_UNVERIFIED` quando la card Accessibility non conteneva una prova positiva del prodotto. L'apertura successiva della pagina Vinted salvava la categoria strutturata, ma non riapriva il caso.
+- «Giochi da tavolo» (e categorie equivalenti riconosciute in italiano, inglese, spagnolo e francese) riattiva soltanto quell'annuncio. I breadcrumb che terminano in accessori, espansioni o componenti restano esclusi.
+- La pubblicazione resta subordinata al tipo BGG e al rating ≥ 6: rating assente in attesa di arricchimento; rating sotto 6 locale e nascosto.
+- La verifica BGG usa prima le prove `BASE_GAME`, così una card incerta più recente non nasconde tutte le inserzioni dello stesso gioco.
+- Le verifiche riuscite riaprono solo gli annunci che hanno una categoria da gioco da tavolo acquisita dalla pagina prodotto. Dati storici e osservazioni non vengono cancellati.
+- Questo intervento ripara il percorso di recupero della classificazione; non aumenta il tetto di richieste Vinted. Il debug più recente non era incluso nel prompt, quindi volume e causa runtime vanno ancora confrontati sul dispositivo.
+
 ## 5.12.51 — Remote-run fairness and catalog conversion funnel (2026-09-23)
 
 - Historical run backlog still monopolized public Vinted lane despite local intake separation: 14 waiting scrolls, 24 remote link tasks in an approximately 44-hour-old active run.
