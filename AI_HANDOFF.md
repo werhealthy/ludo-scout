@@ -47,10 +47,6 @@
 The private GitHub repository `werhealthy/ludo-scout` is now the source of truth.
 Do not reconstruct the project from an older ZIP when the repository is available.
 
-## Vibe Coding project context
-- Read `AGENTS.md` for repository workflow and implementation rules, `PROJECT.md` for the stable product summary, and `STATE.md` for the current task and verification state.
-- This handoff remains the detailed source for versioned engine, product, trust, network, and release invariants. Keep its rules intact when applying the shorter project summary.
-- Keep significant product and technical changes reflected here and in `CHANGELOG.md`; update `STATE.md` when work or verification advances.
 
 ## Current baseline
 - App: Ludo Scout Android
