@@ -131,6 +131,33 @@ checks.extend([
      "DELETE FROM observations" not in category_update),
 ])
 
+# Activity detail screens must consume IO snapshots; render callbacks may never wait
+# for synchronized SQLite reads while Android is dispatching input.
+def method_body(source, signature):
+    start = source.index(signature)
+    end = source.find("\\n    private ", start + len(signature))
+    return source[start:end if end >= 0 else len(source)]
+
+engine_history_render = method_body(main, "private void renderEngineHistory()")
+engine_day_render = method_body(main, "private void renderEngineDay()")
+engine_run_render = method_body(main, "private void renderEngineRun()")
+engine_run_selector = method_body(main, "private DealDatabase.ObservationSession engineSelectedRun()")
+checks.extend([
+    ("Activity history render never performs a synchronous 30-day SQLite scan",
+     "db.recentObservationDays(30)" not in engine_history_render and
+     "requestEngineHistorySnapshot()" in engine_history_render),
+    ("Activity day render never loads sessions or statuses from SQLite on the UI thread",
+     all(token not in engine_day_render for token in
+         ("db.observationSessionsBetween(", "db.activeObservationSession()",
+          "db.isObservationSessionWaiting(", "db.isObservationSessionDeferred(")) and
+     "requestEngineDaySnapshot()" in engine_day_render),
+    ("Activity run detail renders from an asynchronous snapshot",
+     "db.engineRunItems(" not in engine_run_render and
+     "engineSelectedRun()" not in engine_run_render and
+     "requestEngineRunSnapshot()" in engine_run_render and
+     "db.observationSessionsBetween(" not in engine_run_selector),
+])
+
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:
     print(("PASS " if ok else "FAIL ") + name)
