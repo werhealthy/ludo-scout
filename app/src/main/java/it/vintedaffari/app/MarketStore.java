@@ -1333,13 +1333,19 @@ public final class MarketStore {
             while(c.moveToNext())if(ListingClassifier.isExplicitBoardGameCategory(c.getString(4))){ids.add(c.getLong(0));signatures.add(c.getString(1));urls.add(c.getString(2));itemIds.add(c.getString(3));}
         }
         for(int i=0;i<ids.size();i++){
+            boolean categoryConfirmed=ListingClassifier.isExplicitBoardGameCategory(
+                    scalarString(db,"SELECT category_normalized FROM market_listings WHERE id=?",new String[]{String.valueOf(ids.get(i))}));
+            boolean exactIdentity=!TextUtils.isEmpty(urls.get(i))&&!TextUtils.isEmpty(itemIds.get(i));
+            String recoveredState=CategoryRecoveryPolicy.enrichmentState(categoryConfirmed,rating,exactIdentity);
+            if(recoveredState==null)continue;
             ContentValues listing=new ContentValues();listing.put("match_state","MATCHED");listing.put("last_error","");
-            if(rating!=null&&rating<DealPolicy.MIN_BGG_RATING)listing.put("enrichment_state","LOCAL_ONLY");
-            else if(!TextUtils.isEmpty(urls.get(i))&&!TextUtils.isEmpty(itemIds.get(i)))listing.put("enrichment_state","CORE_COMPLETE");
-            else if(rating!=null&&rating>=DealPolicy.MIN_BGG_RATING){listing.put("enrichment_state","DEFERRED_LINK");listing.put("deferred_retry_at",0);}
+            listing.put("enrichment_state",recoveredState);
+            if("DEFERRED_LINK".equals(recoveredState))listing.put("deferred_retry_at",0);
             db.update("market_listings",listing,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(ids.get(i))});
-            ContentValues deal=new ContentValues();deal.put("verification_state","OK");deal.putNull("verification_reason");
-            db.update("deals",deal,"signature=? AND bgg_id=? AND lifecycle='ACTIVE' AND verification_state='TYPE_UNVERIFIED'",new String[]{signatures.get(i),bggId});
+            if(CategoryRecoveryPolicy.mayClearTypeHold(categoryConfirmed,rating)){
+                ContentValues deal=new ContentValues();deal.put("verification_state","OK");deal.putNull("verification_reason");
+                db.update("deals",deal,"signature=? AND bgg_id=? AND lifecycle='ACTIVE' AND verification_state='TYPE_UNVERIFIED'",new String[]{signatures.get(i),bggId});
+            }
         }
     }
 
