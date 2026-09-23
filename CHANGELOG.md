@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.48 — Local-only run unblock (2026-09-23)
+
+- Fixes the Motore ownership deadlock observed with four Marracash `LOCAL_ONLY` listings: those listings are deliberately local and non-published, so they count as settled holds instead of indefinitely missing Vinted remote work.
+- Old sessions remain in history and no listings are deleted, promoted or published merely due to age. Ownership naturally proceeds to the next unfinished scroll when all actionable rows are complete/review/held.
+- Diagnostics now expose `lastVintedEventAgeMs` to distinguish a new Vinted capture from historical `cardsParsedTotal` and `lastClassifierBlock` values.
+- No Vinted pacing, signing, package or CI versionCode changes.
+
 ## 5.12.47 — Stability + intake recovery (2026-09-23)
 
 - Riduce i fault della corsia Vinted su contention SQLite multiprocesso: ogni connessione usa un `busy_timeout` di 8 s e `SQLITE_BUSY` viene trattato come backpressure con retry breve, non come lane fault.
