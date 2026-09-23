@@ -62,6 +62,11 @@ checks=[
     ("bundle exploration intent is bounded",
      "TTL_MS=10L*60_000L" in explore and
      "bundleExploreHintsThisIntent>=40" in radar),
+    ("LOCAL_ONLY observations cannot monopolize old Motore runs",
+     "l.enrichment_state IN ('NEEDS_REVIEW','LOCAL_ONLY')" in deal and
+     "AND NOT "+'"+trustHold+"'+ " AND (l.vinted_item_id IS NULL" in deal),
+    ("radar diagnostics distinguish new Vinted events from persisted counters",
+     "lastVintedEventAgeMs=" in radar and 'p.getLong("lastEventAt",0)' in radar),
     ("diagnostics name exact current-run blockers",
      "engineCoreRemaining={" in radar and
      "engineCoreRemainingSummary()" in market),
