@@ -1454,6 +1454,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "cardsParsedTotal=" + p.getLong("cardsParsedTotal", 0) + "\n" +
                 "analysisBatches=" + p.getLong("analysisBatches", 0) + "\n" +
                 "localAnalysisLastBatchAgeMs=" + (p.getLong("localAnalysisLastBatchAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("localAnalysisLastBatchAt",0))) + "; size=" + p.getInt("localAnalysisLastBatchSize",0) + "\n" +
+                "localPendingAnalysisRows=" + marketDiag.pendingAnalysisCount() + "\n" +
+                "catalogRecognizedAwaitingLinkShown=" + p.getInt("catalogRecognizedAwaitingLinkShown",0) + "\n" +
                 "analysesStored=" + p.getLong("analysesStored", 0) + "\n" +
                 "classifierBlocked=" + p.getLong("classifierBlocked", 0) + "\n" +
                 "lastClassifierBlock=" + p.getString("lastClassifierBlock", "") + "\n" +
