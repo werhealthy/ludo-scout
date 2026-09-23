@@ -1,5 +1,11 @@
 # Ludo Scout — AI handoff
 
+## 5.12.48 local-only session recovery (pending Pixel validation)
+- Root cause from 5.12.47 field debug: the active Motore scroll contained four `LOCAL_ONLY` Marracash listings, which are explicitly not runnable remote jobs; the engineRangeCounts query nevertheless counted them as outstanding Vinted identity work, trapping the oldest run while ten later scrolls waited.
+- A `LOCAL_ONLY` listing is now a non-published, non-actionable hold for Motore progress. It remains in market history and can be re-projected to `DEFERRED_LINK` if eligibility changes during later analysis. `DEFERRED_LINK` remains active remote work, never time-completed.
+- Radar diagnostics expose age of last actual Vinted Accessibility event. No new `cardsParsedTotal` and no fresh event after installing a build means the classification changes were not tested.
+- Regression: `regression/engine_recovery_truth_v51230.py` protects LOCAL_ONLY completion and event telemetry.
+
 ## 5.12.47 stability + intake recovery (pending Pixel validation)
 - Cross-process SQLite contention is expected between :radar, default queue and :ui. DealDatabase configures an 8-second busy timeout; the Vinted lane treats SQLiteDatabaseLockedException as bounded backpressure instead of a FAULT state.
 - ListingClassifier accepts a narrow allow-list of known board-game publishers/brands as positive marketplace evidence. This only opens the existing identity/verification pipeline; BGG identity and structured marketplace checks still gate publication.
