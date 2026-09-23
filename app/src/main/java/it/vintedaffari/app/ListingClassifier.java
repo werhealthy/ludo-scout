@@ -106,6 +106,16 @@ public final class ListingClassifier {
         return new Result(Type.UNCERTAIN, "Manca un segnale positivo che l'oggetto sia un gioco da tavolo.", true, false);
     }
 
+    /** Positive category evidence is accepted only from a labelled Vinted product page. */
+    public static boolean isExplicitBoardGameCategory(String categoryNormalized) {
+        String c=norm(categoryNormalized);
+        if(c.isEmpty())return false;
+        return c.contains("giochi da tavolo")||c.contains("gioco da tavolo")||
+                c.contains("board game")||c.contains("boardgame")||
+                c.contains("juegos de mesa")||c.contains("jeux de societe")||
+                c.contains("juego de mesa")||c.contains("jeu de societe");
+    }
+
     /** Applies only to a labelled Vinted category captured from the product page, never to a
      * free-form seller title. This is deliberately category-level, not a collision blacklist. */
     public static boolean isExplicitNonGameCategory(String categoryNormalized) {
