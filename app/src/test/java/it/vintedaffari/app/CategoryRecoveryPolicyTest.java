@@ -7,6 +7,8 @@ public class CategoryRecoveryPolicyTest {
     @Test public void recognizesStructuredBoardGameCategoriesButNotLookalikes() {
         assertTrue(ListingClassifier.isExplicitBoardGameCategory("Giochi da tavolo > Strategia"));
         assertTrue(ListingClassifier.isExplicitBoardGameCategory("Jeux de société"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Giochi da tavolo > Accessori"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Board games > Expansions"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Musica"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Categoria non disponibile"));
     }
