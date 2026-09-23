@@ -11,6 +11,8 @@ filters=ui[ui.index("private void showFilterSheet()"):ui.index("private void ren
 catalog=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
 overlay=ui[ui.index("private void openGameDetailOverlay"):ui.index("private View marketListingCard",ui.index("private void openGameDetailOverlay"))]
 panel=ui[ui.index("private Dialog fullScreenPanel(String title)"):ui.index("private TextView filterIntro",ui.index("private Dialog fullScreenPanel(String title)"))]
+indicator=ui[ui.index("private void updateActivityIndicator(View target)"):ui.index("private String compactCount",ui.index("private void updateActivityIndicator(View target)"))]
+indicator_loader=ui[ui.index("private void requestActivityIndicatorSnapshot()"):ui.index("private void updateActivityIndicator(View target)",ui.index("private void requestActivityIndicatorSnapshot()"))]
 
 checks=[
     ("release identity",
@@ -43,6 +45,11 @@ checks=[
     ("UI data has dedicated executor",
      "ExecutorService uiDataIo=Executors.newSingleThreadExecutor()" in ui and
      "uiDataIo.shutdownNow()" in ui),
+    ("Activity indicator never queries SQLite on the main thread",
+     "marketStore.jobSummary()" not in indicator and
+     "marketStore.vintedReviewCount()" not in indicator and
+     "requestActivityIndicatorSnapshot()" in indicator and
+     "uiDataIo.execute" in indicator_loader),
     ("filters use progressive rows",
      'filterRow("Voto BGG"' in filters and
      'filterRow("Lingua"' in filters and
