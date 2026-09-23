@@ -131,6 +131,49 @@ checks.extend([
      "DELETE FROM observations" not in category_update),
 ])
 
+# Activity detail screens must consume IO snapshots; render callbacks may never wait
+# for synchronized SQLite reads while Android is dispatching input.
+def method_body(source, signature):
+    start = source.index(signature)
+    end = source.find("\n    private ", start + len(signature))
+    return source[start:end if end >= 0 else len(source)]
+
+engine_history_render = method_body(main, "private void renderEngineHistory()")
+engine_day_render = method_body(main, "private void renderEngineDay()")
+engine_run_render = method_body(main, "private void renderEngineRun()")
+engine_history_load = method_body(main, "private void requestEngineHistorySnapshot()")
+engine_day_load = method_body(main, "private void requestEngineDaySnapshot(")
+engine_run_load = method_body(main, "private void requestEngineRunSnapshot(")
+engine_thumbnail = method_body(main, "private View engineRunThumbnailView(")
+checks.extend([
+    ("Activity history render never performs a synchronous 30-day SQLite scan",
+     "db.recentObservationDays(30)" not in engine_history_render and
+     "requestEngineHistorySnapshot()" in engine_history_render),
+    ("Activity day render never loads sessions or statuses from SQLite on the UI thread",
+     all(token not in engine_day_render for token in
+         ("db.observationSessionsBetween(", "db.activeObservationSession()",
+          "db.isObservationSessionWaiting(", "db.isObservationSessionDeferred(")) and
+     "requestEngineDaySnapshot(" in engine_day_render),
+    ("Activity run detail renders from an asynchronous snapshot",
+     "db.engineRunItems(" not in engine_run_render and
+     "engineSelectedRun()" not in engine_run_render and
+     "private DealDatabase.ObservationSession engineSelectedRun()" not in main and
+     "requestEngineRunSnapshot(" in engine_run_render),
+    ("Activity history query runs inside the background executor",
+     "uiDataIo.execute" in engine_history_load and "db.recentObservationDays(30)" in engine_history_load),
+    ("Activity day queries run inside the background executor",
+     "uiDataIo.execute" in engine_day_load and "db.observationSessionsBetween(start,end,50)" in engine_day_load and
+     "db.isObservationSessionWaiting(session)" in engine_day_load and "db.isObservationSessionDeferred(session)" in engine_day_load),
+    ("Activity run query runs inside the background executor",
+     "uiDataIo.execute" in engine_run_load and "db.engineRunItems(run.startAt,run.endAt,filter,220)" in engine_run_load),
+    ("Activity run thumbnail rendering does not decode local bitmaps synchronously",
+     "decodeLocalBitmap(" not in engine_thumbnail and "loadEngineRunThumbnail(" in engine_thumbnail),
+    ("Activity snapshot IO failures schedule a delayed retry",
+     "engineHistoryRetryAt-System.currentTimeMillis()" in engine_history_load and
+     "engineDayRetryAt-System.currentTimeMillis()" in engine_day_load and
+     "engineRunRetryAt-System.currentTimeMillis()" in engine_run_load),
+])
+
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:
     print(("PASS " if ok else "FAIL ") + name)
