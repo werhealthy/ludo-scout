@@ -44,6 +44,12 @@ public final class MainActivity extends Activity {
     private final AtomicBoolean engineOverviewLoading=new AtomicBoolean(false);
     private volatile long engineOverviewRetryAt=0L;
     private volatile String engineOverviewLoadError="";
+    private static final class ActivityIndicatorSnapshot {
+        final boolean active,onlyPaused; final int factChecks; final long loadedAt;
+        ActivityIndicatorSnapshot(boolean a,boolean p,int f,long at){active=a;onlyPaused=p;factChecks=f;loadedAt=at;}
+    }
+    private volatile ActivityIndicatorSnapshot activityIndicatorSnapshot;
+    private final AtomicBoolean activityIndicatorLoading=new AtomicBoolean(false);
     private static final class PhotoMatch {BggSearchClient.Game game;double visual,text,score;PhotoMatch(BggSearchClient.Game g,double v,double t,double s){game=g;visual=v;text=t;score=s;}}
     private final Runnable activitySnapshotRetry=()->{if(!isDestroyed()&&"activity".equals(tab)&&"overview".equals(engineSection))scheduleRender(0);};
     private static final class LibrarySearchJob {String id,label;Uri uri;boolean running=true;String error="";final List<BggSearchClient.Game> results=new ArrayList<>();LibrarySearchJob(String i,String l,Uri u){id=i;label=l;uri=u;}}
@@ -201,14 +207,44 @@ private View makeCompanionFab(){
     @Override public void onBackPressed(){if("activity".equals(tab)&&!"overview".equals(engineSection)){if("run".equals(engineSection)&&engineDayStart>0){engineSection="day";}else engineSection="overview";scheduleRender(0);if(scroll!=null)scroll.scrollTo(0,0);return;}if("database".equals(tab)&&selectedGameId>0){closeDatabaseGame();return;}if(scroll!=null)tabScrollPositions.put(tab,scroll.getScrollY());if(!tabHistory.isEmpty()){tab=tabHistory.pop();renderNav();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null)scroll.scrollTo(0,tabScrollPositions.getOrDefault(tab,0));},35);return;}if(!"discover".equals(tab)){tab="discover";renderNav();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null)scroll.scrollTo(0,tabScrollPositions.getOrDefault(tab,0));},35);return;}if(scroll!=null)scroll.smoothScrollTo(0,0);}
     private void scheduleRender(long delayMs){uiUpdates.removeCallbacks(deferredRender);uiUpdates.postDelayed(deferredRender,Math.max(0,delayMs));}
     private void updateActivityIndicator(){updateActivityIndicator(activityButton);}
+    private void requestActivityIndicatorSnapshot(){
+        if(marketStore==null||!activityIndicatorLoading.compareAndSet(false,true))return;
+        final long started=System.currentTimeMillis();
+        uiDataIo.execute(()->{
+            ActivityIndicatorSnapshot ready=null;
+            try{
+                OperationCenter.Summary s=OperationCenter.userSummary(this);
+                MarketStore.JobSummary q=marketStore.jobSummary();
+                int durableActive=q==null?0:q.active();
+                int factChecks=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();
+                boolean historyPaused=marketStore.isHistoricalPaused();
+                boolean active=s.active()>0||durableActive>0;
+                boolean onlyPaused=active&&historyPaused&&s.running==0&&(q==null||q.processing==0)&&marketStore.priorityActiveCount()==0;
+                ready=new ActivityIndicatorSnapshot(active,onlyPaused,factChecks,System.currentTimeMillis());
+            }catch(Throwable t){
+                getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activityIndicatorState","ERROR;elapsedMs="+(System.currentTimeMillis()-started)+";error="+String.valueOf(t)).apply();
+            }
+            final ActivityIndicatorSnapshot result=ready;
+            runOnUiThread(()->{
+                activityIndicatorLoading.set(false);
+                if(result!=null){
+                    activityIndicatorSnapshot=result;
+                    getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activityIndicatorState","READY;elapsedMs="+(System.currentTimeMillis()-started)).apply();
+                }
+                if(!isDestroyed()&&activityButton!=null)applyActivityIndicatorSnapshot(activityButton,result!=null?result:activityIndicatorSnapshot);
+            });
+        });
+    }
     private void updateActivityIndicator(View target){
         if(target==null)return;
-        OperationCenter.Summary s=OperationCenter.userSummary(this);
-        MarketStore.JobSummary q=null;try{if(marketStore!=null)q=marketStore.jobSummary();}catch(Throwable ignored){}
-        int durableActive=q==null?0:q.active();
-        int factChecks=0;try{if(marketStore!=null)factChecks=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();}catch(Throwable ignored){}
-        boolean historyPaused=marketStore!=null&&marketStore.isHistoricalPaused();
-        boolean active=s.active()>0||durableActive>0;boolean onlyPaused=active&&historyPaused&&s.running==0&&(q==null||q.processing==0)&&marketStore!=null&&marketStore.priorityActiveCount()==0;
+        ActivityIndicatorSnapshot snapshot=activityIndicatorSnapshot;
+        applyActivityIndicatorSnapshot(target,snapshot);
+        long age=snapshot==null?Long.MAX_VALUE:System.currentTimeMillis()-snapshot.loadedAt;
+        if(age>5_000L)requestActivityIndicatorSnapshot();
+    }
+    private void applyActivityIndicatorSnapshot(View target,ActivityIndicatorSnapshot snapshot){
+        if(target==null)return;
+        boolean active=snapshot!=null&&snapshot.active,onlyPaused=snapshot!=null&&snapshot.onlyPaused;int factChecks=snapshot==null?0:snapshot.factChecks;
         ImageView icon=target.findViewById(SHEET_ID+2);TextView dot=target.findViewById(SHEET_ID+3);TextView badge=target.findViewById(SHEET_ID+1);
         if(icon!=null)icon.setColorFilter(onlyPaused?ORANGE:active?CYAN:MUTED);
         if(dot!=null){dot.setVisibility(active?View.VISIBLE:View.GONE);dot.setBackground(round(onlyPaused?YELLOW:CYAN,999,0,0));}
