@@ -193,10 +193,10 @@ public final class MarketStore {
      * Vinted category wins over a title match and leaves the row reversible in AUTO_FILTERED. */
     public boolean updateVintedCategoryEvidence(long listingId,String raw,String normalized,String source,int confidence) {
         if(listingId<=0||TextUtils.isEmpty(raw)||TextUtils.isEmpty(normalized))return false;
-        long now=System.currentTimeMillis();SQLiteDatabase db=helper.getWritableDatabase();boolean requeuedBgg=false;db.beginTransaction();
+        long now=System.currentTimeMillis();SQLiteDatabase db=helper.getWritableDatabase();boolean requeuedBgg=false;int changed=0;db.beginTransaction();
         try{
             ContentValues v=new ContentValues();v.put("category_raw",raw.trim());v.put("category_normalized",normalized.trim());v.put("category_source",safe(source));v.put("category_confidence",Math.max(0,Math.min(100,confidence)));v.put("category_observed_at",now);
-            int changed=db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
+            changed=db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
             if(changed>0&&ListingClassifier.isExplicitNonGameCategory(normalized)){
                 String reason="Categoria Vinted incompatibile con gioco da tavolo: "+raw.trim();
                 ContentValues hidden=new ContentValues();hidden.put("lifecycle","AUTO_FILTERED");hidden.put("enrichment_state","AUTO_FILTERED");hidden.put("match_state","CATEGORY_INCOMPATIBLE");hidden.put("last_error",reason);
