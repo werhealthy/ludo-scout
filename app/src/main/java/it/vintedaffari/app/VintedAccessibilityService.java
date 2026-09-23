@@ -1444,6 +1444,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "radarService={authoritative="+(radarService.updatedAt>0)+", ageMs="+radarServiceAgeMs+", value="+radarService.value+", payload="+radarService.detail+"}\n" +
                 "vintedEvents=" + p.getLong("vintedEvents", 0) + "\n" +
                 "scans=" + p.getLong("scans", 0) + "\n" +
+                "lastVintedEventAgeMs=" + (p.getLong("lastEventAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("lastEventAt",0))) + "; eventType=" + p.getInt("lastEventType",0) + "\n" +
                 "lastRoot=" + p.getString("lastRoot", "") + "\n" +
                 "accessibilityWindowFallbacks=" + p.getLong("accessibilityWindowFallbacks",0) + "\n" +
                 "lastUnparsedCardSample=" + p.getString("lastUnparsedCardSample","") + "\n" +
