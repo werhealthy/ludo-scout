@@ -11,7 +11,7 @@ build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 MIN=10*60_000
 BASE=60_000
 UNIT=55_000
-SLICE=10*60_000
+SLICE=90_000
 
 def target(core_work,valid=0,settled=False):
     remote=max(0,core_work)
@@ -74,7 +74,7 @@ checks=[
     ("time alone cannot complete a run",
      "engineSlaExpired" not in auto and "engineContentSettled(s)" in auto),
     ("fairness is a lane yield, never a correctness decision",
-     "ENGINE_RUN_FAIRNESS_SLICE_MS=10L*60_000L" in deal and
+     "ENGINE_RUN_FAIRNESS_SLICE_MS=90_000L" in deal and
      "nextUnfinishedObservationSessionAfter" in deal and
      "engine_run_cursor_start" in deal and
      "yieldOverBudgetEngineRun(now)" in market),
