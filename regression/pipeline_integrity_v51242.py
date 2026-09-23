@@ -141,7 +141,6 @@ def method_body(source, signature):
 engine_history_render = method_body(main, "private void renderEngineHistory()")
 engine_day_render = method_body(main, "private void renderEngineDay()")
 engine_run_render = method_body(main, "private void renderEngineRun()")
-engine_run_selector = method_body(main, "private DealDatabase.ObservationSession engineSelectedRun()")
 engine_history_load = method_body(main, "private void requestEngineHistorySnapshot()")
 engine_day_load = method_body(main, "private void requestEngineDaySnapshot(")
 engine_run_load = method_body(main, "private void requestEngineRunSnapshot(")
@@ -158,8 +157,8 @@ checks.extend([
     ("Activity run detail renders from an asynchronous snapshot",
      "db.engineRunItems(" not in engine_run_render and
      "engineSelectedRun()" not in engine_run_render and
-     "requestEngineRunSnapshot(" in engine_run_render and
-     "db.observationSessionsBetween(" not in engine_run_selector),
+     "private DealDatabase.ObservationSession engineSelectedRun()" not in main and
+     "requestEngineRunSnapshot(" in engine_run_render),
     ("Activity history query runs inside the background executor",
      "uiDataIo.execute" in engine_history_load and "db.recentObservationDays(30)" in engine_history_load),
     ("Activity day queries run inside the background executor",

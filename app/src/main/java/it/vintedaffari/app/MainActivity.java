@@ -1328,7 +1328,6 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private void openObservationReady(DealDatabase.ObservationSession run){openEngineRun(run,"ready");}
     private void openObservationSession(DealDatabase.ObservationSession session){openEngineRun(session,"all");}
 
-    private DealDatabase.ObservationSession engineSelectedRun(){return null;}
 
     private String engineRunFilterLabel(){if("bgg".equals(engineRunFilter))return"Riconoscimento BGG";if("vinted".equals(engineRunFilter))return"Collegamento Vinted";if("ready".equals(engineRunFilter))return"Card pronte";if("review".equals(engineRunFilter))return"Da verificare";if("metadata".equals(engineRunFilter))return"Dati finali";return"Tutti i giochi";}
 
