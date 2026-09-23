@@ -212,7 +212,7 @@ public final class MarketStore {
                     // UPDATE_DEAL_LISTING_TYPE_BASE_GAME: category evidence belongs to this exact listing.
                     ContentValues corrected=new ContentValues();corrected.put("match_state","BGG_MATCH_REQUIRED");corrected.put("enrichment_state","PENDING_ANALYSIS");corrected.put("last_error","");
                     db.update("market_listings",corrected,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});
-                    ContentValues legacy=new ContentValues();legacy.put("listing_type","BASE_GAME");legacy.put("verification_reason",""); 
+                    ContentValues legacy=new ContentValues();legacy.put("listing_type","BASE_GAME");legacy.put("verification_reason","");
                     db.update("deals",legacy,"signature=? AND lifecycle='ACTIVE' AND verification_state='TYPE_UNVERIFIED'",new String[]{signature});
                     enqueueGameJob(db,gameId,JOB_BGG,now);requeuedBgg=true;
                     setDiagnosticState("category_recovery",1,"state=BGG_REVALIDATION_QUEUED;listing="+listingId+";game="+gameId);
@@ -1334,7 +1334,8 @@ public final class MarketStore {
         }
         for(int i=0;i<ids.size();i++){
             ContentValues listing=new ContentValues();listing.put("match_state","MATCHED");listing.put("last_error","");
-            if(!TextUtils.isEmpty(urls.get(i))&&!TextUtils.isEmpty(itemIds.get(i)))listing.put("enrichment_state","CORE_COMPLETE");
+            if(rating!=null&&rating<DealPolicy.MIN_BGG_RATING)listing.put("enrichment_state","LOCAL_ONLY");
+            else if(!TextUtils.isEmpty(urls.get(i))&&!TextUtils.isEmpty(itemIds.get(i)))listing.put("enrichment_state","CORE_COMPLETE");
             else if(rating!=null&&rating>=DealPolicy.MIN_BGG_RATING){listing.put("enrichment_state","DEFERRED_LINK");listing.put("deferred_retry_at",0);}
             db.update("market_listings",listing,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(ids.get(i))});
             ContentValues deal=new ContentValues();deal.put("verification_state","OK");deal.putNull("verification_reason");
