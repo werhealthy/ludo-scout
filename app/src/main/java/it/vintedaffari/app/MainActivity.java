@@ -46,7 +46,7 @@ public final class MainActivity extends Activity {
     private volatile String engineOverviewLoadError="";
     private static final class EngineDaySession {final DealDatabase.ObservationSession session;final boolean waiting,deferred,active;EngineDaySession(DealDatabase.ObservationSession s,boolean w,boolean d,boolean a){session=s;waiting=w;deferred=d;active=a;}}
     private static final class EngineDaySnapshot {final long startAt,endAt,loadedAt;final List<EngineDaySession> sessions;EngineDaySnapshot(long a,long b,List<EngineDaySession> s){startAt=a;endAt=b;loadedAt=System.currentTimeMillis();sessions=s==null?Collections.emptyList():s;}}
-    private static final class EngineRunSnapshot {final long startAt,endAt,loadedAt;final String filter;final DealDatabase.ObservationSession run;final List<DealDatabase.EngineRunItem> items;EngineRunSnapshot(long a,long b,String f,DealDatabase.ObservationSession r,List<DealDatabase.EngineRunItem> i){startAt=a;endAt=b;filter=f;run=r;items=i==null?Collections.emptyList():i;}}
+    private static final class EngineRunSnapshot {final long startAt,endAt,loadedAt;final String filter;final DealDatabase.ObservationSession run;final List<DealDatabase.EngineRunItem> items;EngineRunSnapshot(long a,long b,String f,DealDatabase.ObservationSession r,List<DealDatabase.EngineRunItem> i){startAt=a;endAt=b;loadedAt=System.currentTimeMillis();filter=f;run=r;items=i==null?Collections.emptyList():i;}}
     private volatile List<DealDatabase.ObservationDay> engineHistorySnapshot;
     private volatile EngineDaySnapshot engineDaySnapshot;
     private volatile EngineRunSnapshot engineRunSnapshot;
