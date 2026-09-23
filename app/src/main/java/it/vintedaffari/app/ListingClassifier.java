@@ -110,6 +110,12 @@ public final class ListingClassifier {
     public static boolean isExplicitBoardGameCategory(String categoryNormalized) {
         String c=norm(categoryNormalized);
         if(c.isEmpty())return false;
+        // Breadcrumbs can contain a board-game parent while the selected product leaf is
+        // accessories, expansions, or replacement parts. Those are not base-game evidence.
+        String[] nonBaseLeaves={"accessori","accessory","accessories","espansione","espansioni",
+                "expansion","expansions","componenti","components","ricambi","replacement parts",
+                "spare parts","organizer","organiser","inserts","sleeves","miniatures"};
+        if(containsAny(c,nonBaseLeaves))return false;
         return c.contains("giochi da tavolo")||c.contains("gioco da tavolo")||
                 c.contains("board game")||c.contains("boardgame")||
                 c.contains("juegos de mesa")||c.contains("jeux de societe")||
