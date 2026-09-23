@@ -1,5 +1,10 @@
 # Ludo Scout — AI handoff
 
+## Vibe Coding project context
+- Read `AGENTS.md` for repository workflow and implementation rules, `PROJECT.md` for the stable product summary, and `STATE.md` for the current task and verification state.
+- This handoff remains the detailed source for versioned engine, product, trust, network, and release invariants. Keep its rules intact when applying the shorter project summary.
+- Keep significant product and technical changes reflected here and in `CHANGELOG.md`; update `STATE.md` when work or verification advances.
+
 ## 5.12.51 — Remote fairness and conversion funnel
 - 5.12.50 user debug showed oldest active run ~44 hours old with 14 waiting runs and ~24 core remaining; fairness was only 27s into a ten-minute slice after process restart. All 12,816 parsed cards had zero explicit Vinted IDs captured by Accessibility. Request ledger roughly 12.86 physical requests per linked item. Thus exact-link lookup is a hard publish bottleneck.
 - Important timing distinction: `lastVintedEventAgeMs` ~6,141,848 ms on a 5.12.50 build with `radarService.ageMs` ~747,194 ms means the reported counters predated that installation. No new Vinted scroll after install was established.
