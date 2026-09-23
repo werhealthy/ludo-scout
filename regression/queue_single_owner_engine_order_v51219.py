@@ -10,8 +10,8 @@ radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.ja
 engine=(ROOT/"app/src/main/java/it/vintedaffari/app/JsGameEngine.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
-# Executable model: a newer scroll can already be persisted while an older Motore run is active,
-# but classifier work must stay on the oldest active run until it settles.
+# Executable model: all captured scrolls may use the local classifier immediately; the older
+# active Motore run still owns serialized remote Vinted verification until it yields.
 db=sqlite3.connect(":memory:")
 db.executescript("""
 CREATE TABLE observations(signature TEXT, observed_at INTEGER);
@@ -28,16 +28,13 @@ INSERT INTO market_listings VALUES(2,'old-b','old-b','ACTIVE','PENDING_ANALYSIS'
 INSERT INTO market_listings VALUES(3,'new-a','new-a','ACTIVE','PENDING_ANALYSIS',5000);
 INSERT INTO market_listings VALUES(4,'new-b','new-b','ACTIVE','PENDING_ANALYSIS',5100);
 """)
-active=(900,1200)
 rows=db.execute("""
 SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint)
 FROM market_listings
 WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS'
-  AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN
-      (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)
 ORDER BY last_seen DESC
-""",active).fetchall()
-assert [x[0] for x in rows]==["old-b","old-a"], rows
+""").fetchall()
+assert [x[0] for x in rows]==["new-b","new-a","old-b","old-a"], rows
 
 action_start=receiver.index("if (QueueWorkScheduler.ACTION_NOW.equals(action))")
 action_end=receiver.index("final BroadcastReceiver.PendingResult pending",action_start)
@@ -58,12 +55,12 @@ checks=[
      "QueueKeepAliveService.ensureRunning(app)" in action_now and "return;" in action_now and "scheduleLocal" not in action_now),
     ("WorkManager stands down before opening DB under service owner",
      "isStarting()||QueueKeepAliveService.isRunning()" in worker_head and worker_head.index("isRunning()") < worker_head.index("new DealDatabase")),
-    ("pending classifier query is scoped to active Motore run",
-     "DealDatabase.ObservationSession active=helper.activeObservationSession()" in pending and "SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?" in pending),
+    ("local classifier is independent of the active remote run",
+     "activeObservationSession()" not in pending and "ORDER BY last_seen DESC LIMIT ?" in pending and "Math.min(8,limit)" in pending),
     ("RAM hints cannot directly bypass active-run ordering",
-     "freshForAnalysis" not in scan and "marketStore.pendingAnalysisCards(40)" in scan and "new ArrayList<>(pendingForAnalysis.values())" in scan),
-    ("waiting scroll is rechecked without another Vinted visit",
-     "waitingObservationSessionCount()>0" in continuation and "postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L)" in continuation),
+     "freshForAnalysis" not in scan and "marketStore.pendingAnalysisCards(8)" in scan and "new ArrayList<>(pendingForAnalysis.values())" in scan),
+    ("locally pending scroll is rechecked without another Vinted visit",
+     "marketStore.pendingAnalysisCards(8)" in continuation and "postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L)" in continuation),
     ("WebView readiness has bounded retry window",
      "READY_RETRY_MS = 500L" in engine and "READY_TIMEOUT_MS = 30_000L" in engine and "retryVerifyOrFail" in engine),
     ("WebView readiness retry chain is single-flight",

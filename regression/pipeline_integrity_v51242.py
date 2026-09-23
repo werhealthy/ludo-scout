@@ -55,6 +55,15 @@ checks = [
      'return new Result(Type.BASE_GAME, "Segnale esplicito di gioco da tavolo' in listing),
     ("known board-game publisher is positive marketplace evidence",
      "BOARD_GAME_BRANDS" in listing and '"kosmos"' in listing and "Publisher/brand ludico riconoscibile" in listing),
+    ("observed Carcassonne publisher is recognized generically",
+     '"999 games"' in listing and '"z man games"' in listing and '"just games"' in listing),
+    ("new local cards are not blocked by older remote-run ownership",
+     "activeObservationSession()" not in market[market.index("public List<VintedCard> pendingAnalysisCards"):market.index("/** Imports current legacy feed rows")] and
+     "Math.min(8,limit)" in market and
+     "pendingAnalysisCards(8)" in a11y),
+    ("daily Activity summary avoids per-session N+1 joins",
+     "d.sessions=countObservationBursts(start,end)" in deal_db and
+     "List<ObservationSession> sessions=observationSessionsBetween(start,end,100)" not in deal_db),
     ("expansion cue is retained but excluded from automatic catalog/review",
      'return new Result(Type.EXPANSION, "Espansione esplicitamente indicata: esclusa dal catalogo automatico.", false, false)' in listing and
      "return type == Type.BASE_GAME;" in listing),

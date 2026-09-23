@@ -61,7 +61,8 @@ public final class ListingClassifier {
             "kosmos", "asmodee", "ravensburger", "devir", "cranio creations", "giochi uniti",
             "matagot", "lookout games", "goliath games", "stonemaier games", "days of wonder",
             "czech games edition", "cge", "lucky duck games", "iello", "horrible guild",
-            "blue orange", "pegasus spiele", "queen games", "alea", "repos production"
+            "blue orange", "pegasus spiele", "queen games", "alea", "repos production",
+            "999 games", "z man games", "keymaster games", "just games"
     };
     /** Strong negative evidence. Keep this list category-based rather than brand-based: a title such
      * as "Scarpe Adidas" should never become a provisional BGG game, while an obscure board game
