@@ -99,6 +99,23 @@ checks = [
 observed = list(range(200))
 checks.append(("200-card stress harness allocates no feed screenshots", len(observed) == 200 and "ThumbnailStore.captureMissing(this, thumbnailCandidates)" not in a11y))
 
+# A successful BGG title match is not enough for an uncertain marketplace product.
+# When a user opens that exact listing, an explicit board-game category must unlock a
+# reversible revalidation path; one newer uncertain listing must not poison a known base game.
+checks.extend([
+    ("explicit board-game category is recognized separately from non-game categories",
+     "isExplicitBoardGameCategory" in listing and "giochi da tavolo" in listing.lower()),
+    ("positive product-page category can recover a TYPE_UNVERIFIED listing",
+     "isExplicitBoardGameCategory(normalized)" in market and
+     "TYPE_UNVERIFIED" in market and "PENDING_ANALYSIS" in market),
+    ("category recovery updates its exact legacy listing and schedules BGG revalidation",
+     "UPDATE_DEAL_LISTING_TYPE_BASE_GAME" in market and "enqueueGameJob(db" in market),
+    ("BGG compatibility prefers independent base-game evidence over a newer uncertain listing",
+     "ORDER BY CASE listing_type WHEN 'BASE_GAME' THEN 0" in market),
+    ("recovery is additive and leaves observations and history intact",
+     "DELETE FROM observations" not in market[market.index("public boolean updateVintedCategoryEvidence"):market.index("/** One-time UX cut-over")]),
+])
+
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:
     print(("PASS " if ok else "FAIL ") + name)
