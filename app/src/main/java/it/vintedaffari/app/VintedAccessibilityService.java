@@ -223,7 +223,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 // Persisted MarketStore state owns classifier ordering. Clear stale RAM hints
                 // so a newer waiting scroll cannot jump ahead of the oldest active Motore run.
                 pendingForAnalysis.clear();
-                if(marketStore!=null){for(VintedCard c:marketStore.pendingAnalysisCards(40))pendingForAnalysis.put(DealDatabase.signature(c),c);}
+                if(marketStore!=null){for(VintedCard c:marketStore.pendingAnalysisCards(8))pendingForAnalysis.put(DealDatabase.signature(c),c);}
                 Log.i(TAG, "Motore pronto: " + gameCount + " giochi. Flush coda attiva=" + pendingForAnalysis.size());
                 flushPendingAnalysis();
                 rebuildLocalBundles();
@@ -435,7 +435,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     private void flushPendingAnalysis() {
         if (engine == null || !engine.isReady()) return;
-        List<VintedCard> batch = marketStore==null?new ArrayList<>(pendingForAnalysis.values()):marketStore.pendingAnalysisCards(40);
+        List<VintedCard> batch = marketStore==null?new ArrayList<>(pendingForAnalysis.values()):marketStore.pendingAnalysisCards(8);
         if(batch.isEmpty())return;
         long now = System.currentTimeMillis();
         for (VintedCard card : batch) {
@@ -521,9 +521,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         .putLong("analysesStored", p2.getLong("analysesStored", 0) + count)
                         .putString("lastError", "")
                         .apply();
+                diag().edit().putLong("localAnalysisLastBatchAt",System.currentTimeMillis())
+                        .putInt("localAnalysisLastBatchSize",count).apply();
                 analysisBatchInFlight=false;
                 sendBroadcast(new android.content.Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
-                handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,450L);
+                handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,1_500L);
             }
 
             @Override public void onError(String message) {
@@ -538,7 +540,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     private void continuePersistentAnalysis(){
         if(analysisBatchInFlight||engine==null||!engine.isReady()||marketStore==null)return;
-        List<VintedCard> next=marketStore.pendingAnalysisCards(40);
+        List<VintedCard> next=marketStore.pendingAnalysisCards(8);
         if(!next.isEmpty()){
             long now=System.currentTimeMillis();
             for(VintedCard card:next){String sig=DealDatabase.signature(card);pendingForAnalysis.remove(sig);recentlyAnalyzed.put(sig,now);}
@@ -1451,6 +1453,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "lastCardsParsed=" + p.getInt("lastCardsParsed", 0) + "\n" +
                 "cardsParsedTotal=" + p.getLong("cardsParsedTotal", 0) + "\n" +
                 "analysisBatches=" + p.getLong("analysisBatches", 0) + "\n" +
+                "localAnalysisLastBatchAgeMs=" + (p.getLong("localAnalysisLastBatchAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("localAnalysisLastBatchAt",0))) + "; size=" + p.getInt("localAnalysisLastBatchSize",0) + "\n" +
                 "analysesStored=" + p.getLong("analysesStored", 0) + "\n" +
                 "classifierBlocked=" + p.getLong("classifierBlocked", 0) + "\n" +
                 "lastClassifierBlock=" + p.getString("lastClassifierBlock", "") + "\n" +
