@@ -679,27 +679,22 @@ public final class MarketStore {
     }
 
 
+    /** Local classification never needs the scarce public Vinted lane. Classify freshly captured
+     * scrolls in bounded newest-first batches even while an older session owns remote linking.
+     * Remote jobs remain subject to active-run ownership, fairness and public-page pacing. */
     public List<VintedCard> pendingAnalysisCards(int limit) {
-        List<VintedCard> out = new ArrayList<>();
-        DealDatabase.ObservationSession active=helper.activeObservationSession();
-        // No current Motore run means no classifier work. This prevents an expired old run from
-        // being silently resurrected after the 10-minute product SLA.
-        if(active==null)return out;
-        String runFilter=" AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) IN " +
-                "(SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
-        String sql = "SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text " +
-                "FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS'" + runFilter +
-                " ORDER BY last_seen DESC LIMIT ?";
-        java.util.ArrayList<String> args=new java.util.ArrayList<>();
-        args.add(String.valueOf(active.startAt));args.add(String.valueOf(active.endAt));
-        args.add(String.valueOf(Math.max(1, limit)));
-        try (Cursor c = helper.getReadableDatabase().rawQuery(sql, args.toArray(new String[0]))) {
-            while (c.moveToNext()) {
-                double price = c.getInt(3) / 100.0;
-                Double protectedPrice = c.isNull(4) ? null : c.getInt(4) / 100.0;
-                Integer fav = c.isNull(5) ? null : c.getInt(5);
-                out.add(new VintedCard(c.getString(0), c.getString(1), c.getString(2), price, protectedPrice, fav,
-                        new Rect(0, 0, 1, 1), c.isNull(6) ? c.getString(0) : c.getString(6)));
+        List<VintedCard> out=new ArrayList<>();
+        int bounded=Math.max(1,Math.min(8,limit));
+        String sql="SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text " +
+                "FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS' " +
+                "ORDER BY last_seen DESC LIMIT ?";
+        try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(bounded)})){
+            while(c.moveToNext()){
+                double price=c.getInt(3)/100.0;
+                Double protectedPrice=c.isNull(4)?null:c.getInt(4)/100.0;
+                Integer fav=c.isNull(5)?null:c.getInt(5);
+                out.add(new VintedCard(c.getString(0),c.getString(1),c.getString(2),price,protectedPrice,fav,
+                        new Rect(0,0,1,1),c.isNull(6)?c.getString(0):c.getString(6)));
             }
         }
         return out;
