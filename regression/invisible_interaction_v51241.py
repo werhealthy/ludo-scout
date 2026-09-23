@@ -16,7 +16,7 @@ indicator_loader=ui[ui.index("private void requestActivityIndicatorSnapshot()"):
 
 checks=[
     ("release identity",
-     "versionName '5.12.50-intake-ui-summary'" in build),
+     "versionName '5.12.51-fairness-catalog-funnel'" in build),
     ("invisible interaction contract exists",
      "The interface should explain itself by shape, placement and behavior" in system and
      "Never place all chips, checkboxes and inputs on the same filter screen" in system),
