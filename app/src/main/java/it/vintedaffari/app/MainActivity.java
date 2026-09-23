@@ -44,6 +44,10 @@ public final class MainActivity extends Activity {
     private final AtomicBoolean engineOverviewLoading=new AtomicBoolean(false);
     private volatile long engineOverviewRetryAt=0L;
     private volatile String engineOverviewLoadError="";
+    private volatile List<MarketStore.RecognizedPending> catalogPendingPreview=Collections.emptyList();
+    private volatile long catalogPendingPreviewAt=0L;
+    private final AtomicBoolean catalogPendingPreviewLoading=new AtomicBoolean(false);
+
     private static final class ActivityIndicatorSnapshot {
         final boolean active,onlyPaused; final int factChecks; final long loadedAt;
         ActivityIndicatorSnapshot(boolean a,boolean p,int f,long at){active=a;onlyPaused=p;factChecks=f;loadedAt=at;}
@@ -538,6 +542,41 @@ private void renderDatabase(){
 
     private final class PriceHistoryView extends View{private final List<MarketStore.PricePoint> points;private final Paint line=new Paint(Paint.ANTI_ALIAS_FLAG),grid=new Paint(Paint.ANTI_ALIAS_FLAG),label=new Paint(Paint.ANTI_ALIAS_FLAG);PriceHistoryView(Context c,List<MarketStore.PricePoint> p){super(c);points=p;line.setColor(CYAN);line.setStrokeWidth(dp(3));line.setStyle(Paint.Style.STROKE);grid.setColor(OUTLINE);grid.setStrokeWidth(dp(1));label.setColor(MUTED);label.setTextSize(dp(11));setPadding(dp(12),dp(14),dp(12),dp(18));}protected void onDraw(Canvas c){super.onDraw(c);if(points==null||points.size()<2)return;int l=getPaddingLeft(),r=getWidth()-getPaddingRight(),t=getPaddingTop(),b=getHeight()-getPaddingBottom();int min=Integer.MAX_VALUE,max=Integer.MIN_VALUE;for(MarketStore.PricePoint p:points){min=Math.min(min,p.priceCents);max=Math.max(max,p.priceCents);}if(max==min){max+=100;min=Math.max(0,min-100);}for(int i=0;i<=3;i++){float y=t+(b-t)*i/3f;c.drawLine(l,y,r,y,grid);}Path path=new Path();for(int i=0;i<points.size();i++){float x=l+(r-l)*(i/(float)(points.size()-1));float y=b-(points.get(i).priceCents-min)/(float)(max-min)*(b-t);if(i==0)path.moveTo(x,y);else path.lineTo(x,y);}c.drawPath(path,line);c.drawText(money(max),l,t+dp(11),label);c.drawText(money(min),l,b,label);}}
 
+/** BGG-only previews never enter trusted catalog without the exact Vinted item. */
+    private void requestCatalogPendingPreview(){
+        if(marketStore==null||!catalogPendingPreviewLoading.compareAndSet(false,true))return;
+        uiDataIo.execute(()->{
+            List<MarketStore.RecognizedPending> loaded=null;
+            try{loaded=marketStore.recentRecognizedPending(6,System.currentTimeMillis()-7L*24L*60L*60_000L);}
+            catch(Throwable t){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("catalogPreviewError",String.valueOf(t)).apply();}
+            final List<MarketStore.RecognizedPending> ready=loaded;
+            runOnUiThread(()->{
+                catalogPendingPreviewLoading.set(false);
+                if(ready!=null){
+                    catalogPendingPreview=ready;
+                    catalogPendingPreviewAt=System.currentTimeMillis();
+                    getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit()
+                            .putInt("catalogRecognizedAwaitingLinkShown",ready.size()).apply();
+                }
+                if(ready!=null&&!isDestroyed()&&"catalog".equals(tab))scheduleRender(0);
+            });
+        });
+    }
+    private void renderCatalogPendingPreview(){
+        if(System.currentTimeMillis()-catalogPendingPreviewAt>90_000L)requestCatalogPendingPreview();
+        List<MarketStore.RecognizedPending> pending=catalogPendingPreview;
+        if(pending==null||pending.isEmpty())return;
+        TextView title=text("Giochi riconosciuti · Vinted da collegare",16,TEXT,Typeface.BOLD);
+        title.setPadding(dp(2),dp(15),0,dp(4));body.addView(title);
+        body.addView(text("Identificati su BGG, ma non ancora verificati su Vinted. I prezzi sono quelli osservati durante lo scroll.",12,MUTED,Typeface.NORMAL));
+        for(MarketStore.RecognizedPending item:pending){
+            String label=String.format(Locale.ITALY,"BGG %.1f · prezzo osservato da %s · %d annunci",
+                    item.rating,money(item.minObservedPriceCents),item.listingCount);
+            body.addView(engineNavRow(item.gameName,label,ORANGE,()->openDatabaseGame(item.gameId,"catalog")));
+        }
+        body.addView(engineDivider());
+    }
+
 private void renderCatalog(){
         addMarketHeader("catalog");
         LinearLayout searchBox=new LinearLayout(this);searchBox.setGravity(Gravity.CENTER_VERTICAL);searchBox.setPadding(dp(14),0,dp(8),0);searchBox.setBackground(round(SURFACE2,16,0,0));ImageView si=new ImageView(this);si.setImageResource(android.R.drawable.ic_menu_search);si.setColorFilter(MUTED);si.setPadding(dp(7),dp(7),dp(7),dp(7));searchBox.addView(si,new LinearLayout.LayoutParams(dp(34),dp(34)));EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Cerca un gioco");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setText(query);search.setTextSize(16);search.setBackgroundColor(Color.TRANSPARENT);search.setPadding(dp(6),0,dp(4),0);search.setOnEditorActionListener((v,a,e)->{query=v.getText().toString().trim();catalogVisible=24;render();return true;});searchBox.addView(search,new LinearLayout.LayoutParams(0,-1,1));TextView clear=text("×",20,MUTED,Typeface.NORMAL);clear.setGravity(Gravity.CENTER);clear.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{query="";render();});searchBox.addView(clear,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout.LayoutParams slp=new LinearLayout.LayoutParams(-1,dp(54));slp.bottomMargin=dp(12);body.addView(searchBox,slp);
@@ -556,6 +595,7 @@ private void renderCatalog(){
         applyCatalogPreset(list);applyCatalogFilter(list);if(catalogBatchSignatures!=null&&!catalogBatchSignatures.isEmpty())list.removeIf(d->d==null||!catalogBatchSignatures.contains(d.signature));if(!query.isEmpty()){String q=query.toLowerCase(Locale.ROOT);list.removeIf(d->!(name(d).toLowerCase(Locale.ROOT).contains(q)||(d.brand!=null&&d.brand.toLowerCase(Locale.ROOT).contains(q))));}sortDeals(list);
         getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("catalogStoredAll",catalogStoredAll).putInt("catalogEligible",catalogEligible).putInt("catalogVisible",list.size()).putString("catalogPreset",catalogPreset).apply();
         LinearLayout titleRow=new LinearLayout(this);titleRow.setGravity(Gravity.CENTER_VERTICAL);titleRow.setPadding(0,dp(18),0,dp(10));titleRow.addView(text("Annunci",20,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));TextView count=text(list.size()+" di "+catalogEligible+" pronti",12,MUTED,Typeface.NORMAL);count.setGravity(Gravity.END);titleRow.addView(count);body.addView(titleRow);
+        renderCatalogPendingPreview();
         if(list.isEmpty()){String detail=catalogEligible>0?catalogEligible+" annunci pronti nel Catalogo; questa ricerca o questi filtri non ne trovano nessuno.":"Nessun annuncio è ancora pronto per il Catalogo.";body.addView(emptyState("Nessun annuncio in questa vista",detail,R.drawable.ludo_refresh));TextView reset=secondaryTextAction("Azzera filtri");reset.setOnClickListener(v->{catalogPreset=filterMode=languageFilter=linkFilter=typeFilter="all";maxPriceFilter=null;catalogMinRatingFilter=null;catalogMinDiscountFilter=null;filterShipping=filterBundle=filterVerify=false;query="";urgentSnapshot=null;render();});body.addView(reset);return;}
         catalogResultSnapshot=new ArrayList<>(list);LinearLayout results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);catalogResultsHost=results;body.addView(results,new LinearLayout.LayoutParams(-1,-2));for(int i=0;i<Math.min(catalogVisible,list.size());i++)results.addView(catalogRowV51(list.get(i)));if(list.size()>catalogVisible)addLoadMoreHint(results,"Scorri per caricare altri "+(list.size()-catalogVisible)+" annunci…");
     }
