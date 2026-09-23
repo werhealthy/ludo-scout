@@ -1,5 +1,13 @@
 # Ludo Scout — AI handoff
 
+## 5.12.51 — Remote fairness and conversion funnel
+- 5.12.50 user debug showed oldest active run ~44 hours old with 14 waiting runs and ~24 core remaining; fairness was only 27s into a ten-minute slice after process restart. All 12,816 parsed cards had zero explicit Vinted IDs captured by Accessibility. Request ledger roughly 12.86 physical requests per linked item. Thus exact-link lookup is a hard publish bottleneck.
+- Important timing distinction: `lastVintedEventAgeMs` ~6,141,848 ms on a 5.12.50 build with `radarService.ageMs` ~747,194 ms means the reported counters predated that installation. No new Vinted scroll after install was established.
+- 5.12.51 reduces remote run fairness slice from ten minutes to 90s only when another session is waiting. Serial public-page budget and job durability remain unchanged.
+- `catalogPipeline={active=...;pendingAnalysis=...;bggQualified=...;localOnly=...;deferredLink=...;exactVintedLink=...;coreQualified=...}` counts each block independently, not disjoint buckets. Compare only after fresh install and new Vinted scroll.
+- Field-validate whether run cursor rotates and whether coreQualified/new catalog deals increase. If not, focus exact link verification throughput; do not loosen verification or invent links.
+
+
 ## 5.12.50 local intake and summary query (pending Pixel validation)
 - 5.12.49 field debug: 2 post-install UI ANRs, 1 memory exit, excessive UI CPU. Activity indicator was async (371 ms), so this change focuses on the day-summary N+1 query path (snapshot ~5907 ms).
 - `recentObservationDays()` now counts temporal observation bursts directly; it no longer constructs up to 100 detailed session snapshots per day just to count them. Detailed session history remains available separately.

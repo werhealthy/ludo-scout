@@ -1458,6 +1458,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "classifierBlocked=" + p.getLong("classifierBlocked", 0) + "\n" +
                 "lastClassifierBlock=" + p.getString("lastClassifierBlock", "") + "\n" +
                 "lastClassifierBlockMeta=ageMs=" + (p.getLong("lastClassifierBlockAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("lastClassifierBlockAt",0))) + "; build=" + p.getString("lastClassifierBlockBuild","unknown") + "\n" +
+                "catalogPipeline={"+marketDiag.catalogPipelineFunnel()+"}\n"+
                 "catalogStored="+p.getInt("catalogStored",-1)+"\n"+"catalogFiltered="+p.getInt("catalogFiltered",-1)+"\n"+"catalogPreset="+p.getString("catalogPreset","")+"\n"+"catalogFeed=" + all + "\n" +
                 "hot=" + hot + "\n" +
                 "good=" + good + "\n" +

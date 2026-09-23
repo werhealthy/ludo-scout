@@ -1,5 +1,14 @@
 # Ludo Scout — Changelog
 
+## 5.12.51 — Remote-run fairness and catalog conversion funnel (2026-09-23)
+
+- Historical run backlog still monopolized public Vinted lane despite local intake separation: 14 waiting scrolls, 24 remote link tasks in an approximately 44-hour-old active run.
+- Rotate remote run ownership after 90 seconds of service time whenever another unfinished session waits (formerly ten minutes), preserving durable jobs, serial public access and per-hour request budget. This is fair rotation, not deletion or forced completion.
+- Add on-demand catalog conversion funnel in debug: active persisted listings, pending local analysis, BGG-qualified listings, LOCAL_ONLY, DEFERRED_LINK, exact Vinted identity and core-qualified listings.
+- The debug supplied right after 5.12.50 install was before any new Vinted Accessibility event, so it cannot validate post-install local intake; verify only after fresh scrolling.
+- Exact Vinted identity remains an explicit requirement for publishable listings; no fake URLs or reduced trust gates.
+
+
 ## 5.12.50 — Local intake and Activity daily summary (2026-09-23)
 
 - 5.12.49 field debug: 2 new post-install UI ANRs, 1 low-memory exit and excessive :ui CPU despite a 371-ms asynchronous badge. Snapshot history load still took 5.9 seconds.

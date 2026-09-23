@@ -48,7 +48,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public static final long ENGINE_RUN_REMOTE_UNIT_MS=55_000L;
     /** Fairness is deliberately separate from correctness. A run may yield this lane after one
      * service slice only when another unfinished scroll is waiting; its listings remain intact. */
-    public static final long ENGINE_RUN_FAIRNESS_SLICE_MS=10L*60_000L;
+    public static final long ENGINE_RUN_FAIRNESS_SLICE_MS=90_000L;
     public static final long ENGINE_RUN_LOCAL_ETA_MS=60_000L;
     /** Legacy alias kept for older regression/diagnostic callers; do not use as a fixed deadline. */
     public static final long ENGINE_RUN_SLA_MS=ENGINE_RUN_TARGET_MIN_MS;
