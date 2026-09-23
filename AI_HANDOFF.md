@@ -51,8 +51,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.35-pricing-bundle-exploration`
-- versionCode: `149`
+- Current integration baseline on `beta`: `5.12.51-fairness-catalog-funnel` (local `versionCode 160`).
+- Stable `main` baseline: `5.12.41-invisible-interactions` (local `versionCode 154`).
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
