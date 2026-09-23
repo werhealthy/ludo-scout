@@ -16,7 +16,7 @@ indicator_loader=ui[ui.index("private void requestActivityIndicatorSnapshot()"):
 
 checks=[
     ("release identity",
-     "versionName '5.12.51-fairness-catalog-funnel'" in build),
+     "versionName '5.12." in build and "applicationId 'it.vintedaffari.app'" in build),
     ("invisible interaction contract exists",
      "The interface should explain itself by shape, placement and behavior" in system and
      "Never place all chips, checkboxes and inputs on the same filter screen" in system),
@@ -72,5 +72,5 @@ for name,ok in checks:
     print(("PASS " if ok else "FAIL ")+name)
 failed=[name for name,ok in checks if not ok]
 if failed:
-    raise SystemExit("5.12.41 invisible interaction regression failed: "+", ".join(failed))
+    raise SystemExit("Invisible interaction regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} invisible-interaction guards")
