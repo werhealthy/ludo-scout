@@ -682,6 +682,39 @@ public final class MarketStore {
     /** Local classification never needs the scarce public Vinted lane. Classify freshly captured
      * scrolls in bounded newest-first batches even while an older session owns remote linking.
      * Remote jobs remain subject to active-run ownership, fairness and public-page pacing. */
+    /** Identified, rating-eligible games observed locally but not yet linked to an exact Vinted
+     * item. These are discovery previews, NEVER trusted purchasable catalog deals. A candidate
+     * becomes a catalog deal only through the existing exact-item and variant checks. */
+    public static final class RecognizedPending {
+        public final long gameId, lastSeen;
+        public final String gameName;
+        public final double rating;
+        public final int minObservedPriceCents, listingCount;
+        RecognizedPending(long id,String name,double score,int price,int count,long seen){
+            gameId=id;gameName=name;rating=score;minObservedPriceCents=price;listingCount=count;lastSeen=seen;
+        }
+    }
+
+    public List<RecognizedPending> recentRecognizedPending(int limit,long since){
+        List<RecognizedPending> out=new ArrayList<>();
+        String sql="SELECT g.id,g.canonical_name,g.rating,MIN(l.current_price_cents),COUNT(DISTINCT l.id),MAX(l.last_seen) "+
+                "FROM market_listings l JOIN games g ON g.id=l.game_id "+
+                "WHERE l.lifecycle='ACTIVE' AND l.first_seen>=? AND l.enrichment_state IN ('DEFERRED_LINK','PENDING_ENRICHMENT') "+
+                "AND (l.vinted_item_id IS NULL OR l.vinted_item_id='') AND (l.vinted_url IS NULL OR l.vinted_url='') "+
+                "AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 "+
+                "AND g.match_state='MATCHED' AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' "+
+                "AND g.rating>=? AND NOT EXISTS (SELECT 1 FROM deals d WHERE d.signature=l.legacy_signature "+
+                "AND (d.tier='filtered' OR d.verification_state IN ('PRICE_FILTERED','EXPANSION_CHECK','BGG_VARIANT_REVIEW'))) "+
+                "GROUP BY g.id,g.canonical_name,g.rating ORDER BY MAX(l.last_seen) DESC LIMIT ?";
+        try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{
+                String.valueOf(Math.max(0L,since)),String.valueOf(DealPolicy.MIN_BGG_RATING),
+                String.valueOf(Math.max(1,Math.min(12,limit)))})){
+            while(c.moveToNext())out.add(new RecognizedPending(c.getLong(0),c.getString(1),
+                    c.getDouble(2),c.getInt(3),c.getInt(4),c.getLong(5)));
+        }
+        return out;
+    }
+
     public List<VintedCard> pendingAnalysisCards(int limit) {
         List<VintedCard> out=new ArrayList<>();
         int bounded=Math.max(1,Math.min(8,limit));
