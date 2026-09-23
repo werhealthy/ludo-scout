@@ -896,13 +896,13 @@ public final class MarketStore {
             }
             boolean allowHistory = vintedHistoryAllowed(db, now);
             DealDatabase.ObservationSession activeRun=test2bOwner?null:helper.activeObservationSession();
-            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY') OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH','CATALOG_RECOVERY')) OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
+            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY') OR (j.source='LIVE_DEAL' AND l.first_seen>=? AND j.attempt<3) OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH','CATALOG_RECOVERY')) OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql = "SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
                     "FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                     "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE' " +
                     (allowHistory ? "" : "AND j.source<>? ") + runGate +
                     "ORDER BY CASE WHEN j.job_type=? THEN 0 ELSE 1 END,j.priority DESC,CASE WHEN j.priority>=300 THEN j.created_at END DESC,j.next_attempt_at ASC,j.created_at ASC LIMIT 1";
-            java.util.ArrayList<String> argList=new java.util.ArrayList<>();argList.add(JOB_VINTED);argList.add(JOB_VINTED_DEEP);argList.add(PENDING);argList.add(FAILED_RETRYABLE);argList.add(String.valueOf(now));if(!allowHistory)argList.add(HISTORICAL_SOURCE);if(!test2bOwner){long start=activeRun==null?0:activeRun.startAt,end=activeRun==null?0:activeRun.endAt;argList.add(String.valueOf(start));argList.add(String.valueOf(start));argList.add(String.valueOf(start));argList.add(String.valueOf(end));}argList.add(JOB_VINTED);
+            java.util.ArrayList<String> argList=new java.util.ArrayList<>();argList.add(JOB_VINTED);argList.add(JOB_VINTED_DEEP);argList.add(PENDING);argList.add(FAILED_RETRYABLE);argList.add(String.valueOf(now));if(!allowHistory)argList.add(HISTORICAL_SOURCE);if(!test2bOwner){long start=activeRun==null?0:activeRun.startAt,end=activeRun==null?0:activeRun.endAt;argList.add(String.valueOf(now-24L*60L*60_000L));argList.add(String.valueOf(start));argList.add(String.valueOf(start));argList.add(String.valueOf(start));argList.add(String.valueOf(end));}argList.add(JOB_VINTED);
             try (Cursor c = db.rawQuery(sql, argList.toArray(new String[0]))) {
                 if (c.moveToFirst()) job = readJob(c);
             }
@@ -1826,8 +1826,8 @@ public final class MarketStore {
     public int activeRunCoreVintedCount(){
         DealDatabase.ObservationSession run=helper.activeObservationSession();SQLiteDatabase db=helper.getReadableDatabase();
         if(run==null){try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM processing_jobs WHERE job_type=? AND state IN (?,?,?)",new String[]{JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE})){return c.moveToFirst()?c.getInt(0):0;}}
-        String sql="SELECT COUNT(*) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?,?) AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
-        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
+        String sql="SELECT COUNT(*) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?,?) AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR (j.source='LIVE_DEAL' AND l.first_seen>=? AND j.attempt<3) OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,String.valueOf(System.currentTimeMillis()-24L*60L*60_000L),String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
     }
 
     /** Observations kept locally on purpose: useful for price/history, but they do not consume the remote Vinted lane. */
@@ -1971,10 +1971,10 @@ public final class MarketStore {
         if(isVintedPaused())return 0;
         SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR (j.source='LIVE_DEAL' AND l.first_seen>=? AND j.attempt<3) OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT COUNT(*) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
-        java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);a.add(String.valueOf(now));if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
+        java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);a.add(String.valueOf(now));if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(now-24L*60L*60_000L));a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
         try(Cursor c=db.rawQuery(sql,a.toArray(new String[0]))){return c.moveToFirst()?c.getInt(0):0;}
     }
 
@@ -1996,10 +1996,10 @@ public final class MarketStore {
         if(isVintedPaused())return 0L;
         long now=System.currentTimeMillis();SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
         String historyExtra=allowHistory?"":" AND j.source<>?";
-        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR (j.source='LIVE_DEAL' AND l.first_seen>=? AND j.attempt<3) OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
         String sql="SELECT MIN(j.next_attempt_at) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                 "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
-        java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
+        java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(now-24L*60L*60_000L));a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
         try(Cursor c=db.rawQuery(sql,a.toArray(new String[0]))){if(c.moveToFirst()&&!c.isNull(0))return c.getLong(0);}return 0L;
     }
 
@@ -2683,8 +2683,8 @@ public final class MarketStore {
     public int urgentVintedWorkCount(long now) {
         DealDatabase.ObservationSession run=helper.activeObservationSession();SQLiteDatabase db=helper.getReadableDatabase();
         if(run==null){String sql="SELECT COUNT(*) FROM processing_jobs WHERE job_type=? AND source IN (?,?,?) AND state IN (?,?,?)";try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,"LIVE_DEAL","HUNT_PRIORITY","MANUAL_PRIORITY",PENDING,PROCESSING,FAILED_RETRYABLE})){return c.moveToFirst()?c.getInt(0):0;}}
-        String sql="SELECT COUNT(*) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?,?) AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
-        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
+        String sql="SELECT COUNT(*) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?,?) AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND l.first_seen>=? AND j.attempt<3) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
+        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,PROCESSING,FAILED_RETRYABLE,"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(now-24L*60L*60_000L),String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
     }
 
     /** Urgent rows that may be claimed right now. Newer-scroll Live rows are intentionally not due
@@ -2692,8 +2692,8 @@ public final class MarketStore {
     public int urgentVintedDueCount(long now) {
         DealDatabase.ObservationSession run=helper.activeObservationSession();SQLiteDatabase db=helper.getReadableDatabase();
         if(run==null){String sql="SELECT COUNT(*) FROM processing_jobs WHERE job_type=? AND source IN (?,?,?) AND state IN (?,?) AND next_attempt_at<=?";try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,"LIVE_DEAL","HUNT_PRIORITY","MANUAL_PRIORITY",PENDING,FAILED_RETRYABLE,String.valueOf(now)})){return c.moveToFirst()?c.getInt(0):0;}}
-        String sql="SELECT COUNT(*) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?) AND j.next_attempt_at<=? AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
-        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,FAILED_RETRYABLE,String.valueOf(now),"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
+        String sql="SELECT COUNT(*) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?) AND j.next_attempt_at<=? AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND l.first_seen>=? AND j.attempt<3) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
+        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,FAILED_RETRYABLE,String.valueOf(now),"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(now-24L*60L*60_000L),String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
     }
 
     public long nextUrgentVintedDueAt(long now) {
@@ -2702,8 +2702,8 @@ public final class MarketStore {
             String sql="SELECT MIN(next_attempt_at) FROM processing_jobs WHERE job_type=? AND source IN (?,?,?) AND state IN (?,?)";
             try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,"LIVE_DEAL","HUNT_PRIORITY","MANUAL_PRIORITY",PENDING,FAILED_RETRYABLE})){return c.moveToFirst()&&!c.isNull(0)?c.getLong(0):0L;}
         }
-        String sql="SELECT MIN(j.next_attempt_at) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?) AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
-        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,FAILED_RETRYABLE,"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()&&!c.isNull(0)?c.getLong(0):0L;}
+        String sql="SELECT MIN(j.next_attempt_at) FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id WHERE j.job_type=? AND j.state IN (?,?) AND (j.source IN (?,?) OR (j.source='LIVE_DEAL' AND l.first_seen>=? AND j.attempt<3) OR (j.source='LIVE_DEAL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)))";
+        try(Cursor c=db.rawQuery(sql,new String[]{JOB_VINTED,PENDING,FAILED_RETRYABLE,"HUNT_PRIORITY","MANUAL_PRIORITY",String.valueOf(now-24L*60L*60_000L),String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()&&!c.isNull(0)?c.getLong(0):0L;}
     }
 
     /** Return a future timestamp only when it is worth holding one public-page slot for urgent work.
