@@ -378,4 +378,5 @@
 ## 2026-09-23 — Vibe Coding project context
 - Added `AGENTS.md`, `PROJECT.md`, and `STATE.md` as the repository's concise working context.
 - Updated the README's AI-assisted development entry points and removed its stale current-version references.
-- Linked the Vibe Coding context from `AI_HANDOFF.md`; no application code or runtime behavior changed.
+- Linked the Vibe Coding context from `AI_HANDOFF.md` and aligned its current beta/stable baseline with repository metadata.
+- No application code or runtime behavior changed.
