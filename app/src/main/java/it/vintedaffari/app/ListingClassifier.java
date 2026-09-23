@@ -112,9 +112,12 @@ public final class ListingClassifier {
         if(c.isEmpty())return false;
         // Breadcrumbs can contain a board-game parent while the selected product leaf is
         // accessories, expansions, or replacement parts. Those are not base-game evidence.
-        String[] nonBaseLeaves={"accessori","accessory","accessories","espansione","espansioni",
-                "expansion","expansions","componenti","components","ricambi","replacement parts",
-                "spare parts","organizer","organiser","inserts","sleeves","miniatures"};
+        String[] nonBaseLeaves={"accessori","accessory","accessories","accessoire","accessoires",
+                "accesorio","accesorios","espansione","espansioni","expansion","expansions",
+                "extension","extensions","extensiones","componenti","components","composants",
+                "componentes","ricambi","repuestos","recambios","replacement parts","spare parts",
+                "pieces detachees","partes","piezas","parts","organizer","organiser","inserts",
+                "sleeves","miniatures"};
         if(containsAny(c,nonBaseLeaves))return false;
         return c.contains("giochi da tavolo")||c.contains("gioco da tavolo")||
                 c.contains("board game")||c.contains("boardgame")||
