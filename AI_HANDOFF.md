@@ -1,5 +1,13 @@
 # Ludo Scout — AI handoff
 
+## 5.12.50 local intake and summary query (pending Pixel validation)
+- 5.12.49 field debug: 2 post-install UI ANRs, 1 memory exit, excessive UI CPU. Activity indicator was async (371 ms), so this change focuses on the day-summary N+1 query path (snapshot ~5907 ms).
+- `recentObservationDays()` now counts temporal observation bursts directly; it no longer constructs up to 100 detailed session snapshots per day just to count them. Detailed session history remains available separately.
+- `pendingAnalysisCards()` no longer requires the owner of the remote Vinted run: local BGG/JS classifier processes newer captured observations in newest-first 8-card batches every 1.5s. No new Vinted network requests or bypass of serialized public pacing.
+- Diagnostic `localAnalysisLastBatchAgeMs; size=` tracks local intake. `classifierBlocked` still counts all UNCERTAIN or otherwise unpriced sightings; positive publisher evidence now includes 999 Games, Z-Man Games, Keymaster Games and Just Games. Publication still needs product/type/identity verification.
+- Confirm that `analysisBatches` and `analysesStored` rise with fresh `cardsParsedTotal` while older remote runs progress separately. Track `anrAfterInstall`, memory and Activity snapshot elapsed times.
+
+
 ## 5.12.49 UI indicator ANR guard (pending Pixel validation)
 - 5.12.48 field debug proves LOCAL_ONLY run unblocking worked: active Motore run moved forward from the Marracash run to start=1790003455573.
 - The same debug recorded 3 post-install UI ANRs. `activitySnapshot` took 6685 ms but already executes on `uiDataIo`, so that number is background latency rather than direct proof of main-thread blocking.
