@@ -10,8 +10,12 @@ public class CategoryRecoveryPolicyTest {
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Giochi da tavolo > Accessori"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Board games > Expansions"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Juegos de mesa > Accesorios"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Juegos de mesa > Expansiones"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Juegos de mesa > Repuestos"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Jeux de société > Accessoires"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Jeux de société > Extensions"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Jeux de société > Pièces de rechange"));
+        assertFalse(ListingClassifier.isExplicitBoardGameCategory("Giochi da tavolo > Ricambio"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Musica"));
         assertFalse(ListingClassifier.isExplicitBoardGameCategory("Categoria non disponibile"));
     }
