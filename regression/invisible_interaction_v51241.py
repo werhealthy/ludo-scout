@@ -14,7 +14,7 @@ panel=ui[ui.index("private Dialog fullScreenPanel(String title)"):ui.index("priv
 
 checks=[
     ("release identity",
-     "versionName '5.12.48-local-only-run-unblock'" in build),
+     "versionName '5.12.49-ui-indicator-anr'" in build),
     ("invisible interaction contract exists",
      "The interface should explain itself by shape, placement and behavior" in system and
      "Never place all chips, checkboxes and inputs on the same filter screen" in system),
