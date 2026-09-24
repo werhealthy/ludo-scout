@@ -7,7 +7,7 @@ service = (root / "app/src/main/java/it/vintedaffari/app/VintedAccessibilityServ
 market = (root / "app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")
 
 event_start = service.index("@Override public void onAccessibilityEvent")
-snapshot_start = service.index("private void publishA11yDiagnosticSnapshot")
+snapshot_start = service.index("private synchronized void publishA11yDiagnosticSnapshot")
 scan_start = service.index("private void scheduleScan", snapshot_start)
 event_handler = service[event_start:snapshot_start]
 snapshot_writer = service[snapshot_start:scan_start]
