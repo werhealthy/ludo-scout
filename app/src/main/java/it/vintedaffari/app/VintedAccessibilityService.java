@@ -1477,10 +1477,24 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String waitingState=firstWaiting==null?"NONE":(engineRun!=null&&firstWaiting.startAt<engineRun.startAt?"DEFERRED":"WAITING");
         String engineWaitingSummary=firstWaiting==null?"state=NONE":("state="+waitingState+";start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";etaMs="+DealDatabase.engineEtaMs(firstWaiting)+";coreWork="+firstWaiting.coreWorkListings+";corePending="+firstWaiting.corePendingListings+";coreRemaining="+firstWaiting.coreRemainingListings+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";held="+firstWaiting.heldListings+";analysisPending="+firstWaiting.analysisPendingListings);
         String engineCoreRemainingSummary=marketDiag.engineCoreRemainingSummary();
+        MarketStore.RuntimeStatus a11yIntakeStatus=marketDiag.diagnosticState("a11y_intake");
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
         SharedPreferences p = context.getSharedPreferences(PREFS_DIAG, MODE_PRIVATE);
+        String a11yIntakePayload=TextUtils.isEmpty(a11yIntakeStatus.detail)?"":a11yIntakeStatus.detail;
+        long a11yIntakeAgeMs=a11yIntakeStatus.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-a11yIntakeStatus.updatedAt);
+        long a11yEventAt=parseLongField(a11yIntakePayload,"eventAt",p.getLong("lastEventAt",0));
+        long a11yEventType=parseLongField(a11yIntakePayload,"eventType",p.getInt("lastEventType",0));
+        long a11yEvents=parseLongField(a11yIntakePayload,"vintedEvents",p.getLong("vintedEvents",0));
+        long a11yScans=parseLongField(a11yIntakePayload,"scans",p.getLong("scans",0));
+        long a11yLastCardsParsed=parseLongField(a11yIntakePayload,"lastCardsParsed",p.getInt("lastCardsParsed",0));
+        long a11yCardsParsedTotal=parseLongField(a11yIntakePayload,"cardsParsedTotal",p.getLong("cardsParsedTotal",0));
+        long a11yAnalysisBatches=parseLongField(a11yIntakePayload,"analysisBatches",p.getLong("analysisBatches",0));
+        long a11yLastAnalysisAt=parseLongField(a11yIntakePayload,"localAnalysisLastBatchAt",p.getLong("localAnalysisLastBatchAt",0));
+        long a11yLastAnalysisSize=parseLongField(a11yIntakePayload,"localAnalysisLastBatchSize",p.getInt("localAnalysisLastBatchSize",0));
+        long a11yAnalysesStored=parseLongField(a11yIntakePayload,"analysesStored",p.getLong("analysesStored",0));
+        long a11yClassifierBlocked=parseLongField(a11yIntakePayload,"classifierBlocked",p.getLong("classifierBlocked",0));
         boolean serviceConnectedAuthoritative=radarService.updatedAt>0?radarService.value==1:p.getBoolean("serviceConnected",false);
         boolean engineReadyAuthoritative=engineRuntime.updatedAt>0?engineRuntime.value>0:p.getBoolean("engineReady",false);
         int engineGamesAuthoritative=engineRuntime.value>0?(int)Math.min(Integer.MAX_VALUE,engineRuntime.value):p.getInt("engineGames",0);
@@ -1491,18 +1505,19 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineGames=" + engineGamesAuthoritative + "\n" +
                 "engineRuntime={authoritative="+(engineRuntime.updatedAt>0)+", ageMs="+engineRuntimeAgeMs+", value="+engineRuntime.value+", payload="+engineRuntimePayload+"}\n" +
                 "radarService={authoritative="+(radarService.updatedAt>0)+", ageMs="+radarServiceAgeMs+", value="+radarService.value+", payload="+radarService.detail+"}\n" +
-                "vintedEvents=" + p.getLong("vintedEvents", 0) + "\n" +
-                "scans=" + p.getLong("scans", 0) + "\n" +
-                "lastVintedEventAgeMs=" + (p.getLong("lastEventAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("lastEventAt",0))) + "; eventType=" + p.getInt("lastEventType",0) + "\n" +
+                "vintedEvents=" + a11yEvents + "\n" +
+                "scans=" + a11yScans + "\n" +
+                "lastVintedEventAgeMs=" + (a11yEventAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-a11yEventAt)) + "; eventType=" + a11yEventType + "\n" +
+                "a11yIntakeCrossProcess={authoritative="+(a11yIntakeStatus.updatedAt>0)+", ageMs="+a11yIntakeAgeMs+", value="+a11yIntakeStatus.value+", payload="+a11yIntakePayload+"}\n" +
                 "lastRoot=" + p.getString("lastRoot", "") + "\n" +
                 "accessibilityWindowFallbacks=" + p.getLong("accessibilityWindowFallbacks",0) + "\n" +
                 "lastUnparsedCardSample=" + p.getString("lastUnparsedCardSample","") + "\n" +
-                "lastCardsParsed=" + p.getInt("lastCardsParsed", 0) + "\n" +
-                "cardsParsedTotal=" + p.getLong("cardsParsedTotal", 0) + "\n" +
-                "analysisBatches=" + p.getLong("analysisBatches", 0) + "\n" +
-                "localAnalysisLastBatchAgeMs=" + (p.getLong("localAnalysisLastBatchAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("localAnalysisLastBatchAt",0))) + "; size=" + p.getInt("localAnalysisLastBatchSize",0) + "\n" +
-                "analysesStored=" + p.getLong("analysesStored", 0) + "\n" +
-                "classifierBlocked=" + p.getLong("classifierBlocked", 0) + "\n" +
+                "lastCardsParsed=" + a11yLastCardsParsed + "\n" +
+                "cardsParsedTotal=" + a11yCardsParsedTotal + "\n" +
+                "analysisBatches=" + a11yAnalysisBatches + "\n" +
+                "localAnalysisLastBatchAgeMs=" + (a11yLastAnalysisAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-a11yLastAnalysisAt)) + "; size=" + a11yLastAnalysisSize + "\n" +
+                "analysesStored=" + a11yAnalysesStored + "\n" +
+                "classifierBlocked=" + a11yClassifierBlocked + "\n" +
                 "lastClassifierBlock=" + p.getString("lastClassifierBlock", "") + "\n" +
                 "lastClassifierBlockMeta=ageMs=" + (p.getLong("lastClassifierBlockAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("lastClassifierBlockAt",0))) + "; build=" + p.getString("lastClassifierBlockBuild","unknown") + "\n" +
                 "catalogPipeline={"+marketDiag.catalogPipelineFunnel()+"}\n"+
