@@ -174,13 +174,6 @@ checks.extend([
      "engineRunRetryAt-System.currentTimeMillis()" in engine_run_load),
 ])
 
-failed = [name for name, ok in checks if not ok]
-for name, ok in checks:
-    print(("PASS " if ok else "FAIL ") + name)
-if failed:
-    raise SystemExit("Pipeline integrity regression failed: " + ", ".join(failed))
-print(f"PASS {len(checks)}/{len(checks)} pipeline-integrity guards")
-
 # Copying diagnostics is a database workload, so the click handler must never invoke it
 # synchronously while the main thread is dispatching input.
 settings_start = main.index("private void settings()")
@@ -195,3 +188,11 @@ checks.extend([
      "VintedAccessibilityService.diagnostics(getApplicationContext())" in diagnostic_copy and
      "runOnUiThread" in diagnostic_copy),
 ])
+
+failed = [name for name, ok in checks if not ok]
+for name, ok in checks:
+    print(("PASS " if ok else "FAIL ") + name)
+if failed:
+    raise SystemExit("Pipeline integrity regression failed: " + ", ".join(failed))
+print(f"PASS {len(checks)}/{len(checks)} pipeline-integrity guards")
+
