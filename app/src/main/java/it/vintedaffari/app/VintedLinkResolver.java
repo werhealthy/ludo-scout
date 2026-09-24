@@ -224,6 +224,8 @@ public final class VintedLinkResolver {
 
     private void applyPhotoEvidence(DealRecord d,List<Candidate> ranked){
         if(d==null||ranked==null||ranked.isEmpty()||TextUtils.isEmpty(d.signature))return;
+        boolean singleCanonicalOnly=ranked.size()==1&&ranked.get(0).canonicalTitleMatch&&!ranked.get(0).observedTitleMatch;
+        if(ranked.size()<2&&!singleCanonicalOnly)return;
         java.io.File observed=ThumbnailStore.fileFor(context,d.signature);if(!observed.exists()||observed.length()<2048)return;
         int compared=0;double best=Double.NaN;
         // Compare only the strongest textual candidates. This keeps image traffic bounded and never
