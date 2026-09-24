@@ -8,6 +8,7 @@ market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text
 ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
 service=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueKeepAliveService.java").read_text(encoding="utf-8")
 crash=(ROOT/"app/src/main/java/it/vintedaffari/app/ProcessCrashJournal.java").read_text(encoding="utf-8")
+hero=ui[ui.index("private View engineCurrentRunHero"):ui.index("private View engineStepRow")]
 
 # Executable fixture for the product-facing cut-over.
 db=sqlite3.connect(":memory:")
@@ -70,7 +71,7 @@ checks=[
  ("legacy review debt archived", "EPOCH_ARCHIVED_REVIEW" in market and "listingReviewsCleared" in market),
  ("archived provisional can revive on fresh evidence", '"EPOCH_ARCHIVED_REVIEW".equals(currentState)' in market),
  ("review inbox is epoch-scoped", "last_seen>=?" in market[market.index("public int vintedReviewCount"):market.index("public boolean retryNow")]),
- ("hero is progress-first", 'automaticDone+" / "+run.validListings' in ui and '" elaborati"' in ui),
+ ("hero is progress-first", 'automaticDone+" di "+run.validListings+" risultati con un esito' in hero and '"Sto elaborando"' in hero and '" elaborati"' not in hero),
  ("human recovery is separate from automatic completion", 'renderEngineHeader("Da completare"' in ui and "Qui Ludo ti chiede solo una decisione precisa" in ui),
  ("queue startup records phases instead of throwing through Service", "queue:onCreate:database" in service and "queue:onCreate:lanes" in service and "START_NOT_STICKY" in service),
  ("crash journal exposes root cause and handled phase", "recordHandled" in crash and "root=" in crash and "phase=" in crash),
