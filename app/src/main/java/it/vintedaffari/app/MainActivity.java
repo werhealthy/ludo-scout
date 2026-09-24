@@ -72,7 +72,7 @@ public final class MainActivity extends Activity {
     private final Set<String> photoRefreshes=Collections.synchronizedSet(new HashSet<>());
     private final Map<Long,Integer> jobProgressMemory=new HashMap<>();
     private final LocalIntelligenceBackend intelligence=new LocalIntelligenceBackend.Rules();
-    private final ExecutorService net=Executors.newFixedThreadPool(2);private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();private final ExecutorService uiDataIo=Executors.newSingleThreadExecutor();private final ExecutorService galleryNet=Executors.newSingleThreadExecutor();private final android.util.LruCache<String,Bitmap> imageCache=new android.util.LruCache<String,Bitmap>(4*1024*1024){protected int sizeOf(String k,Bitmap b){return b.getByteCount();}};
+    private final ExecutorService net=Executors.newFixedThreadPool(2);private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();private final ExecutorService uiDataIo=Executors.newSingleThreadExecutor();private static final ExecutorService diagnosticIo=Executors.newSingleThreadExecutor();private final ExecutorService galleryNet=Executors.newSingleThreadExecutor();private final android.util.LruCache<String,Bitmap> imageCache=new android.util.LruCache<String,Bitmap>(4*1024*1024){protected int sizeOf(String k,Bitmap b){return b.getByteCount();}};
     private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){
         if(!"activity".equals(tab))updateActivityIndicator();
         long now=System.currentTimeMillis();
@@ -1183,11 +1183,30 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setHintTextColor(MUTED);e.setTextColor(TEXT);e.setTextSize(15);e.setSingleLine(true);e.setPadding(dp(14),0,dp(14),0);e.setBackground(round(SURFACE2,16,0,0));return e;}
 
     // ---------- settings/intents ----------
+    private void copyDiagnosticsAsync(TextView action){
+        if(action==null||!action.isEnabled())return;
+        action.setEnabled(false);action.setText("Preparazione diagnostica…");
+        diagnosticIo.execute(()->{
+            String report=null,error="";
+            try{report=VintedAccessibilityService.diagnostics(getApplicationContext());}
+            catch(Exception t){error=t.getClass().getSimpleName();}
+            final String ready=report,failed=error;
+            runOnUiThread(()->{
+                if(isDestroyed())return;
+                action.setEnabled(true);action.setText("Copia diagnostica tecnica");
+                if(!TextUtils.isEmpty(failed)||ready==null){Toast.makeText(this,"Diagnostica non disponibile · "+(TextUtils.isEmpty(failed)?"errore":failed),Toast.LENGTH_LONG).show();return;}
+                android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Ludo Scout",ready));
+                Toast.makeText(this,"Diagnostica copiata",Toast.LENGTH_SHORT).show();
+            });
+        });
+    }
+
     private void settings(){
         Dialog dialog=bottomSheet("Impostazioni");LinearLayout box=dialog.findViewById(SHEET_ID);
         box.addView(text("RADAR",12,MUTED,Typeface.BOLD));TextView radar=text(isAccessibilityEnabled()?"Accessibilità Radar  ·  Attiva":"Accessibilità Radar  ·  Da attivare",16,TEXT,Typeface.BOLD);radar.setGravity(Gravity.CENTER_VERTICAL);radar.setMinHeight(dp(54));radar.setOnClickListener(v->{dialog.dismiss();startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));});box.addView(radar);
         box.addView(text("DATI",12,MUTED,Typeface.BOLD));TextView bgg=text(bggSearch.configured()?"BoardGameGeek  ·  Collegato":"BoardGameGeek  ·  Token mancante",16,TEXT,Typeface.BOLD);bgg.setGravity(Gravity.CENTER_VERTICAL);bgg.setMinHeight(dp(54));box.addView(bgg);
-        box.addView(text("AVANZATE",12,MUTED,Typeface.BOLD));TextView diag=text("Copia diagnostica tecnica",15,MUTED,Typeface.NORMAL);diag.setGravity(Gravity.CENTER_VERTICAL);diag.setMinHeight(dp(52));diag.setOnClickListener(v->{String x=VintedAccessibilityService.diagnostics(this);((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Ludo Scout",x));Toast.makeText(this,"Diagnostica copiata",Toast.LENGTH_SHORT).show();});box.addView(diag);
+        box.addView(text("AVANZATE",12,MUTED,Typeface.BOLD));TextView diag=text("Copia diagnostica tecnica",15,MUTED,Typeface.NORMAL);diag.setGravity(Gravity.CENTER_VERTICAL);diag.setMinHeight(dp(52));diag.setOnClickListener(v->copyDiagnosticsAsync(diag));box.addView(diag);
         TextView reset=text("Cancella dati Radar",15,RED,Typeface.NORMAL);reset.setGravity(Gravity.CENTER_VERTICAL);reset.setMinHeight(dp(52));reset.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Cancellare i dati Radar?").setMessage("Rimuove annunci e dati locali raccolti da Ludo.").setNegativeButton("Annulla",null).setPositiveButton("Cancella",(d,w)->{db.clearAll();bundleDb.clearAll();dialog.dismiss();render();}).show());box.addView(reset);dialog.show();
     }
 

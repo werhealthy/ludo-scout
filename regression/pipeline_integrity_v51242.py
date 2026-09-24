@@ -174,9 +174,25 @@ checks.extend([
      "engineRunRetryAt-System.currentTimeMillis()" in engine_run_load),
 ])
 
+# Copying diagnostics is a database workload, so the click handler must never invoke it
+# synchronously while the main thread is dispatching input.
+settings_start = main.index("private void settings()")
+settings_end = main.find("\n    private ", settings_start + len("private void settings()"))
+settings_body = main[settings_start:settings_end if settings_end >= 0 else len(main)]
+diagnostic_copy = method_body(main, "private void copyDiagnosticsAsync(") if "private void copyDiagnosticsAsync(" in main else ""
+checks.extend([
+    ("settings diagnostics are generated away from the UI thread",
+     "copyDiagnosticsAsync(" in settings_body and
+     "VintedAccessibilityService.diagnostics(this)" not in settings_body and
+     "diagnosticIo.execute" in diagnostic_copy and
+     "VintedAccessibilityService.diagnostics(getApplicationContext())" in diagnostic_copy and
+     "runOnUiThread" in diagnostic_copy),
+])
+
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:
     print(("PASS " if ok else "FAIL ") + name)
 if failed:
     raise SystemExit("Pipeline integrity regression failed: " + ", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} pipeline-integrity guards")
+
