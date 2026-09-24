@@ -26,7 +26,7 @@ checks = [
     ("Accessibility callback does not synchronously write SQLite telemetry", "setDiagnosticState(" not in event_handler),
     ("SQLite mirroring is off the Accessibility callback", "diagnosticIo.execute(" in snapshot_writer),
     ("telemetry writes are coalesced instead of accumulating", "a11yDiagnosticFlushQueued.compareAndSet(false,true)" in snapshot_writer and "pendingA11yDiagnosticSnapshot" in snapshot_writer),
-    ("snapshot writes are time-throttled during rapid scroll events", "A11Y_DIAGNOSTIC_MIN_WRITE_MS=2_000L" in snapshot_writer and "a11yDiagnosticPublishScheduled" in snapshot_writer),
+    ("snapshot writes are time-throttled during rapid scroll events", "A11Y_DIAGNOSTIC_MIN_WRITE_MS=2_000L" in service and "a11yDiagnosticPublishScheduled" in snapshot_writer),
     ("the existing SQLite diagnostics channel is used", 'setDiagnosticState("a11y_intake"' in snapshot_writer and "SharedPreferences are process-local caches" in market),
     ("the snapshot includes event, parse and analysis freshness", all(k in snapshot_writer for k in ("eventAt=", "cardsParsedTotal=", "analysisBatches=", "localAnalysisLastBatchAt="))),
     ("completed Accessibility parses publish updated counters", scan_publish > scan_counter_write),
