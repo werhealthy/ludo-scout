@@ -1,5 +1,11 @@
 # Ludo Scout — AI handoff
 
+## 5.12.58 — Alternate-title Vinted photo proof
+- The linker records whether title confidence came from the observed Vinted title or an exact canonical BGG title after removing the known brand.
+- Canonical-only matches require the observed exact price and thumbnail similarity of at least 0.84, and they cannot use the catalogue fast path: the public item page is still verified.
+- Photo evidence now runs for a single strong candidate as well as ambiguous candidate sets.
+- No BGG rating, price-opportunity or catalog-publication threshold changed.
+
 ## 5.12.57 — Engine UI clarity
 - Motore overview now exposes the current scroll as a five-stage funnel: unique Vinted cards, eligible games, BGG-confirmed games rated 6+, exact Vinted links and Catalog-ready results.
 - The hero uses a descriptive working/completed state instead of the ambiguous processed fraction. Cyan means automatic work is still progressing; orange is reserved for human decisions.
