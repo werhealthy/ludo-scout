@@ -58,7 +58,7 @@ public final class VintedLinkResolver {
         public List<SellerBundleScanner.SellerItem> sellerSnapshot=new ArrayList<>();
     }
     private static final class Candidate{
-        String id,title,url,brand,photo,sellerId,sellerName,photosCsv,snapshotParser,publishedLabel,detailsText; List<SellerBundleScanner.SellerItem> sellerSnapshot=new ArrayList<>(); double price=Double.NaN,total=Double.NaN,photoSimilarity=Double.NaN; int favorites=-1,score; Integer catalogId; boolean brandMatch,favMatch,sold,catalogStructured;
+        String id,title,url,brand,photo,sellerId,sellerName,photosCsv,snapshotParser,publishedLabel,detailsText; List<SellerBundleScanner.SellerItem> sellerSnapshot=new ArrayList<>(); double price=Double.NaN,total=Double.NaN,photoSimilarity=Double.NaN; int favorites=-1,score; Integer catalogId; boolean brandMatch,favMatch,sold,catalogStructured,observedTitleMatch,canonicalTitleMatch;
     }
 
     public VintedLinkResolver(Context c){context=c.getApplicationContext();session=new VintedPublicSession(c);}
@@ -128,14 +128,17 @@ public final class VintedLinkResolver {
         Candidate best=ranked.get(0);int second=ranked.size()>1?ranked.get(1).score:0;
         if(cb!=null){List<CandidateOption> options=new ArrayList<>();for(int i=0;i<Math.min(6,ranked.size());i++)options.add(toOption(ranked.get(i)));cb.onCandidates(d.signature,options);}
         diag().edit().putInt("linkBestScore",best.score).putInt("linkSecondScore",second).putString("linkBestTitle",safe(best.title)).apply();
-        boolean unique=best.score>=90 && (best.score-second>=12 || ranked.size()==1);
+        boolean canonicalOnly=best.canonicalTitleMatch&&!best.observedTitleMatch;
+        boolean exactObservedPrice=exactObservedPrice(d,best);
+        boolean canonicalProof=!canonicalOnly||(exactObservedPrice&&best.photoSimilarity>=.84);
+        boolean unique=best.score>=90 && (best.score-second>=12 || ranked.size()==1) && canonicalProof;
         if(!unique)return null;
 
         // The catalog page can already carry Vinted's structured item object. If one item is
         // uniquely identified by title + exact price, keep that identity immediately instead of
         // spending a second public request only to rediscover the same id/url. Optional metadata
         // is moved to a low-priority deep phase and never blocks the core queue.
-        if(best.catalogStructured && best.score>=92){
+        if(!canonicalOnly&&best.catalogStructured && best.score>=92){
             Result fast=resultFromCandidate(d,best,best.score,"Vinted catalog · identità ad alta confidenza");
             fast.catalogFastPath=true;
             fast.needsDeepMetadata=TextUtils.isEmpty(best.sellerId)||TextUtils.isEmpty(best.photo)||TextUtils.isEmpty(best.publishedLabel);
@@ -220,7 +223,9 @@ public final class VintedLinkResolver {
 
 
     private void applyPhotoEvidence(DealRecord d,List<Candidate> ranked){
-        if(d==null||ranked==null||ranked.size()<2||TextUtils.isEmpty(d.signature))return;
+        if(d==null||ranked==null||ranked.isEmpty()||TextUtils.isEmpty(d.signature))return;
+        boolean singleCanonicalOnly=ranked.size()==1&&ranked.get(0).canonicalTitleMatch&&!ranked.get(0).observedTitleMatch;
+        if(ranked.size()<2&&!singleCanonicalOnly)return;
         java.io.File observed=ThumbnailStore.fileFor(context,d.signature);if(!observed.exists()||observed.length()<2048)return;
         int compared=0;double best=Double.NaN;
         // Compare only the strongest textual candidates. This keeps image traffic bounded and never
@@ -315,7 +320,9 @@ public final class VintedLinkResolver {
     private static String visibleHtmlSample(String html){String sample=boundedHtmlSample(html,600_000);return sample.replaceAll("(?is)<script\\b[^>]*>.*?</script>"," ").replaceAll("(?is)<style\\b[^>]*>.*?</style>"," ").replaceAll("(?s)<[^>]+>"," ").replace("&nbsp;"," ").replace("&middot;"," · ").replaceAll("\\s+"," ");}
 
     private int score(DealRecord d,Candidate c){
-        String a=norm(d.vintedTitle),b=norm(c.title);int s=0;if(a.equals(b))s+=60;else{double j=jaccard(a,b);if(j>=.92)s+=50;else if(j>=.82)s+=40;else if(j>=.68)s+=26;else return 0;}
+        String observed=norm(d.vintedTitle),candidate=norm(c.title);int observedScore=observedTitleScore(observed,candidate);
+        String canonicalCandidate=titleWithoutKnownBrand(c.title,d.brand);boolean canonicalExact=canonicalTitleExact(d.displayName,canonicalCandidate)||canonicalTitleExact(d.gameName,canonicalCandidate);int canonicalScore=canonicalExact?60:0;
+        c.observedTitleMatch=observedScore>0;c.canonicalTitleMatch=canonicalExact;int s=Math.max(observedScore,canonicalScore);if(s<=0)return 0;
         if(!Double.isNaN(c.price)){int pc=(int)Math.round(c.price*100);int diff=Math.abs(pc-d.itemPriceCents);if(diff<=1)s+=32;else if(diff<=5)s+=26;else if(diff<=20)s+=10;else return 0;}
         if(!TextUtils.isEmpty(d.brand)&&!TextUtils.isEmpty(c.brand)){double j=jaccard(norm(d.brand),norm(c.brand));if(j>=.90){s+=14;c.brandMatch=true;}else if(j>=.62)s+=6;}
         if(d.favorites!=null&&c.favorites>=0&&Math.abs(d.favorites-c.favorites)<=1){s+=7;c.favMatch=true;}
@@ -325,6 +332,11 @@ public final class VintedLinkResolver {
         if(!TextUtils.isEmpty(d.sellerId)&&!TextUtils.isEmpty(c.sellerId)&&d.sellerId.equals(c.sellerId))s+=30;
         return s;
     }
+
+    private static int observedTitleScore(String observed,String candidate){if(observed.equals(candidate)&&!observed.isEmpty())return 60;double j=jaccard(observed,candidate);if(j>=.92)return 50;if(j>=.82)return 40;if(j>=.68)return 26;return 0;}
+    private static boolean canonicalTitleExact(String canonical,String candidateWithoutBrand){String c=norm(canonical);return !c.isEmpty()&&c.equals(candidateWithoutBrand);}
+    private static String titleWithoutKnownBrand(String title,String brand){String t=norm(title),b=norm(brand);if(t.isEmpty()||b.isEmpty())return t;java.util.Set<String> remove=new java.util.HashSet<>(java.util.Arrays.asList(b.split(" ")));StringBuilder out=new StringBuilder();for(String token:t.split(" ")){if(remove.contains(token))continue;if(out.length()>0)out.append(' ');out.append(token);}return out.toString();}
+    private static boolean exactObservedPrice(DealRecord d,Candidate c){return d!=null&&c!=null&&!Double.isNaN(c.price)&&Math.abs((int)Math.round(c.price*100)-d.itemPriceCents)<=1;}
 
     // Current Vinted Italy board-game catalog ids. Category is a strong negative signal when
     // present, but never the only positive signal because sellers can miscategorise items even inside
