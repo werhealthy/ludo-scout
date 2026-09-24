@@ -2088,7 +2088,10 @@ public final class MarketStore {
             "SUM(CASE WHEN "+core+" THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN "+fresh+" THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN "+fresh+" AND l.enrichment_state='PENDING_ANALYSIS' THEN 1 ELSE 0 END),"+
-            "SUM(CASE WHEN "+fresh+" AND COALESCE(l.enrichment_state,'')<>'PENDING_ANALYSIS' AND NOT("+trusted+") THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN "+fresh+" AND l.enrichment_state='BLOCKED_CLASSIFIER' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN "+fresh+" AND COALESCE(g.match_state,l.match_state,'')='TYPE_UNVERIFIED' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN "+fresh+" AND COALESCE(g.match_state,l.match_state,'')='BGG_MATCH_REVIEW' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN "+fresh+" AND COALESCE(l.enrichment_state,'') NOT IN ('PENDING_ANALYSIS','BLOCKED_CLASSIFIER') AND COALESCE(g.match_state,l.match_state,'') NOT IN ('TYPE_UNVERIFIED','BGG_MATCH_REVIEW') AND NOT("+trusted+") THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN "+fresh+" AND "+trusted+" AND g.rating IS NULL THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN "+fresh+" AND "+trusted+" AND g.rating<6.0 THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN "+fresh+" AND "+trusted+" AND g.rating>=6.0 AND g.database_visible=0 THEN 1 ELSE 0 END),"+
@@ -2105,12 +2108,14 @@ public final class MarketStore {
             return "active="+c.getInt(0)+";pendingAnalysis="+c.getInt(1)+";bggQualified="+c.getInt(2)+
                 ";localOnly="+c.getInt(3)+";deferredLink="+c.getInt(4)+";exactVintedLink="+c.getInt(5)+
                 ";coreQualified="+c.getInt(6)+";firstSeenListings24h="+c.getInt(7)+
-                ";firstSeenPendingAnalysis24h="+c.getInt(8)+";firstSeenBggUnmatched24h="+c.getInt(9)+
-                ";firstSeenBggRatingPending24h="+c.getInt(10)+";firstSeenBggBelow6_24h="+c.getInt(11)+
-                ";firstSeenBggHidden24h="+c.getInt(12)+";firstSeenBggQualified24h="+c.getInt(13)+
-                ";firstSeenVintedLinkPending24h="+c.getInt(14)+";firstSeenExactVintedLink24h="+c.getInt(15)+
-                ";firstSeenManualReview24h="+c.getInt(16)+";firstSeenLocalOnly24h="+c.getInt(17)+
-                ";firstSeenDeferredLink24h="+c.getInt(18)+";firstSeenCoreQualified24h="+c.getInt(19);
+                ";firstSeenPendingAnalysis24h="+c.getInt(8)+";firstSeenClassifierBlocked24h="+c.getInt(9)+
+                ";firstSeenProductTypeUnverified24h="+c.getInt(10)+";firstSeenBggMatchReview24h="+c.getInt(11)+
+                ";firstSeenBggUnmatched24h="+c.getInt(12)+";firstSeenBggRatingPending24h="+c.getInt(13)+
+                ";firstSeenBggBelow6_24h="+c.getInt(14)+";firstSeenBggHidden24h="+c.getInt(15)+
+                ";firstSeenBggQualified24h="+c.getInt(16)+";firstSeenVintedLinkPending24h="+c.getInt(17)+
+                ";firstSeenExactVintedLink24h="+c.getInt(18)+";firstSeenManualReview24h="+c.getInt(19)+
+                ";firstSeenLocalOnly24h="+c.getInt(20)+";firstSeenDeferredLink24h="+c.getInt(21)+
+                ";firstSeenCoreQualified24h="+c.getInt(22);
         }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
     }
 

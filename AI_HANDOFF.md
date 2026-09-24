@@ -2,7 +2,7 @@
 
 ## 5.12.55 — Diagnostic funnel and process-exit reasons
 - The 5.12.54 Pixel sample proved fresh accessibility intake: Vinted events, parsed cards and stored analyses increased. The legacy funnel did not identify the reasons new active listings failed later gates.
-- `catalogPipeline` now adds first-seen active listing counts for the last 24 hours across analysis, BGG match, rating, visibility, exact Vinted identity, review and core publication eligibility. These are listing/fingerprint counts, not unique games, and later-stage counts can overlap.
+- `catalogPipeline` now adds first-seen active listing counts for the last 24 hours across pending analysis, classifier blocks, uncertain product type, ambiguous or absent BGG identity, rating, visibility, exact Vinted identity, review and core publication eligibility. These are listing/fingerprint counts, not unique games, and later-stage counts can overlap.
 - Android exit diagnostics now separate `REASON_LOW_MEMORY` from `REASON_EXCESSIVE_RESOURCE_USAGE`. Previous `memory*` counters combined both causes, so historical values included CPU-resource terminations.
 - Diagnostic-only change; it does not relax product, rating, identity, pricing or publication gates. Pixel validation is still required.
 

@@ -7,7 +7,7 @@ method = market[market.index("public String catalogPipelineFunnel()"):market.ind
 
 checks = [
     ("24h funnel uses first-seen listing rows, not repeat observations", "l.first_seen>=" in method and "firstSeenListings24h=" in method),
-    ("funnel separates analysis pending from unmatched BGG identity", "firstSeenPendingAnalysis24h=" in method and "firstSeenBggUnmatched24h=" in method),
+    ("funnel separates pending, classifier blocks, uncertain product type, and BGG review", "firstSeenPendingAnalysis24h=" in method and "firstSeenClassifierBlocked24h=" in method and "firstSeenProductTypeUnverified24h=" in method and "firstSeenBggMatchReview24h=" in method and "firstSeenBggUnmatched24h=" in method),
     ("funnel distinguishes missing, low, and hidden BGG ratings", "firstSeenBggRatingPending24h=" in method and "firstSeenBggBelow6_24h=" in method and "firstSeenBggHidden24h=" in method),
     ("funnel exposes exact-link and publication outcomes", "firstSeenVintedLinkPending24h=" in method and "firstSeenExactVintedLink24h=" in method and "firstSeenCoreQualified24h=" in method),
     ("funnel marks review and local/deferred holds", "firstSeenManualReview24h=" in method and "firstSeenLocalOnly24h=" in method and "firstSeenDeferredLink24h=" in method),
