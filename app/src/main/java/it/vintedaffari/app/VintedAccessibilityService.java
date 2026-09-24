@@ -257,12 +257,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             SharedPreferences p=diag();long delta=pendingVintedEventDiag;pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
             long eventTotal=p.getLong("vintedEvents",0)+delta;int eventType=event.getEventType();
             p.edit().putLong("vintedEvents",eventTotal).putLong("lastEventAt",eventNow).putInt("lastEventType",eventType).apply();
-            queueA11yDiagnosticSnapshot("build=a11y-intake-v1;eventAt="+eventNow+";eventType="+eventType+
-                    ";vintedEvents="+eventTotal+";scans="+p.getLong("scans",0)+
-                    ";lastCardsParsed="+p.getInt("lastCardsParsed",0)+";cardsParsedTotal="+p.getLong("cardsParsedTotal",0)+
-                    ";analysisBatches="+p.getLong("analysisBatches",0)+";localAnalysisLastBatchAt="+p.getLong("localAnalysisLastBatchAt",0)+
-                    ";localAnalysisLastBatchSize="+p.getInt("localAnalysisLastBatchSize",0)+";analysesStored="+p.getLong("analysesStored",0)+
-                    ";classifierBlocked="+p.getLong("classifierBlocked",0));
+            publishA11yDiagnosticSnapshot();
         }
 
         int type = event.getEventType();lastVintedEventAt=eventNow;
@@ -279,6 +274,17 @@ public final class VintedAccessibilityService extends AccessibilityService {
      * Mirror a coalesced intake snapshot through MarketStore's existing SQLite diagnostics channel.
      * The write runs off the Accessibility callback and failures never affect observation.
      */
+    private void publishA11yDiagnosticSnapshot() {
+        SharedPreferences p=diag();long eventAt=p.getLong("lastEventAt",0L);if(eventAt<=0L)return;
+        String payload="build=a11y-intake-v1;eventAt="+eventAt+";eventType="+p.getInt("lastEventType",0)+
+                ";vintedEvents="+p.getLong("vintedEvents",0)+";scans="+p.getLong("scans",0)+
+                ";lastCardsParsed="+p.getInt("lastCardsParsed",0)+";cardsParsedTotal="+p.getLong("cardsParsedTotal",0)+
+                ";analysisBatches="+p.getLong("analysisBatches",0)+";localAnalysisLastBatchAt="+p.getLong("localAnalysisLastBatchAt",0)+
+                ";localAnalysisLastBatchSize="+p.getInt("localAnalysisLastBatchSize",0)+";analysesStored="+p.getLong("analysesStored",0)+
+                ";classifierBlocked="+p.getLong("classifierBlocked",0);
+        queueA11yDiagnosticSnapshot(payload);
+    }
+
     private void queueA11yDiagnosticSnapshot(String snapshot) {
         pendingA11yDiagnosticSnapshot=snapshot;
         scheduleA11yDiagnosticFlush();
@@ -422,6 +428,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 .putInt("lastCardsParsed", discovered.size())
                 .putLong("cardsParsedTotal", p.getLong("cardsParsedTotal", 0) + discovered.size())
                 .apply();
+        publishA11yDiagnosticSnapshot();
         if (discovered.isEmpty()) return;
         // Feed screenshots were an optional visual tie-break, but each capture allocates a full
         // framebuffer. Under a 150–250 card scroll that is unsafe after an OOM/ANR report.
@@ -570,6 +577,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         .apply();
                 diag().edit().putLong("localAnalysisLastBatchAt",System.currentTimeMillis())
                         .putInt("localAnalysisLastBatchSize",count).apply();
+                publishA11yDiagnosticSnapshot();
                 analysisBatchInFlight=false;
                 sendBroadcast(new android.content.Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
                 handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,1_500L);
@@ -579,6 +587,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 analysisBatchInFlight=false;
                 String safe = message == null ? "Errore analisi" : message;
                 diag().edit().putString("lastError", safe).apply();
+                publishA11yDiagnosticSnapshot();
                 Log.e(TAG, safe);
                 handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,2_000L);
             }
