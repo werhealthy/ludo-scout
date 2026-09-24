@@ -1,5 +1,12 @@
 # Ludo Scout — AI handoff
 
+## 5.12.57 — Engine UI clarity
+- Motore overview now exposes the current scroll as a five-stage funnel: unique Vinted cards, eligible games, BGG-confirmed games rated 6+, exact Vinted links and Catalog-ready results.
+- The hero uses a descriptive working/completed state instead of the ambiguous processed fraction. Cyan means automatic work is still progressing; orange is reserved for human decisions.
+- Manual-review cases are explicitly separate from automatic processing and do not imply that the whole engine is blocked.
+- The funnel reuses EngineOverviewSnapshot fields already loaded on uiDataIo; it adds no direct SQLite reads to rendering.
+- This change improves truth and comprehension only. It does not loosen identity, rating, price or publication gates. Pixel visual validation is required.
+
 ## 5.12.55 — Diagnostic funnel and process-exit reasons
 - The 5.12.54 Pixel sample proved fresh accessibility intake: Vinted events, parsed cards and stored analyses increased. The legacy funnel did not identify the reasons new active listings failed later gates.
 - `catalogPipeline` now adds first-seen active listing counts for the last 24 hours across pending analysis, classifier blocks, uncertain product type, ambiguous or absent BGG identity, rating, visibility, exact Vinted identity, review and core publication eligibility. These are listing/fingerprint counts, not unique games, and later-stage counts can overlap.

@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.57 — Motore leggibile per scroll (2026-09-24)
+
+- La schermata Motore mostra il percorso dello scroll con cinque conteggi espliciti: card Vinted uniche, giochi idonei, BGG confermati con voto almeno 6, annunci Vinted collegati e risultati entrati nel Catalogo.
+- Lo stato principale usa parole descrittive al posto della frazione ambigua “elaborati”. Il colore azzurro indica lavoro automatico in corso; arancione resta riservato ai casi che richiedono una scelta.
+- I casi manuali sono dichiarati separati dal lavoro automatico: non fanno apparire l’intero Motore bloccato.
+- La UI riusa lo snapshot già caricato in background e non aggiunge letture SQLite sul thread principale.
+
 ## 5.12.55 — Funnel diagnostico per nuove inserzioni (2026-09-24)
 
 - Il report separa le uscite Android per memoria bassa da quelle per uso eccessivo di risorse CPU. I vecchi contatori memoria includevano entrambe le cause e non vanno confrontati direttamente con i nuovi.
