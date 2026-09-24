@@ -1,5 +1,11 @@
 # Ludo Scout — Changelog
 
+## 5.12.58 — Titoli alternativi Vinted con prova fotografica (2026-09-24)
+
+- Il collegamento Vinted può riconoscere il nome BGG esatto anche quando il titolo osservato usa una traduzione o un nome alternativo.
+- Questo percorso automatico richiede prezzo identico e similarità fotografica almeno dell’84%, quindi verifica comunque la pagina pubblica Vinted.
+- In assenza di uno dei tre segnali il risultato resta incerto: non vengono ridotte le soglie generali e non viene pubblicato un match dubbio.
+
 ## 5.12.57 — Motore leggibile per scroll (2026-09-24)
 
 - La schermata Motore mostra il percorso dello scroll con cinque conteggi espliciti: card Vinted uniche, giochi idonei, BGG confermati con voto almeno 6, annunci Vinted collegati e risultati entrati nel Catalogo.
