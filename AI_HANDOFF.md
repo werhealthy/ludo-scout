@@ -1,5 +1,10 @@
 # Ludo Scout — AI handoff
 
+## 5.12.60 — Authoritative Vinted miss breakdown
++- Debug derives a mutually exclusive breakdown for every active listing without a Vinted URL directly from shared SQLite state.
++- `notBggQualified` is kept separate from eligible Vinted outcomes; eligible categories reconcile exactly to queued, awaiting attempt, no candidate, ambiguous, weak match, unavailable, throttled, verification failed and other.
++- This is diagnostic-only: no matcher threshold, queue behavior, network budget or publication gate changes.
+
 ## 5.12.59 — Startup processing-lease recovery
 - A freshly created QueueKeepAliveService now reopens every inherited PROCESSING lease before reconciliation. No in-memory worker from the previous killed process can still own those rows.
 - Recovery preserves attempts, source, priority, listing identity and backlog; rows become FAILED_RETRYABLE instead of being deleted.
