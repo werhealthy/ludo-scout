@@ -13,7 +13,7 @@ checks = [
     ("journal uses one file per process", "process_crash_journal" in journal and '"crash-"+process+".txt"' in journal),
     ("crash write is bounded and synchronous", "stack.length()>7000" in journal and "fos.getFD().sync()" in journal),
     ("Android exit history queried on API 30+", "getHistoricalProcessExitReasons" in journal and "Build.VERSION.SDK_INT<30" in journal),
-    ("exit summary distinguishes crash/anr/memory", "crash24h=" in journal and "anr24h=" in journal and "memory24h=" in journal),
+    ("exit summary distinguishes crash/anr/memory/resource", "crash24h=" in journal and "anr24h=" in journal and "memory24h=" in journal and "resource24h=" in journal and "resourceAfterInstall=" in journal),
     ("diagnostics expose process journal", "processCrashJournal={" in diag),
     ("diagnostics expose system exit history", "systemExitHistory={" in diag),
 ]

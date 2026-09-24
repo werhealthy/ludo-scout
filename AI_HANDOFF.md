@@ -1,5 +1,11 @@
 # Ludo Scout — AI handoff
 
+## 5.12.55 — Diagnostic funnel and process-exit reasons
+- The 5.12.54 Pixel sample proved fresh accessibility intake: Vinted events, parsed cards and stored analyses increased. The legacy funnel did not identify the reasons new active listings failed later gates.
+- `catalogPipeline` now adds first-seen active listing counts for the last 24 hours across pending analysis, classifier blocks, uncertain product type, ambiguous or absent BGG identity, rating, visibility, exact Vinted identity, review and core publication eligibility. These are listing/fingerprint counts, not unique games, and later-stage counts can overlap.
+- Android exit diagnostics now separate `REASON_LOW_MEMORY` from `REASON_EXCESSIVE_RESOURCE_USAGE`. Previous `memory*` counters combined both causes, so historical values included CPU-resource terminations.
+- Diagnostic-only change; it does not relax product, rating, identity, pricing or publication gates. Pixel validation is still required.
+
 ## 5.12.51 — Remote fairness and conversion funnel
 - 5.12.50 user debug showed oldest active run ~44 hours old with 14 waiting runs and ~24 core remaining; fairness was only 27s into a ten-minute slice after process restart. All 12,816 parsed cards had zero explicit Vinted IDs captured by Accessibility. Request ledger roughly 12.86 physical requests per linked item. Thus exact-link lookup is a hard publish bottleneck.
 - Important timing distinction: `lastVintedEventAgeMs` ~6,141,848 ms on a 5.12.50 build with `radarService.ageMs` ~747,194 ms means the reported counters predated that installation. No new Vinted scroll after install was established.

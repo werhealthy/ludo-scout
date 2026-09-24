@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.55 — Funnel diagnostico per nuove inserzioni (2026-09-24)
+
+- Il report separa le uscite Android per memoria bassa da quelle per uso eccessivo di risorse CPU. I vecchi contatori memoria includevano entrambe le cause e non vanno confrontati direttamente con i nuovi.
+- Il funnel Motore aggiunge il percorso delle inserzioni attive viste per la prima volta nelle ultime 24 ore: analisi in attesa, blocchi del classificatore, tipo prodotto incerto, match BGG ambiguo o assente, rating mancante o sotto 6, voce BGG nascosta, collegamento Vinted esatto e qualificazione finale.
+- Le metriche recenti contano inserzioni/fingerprint, non giochi distinti; restano conteggi di stato e possono sovrapporsi dopo la qualificazione.
+- Modifica solo diagnostica: non cambia selezione, rating minimo, collegamenti, pubblicazione né database.
+
 ## 5.12.52 — Recupero da categoria Vinted esplicita (2026-09-23)
 
 - Un match BGG poteva nascondere un gioco come `TYPE_UNVERIFIED` quando la card Accessibility non conteneva una prova positiva del prodotto. L'apertura successiva della pagina Vinted salvava la categoria strutturata, ma non riapriva il caso.
