@@ -48,8 +48,9 @@ checks = [
      "canonicalTitleExact" in resolver and "titleWithoutKnownBrand" in resolver),
     ("candidate records observed and canonical title provenance",
      "observedTitleMatch" in resolver and "canonicalTitleMatch" in resolver),
-    ("one strong candidate still receives photo evidence",
-     "ranked.size()<2" not in photo_block and "ranked.isEmpty()" in photo_block),
+    ("one canonical-only candidate receives photo evidence without taxing ordinary single matches",
+     "singleCanonicalOnly" in photo_block and
+     "ranked.get(0).canonicalTitleMatch&&!ranked.get(0).observedTitleMatch" in photo_block),
     ("canonical-only identity requires exact price and strong photo proof",
      "canonicalOnly" in resolver and "exactObservedPrice" in resolver and "photoSimilarity>=.84" in resolver),
     ("canonical-only identity cannot use the unverified catalogue fast path",
