@@ -1,5 +1,11 @@
 # Ludo Scout — Changelog
 
+## 5.12.59 — Ripresa immediata dopo aggiornamento (2026-09-24)
+
+- Una nuova istanza del servizio libera subito i job rimasti `PROCESSING` dal processo precedente e li rende nuovamente eseguibili.
+- Tentativi, priorità, sorgente, annunci e osservazioni vengono conservati; non viene eliminato alcun backlog.
+- Il watchdog dei job bloccati durante lo stesso avvio resta attivo.
+
 ## 5.12.58 — Titoli alternativi Vinted con prova fotografica (2026-09-24)
 
 - Il collegamento Vinted può riconoscere il nome BGG esatto anche quando il titolo osservato usa una traduzione o un nome alternativo.
