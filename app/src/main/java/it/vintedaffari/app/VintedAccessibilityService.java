@@ -50,6 +50,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private static final String VINTED_PACKAGE = "fr.vinted";
     private static final String PREFS_DIAG = "va_v3_diag";
     private static final long SCAN_DEBOUNCE_MS = 70;
+    private static final long A11Y_DIAGNOSTIC_MIN_WRITE_MS=2_000L;
     // Accessibility can emit the same visible Compose cards repeatedly on focus/window changes.
     // Keep a generous in-process guard so returning to Vinted does not manufacture another Motore job
     // from the exact same title/brand/price rows. A changed price changes the signature and is fresh.
@@ -83,6 +84,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private final ExecutorService diagnosticIo=Executors.newSingleThreadExecutor();
     private final AtomicBoolean a11yDiagnosticFlushQueued=new AtomicBoolean(false);
     private volatile String pendingA11yDiagnosticSnapshot=null;
+    private long lastA11yDiagnosticPublishAt=0L;
+    private boolean a11yDiagnosticPublishScheduled=false;
     private volatile boolean marketJobInFlight=false;
     private volatile boolean analysisBatchInFlight=false;
     private BundleDatabase bundleDatabase;
@@ -274,7 +277,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
      * Mirror a coalesced intake snapshot through MarketStore's existing SQLite diagnostics channel.
      * The write runs off the Accessibility callback and failures never affect observation.
      */
-    private void publishA11yDiagnosticSnapshot() {
+    private synchronized void publishA11yDiagnosticSnapshot() {
+        long now=System.currentTimeMillis();long wait=A11Y_DIAGNOSTIC_MIN_WRITE_MS-(now-lastA11yDiagnosticPublishAt);
+        if(lastA11yDiagnosticPublishAt>0L&&wait>0L){
+            if(!a11yDiagnosticPublishScheduled){a11yDiagnosticPublishScheduled=true;handler.postDelayed(()->{synchronized(VintedAccessibilityService.this){a11yDiagnosticPublishScheduled=false;}publishA11yDiagnosticSnapshot();},wait);}
+            return;
+        }
+        lastA11yDiagnosticPublishAt=now;
         SharedPreferences p=diag();long eventAt=p.getLong("lastEventAt",0L);if(eventAt<=0L)return;
         String payload="build=a11y-intake-v1;eventAt="+eventAt+";eventType="+p.getInt("lastEventType",0)+
                 ";vintedEvents="+p.getLong("vintedEvents",0)+";scans="+p.getLong("scans",0)+
