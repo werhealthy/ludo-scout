@@ -43,6 +43,32 @@ public final class MarketStore {
     public static final String FAILED_PERMANENT = "FAILED_PERMANENT";
     public static final String COMPLETE = "COMPLETE";
     private static final String TAG = "LudoPipeline";
+    private static final String VINTED_MISSING_BREAKDOWN_SQL =
+            "SELECT COUNT(*),"+
+            "SUM(CASE WHEN stage='notBggQualified' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage<>'notBggQualified' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='queued' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='awaitingAttempt' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='noCandidate' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='ambiguous' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='weakMatch' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='unavailable' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='throttled' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='verificationFailed' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='other' THEN 1 ELSE 0 END) FROM ("+
+            "SELECT CASE "+
+            "WHEN g.id IS NULL OR g.bgg_id IS NULL OR g.bgg_id='' OR COALESCE(g.match_state,'')<>'MATCHED' OR g.rating IS NULL OR g.rating<6.0 OR COALESCE(g.database_visible,0)<>1 THEN 'notBggQualified' "+
+            "WHEN COALESCE(j.state,'') IN ('PENDING','PROCESSING') THEN 'queued' "+
+            "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%429%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%403%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%cooldown%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%limitato temporaneamente%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%budget pubblico%' THEN 'throttled' "+
+            "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%nessun annuncio compatibile%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%nessun candidato%' THEN 'noCandidate' "+
+            "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%più annunci compatibili%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%ambigu%' THEN 'ambiguous' "+
+            "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%non corrispondono abbastanza%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%titolo e prezzo%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%score%' THEN 'weakMatch' "+
+            "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%404%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%pagina vinted non disponibile%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%non più pubblico%' THEN 'unavailable' "+
+            "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%metadati%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%non supera la verifica%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%dettagli non sono disponibili%' THEN 'verificationFailed' "+
+            "WHEN COALESCE(NULLIF(j.last_error,''),l.last_error,'')='' THEN 'awaitingAttempt' ELSE 'other' END AS stage "+
+            "FROM market_listings l LEFT JOIN games g ON g.id=l.game_id "+
+            "LEFT JOIN processing_jobs j ON j.id=(SELECT j2.id FROM processing_jobs j2 WHERE j2.listing_id=l.id AND j2.job_type IN ('VINTED_ENRICHMENT','VINTED_DEEP_ENRICHMENT') ORDER BY j2.updated_at DESC,j2.id DESC LIMIT 1) "+
+            "WHERE l.lifecycle='ACTIVE' AND (l.vinted_url IS NULL OR l.vinted_url=''))";
     private static final String QUEUE_PREFS = "ludo_market_queue_controls";
     private static final String KEY_HISTORY_PAUSED = "history_paused";
     private static final String KEY_VINTED_PAUSED = "vinted_paused";
@@ -2705,6 +2731,12 @@ public final class MarketStore {
     }
 
     public int missingVintedCoreCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='')",null)){return c.moveToFirst()?c.getInt(0):0;}}
+    public String vintedMissingBreakdown(){
+        try(Cursor c=helper.getReadableDatabase().rawQuery(VINTED_MISSING_BREAKDOWN_SQL,null)){
+            if(!c.moveToFirst())return"total=0";
+            return "total="+c.getInt(0)+"; notBggQualified="+c.getInt(1)+"; eligible="+c.getInt(2)+"; queued="+c.getInt(3)+"; awaitingAttempt="+c.getInt(4)+"; noCandidate="+c.getInt(5)+"; ambiguous="+c.getInt(6)+"; weakMatch="+c.getInt(7)+"; unavailable="+c.getInt(8)+"; throttled="+c.getInt(9)+"; verificationFailed="+c.getInt(10)+"; other="+c.getInt(11);
+        }
+    }
     public int partialVintedMetadataCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (published_label IS NULL OR published_label=''))",null)){return c.moveToFirst()?c.getInt(0):0;}}
 
     public List<Job> activeBggJobs(int limit){List<Job> out=new ArrayList<>();String sql="SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source,j.progress AS stored_progress,COALESCE(g.canonical_name,'') AS label,COALESCE(j.game_id,0) AS display_game_id,g.bgg_id,g.thumbnail_url,g.image_url,j.processing_started_at,j.progress AS progress FROM processing_jobs j JOIN games g ON g.id=j.game_id WHERE j.job_type=? AND j.state IN (?,?,?) ORDER BY CASE j.state WHEN 'PROCESSING' THEN 0 WHEN 'FAILED_RETRYABLE' THEN 1 ELSE 2 END,j.priority DESC,j.next_attempt_at ASC,j.created_at ASC LIMIT ?";try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{JOB_BGG,PENDING,PROCESSING,FAILED_RETRYABLE,String.valueOf(Math.max(1,limit))})){while(c.moveToNext())out.add(readJob(c));}return out;}
