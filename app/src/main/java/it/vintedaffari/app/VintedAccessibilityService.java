@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -79,6 +80,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private BggEnricher bggEnricher;
     private MarketStore marketStore;
     private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();
+    private final ExecutorService diagnosticIo=Executors.newSingleThreadExecutor();
+    private final AtomicBoolean a11yDiagnosticFlushQueued=new AtomicBoolean(false);
+    private volatile String pendingA11yDiagnosticSnapshot=null;
     private volatile boolean marketJobInFlight=false;
     private volatile boolean analysisBatchInFlight=false;
     private BundleDatabase bundleDatabase;
@@ -251,7 +255,14 @@ public final class VintedAccessibilityService extends AccessibilityService {
         long eventNow=System.currentTimeMillis();pendingVintedEventDiag++;
         if(lastVintedEventDiagFlushAt==0L||eventNow-lastVintedEventDiagFlushAt>=2_000L||pendingVintedEventDiag>=64L){
             SharedPreferences p=diag();long delta=pendingVintedEventDiag;pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
-            p.edit().putLong("vintedEvents",p.getLong("vintedEvents",0)+delta).putLong("lastEventAt",eventNow).putInt("lastEventType",event.getEventType()).apply();
+            long eventTotal=p.getLong("vintedEvents",0)+delta;int eventType=event.getEventType();
+            p.edit().putLong("vintedEvents",eventTotal).putLong("lastEventAt",eventNow).putInt("lastEventType",eventType).apply();
+            queueA11yDiagnosticSnapshot("build=a11y-intake-v1;eventAt="+eventNow+";eventType="+eventType+
+                    ";vintedEvents="+eventTotal+";scans="+p.getLong("scans",0)+
+                    ";lastCardsParsed="+p.getInt("lastCardsParsed",0)+";cardsParsedTotal="+p.getLong("cardsParsedTotal",0)+
+                    ";analysisBatches="+p.getLong("analysisBatches",0)+";localAnalysisLastBatchAt="+p.getLong("localAnalysisLastBatchAt",0)+
+                    ";localAnalysisLastBatchSize="+p.getInt("localAnalysisLastBatchSize",0)+";analysesStored="+p.getLong("analysesStored",0)+
+                    ";classifierBlocked="+p.getLong("classifierBlocked",0));
         }
 
         int type = event.getEventType();lastVintedEventAt=eventNow;
@@ -261,6 +272,42 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
             scheduleScan(type == AccessibilityEvent.TYPE_VIEW_SCROLLED ? 0 : (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ? 20 : SCAN_DEBOUNCE_MS));
         }
+    }
+
+    /**
+     * SharedPreferences are process-local caches; :ui cannot reliably read the :radar copy.
+     * Mirror a coalesced intake snapshot through MarketStore's existing SQLite diagnostics channel.
+     * The write runs off the Accessibility callback and failures never affect observation.
+     */
+    private void queueA11yDiagnosticSnapshot(String snapshot) {
+        pendingA11yDiagnosticSnapshot=snapshot;
+        scheduleA11yDiagnosticFlush();
+    }
+
+    private void scheduleA11yDiagnosticFlush() {
+        if(!a11yDiagnosticFlushQueued.compareAndSet(false,true))return;
+        try{
+            diagnosticIo.execute(()->{
+                try{
+                    String snapshot;
+                    while((snapshot=pendingA11yDiagnosticSnapshot)!=null){
+                        pendingA11yDiagnosticSnapshot=null;
+                        try{MarketStore store=marketStore;if(store!=null)store.setDiagnosticState("a11y_intake",parseLongField(snapshot,"vintedEvents",0L),snapshot);}
+                        catch(Throwable t){Log.w(TAG,"Accessibility telemetry write skipped",t);}
+                    }
+                }finally{
+                    a11yDiagnosticFlushQueued.set(false);
+                    if(pendingA11yDiagnosticSnapshot!=null)scheduleA11yDiagnosticFlush();
+                }
+            });
+        }catch(RuntimeException rejected){a11yDiagnosticFlushQueued.set(false);}
+    }
+
+    private static long parseLongField(String payload,String key,long fallback){
+        if(TextUtils.isEmpty(payload)||TextUtils.isEmpty(key))return fallback;
+        String prefix=key+"=";
+        for(String part:payload.split(";"))if(part.startsWith(prefix))try{return Long.parseLong(part.substring(prefix.length()));}catch(NumberFormatException ignored){return fallback;}
+        return fallback;
     }
 
     private void scheduleScan(long delay) {
@@ -1622,6 +1669,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if (bundleScanner != null) bundleScanner.close();
         if (bundleDatabase != null) bundleDatabase.close();
         maintenanceIo.shutdownNow();
+        diagnosticIo.shutdownNow();
         super.onDestroy();
     }
 }
