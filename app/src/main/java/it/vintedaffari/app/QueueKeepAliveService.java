@@ -104,7 +104,7 @@ public final class QueueKeepAliveService extends Service {
         }
         try{resolver=new AutoLinkResolver(this);}catch(Throwable t){Log.w(TAG,"resolver init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:resolver",t);}
         try{bgg=new BggEnricher(this,db,market);bggMatcher=new BggSearchClient(this);}catch(Throwable t){Log.w(TAG,"bgg init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:bgg",t);}
-        try{market.resetStaleProcessingOlderThan(15*60_000L);market.reconcileQueue();lastReconcileAt=System.currentTimeMillis();}
+        try{market.resetStaleProcessing();market.reconcileQueue();lastReconcileAt=System.currentTimeMillis();}
         catch(Throwable t){Log.e(TAG,"queue reconcile startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:reconcile",t);}
         try{QueueWorkScheduler.ensureRecovery(this);}catch(Throwable t){Log.w(TAG,"recovery scheduler startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:recovery",t);}
         try{QueueJobRunner.sweepMissing(this,market);}catch(Throwable t){Log.w(TAG,"sweep startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:sweep",t);}
