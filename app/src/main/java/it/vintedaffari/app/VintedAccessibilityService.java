@@ -1429,6 +1429,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         int queueVinted=marketDiag.vintedActiveCount();
         int queueVintedCore=marketDiag.coreVintedActiveCount(),queueVintedDeep=marketDiag.deepMetadataActiveCount(),queueBgg=marketDiag.bggActiveCount(),queueBggBlocked=marketDiag.bggUnrunnableCount(),queueBggMatchRequired=marketDiag.bggMatchRequiredCount(),queueBggMatchReview=marketDiag.bggMatchReviewCount();
         int queueHistorical=marketDiag.historicalActiveCount(),queueMissingVinted=marketDiag.missingVintedCoreCount(),queuePartialVinted=marketDiag.partialVintedMetadataCount();
+        String queueMissingBreakdown=marketDiag.vintedMissingBreakdown();
         long queueNextDue=marketDiag.nextDueAt();
         boolean queueVintedPaused=marketDiag.isVintedPaused(),queueBggPaused=marketDiag.isBggPaused(),queueHistoricalPaused=marketDiag.isHistoricalPaused();
         long vintedLaneHeartbeat=marketDiag.laneHeartbeatAt("vinted"),bggLaneHeartbeat=marketDiag.laneHeartbeatAt("bgg");
@@ -1675,6 +1676,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "persistentJobs={PENDING="+queueSummary.pending+", PROCESSING="+queueSummary.processing+", FAILED_RETRYABLE="+queueSummary.retryable+", FAILED_PERMANENT="+queueSummary.permanent+"}\n"+
                 "queueRunnable={vinted="+queueVintedDue+", bgg="+queueBggDue+", total="+queueDueNow+"}; nextDueAt="+queueNextDue+"; vintedActive="+queueVinted+"; vintedCore="+queueVintedCore+"; vintedDeep="+queueVintedDeep+"; bggActive="+queueBgg+"; bggUnrunnable="+queueBggBlocked+"; bggMatchRequired="+queueBggMatchRequired+"; bggMatchReview="+queueBggMatchReview+"; historicalActive="+queueHistorical+"; vintedPaused="+queueVintedPaused+"; bggPaused="+queueBggPaused+"; historicalPaused="+queueHistoricalPaused+"\n"+                "vintedUrgent={active="+queueUrgentVinted+", due="+queueUrgentVintedDue+", nextDueAt="+queueUrgentNext+", reserveUntil="+queueUrgentReserve+"}\n"+
                 "vintedData={missingLink="+queueMissingVinted+", partialMetadata="+queuePartialVinted+"}\n"+
+                "vintedMissingBreakdown={"+queueMissingBreakdown+"}\n"+
                 "bggBatch={lastSize="+p.getInt("bggBatchLastSize",0)+", requests="+p.getLong("bggBatchRequests",0)+", items="+p.getLong("bggBatchItems",0)+"}\n"+
                 "queueLanes={vinted="+vintedLane.state+", detail="+firstLine(vintedLane.detail)+", heartbeatAgeMs="+(vintedLaneHeartbeat<=0?-1:Math.max(0,queueNow-vintedLaneHeartbeat))+", bgg="+bggLane.state+", detail="+firstLine(bggLane.detail)+", heartbeatAgeMs="+(bggLaneHeartbeat<=0?-1:Math.max(0,queueNow-bggLaneHeartbeat))+"}\n"+
                 "uiLastRenderMs="+p.getLong("uiLastRenderMs",0)+"; tab="+p.getString("uiLastRenderTab","")+"\n"+
