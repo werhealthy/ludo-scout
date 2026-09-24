@@ -46,7 +46,7 @@ checks=[
     ("receiver uses goAsync for WorkManager scheduling", "goAsync()" in receiver and "WAKE_EXEC.execute" in receiver and "scheduleLocal(app)" in receiver),
     ("default-process scheduler dispatches main-thread calls", "runLocalOffMain" in scheduler and "Looper.myLooper()==Looper.getMainLooper()" in scheduler and "SCHEDULER_EXEC.execute" in scheduler),
     ("Motore analysis pending follows canonical listing state", "l.enrichment_state='PENDING_ANALYSIS'" in deal and "COUNT(DISTINCT l.id)" in deal),
-    ("exit diagnostics expose current-install stability", "build=system-exit-v3" in crash and "installBoundary=" in crash and "crashAfterInstall=" in crash and "anrAfterInstall=" in crash and "memoryAfterInstall=" in crash),
+    ("exit diagnostics expose current-install stability", "build=system-exit-v4" in crash and "installBoundary=" in crash and "crashAfterInstall=" in crash and "anrAfterInstall=" in crash and "memoryAfterInstall=" in crash and "resourceAfterInstall=" in crash),
     ("waiting run telemetry is exposed", "engineWaiting={" in diag and "engineWaitingSummary" in diag),
     ("build invariants preserved", "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build),
 ]
