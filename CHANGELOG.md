@@ -1,5 +1,11 @@
 # Ludo Scout — Changelog
 
+## 5.12.60 — Cause dei collegamenti Vinted mancanti (2026-09-25)
+
+- Il debug separa tutti gli annunci attivi senza link Vinted in gruppi mutuamente esclusivi: non idonei BGG, in coda, ancora da tentare, nessun candidato, ambigui, match debole, pagina non disponibile, attesa Vinted, verifica fallita e altro.
+- Il totale idoneo si riconcilia con la somma degli esiti, distinguendo i record che non devono ancora arrivare a Vinted dai veri fallimenti del linker.
+- La misura legge lo stato SQLite condiviso e non aggiunge richieste di rete né modifica soglie, ranking o pubblicazione.
+
 ## 5.12.59 — Ripresa immediata dopo aggiornamento (2026-09-24)
 
 - Una nuova istanza del servizio libera subito i job rimasti `PROCESSING` dal processo precedente e li rende nuovamente eseguibili.
