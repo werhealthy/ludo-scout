@@ -1,5 +1,10 @@
 # Ludo Scout — AI handoff
 
+## 5.12.59 — Startup processing-lease recovery
+- A freshly created QueueKeepAliveService now reopens every inherited PROCESSING lease before reconciliation. No in-memory worker from the previous killed process can still own those rows.
+- Recovery preserves attempts, source, priority, listing identity and backlog; rows become FAILED_RETRYABLE instead of being deleted.
+- The existing three-minute runtime watchdog remains responsible for work that stalls after startup.
+
 ## 5.12.58 — Alternate-title Vinted photo proof
 - The linker records whether title confidence came from the observed Vinted title or an exact canonical BGG title after removing the known brand.
 - Canonical-only matches require the observed exact price and thumbnail similarity of at least 0.84, and they cannot use the catalogue fast path: the public item page is still verified.
