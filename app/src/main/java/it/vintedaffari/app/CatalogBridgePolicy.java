@@ -18,6 +18,7 @@ public final class CatalogBridgePolicy {
         if(manualReviewRequired)return reject("MANUAL_REVIEW");
         if(blockingJob)return reject("BLOCKING_JOB");
         if(empty(draft.bggId)||empty(draft.vintedItemId)||empty(draft.vintedUrl))return reject("IDENTITY_INCOMPLETE");
+        if(!exactVintedIdentity(draft.vintedItemId,draft.vintedUrl))return reject("VINTED_IDENTITY_MISMATCH");
         if(draft.rating==null||draft.rating<DealPolicy.MIN_BGG_RATING)return reject("BGG_RATING");
 
         String type=safe(draft.listingType);
@@ -36,6 +37,18 @@ public final class CatalogBridgePolicy {
     }
 
     private static Result reject(String reason){return new Result(false,null,null,reason);}
+    static boolean exactVintedIdentity(String itemId,String url){
+        String expected=safe(itemId);
+        if(expected.isEmpty()||!expected.matches("[0-9]+"))return false;
+        try{
+            java.net.URI parsed=new java.net.URI(safe(url));String host=safe(parsed.getHost()).toLowerCase(java.util.Locale.ROOT);
+            if(!"https".equalsIgnoreCase(parsed.getScheme()))return false;
+            if(!("vinted.it".equals(host)||host.endsWith(".vinted.it")))return false;
+            String path=safe(parsed.getPath()),prefix="/items/"+expected;
+            if(!path.startsWith(prefix))return false;
+            return path.length()==prefix.length()||path.charAt(prefix.length())=='-'||path.charAt(prefix.length())=='/';
+        }catch(Exception ignored){return false;}
+    }
     private static String safe(String value){return value==null?"":value.trim();}
     private static boolean empty(String value){return safe(value).isEmpty();}
 }
