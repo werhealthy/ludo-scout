@@ -1,5 +1,17 @@
 # Ludo Scout — Changelog
 
+## 5.12.66 — Redesign completo Motore (2026-09-25)
+
+- La overview del Motore non è più una dashboard della pipeline: mette in ordine stato del lavoro automatico, risultati dello scroll corrente, eventuali scelte umane, altri scroll non conclusi e attività recente.
+- Rimossa la progress bar: il Motore usa stati concreti come raccolta dello scroll, riconoscimento giochi, collegamento annunci, attesa del prossimo controllo Vinted, preparazione risultati e completamento.
+- I risultati pronti sono sempre dichiarati come appartenenti **a questo scroll**, eliminando l'ambiguità tra conteggio del run corrente e Catalogo globale.
+- “Serve il tuo aiuto” compare solo quando esistono casi realmente azionabili; gli esiti trattenuti automaticamente restano secondari e sono descritti come “non pubblicati automaticamente”.
+- Gli altri scroll non conclusi sono mostrati come “Riprenderà” o “In attesa”, senza esporre round-robin, corsie, retry o scheduler.
+- Il dettaglio “Lavoro automatico” spiega Riconoscimento giochi → Collegamento annunci → Preparazione risultati con quantità concrete e senza percentuali.
+- Il dettaglio dello scroll usa filtri per esito (Tutti, Pronti, In lavorazione) invece dei vecchi filtri tecnici BGG/Vinted; le singole card usano stati leggibili e coerenti.
+- Il rendering continua a consumare snapshot caricati su `uiDataIo`; nessuna nuova lettura SQLite viene eseguita sul main thread.
+- Nessuna modifica a motore, matching, soglie di pubblicazione, pacing Vinted, fairness, schema database, signing o applicationId.
+
 ## 5.12.65 — Collegamenti manuali senza bloccare la UI (2026-09-25)
 
 - Il debug 5.12.64 ha mostrato 6 ANR della UI dopo l’installazione, con input dispatch oltre 5 secondi, mentre gli snapshot SQLite arrivavano a oltre 7 secondi e il ledger Vinted riportava `SQLiteDatabaseLockedException`.

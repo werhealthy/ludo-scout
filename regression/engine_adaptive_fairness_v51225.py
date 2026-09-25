@@ -90,8 +90,8 @@ checks=[
     ("Home remains trusted-only",
      'db.getDeals("trusted",320)' in ui and '"trusted".equals(filter)' in deal),
     ("Motore UI exposes remaining online candidates and continuation",
-     "verifiche online ancora necessarie" in ui and "In pausa · riprenderà" in ui and
-     "saranno elaborati automaticamente a turno" in ui),
+     "verifiche online ancora necessarie" in ui and "Altri scroll" in ui and
+     "Riprenderà" in ui and "In attesa" in ui),
     ("diagnostics expose ETA, core work and fairness",
      "etaMs=" in radar and "corePending=" in radar and "coreRemaining=" in radar and "engineFairness={" in radar),
     ("build identity and CI versionCode strategy stay unchanged",

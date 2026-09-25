@@ -480,7 +480,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "GROUP BY l.id ORDER BY l.last_seen DESC LIMIT ?";
         try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt),String.valueOf(Math.max(1,limit))})){
             while(c.moveToNext()){EngineRunItem x=new EngineRunItem();int i=0;x.listingId=c.getLong(i++);x.gameId=c.getLong(i++);x.signature=c.getString(i++);x.title=c.getString(i++);x.canonical=c.getString(i++);x.bggId=c.getString(i++);x.imageUrl=c.getString(i++);x.listingState=c.getString(i++);x.listingMatchState=c.getString(i++);x.gameState=c.getString(i++);x.publishedLabel=c.getString(i++);x.languageCode=c.getString(i++);x.priceCents=c.getInt(i++);x.bggReady=c.getInt(i++)!=0;x.vintedReady=c.getInt(i++)!=0;x.complete=c.getInt(i++)!=0;x.review=c.getInt(i++)!=0;x.held=c.getInt(i)!=0;
-                boolean keep="all".equals(mode)||"bgg".equals(mode)||("vinted".equals(mode)&&x.bggReady)||("ready".equals(mode)&&x.complete)||("review".equals(mode)&&x.review)||("metadata".equals(mode)&&x.vintedReady&&!x.complete&&!x.review&&!x.held);if(keep)out.add(x);
+                boolean keep="all".equals(mode)||("ready".equals(mode)&&x.complete)||("working".equals(mode)&&!x.complete&&!x.review&&!x.held)||("bgg".equals(mode)&&!x.bggReady&&!x.review&&!x.held)||("vinted".equals(mode)&&x.bggReady&&!x.vintedReady&&!x.review&&!x.held)||("review".equals(mode)&&x.review)||("metadata".equals(mode)&&x.vintedReady&&!x.complete&&!x.review&&!x.held);if(keep)out.add(x);
             }
         }return out;
     }

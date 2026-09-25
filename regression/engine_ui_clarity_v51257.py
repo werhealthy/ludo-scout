@@ -1,32 +1,58 @@
 #!/usr/bin/env python3
-"""Regression guards for the user-facing Motore funnel in v5.12.57."""
+"""Regression guards for the outcome-oriented Motore information architecture."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 main = (root / "app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
+db = (root / "app/src/main/java/it/vintedaffari/app/DealDatabase.java").read_text(encoding="utf-8")
 
 overview_start = main.index("private void renderEngineOverview()")
 hero_start = main.index("private View engineCurrentRunHero", overview_start)
-step_start = main.index("private View engineStepRow", hero_start)
+results_start = main.index("private View engineCurrentResultsCard", hero_start)
+funnel_start = main.index("private View engineFunnelRow", results_start)
+run_start = main.index("private void renderEngineRun()")
+thumb_start = main.index("private View engineRunThumbnailView", run_start)
+
 overview = main[overview_start:hero_start]
-hero = main[hero_start:step_start]
+hero = main[hero_start:results_start]
+components = main[results_start:funnel_start]
+run = main[run_start:thumb_start]
 
 checks = [
-    ("current scroll exposes a five-stage funnel", all(label in overview for label in (
-        "Card Vinted uniche", "Giochi idonei", "BGG confermato · voto 6+",
-        "Annunci Vinted collegati", "Nel Catalogo"))),
-    ("funnel uses the existing coherent run snapshot", all(field in overview for field in (
-        "run.uniqueListings", "run.validListings", "run.bggMatchedListings",
-        "run.vintedLinkedListings", "run.completeListings"))),
-    ("manual review is described as optional and independent", "Il Motore continua anche senza una tua scelta" in overview),
-    ("old copy no longer implies the whole engine is blocked", "una tua scelta può far ripartire Ludo" not in overview),
-    ("hero states the outcome instead of an ambiguous processed fraction", "risultati con un esito" in hero and '" elaborati"' not in hero),
-    ("overview funnel does not add direct SQLite reads", "marketStore." not in overview and "db." not in overview),
+    ("overview is organized around work, results, human attention and other scrolls",
+     all(token in overview for token in (
+         "engineCurrentRunHero", "engineCurrentResultsCard",
+         "engineAttentionCard", "engineWorkQueueCard", "Attività recente"))),
+    ("overview no longer renders the technical five-stage funnel",
+     "engineFunnelRow(" not in overview and "Percorso di questo scroll" not in overview),
+    ("hero has concrete states and no percentage progress bar",
+     all(copy in hero for copy in (
+         "STO RACCOGLIENDO", "Sto riconoscendo i giochi",
+         "Sto collegando gli annunci", "In attesa del prossimo controllo Vinted",
+         "Sto preparando i risultati")) and "ProgressBar" not in hero),
+    ("ready results are explicitly scoped to the current scroll",
+     "Risultati di questo scroll" in components and
+     "risultati pronti" in components and
+     "da questo scroll" in components and
+     "nel Catalogo" not in components),
+    ("human attention is a separate conditional inbox",
+     "Serve il tuo aiuto" in components and
+     "elementi richiedono" in components and
+     'engineSection="review"' in components),
+    ("unfinished scrolls use user-facing waiting states",
+     "Altri scroll" in components and "Riprenderà" in components and "In attesa" in components),
+    ("run inspector filters by outcome instead of provider lane",
+     '{"all","Tutti"},{"ready","Pronti"},{"working","In lavorazione"}' in run and
+     '{"all","Tutti"},{"bgg","BGG"},{"vinted","Vinted"},{"ready","Pronte"}' not in run),
+    ("working filter excludes terminal outcomes",
+     '"working".equals(mode)&&!x.complete&&!x.review&&!x.held' in db),
+    ("overview rendering stays snapshot-only",
+     "marketStore." not in overview and "db." not in overview),
 ]
 
-failed = [name for name, ok in checks if not ok]
 for name, ok in checks:
     print(("PASS " if ok else "FAIL ") + name)
+failed = [name for name, ok in checks if not ok]
 if failed:
-    raise SystemExit("engine UI clarity regression failed: " + ", ".join(failed))
-print(f"PASS {len(checks)}/{len(checks)} engine UI clarity guards")
+    raise SystemExit("Motore UI clarity regression failed: " + ", ".join(failed))
+print(f"PASS {len(checks)}/{len(checks)} Motore UI clarity guards")

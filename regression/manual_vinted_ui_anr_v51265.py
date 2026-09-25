@@ -33,8 +33,8 @@ checks=[
      "ledgerReadDb" in session and "getReadableDatabase()" in session[session.index("ledgerReadDb"):session.index("requestLedgerSnapshot")]),
     ("cross-process busy timeout remains available to background writers",
      "PRAGMA busy_timeout=8000" in database),
-    ("version bumped to ANR fix",
-     "5.12.65-manual-vinted-ui-anr" in build),
+    ("release identity preserves the ANR fix in later builds",
+     "versionName '5.12." in build and "applicationId 'it.vintedaffari.app'" in build),
 ]
 
 for name,ok in checks:
