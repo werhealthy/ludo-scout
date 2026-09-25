@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+import subprocess
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "app/src/main/java/it/vintedaffari/app"
+POLICY = SRC / "CatalogBridgePolicy.java"
+
+if not POLICY.exists():
+    raise AssertionError("CatalogBridgePolicy is missing: canonical records still cannot be safely materialized")
+
+harness = r'''
+package it.vintedaffari.app;
+
+public final class CatalogBridgePolicyHarness {
+    private static DealRecord deal(int item, Integer total, Integer benchmark, String type, String verification) {
+        DealRecord d = new DealRecord();
+        d.signature = "sig";
+        d.vintedItemId = "991";
+        d.vintedUrl = "https://www.vinted.it/items/991";
+        d.bggId = "42";
+        d.rating = 7.1;
+        d.itemPriceCents = item;
+        d.totalCents = total;
+        d.benchmarkCents = benchmark;
+        d.listingType = type;
+        d.verificationState = verification;
+        d.lifecycle = "ACTIVE";
+        return d;
+    }
+
+    private static void check(boolean value, String message) {
+        if (!value) throw new AssertionError(message);
+    }
+
+    public static void main(String[] args) {
+        CatalogBridgePolicy.Result valid = CatalogBridgePolicy.decide(
+                deal(1500, 1700, 3000, "BASE_GAME", "MATCH_UNCERTAIN"), true, false, false);
+        check(valid.publish, "a canonically verified base game should be materialized");
+        check("good".equals(valid.tier), "the existing price policy must classify the deal as good");
+
+        CatalogBridgePolicy.Result overpriced = CatalogBridgePolicy.decide(
+                deal(4000, 4500, 3000, "BASE_GAME", "MATCH_UNCERTAIN"), true, false, false);
+        check(!overpriced.publish && "PRICE_REJECTED".equals(overpriced.reason),
+                "an overpriced listing must stay out of Catalog");
+
+        CatalogBridgePolicy.Result ambiguous = CatalogBridgePolicy.decide(
+                deal(1500, 1700, 3000, "BASE_GAME", "MATCH_UNCERTAIN"), false, false, false);
+        check(!ambiguous.publish, "an uncertain canonical identity must stay out of Catalog");
+
+        CatalogBridgePolicy.Result review = CatalogBridgePolicy.decide(
+                deal(1500, 1700, 3000, "BASE_GAME", "MATCH_UNCERTAIN"), true, true, false);
+        check(!review.publish, "a manual-review listing must stay out of Catalog");
+
+        CatalogBridgePolicy.Result expansion = CatalogBridgePolicy.decide(
+                deal(1500, 1700, 3000, "EXPANSION", "MATCH_UNCERTAIN"), true, false, false);
+        check(!expansion.publish, "an unverified expansion must stay out of Catalog");
+
+        CatalogBridgePolicy.Result pendingPrice = CatalogBridgePolicy.decide(
+                deal(1500, null, null, "BASE_GAME", "MATCH_UNCERTAIN"), true, false, false);
+        check(pendingPrice.publish && "insufficient".equals(pendingPrice.tier),
+                "missing market evidence is pending, not a fabricated price rejection");
+
+        DealRecord low = deal(1500, 1700, 3000, "BASE_GAME", "MATCH_UNCERTAIN");
+        low.rating = 5.9;
+        check(!CatalogBridgePolicy.decide(low, true, false, false).publish,
+                "BGG ratings below six must stay out of Catalog");
+    }
+}
+'''
+
+with tempfile.TemporaryDirectory() as td:
+    td = Path(td)
+    harness_path = td / "CatalogBridgePolicyHarness.java"
+    harness_path.write_text(harness, encoding="utf-8")
+    sources = [
+        SRC / "DealRecord.java",
+        SRC / "PurchaseMath.java",
+        SRC / "DealEvaluator.java",
+        POLICY,
+        harness_path,
+    ]
+    subprocess.run(["javac", "-d", str(td), *map(str, sources)], check=True)
+    subprocess.run(["java", "-cp", str(td), "it.vintedaffari.app.CatalogBridgePolicyHarness"], check=True)
+
+database = (SRC / "DealDatabase.java").read_text(encoding="utf-8")
+market = (SRC / "MarketStore.java").read_text(encoding="utf-8")
+
+assert "materializeCanonicalDeal" in database, "DealDatabase does not materialize canonical listings"
+assert "findByVintedItemId" in database, "materialization must deduplicate by exact Vinted identity"
+assert market.count("materializeCanonicalDeal") >= 2, "both BGG-first and Vinted-first completion must bridge Catalog"
+
+print("PASS canonical Catalog bridge policy, safety gates, price handling, and async wiring")
