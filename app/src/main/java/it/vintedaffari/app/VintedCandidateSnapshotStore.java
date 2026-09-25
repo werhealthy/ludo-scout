@@ -77,7 +77,7 @@ public final class VintedCandidateSnapshotStore {
         if(context==null||TextUtils.isEmpty(query))return null;
         DealDatabase helper=new DealDatabase(context.getApplicationContext());
         try{
-            SQLiteDatabase db=helper.getReadableDatabase();ensure(db);
+            SQLiteDatabase db=helper.getWritableDatabase();ensure(db);
             String key=norm(query);if(TextUtils.isEmpty(key))return null;
             long now=System.currentTimeMillis(),age=Math.max(60_000L,maxAgeMs);
             try(Cursor cur=db.rawQuery("SELECT last_at,payload FROM vinted_shadow_snapshots_v3 WHERE query_key=? AND last_at>=? LIMIT 1",
