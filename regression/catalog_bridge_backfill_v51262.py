@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import re
 import sqlite3
+import tempfile
+import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,16 +33,43 @@ INSERT INTO deals VALUES(1,'sig-4','904');
 INSERT INTO processing_jobs VALUES(1,5,'VINTED_ENRICHMENT','AUTO','PENDING');
 """)
 
-assert [row[0] for row in db.execute(sql, (20,))] == [1]
+now = 1_000_000
+assert [row[0] for row in db.execute(sql, (now, 20))] == [1]
 
 # The query is intentionally bounded and newest-first.
 db.execute("DELETE FROM processing_jobs")
-assert [row[0] for row in db.execute(sql, (1,))] == [5]
-db.execute("INSERT INTO queue_controls VALUES('catalog_bridge_seen:5',5,0,'PRICE_REJECTED')")
-assert [row[0] for row in db.execute(sql, (1,))] == [1]
+assert [row[0] for row in db.execute(sql, (now, 1))] == [5]
+db.execute("INSERT INTO queue_controls VALUES('catalog_bridge_retry:5',?,0,'PRICE_REJECTED')", (now + 10_000,))
+assert [row[0] for row in db.execute(sql, (now, 1))] == [1]
+assert [row[0] for row in db.execute(sql, (now + 10_001, 1))] == [5]
 
 assert "materializeCanonicalCatalogBatch" in MARKET
 assert "materializeCanonicalCatalogBatch" in RUNNER
-assert "last_catalog_bridge_v51262" in RUNNER
+assert "claimCatalogBridgeSweep" in MARKET
+assert "claimCatalogBridgeSweep" in RUNNER
+assert "last_catalog_bridge_v51262" not in RUNNER
+assert "completeResolvedVintedJob(job, canonical)" in RUNNER
+assert "materializeCanonicalDeal(canonicalListingId)" in MARKET
 
-print("PASS existing canonical rows recover locally in a bounded, idempotent batch")
+# The cadence lease must have one winner even when :radar and the main process race.
+with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+    seed = sqlite3.connect(tmp.name)
+    seed.execute("CREATE TABLE queue_controls(name TEXT PRIMARY KEY,value INTEGER,updated_at INTEGER,text_value TEXT)")
+    seed.commit(); seed.close()
+    barrier = threading.Barrier(2)
+    winners = []
+    def claim():
+        connection = sqlite3.connect(tmp.name, timeout=5, isolation_level=None)
+        barrier.wait()
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute("SELECT value FROM queue_controls WHERE name='catalog_bridge_sweep_lease_v1'").fetchone()
+        if row is None or row[0] <= now:
+            connection.execute("INSERT OR REPLACE INTO queue_controls VALUES('catalog_bridge_sweep_lease_v1',?,?,?)", (now + 60_000, now, 'claimed'))
+            winners.append(1)
+        connection.commit(); connection.close()
+    threads = [threading.Thread(target=claim) for _ in range(2)]
+    for thread in threads: thread.start()
+    for thread in threads: thread.join()
+    assert len(winners) == 1, "the SQLite sweep lease must have exactly one cross-process winner"
+
+print("PASS bounded recovery retries mutable evidence, uses a cross-process lease, and completes the merge target")
