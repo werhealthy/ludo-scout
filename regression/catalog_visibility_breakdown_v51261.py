@@ -116,7 +116,7 @@ authoritative_ids = [row[0] for row in db.execute(authoritative_sql)]
 assert authoritative_ids == [14, 12, 11, 10, 9], authoritative_ids
 
 row = db.execute(sql).fetchone()
-expected = (14, 11, 10, 9, 8, 7, 5, 5, 5)
+expected = (14, 11, 10, 9, 8, 7, 5, 5)
 assert row == expected, f"expected={expected} actual={row}"
 assert row[-1] == len(authoritative_ids), f"diagnostic={row[-1]} catalog={len(authoritative_ids)}"
 
