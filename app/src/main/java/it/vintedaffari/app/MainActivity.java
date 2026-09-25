@@ -1643,15 +1643,86 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private String extractSharedVintedUrl(String raw){if(TextUtils.isEmpty(raw))return"";Matcher m=VINTED_URL.matcher(raw);if(!m.find())return"";String u=m.group();while(u.endsWith(".")||u.endsWith(",")||u.endsWith(")")||u.endsWith("]"))u=u.substring(0,u.length()-1);return u;}
 
     private void handleSharedVintedUrl(String url){
-        String itemId=vintedItemId(url);if(TextUtils.isEmpty(itemId)){Toast.makeText(this,"Link Vinted non riconosciuto.",Toast.LENGTH_SHORT).show();return;}SharedPreferences p=getSharedPreferences(PREF_MANUAL_VINTED_SHARE,MODE_PRIVATE);long listingId=p.getLong("listing_id",0),jobId=p.getLong("job_id",0),at=p.getLong("at",0);String title=p.getString("title","");if(listingId<=0||at<=0||System.currentTimeMillis()-at>MANUAL_VINTED_SHARE_TTL){Toast.makeText(this,"Apri prima un caso da collegare e usa ‘Cerca su Vinted’.",Toast.LENGTH_LONG).show();return;}MarketListingRecord l=marketStore.listing(listingId);if(l==null){Toast.makeText(this,"Il caso da collegare non è più disponibile.",Toast.LENGTH_LONG).show();return;}String label=TextUtils.isEmpty(title)?l.title:title;new AlertDialog.Builder(this).setTitle("Collegare questo annuncio?").setMessage(label+"\n\n"+url).setNegativeButton("Annulla",null).setPositiveButton("Collega",(d,w)->applySharedVintedLink(jobId,listingId,url,itemId)).show();
+        String itemId=vintedItemId(url);
+        if(TextUtils.isEmpty(itemId)){Toast.makeText(this,"Link Vinted non riconosciuto.",Toast.LENGTH_SHORT).show();return;}
+        SharedPreferences p=getSharedPreferences(PREF_MANUAL_VINTED_SHARE,MODE_PRIVATE);
+        long listingId=p.getLong("listing_id",0),jobId=p.getLong("job_id",0),at=p.getLong("at",0);
+        String title=p.getString("title","");
+        if(listingId<=0||at<=0||System.currentTimeMillis()-at>MANUAL_VINTED_SHARE_TTL){Toast.makeText(this,"Apri prima un caso da collegare e usa ‘Cerca su Vinted’.",Toast.LENGTH_LONG).show();return;}
+        uiDataIo.execute(()->{
+            MarketListingRecord loaded=null;
+            try{loaded=marketStore.listing(listingId);}catch(Throwable ignored){}
+            final MarketListingRecord l=loaded;
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;
+                if(l==null){Toast.makeText(this,"Il caso da collegare non è più disponibile.",Toast.LENGTH_LONG).show();return;}
+                String label=TextUtils.isEmpty(title)?l.title:title;
+                new AlertDialog.Builder(this).setTitle("Collegare questo annuncio?").setMessage(label+"\n\n"+url)
+                        .setNegativeButton("Annulla",null)
+                        .setPositiveButton("Collega",(d,w)->applySharedVintedLink(jobId,listingId,url,itemId)).show();
+            });
+        });
     }
 
-    private void applySharedVintedLink(long jobId,long listingId,String url,String itemId){long canonical=marketStore.applyManualVintedLink(jobId,listingId,url,itemId,null,null);if(canonical<=0){Toast.makeText(this,"Non riesco a salvare il collegamento.",Toast.LENGTH_SHORT).show();return;}String sig=marketStore.signatureForListing(canonical);if(!TextUtils.isEmpty(sig)){DealRecord legacy=db.findBySignature(sig);if(legacy!=null)db.applyResolvedLink(sig,itemId,url,null,100,"Condiviso da Vinted",null,legacy.sellerName,null,System.currentTimeMillis());}getSharedPreferences(PREF_MANUAL_VINTED_SHARE,MODE_PRIVATE).edit().clear().apply();if(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()){suppressResolutionDismissState=true;activeResolutionDialog.dismiss();suppressResolutionDismissState=false;}activeVintedResolutionListingId=0;Toast.makeText(this,"Annuncio Vinted collegato",Toast.LENGTH_SHORT).show();kickActivityQueue();refreshMarketReferencesAsync();scheduleRender(80);if(!TextUtils.isEmpty(sig)&&selectedGameId==0&&(activeDetailDialog==null||!activeDetailDialog.isShowing())){DealRecord fresh=db.findBySignature(sig);if(fresh!=null)uiUpdates.postDelayed(()->openDetail(fresh),160);}}
+    private void applySharedVintedLink(long jobId,long listingId,String url,String itemId){
+        Toast.makeText(this,"Salvo il collegamento…",Toast.LENGTH_SHORT).show();
+        maintenanceIo.execute(()->{
+            long canonical=0L;String sig="";DealRecord fresh=null;String error="";
+            try{
+                canonical=marketStore.applyManualVintedLink(jobId,listingId,url,itemId,null,null);
+                if(canonical>0){
+                    sig=marketStore.signatureForListing(canonical);
+                    if(!TextUtils.isEmpty(sig)){
+                        DealRecord legacy=db.findBySignature(sig);
+                        if(legacy!=null)db.applyResolvedLink(sig,itemId,url,null,100,"Condiviso da Vinted",null,legacy.sellerName,null,System.currentTimeMillis());
+                        fresh=db.findBySignature(sig);
+                    }
+                }else error="Non riesco a salvare il collegamento.";
+            }catch(Throwable t){error="Il collegamento non è stato salvato. Riprova.";}
+            final boolean ok=canonical>0;final String finalSig=sig;final DealRecord finalFresh=fresh;final String finalError=error;
+            if(ok)getSharedPreferences(PREF_MANUAL_VINTED_SHARE,MODE_PRIVATE).edit().clear().apply();
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;
+                if(!ok){Toast.makeText(this,finalError,Toast.LENGTH_SHORT).show();return;}
+                if(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()){suppressResolutionDismissState=true;activeResolutionDialog.dismiss();suppressResolutionDismissState=false;}
+                activeVintedResolutionListingId=0;
+                Toast.makeText(this,"Annuncio Vinted collegato",Toast.LENGTH_SHORT).show();
+                kickActivityQueue();refreshMarketReferencesAsync();scheduleRender(80);
+                if(!TextUtils.isEmpty(finalSig)&&finalFresh!=null&&selectedGameId==0&&(activeDetailDialog==null||!activeDetailDialog.isShowing()))
+                    uiUpdates.postDelayed(()->openDetail(finalFresh),160);
+            });
+        });
+    }
 
     private String vintedItemId(String url){if(TextUtils.isEmpty(url))return"";Matcher m=Pattern.compile("https?://(?:www\\.)?vinted\\.[^/]+/items/([0-9]+)(?:-[^\\s?#]*)?(?:[?#].*)?",Pattern.CASE_INSENSITIVE).matcher(url.trim());return m.matches()?m.group(1):"";}
 
     private void applyManualVintedChoice(MarketStore.Job job,String itemId,String url,String image,String seller,boolean sold,Dialog dialog){
-        long canonical=marketStore.applyManualVintedLink(job.id,job.listingId,url,itemId,seller,image);if(canonical<=0){Toast.makeText(this,"Non riesco a salvare il collegamento",Toast.LENGTH_SHORT).show();return;}MarketListingRecord resolved=marketStore.listing(canonical);String sig=marketStore.signatureForListing(canonical);if(!TextUtils.isEmpty(sig)){DealRecord legacy=db.findBySignature(sig);if(legacy!=null){db.applyResolvedLink(sig,itemId,url,image,100,"Confermato manualmente",null,seller,null,System.currentTimeMillis());if(sold)db.markSold(sig);}}if(sold)marketStore.markSold(canonical);if(dialog!=null&&dialog.isShowing())dialog.dismiss();Toast.makeText(this,"Collegamento salvato · Ludo completa la card",Toast.LENGTH_SHORT).show();kickActivityQueue();scheduleRender(80);
+        if(job==null)return;
+        if(dialog!=null&&dialog.isShowing())dialog.dismiss();
+        Toast.makeText(this,"Salvo il collegamento…",Toast.LENGTH_SHORT).show();
+        maintenanceIo.execute(()->{
+            long canonical=0L;String error="";
+            try{
+                canonical=marketStore.applyManualVintedLink(job.id,job.listingId,url,itemId,seller,image);
+                if(canonical>0){
+                    String sig=marketStore.signatureForListing(canonical);
+                    if(!TextUtils.isEmpty(sig)){
+                        DealRecord legacy=db.findBySignature(sig);
+                        if(legacy!=null){
+                            db.applyResolvedLink(sig,itemId,url,image,100,"Confermato manualmente",null,seller,null,System.currentTimeMillis());
+                            if(sold)db.markSold(sig);
+                        }
+                    }
+                    if(sold)marketStore.markSold(canonical);
+                }else error="Non riesco a salvare il collegamento";
+            }catch(Throwable t){error="Il collegamento non è stato salvato. Riprova.";}
+            final boolean ok=canonical>0;final String finalError=error;
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;
+                Toast.makeText(this,ok?"Collegamento salvato · Ludo completa la card":finalError,Toast.LENGTH_SHORT).show();
+                if(ok){kickActivityQueue();scheduleRender(80);}
+            });
+        });
     }
 
     private void confirmDeleteReviewListing(MarketStore.Job job){if(job==null||job.listingId<=0)return;new AlertDialog.Builder(this).setTitle("Eliminare questo elemento?").setMessage("Uscirà dall’app e non influenzerà più prezzi o fact-check.").setNegativeButton("Annulla",null).setPositiveButton("Elimina",(d,w)->{String signature=marketStore.signatureForListing(job.listingId);DealRecord legacy=TextUtils.isEmpty(signature)?null:db.findBySignature(signature);if(legacy!=null){db.exclude(legacy,"Eliminato dalle attività");marketStore.setLegacyListingUserHidden(signature,true);bundleDb.invalidate(legacy);}else marketStore.archiveUnresolvedListing(job.listingId,"Eliminato dalle attività");refreshMarketReferencesAsync();scheduleRender(0);Toast.makeText(this,"Elemento eliminato dall'app",Toast.LENGTH_SHORT).show();}).show();}
