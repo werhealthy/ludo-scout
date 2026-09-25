@@ -43,7 +43,7 @@ public final class VintedPublicSession {
     // TEST 2: authoritative cross-process request ledger. This does not change pacing or requests;
     // it only classifies requests that already happen so we can measure amplification safely.
     private static final String LEDGER_PREFIX="t2_ledger:";
-    private static final String LEDGER_BUILD="request-ledger-v2b";
+    private static final String LEDGER_BUILD="request-ledger-v3-efficiency";
 
     private static final Map<String,CachedResponse> PUBLIC_CACHE=Collections.synchronizedMap(
             new LinkedHashMap<String,CachedResponse>(20,.75f,true){
@@ -157,6 +157,20 @@ public final class VintedPublicSession {
         }catch(Throwable ignored){}finally{try{if(db.inTransaction())db.endTransaction();}catch(Throwable ignored){}}
     }
 
+    /** Records a newly established exact Vinted identity. Unlike the old active-row delta,
+     * this counter is monotonic inside the current ledger epoch and is not reduced when sold rows
+     * later leave the active catalog. */
+    public static void recordResolvedLink(SQLiteDatabase db,String source){
+        if(db==null)return;long now=System.currentTimeMillis();boolean own=!db.inTransaction();
+        try{
+            if(own)db.beginTransactionNonExclusive();
+            ensureLedgerEpoch(db,now);
+            incLedger(db,"link:resolved",now);
+            putControl(db,LEDGER_PREFIX+"last_resolved",1L,now,source==null?"":source);
+            if(own)db.setTransactionSuccessful();
+        }catch(Throwable ignored){}finally{if(own)try{if(db.inTransaction())db.endTransaction();}catch(Throwable ignored){}}
+    }
+
     private static void ensureLedgerEpoch(SQLiteDatabase db,long now){
         String marker=controlText(db,LEDGER_PREFIX+"build");
         if(LEDGER_BUILD.equals(marker))return;
@@ -169,7 +183,7 @@ public final class VintedPublicSession {
     private static String controlText(SQLiteDatabase db,String name){try(Cursor c=db.rawQuery("SELECT text_value FROM queue_controls WHERE name=? LIMIT 1",new String[]{name})){return c.moveToFirst()&&!c.isNull(0)?c.getString(0):"";}catch(Throwable ignored){return"";}}
 
     public static final class LedgerSnapshot {
-        public long physical,cacheHits,linkPhysical,linkCacheHits,bundlePhysical,catalogPhysical,itemPhysical,linkedNow;
+        public long physical,cacheHits,linkPhysical,linkCacheHits,bundlePhysical,catalogPhysical,itemPhysical,linkedNow,resolvedLinks;
     }
 
     /** Small numeric snapshot used by Test 2b to measure exactly one resolver invocation. */
@@ -182,6 +196,7 @@ public final class VintedPublicSession {
             out.linkPhysical=control(db,LEDGER_PREFIX+"link:physical");out.linkCacheHits=control(db,LEDGER_PREFIX+"link:cache");
             out.bundlePhysical=control(db,LEDGER_PREFIX+"bundle:physical");
             out.catalogPhysical=control(db,LEDGER_PREFIX+"route:catalog:physical");out.itemPhysical=control(db,LEDGER_PREFIX+"route:item:physical");
+            out.resolvedLinks=control(db,LEDGER_PREFIX+"link:resolved");
             try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM market_listings WHERE vinted_item_id IS NOT NULL AND vinted_item_id<>''",null)){if(c.moveToFirst())out.linkedNow=c.getLong(0);}
         }catch(Throwable ignored){}finally{try{if(db!=null&&db.inTransaction())db.endTransaction();}catch(Throwable ignored){}try{h.close();}catch(Throwable ignored){}}
         return out;
@@ -195,9 +210,9 @@ public final class VintedPublicSession {
             db.beginTransactionNonExclusive();ensureLedgerEpoch(db,now);db.setTransactionSuccessful();db.endTransaction();
             long startAt=control(db,LEDGER_PREFIX+"start_at"),startLinked=control(db,LEDGER_PREFIX+"start_linked");
             long linkedNow=0L;try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM market_listings WHERE vinted_item_id IS NOT NULL AND vinted_item_id<>''",null)){if(c.moveToFirst())linkedNow=c.getLong(0);}catch(Throwable ignored){}
-            long newLinked=Math.max(0L,linkedNow-startLinked),linkPhysical=control(db,LEDGER_PREFIX+"link:physical"),bundlePhysical=control(db,LEDGER_PREFIX+"bundle:physical"),physical=control(db,LEDGER_PREFIX+"physical"),cache=control(db,LEDGER_PREFIX+"cache");
-            String ratio=newLinked>0?String.format(Locale.US,"%.2f",linkPhysical/(double)newLinked):"n/a";
-            return "build="+LEDGER_BUILD+", ageMs="+(startAt<=0?-1:Math.max(0L,now-startAt))+", physical="+physical+", cacheHits="+cache+", linkPhysical="+linkPhysical+", linkCacheHits="+control(db,LEDGER_PREFIX+"link:cache")+", bundlePhysical="+bundlePhysical+", catalogPhysical="+control(db,LEDGER_PREFIX+"route:catalog:physical")+", itemPhysical="+control(db,LEDGER_PREFIX+"route:item:physical")+", http200="+control(db,LEDGER_PREFIX+"http:200")+", http403="+control(db,LEDGER_PREFIX+"http403")+", http429="+control(db,LEDGER_PREFIX+"http429")+", linkedStart="+startLinked+", linkedNow="+linkedNow+", newlyLinked="+newLinked+", linkRequestsPerNewLink="+ratio+", last="+controlText(db,LEDGER_PREFIX+"last");
+            long activeDelta=Math.max(0L,linkedNow-startLinked),resolvedLinks=control(db,LEDGER_PREFIX+"link:resolved"),linkPhysical=control(db,LEDGER_PREFIX+"link:physical"),bundlePhysical=control(db,LEDGER_PREFIX+"bundle:physical"),physical=control(db,LEDGER_PREFIX+"physical"),cache=control(db,LEDGER_PREFIX+"cache");
+            String ratio=resolvedLinks>0?String.format(Locale.US,"%.2f",linkPhysical/(double)resolvedLinks):"n/a";
+            return "build="+LEDGER_BUILD+", ageMs="+(startAt<=0?-1:Math.max(0L,now-startAt))+", physical="+physical+", cacheHits="+cache+", linkPhysical="+linkPhysical+", linkCacheHits="+control(db,LEDGER_PREFIX+"link:cache")+", bundlePhysical="+bundlePhysical+", catalogPhysical="+control(db,LEDGER_PREFIX+"route:catalog:physical")+", itemPhysical="+control(db,LEDGER_PREFIX+"route:item:physical")+", http200="+control(db,LEDGER_PREFIX+"http:200")+", http403="+control(db,LEDGER_PREFIX+"http403")+", http429="+control(db,LEDGER_PREFIX+"http429")+", linkedStart="+startLinked+", linkedNow="+linkedNow+", activeLinkedDelta="+activeDelta+", resolvedLinks="+resolvedLinks+", linkRequestsPerNewLink="+ratio+", last="+controlText(db,LEDGER_PREFIX+"last");
         }catch(Throwable t){return "error="+t.getClass().getSimpleName();}
         finally{try{if(db!=null&&db.inTransaction())db.endTransaction();}catch(Throwable ignored){}try{h.close();}catch(Throwable ignored){}}
     }
