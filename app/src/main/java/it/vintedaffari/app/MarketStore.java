@@ -122,6 +122,15 @@ public final class MarketStore {
             "o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
             "WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND o.listing_type IN ('BASE_GAME','EXPANSION','GAME') "+
             "ORDER BY CASE o.listing_type WHEN 'BASE_GAME' THEN 0 WHEN 'EXPANSION' THEN 1 WHEN 'GAME' THEN 2 ELSE 3 END,o.observed_at DESC,o.id DESC LIMIT 1";
+    private static final String CATALOG_BRIDGE_BACKFILL_SQL =
+            "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE "+
+            "l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 "+
+            "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
+            "AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
+            "AND NOT EXISTS(SELECT 1 FROM deals d WHERE d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (d.vinted_item_id IS NOT NULL AND d.vinted_item_id=l.vinted_item_id)) "+
+            "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='catalog_bridge_seen:'||l.id) "+
+            "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) "+
+            "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?";
     private static final String QUEUE_PREFS = "ludo_market_queue_controls";
     private static final String KEY_HISTORY_PAUSED = "history_paused";
     private static final String KEY_VINTED_PAUSED = "vinted_paused";
@@ -2804,6 +2813,11 @@ public final class MarketStore {
                     "; bggAgreement="+c.getInt(9)+"; noBlockingJobs="+c.getInt(10)+"; catalogEligible="+c.getInt(11)+
                     "; "+helper.catalogBridgeBreakdown();
         }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
+    }
+    public int materializeCanonicalCatalogBatch(int limit){
+        int bounded=Math.max(1,Math.min(24,limit));List<Long> ids=new ArrayList<>();
+        try(Cursor c=helper.getReadableDatabase().rawQuery(CATALOG_BRIDGE_BACKFILL_SQL,new String[]{String.valueOf(bounded)})){while(c.moveToNext())ids.add(c.getLong(0));}
+        int inserted=0;for(Long id:ids)if("MATERIALIZED".equals(helper.materializeCanonicalDeal(id)))inserted++;return inserted;
     }
     public int partialVintedMetadataCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (published_label IS NULL OR published_label=''))",null)){return c.moveToFirst()?c.getInt(0):0;}}
 

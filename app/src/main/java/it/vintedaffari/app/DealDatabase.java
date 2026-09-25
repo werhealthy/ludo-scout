@@ -274,6 +274,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         long count=0;try(Cursor c=db.rawQuery("SELECT value FROM queue_controls WHERE name=?",new String[]{key})){if(c.moveToFirst())count=c.getLong(0);}
         ContentValues v=new ContentValues();v.put("name",key);v.put("value",count+1);v.put("updated_at",now);v.put("text_value","listing="+listingId+";outcome="+safe);db.insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
         ContentValues last=new ContentValues();last.put("name","catalog_bridge_last");last.put("value",listingId);last.put("updated_at",now);last.put("text_value","outcome="+safe);db.insertWithOnConflict("queue_controls",null,last,SQLiteDatabase.CONFLICT_REPLACE);
+        ContentValues seen=new ContentValues();seen.put("name","catalog_bridge_seen:"+listingId);seen.put("value",listingId);seen.put("updated_at",now);seen.put("text_value",safe);db.insertWithOnConflict("queue_controls",null,seen,SQLiteDatabase.CONFLICT_REPLACE);
     }
     public synchronized String catalogBridgeBreakdown(){
         SQLiteDatabase db=getReadableDatabase();return "bridgeMaterialized="+controlValue(db,"catalog_bridge_materialized")+

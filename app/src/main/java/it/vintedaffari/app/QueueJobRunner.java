@@ -196,6 +196,8 @@ public final class QueueJobRunner {
         try {
             android.content.SharedPreferences auto=context.getSharedPreferences("ludo_queue_maintenance",Context.MODE_PRIVATE);
             long last=auto.getLong("last_missing_sweep",0L),now=System.currentTimeMillis();
+            long lastBridge=auto.getLong("last_catalog_bridge_v51262",0L);
+            if(now-lastBridge>=60_000L){int bridged=market.materializeCanonicalCatalogBatch(24);auto.edit().putLong("last_catalog_bridge_v51262",now).putInt("last_catalog_bridge_materialized",bridged).apply();}
             // Local inference is intentionally independent from the Vinted HTTP gate.
             market.inferDeferredLanguages(120);
             if(now-last>=30*60_000L){

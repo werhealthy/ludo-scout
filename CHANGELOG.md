@@ -5,7 +5,7 @@
 - Un annuncio completato in modo asincrono viene materializzato nel Catalogo solo quando il grafo canonico conferma identità BGG, voto almeno 6, ID e URL Vinted esatti, assenza di review e assenza di job bloccanti.
 - Tipo prodotto e prova di prezzo provengono dall'osservazione originale: espansioni non verificate, prezzi respinti e classificazioni incerte restano esclusi.
 - La verifica del tipo BGG può usare l'osservazione canonica quando la riga legacy non esiste ancora, eliminando la dipendenza circolare tra verifica e Catalogo.
-- La sincronizzazione è idempotente per firma e ID Vinted; non elimina né riclassifica osservazioni storiche. Il debug riporta materializzazioni, duplicati già presenti ed esclusioni.
+- La sincronizzazione è idempotente per firma e ID Vinted; non elimina né riclassifica osservazioni storiche. Un recupero locale e senza rete riesamina fino a 24 record completi al minuto, così anche il backlog già presente può arrivare al Catalogo. Il debug riporta materializzazioni, duplicati già presenti ed esclusioni.
 
 ## 5.12.60 — Cause dei collegamenti Vinted mancanti (2026-09-25)
 
