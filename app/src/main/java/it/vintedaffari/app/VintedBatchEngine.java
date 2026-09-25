@@ -206,6 +206,7 @@ public final class VintedBatchEngine {
                     applyFailed++;
                     continue;
                 }
+                VintedPublicSession.recordResolvedLink(db,"durable-batch-snapshot");
 
                 if (!TextUtils.isEmpty(e.c.title)) {
                     android.content.ContentValues mv = new android.content.ContentValues();
