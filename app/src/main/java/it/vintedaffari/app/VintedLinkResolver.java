@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 public final class VintedLinkResolver {
     private static final String TAG="VintedLinkResolver";
     private static final long RETRY_MS=60_000L;
+    private static final long DURABLE_SNAPSHOT_MAX_AGE_MS=24L*60L*60_000L;
     private static final Pattern ITEM_LINK=Pattern.compile("/items/(\\d+)-([^\"\'<>?#]+)",Pattern.CASE_INSENSITIVE);
     private static final Pattern LDJSON=Pattern.compile("<script[^>]*type=[\"']application/ld\\+json[\"'][^>]*>(.*?)</script>",Pattern.CASE_INSENSITIVE|Pattern.DOTALL);
     private static final Pattern VINTED_IMAGE=Pattern.compile("https?://images(?:\\d+)?\\.vinted\\.(?:net|com)/[^\\s<>\"']+",Pattern.CASE_INSENSITIVE);
@@ -59,6 +60,9 @@ public final class VintedLinkResolver {
     }
     private static final class Candidate{
         String id,title,url,brand,photo,sellerId,sellerName,photosCsv,snapshotParser,publishedLabel,detailsText; List<SellerBundleScanner.SellerItem> sellerSnapshot=new ArrayList<>(); double price=Double.NaN,total=Double.NaN,photoSimilarity=Double.NaN; int favorites=-1,score; Integer catalogId; boolean brandMatch,favMatch,sold,catalogStructured,observedTitleMatch,canonicalTitleMatch;
+    }
+    private static final class Selection{
+        List<Candidate> ranked=new ArrayList<>();Candidate best;int second;boolean unique;
     }
 
     public VintedLinkResolver(Context c){context=c.getApplicationContext();session=new VintedPublicSession(c);}
@@ -108,37 +112,46 @@ public final class VintedLinkResolver {
         if(!TextUtils.isEmpty(d.vintedTitle)&&!norm(d.vintedTitle).equals(norm(d.displayName))&&!norm(d.vintedTitle).equals(norm(d.gameName)))queries.add(cleanQuery(d.vintedTitle));
         String compact=compactQuery(d.vintedTitle);if(!TextUtils.isEmpty(compact))queries.add(compact);
 
-        int attempts=0;
+        // First reuse catalogue pages already downloaded by a previous resolver invocation.
+        // We may skip HTTP only when every earlier query in the normal two-query chain has a fresh
+        // durable snapshot. A weak/ambiguous snapshot falls back to the exact existing network path.
+        Selection snapshotSelection=null;boolean fromDurableSnapshot=false;int snapshotAttempts=0;
         for(String q:queries){
-            if(TextUtils.isEmpty(q)||attempts>=2)continue;
-            if(attempts>0&&!candidates.isEmpty())break; // only spend the fallback request after a true miss
-            attempts++;searchInto(d,q,candidates);
+            if(TextUtils.isEmpty(q)||snapshotAttempts>=2)continue;
+            snapshotAttempts++;
+            int before=candidates.size();
+            boolean snapshotPresent=searchSnapshotInto(d,q,candidates);
+            if(!snapshotPresent){candidates.clear();break;}
+            if(candidates.size()>before){
+                snapshotSelection=selectCandidates(d,candidates);
+                if(snapshotSelection!=null&&snapshotSelection.unique)fromDurableSnapshot=true;
+                break;
+            }
         }
+
+        Selection selection=snapshotSelection;
+        if(snapshotSelection==null||!snapshotSelection.unique){
+            candidates.clear();
+            int attempts=0;
+            for(String q:queries){
+                if(TextUtils.isEmpty(q)||attempts>=2)continue;
+                if(attempts>0&&!candidates.isEmpty())break; // only spend the fallback request after a true miss
+                attempts++;searchInto(d,q,candidates);
+            }
+            selection=selectCandidates(d,candidates);
+        }
+
         if(cb!=null)cb.onProgress(d.signature,52,"risultati ricevuti");
-        diag().edit().putInt("linkCandidateCount",candidates.size()).apply();
-        if(candidates.isEmpty())return null;
-        List<Candidate> ranked=new ArrayList<>(candidates.values());
-        for(Candidate c:ranked)c.score=score(d,c);
-        ranked.sort((a,b)->Integer.compare(b.score,a.score));
-        // When title + price produce several equally plausible Vinted items, compare the thumbnail
-        // captured during the original Accessibility observation with catalogue thumbnails. This is
-        // tie-breaking evidence only: candidates still had to pass the textual/price filters above.
-        applyPhotoEvidence(d,ranked);
-        ranked.sort((a,b)->Integer.compare(b.score,a.score));
-        Candidate best=ranked.get(0);int second=ranked.size()>1?ranked.get(1).score:0;
+        diag().edit().putInt("linkCandidateCount",selection==null?0:selection.ranked.size()).apply();
+        if(selection==null||!selection.unique)return null;
+        List<Candidate> ranked=selection.ranked;Candidate best=selection.best;int second=selection.second;
         if(cb!=null){List<CandidateOption> options=new ArrayList<>();for(int i=0;i<Math.min(6,ranked.size());i++)options.add(toOption(ranked.get(i)));cb.onCandidates(d.signature,options);}
         diag().edit().putInt("linkBestScore",best.score).putInt("linkSecondScore",second).putString("linkBestTitle",safe(best.title)).apply();
         boolean canonicalOnly=best.canonicalTitleMatch&&!best.observedTitleMatch;
-        boolean exactObservedPrice=exactObservedPrice(d,best);
-        boolean canonicalProof=!canonicalOnly||(exactObservedPrice&&best.photoSimilarity>=.84);
-        boolean unique=best.score>=90 && (best.score-second>=12 || ranked.size()==1) && canonicalProof;
-        if(!unique)return null;
 
-        // The catalog page can already carry Vinted's structured item object. If one item is
-        // uniquely identified by title + exact price, keep that identity immediately instead of
-        // spending a second public request only to rediscover the same id/url. Optional metadata
-        // is moved to a low-priority deep phase and never blocks the core queue.
-        if(!canonicalOnly&&best.catalogStructured && best.score>=92){
+        // Only a live structured catalogue response may use the zero-item-page fast path.
+        // Durable snapshots can save the catalogue request, but still require exact public item verification.
+        if(!fromDurableSnapshot&&!canonicalOnly&&best.catalogStructured && best.score>=92){
             Result fast=resultFromCandidate(d,best,best.score,"Vinted catalog · identità ad alta confidenza");
             fast.catalogFastPath=true;
             fast.needsDeepMetadata=TextUtils.isEmpty(best.sellerId)||TextUtils.isEmpty(best.photo)||TextUtils.isEmpty(best.publishedLabel);
@@ -148,11 +161,9 @@ public final class VintedLinkResolver {
             return fast;
         }
 
-        // Fall back to the public item page when the catalog did not expose a sufficiently strong
-        // structured identity. Private Vinted APIs are intentionally unused.
         if(cb!=null)cb.onProgress(d.signature,68,"verifico annuncio");
         Candidate verified=verifyPublicItem(best.id);
-        String verifyMode="public-page";
+        String verifyMode=fromDurableSnapshot?"durable-snapshot+public-page":"public-page";
         if(verified==null)return null;
         if(cb!=null)cb.onProgress(d.signature,86,"verifica ricevuta");
         int verifiedScore=score(d,verified);
@@ -161,6 +172,37 @@ public final class VintedLinkResolver {
         Result r=new Result();r.signature=d.signature;r.itemId=verified.id;r.url=!TextUtils.isEmpty(verified.url)?verified.url:VintedPublicSession.HOST+"/items/"+verified.id;r.imageUrl=verified.photo;r.confidence=Math.min(100,Math.max(best.score,verifiedScore));r.matchedTitle=verified.title;r.sellerId=!TextUtils.isEmpty(verified.sellerId)?verified.sellerId:best.sellerId;r.sellerName=!TextUtils.isEmpty(verified.sellerName)?verified.sellerName:best.sellerName;r.photosCsv=!TextUtils.isEmpty(verified.photosCsv)?verified.photosCsv:best.photosCsv;r.sellerSnapshot=verified.sellerSnapshot;r.snapshotParser=verified.snapshotParser;r.publishedLabel=verified.publishedLabel;r.detailsText=!TextUtils.isEmpty(verified.detailsText)?verified.detailsText:best.detailsText;r.sold=verified.sold;r.needsDeepMetadata=false;applyExactPagePrice(r,verified);r.reason="Vinted "+verifyMode+" · titolo/prezzo verificati · score "+verifiedScore+(second>0?" / secondo "+second:"");
         diag().edit().putString("linkVerifyMode",verifyMode).apply();
         return r;
+    }
+
+    private Selection selectCandidates(DealRecord d,Map<String,Candidate> candidates){
+        if(candidates==null||candidates.isEmpty())return null;
+        Selection out=new Selection();out.ranked.addAll(candidates.values());
+        for(Candidate c:out.ranked)c.score=score(d,c);
+        out.ranked.sort((a,b)->Integer.compare(b.score,a.score));
+        applyPhotoEvidence(d,out.ranked);
+        out.ranked.sort((a,b)->Integer.compare(b.score,a.score));
+        out.best=out.ranked.get(0);out.second=out.ranked.size()>1?out.ranked.get(1).score:0;
+        boolean canonicalOnly=out.best.canonicalTitleMatch&&!out.best.observedTitleMatch;
+        boolean exactObservedPrice=exactObservedPrice(d,out.best);
+        boolean canonicalProof=!canonicalOnly||(exactObservedPrice&&out.best.photoSimilarity>=.84);
+        out.unique=out.best.score>=90&&(out.best.score-out.second>=12||out.ranked.size()==1)&&canonicalProof;
+        return out;
+    }
+
+    private boolean searchSnapshotInto(DealRecord d,String query,Map<String,Candidate> out){
+        VintedCandidateSnapshotStore.SearchSnapshot snapshot=
+                VintedCandidateSnapshotStore.recentSearch(context,query,d==null?0L:d.firstSeen,DURABLE_SNAPSHOT_MAX_AGE_MS);
+        if(snapshot==null)return false;
+        double euros=d.itemPriceCents/100.0;
+        for(VintedCandidateSnapshotStore.SnapshotCandidate x:snapshot.candidates){
+            if(x==null||TextUtils.isEmpty(x.id)||x.bestPriceDiff(d.itemPriceCents)>5)continue;
+            boolean titleOk=jaccard(norm(d.vintedTitle),norm(x.title))>=.68||jaccard(norm(query),norm(x.title))>=.72;
+            if(!titleOk)continue;
+            Candidate c=new Candidate();c.id=x.id;c.title=x.title;c.brand=x.brand;c.photo=x.image;c.price=euros;
+            c.url=VintedPublicSession.HOST+"/items/"+x.id;
+            out.put(c.id,c);
+        }
+        return true;
     }
 
     private static void applyExactPagePrice(Result r,Candidate c){
