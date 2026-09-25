@@ -196,6 +196,7 @@ public final class QueueJobRunner {
         try {
             android.content.SharedPreferences auto=context.getSharedPreferences("ludo_queue_maintenance",Context.MODE_PRIVATE);
             long last=auto.getLong("last_missing_sweep",0L),now=System.currentTimeMillis();
+            if(market.claimCatalogBridgeSweep(now,60_000L)){int bridged=market.materializeCanonicalCatalogBatch(24);auto.edit().putInt("last_catalog_bridge_materialized",bridged).apply();}
             // Local inference is intentionally independent from the Vinted HTTP gate.
             market.inferDeferredLanguages(120);
             if(now-last>=30*60_000L){
@@ -303,7 +304,7 @@ public final class QueueJobRunner {
             if (!TextUtils.isEmpty(r.imageUrl)) ThumbnailStore.downloadRemote(context, r.signature, r.imageUrl);
             market.setJobProgress(job, 96); // optional thumbnail scheduled
             market.clearVintedCandidates(job.listingId);
-            market.completeJob(job);
+            market.completeResolvedVintedJob(job, canonical);
             if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source))market.setDiagnosticState("catalog_health",1,"build=catalog-health-v1;state=REFRESHED;listing="+canonical+";published="+(!TextUtils.isEmpty(r.publishedLabel))+";seller="+(!TextUtils.isEmpty(r.sellerId)));
             if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source))market.setDiagnosticState("opened_vinted_verify",1,"state=REFRESHED;listing="+canonical+";sold=false");
             if(canonical>0 && TextUtils.isEmpty(r.publishedLabel) && !MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source)){

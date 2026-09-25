@@ -81,6 +81,12 @@ jobs:
         run: python3 regression/vinted_missing_breakdown_v51260.py
       - name: Run catalog visibility breakdown regression
         run: python3 regression/catalog_visibility_breakdown_v51261.py
+      - name: Run canonical Catalog bridge regression
+        run: python3 regression/catalog_canonical_bridge_v51262.py
+      - name: Run canonical product-type evidence regression
+        run: python3 regression/catalog_bridge_type_evidence_v51262.py
+      - name: Run existing canonical Catalog recovery regression
+        run: python3 regression/catalog_bridge_backfill_v51262.py
       - name: Run Motore epoch/progress stability regression
         run: python3 regression/engine_epoch_progress_stability_v51216.py
       - name: Run acquisition/crash stability regression

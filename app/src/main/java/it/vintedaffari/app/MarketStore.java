@@ -117,6 +117,20 @@ public final class MarketStore {
             "(SELECT COUNT(DISTINCT deal_id) FROM bgg_agreement),"+
             "(SELECT COUNT(DISTINCT deal_id) FROM job_clear),"+
             "(SELECT COUNT(*) FROM catalog_rows)";
+    private static final String BGG_PRODUCT_TYPE_EVIDENCE_SQL =
+            "SELECT o.listing_type FROM market_listings l JOIN observations o ON "+
+            "o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+            "WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND o.listing_type IN ('BASE_GAME','EXPANSION','GAME') "+
+            "ORDER BY CASE o.listing_type WHEN 'BASE_GAME' THEN 0 WHEN 'EXPANSION' THEN 1 WHEN 'GAME' THEN 2 ELSE 3 END,o.observed_at DESC,o.id DESC LIMIT 1";
+    private static final String CATALOG_BRIDGE_BACKFILL_SQL =
+            "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE "+
+            "l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 "+
+            "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
+            "AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
+            "AND NOT EXISTS(SELECT 1 FROM deals d WHERE d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (d.vinted_item_id IS NOT NULL AND d.vinted_item_id=l.vinted_item_id)) "+
+            "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='catalog_bridge_retry:'||l.id AND q.value>?) "+
+            "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) "+
+            "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?";
     private static final String QUEUE_PREFS = "ludo_market_queue_controls";
     private static final String KEY_HISTORY_PAUSED = "history_paused";
     private static final String KEY_VINTED_PAUSED = "vinted_paused";
@@ -1285,8 +1299,15 @@ public final class MarketStore {
                 : helper.getWritableDatabase().update("processing_jobs",v,"id=?",new String[]{String.valueOf(job.id)});
         if(changed==0)return;
         updateListingState(job.listingId, COMPLETE, "");
+        if(job.listingId>0)helper.materializeCanonicalDeal(job.listingId);
         Log.i(TAG, "job=" + job.id + " state=COMPLETE attempt=" + job.attempt + " listing=" + job.listingId);
         notifyQueueChanged();
+    }
+
+    /** Completes the leased source job, then bridges the surviving listing returned by a merge. */
+    public void completeResolvedVintedJob(Job job,long canonicalListingId){
+        completeJob(job);
+        if(canonicalListingId>0)helper.materializeCanonicalDeal(canonicalListingId);
     }
 
     public MarketListingRecord listing(long id) {
@@ -1431,6 +1452,7 @@ public final class MarketStore {
             Long id = scalarLong(db, "SELECT id FROM games WHERE bgg_id=?", new String[]{m.bggId});
             if (id == null) { db.setTransactionSuccessful(); return; }
             String listingTypeRaw=scalarString(db,"SELECT listing_type FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE' ORDER BY CASE listing_type WHEN 'BASE_GAME' THEN 0 WHEN 'EXPANSION' THEN 1 ELSE 2 END,last_seen DESC LIMIT 1",new String[]{m.bggId});
+            if(TextUtils.isEmpty(listingTypeRaw))listingTypeRaw=scalarString(db,BGG_PRODUCT_TYPE_EVIDENCE_SQL,new String[]{String.valueOf(id)});
             ListingClassifier.Type listingType=ListingClassifier.Type.UNCERTAIN;
             try{ if(!TextUtils.isEmpty(listingTypeRaw))listingType=ListingClassifier.Type.valueOf(listingTypeRaw); }catch(Throwable ignored){}
             BggProductCompatibility.Verdict typeVerdict=BggProductCompatibility.validate(listingType.name(),m.itemType);
@@ -1493,6 +1515,9 @@ public final class MarketStore {
             if (!TextUtils.isEmpty(m.alternateNames)) for (String a : m.alternateNames.split("\\s*\\|\\s*")) addAlias(db, id, a, "BGG_ALTERNATE");
             ContentValues done = new ContentValues(); done.put("state", COMPLETE); done.put("updated_at", System.currentTimeMillis()); done.put("next_attempt_at", 0); done.put("last_error", ""); done.put("progress",100);
             db.update("processing_jobs", done, "job_key=?", new String[]{"bgg:" + id});
+            try(Cursor ready=db.rawQuery("SELECT id FROM market_listings WHERE game_id=? AND lifecycle='ACTIVE' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' AND vinted_url IS NOT NULL AND vinted_url<>''",new String[]{String.valueOf(id)})){
+                while(ready.moveToNext())helper.materializeCanonicalDeal(ready.getLong(0));
+            }
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
     }
@@ -2791,8 +2816,24 @@ public final class MarketStore {
             return "marketCoreListings="+c.getInt(0)+"; coreBridgedDeals="+c.getInt(1)+"; coreInCatalog="+c.getInt(2)+
                     "; coreNotCatalog="+c.getInt(3)+"; catalogOutsideCore="+c.getInt(4)+"; catalogBase="+c.getInt(5)+
                     "; dealIdentity="+c.getInt(6)+"; reviewClear="+c.getInt(7)+"; listingMatched="+c.getInt(8)+
-                    "; bggAgreement="+c.getInt(9)+"; noBlockingJobs="+c.getInt(10)+"; catalogEligible="+c.getInt(11);
+                    "; bggAgreement="+c.getInt(9)+"; noBlockingJobs="+c.getInt(10)+"; catalogEligible="+c.getInt(11)+
+                    "; "+helper.catalogBridgeBreakdown();
         }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
+    }
+    public int materializeCanonicalCatalogBatch(int limit){
+        int bounded=Math.max(1,Math.min(24,limit));long now=System.currentTimeMillis();List<Long> ids=new ArrayList<>();
+        try(Cursor c=helper.getReadableDatabase().rawQuery(CATALOG_BRIDGE_BACKFILL_SQL,new String[]{String.valueOf(now),String.valueOf(bounded)})){while(c.moveToNext())ids.add(c.getLong(0));}
+        int inserted=0;for(Long id:ids)if("MATERIALIZED".equals(helper.materializeCanonicalDeal(id)))inserted++;return inserted;
+    }
+    /** Cross-process maintenance lease. SQLite is authoritative; SharedPreferences are process-local. */
+    public boolean claimCatalogBridgeSweep(long now,long intervalMs){
+        SQLiteDatabase db=helper.getWritableDatabase();boolean claimed=false;long next=now+Math.max(10_000L,intervalMs);
+        db.beginTransaction();try{
+            long current=0L;try(Cursor c=db.rawQuery("SELECT value FROM queue_controls WHERE name='catalog_bridge_sweep_lease_v1'",null)){if(c.moveToFirst())current=c.getLong(0);}
+            if(current<=now){ContentValues v=new ContentValues();v.put("name","catalog_bridge_sweep_lease_v1");v.put("value",next);v.put("updated_at",now);v.put("text_value","claimed");db.insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);claimed=true;}
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        return claimed;
     }
     public int partialVintedMetadataCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (published_label IS NULL OR published_label=''))",null)){return c.moveToFirst()?c.getInt(0):0;}}
 
