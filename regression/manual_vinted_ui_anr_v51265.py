@@ -16,13 +16,15 @@ manual=block("    private void applyManualVintedChoice","    private void confir
 
 checks=[
     ("shared-link lookup leaves the UI thread",
-     "uiDataIo.execute" in shared and shared.index("uiDataIo.execute") < shared.index("marketStore.listing")),
+     "manualLinkIo.execute" in shared and shared.index("manualLinkIo.execute") < shared.index("marketStore.listing")),
     ("shared-link save leaves the UI thread",
-     "maintenanceIo.execute" in shared and shared.index("maintenanceIo.execute") < shared.index("marketStore.applyManualVintedLink")),
+     "manualLinkIo.execute" in shared and shared.index("manualLinkIo.execute") < shared.index("marketStore.applyManualVintedLink")),
     ("manual candidate save leaves the UI thread",
-     "maintenanceIo.execute" in manual and manual.index("maintenanceIo.execute") < manual.index("marketStore.applyManualVintedLink")),
+     "manualLinkIo.execute" in manual and manual.index("manualLinkIo.execute") < manual.index("marketStore.applyManualVintedLink")),
     ("manual UI callbacks happen after background persistence",
      "runOnUiThread" in shared and "runOnUiThread" in manual),
+    ("manual Vinted lane is dedicated and lifecycle-bound",
+     "manualLinkIo=Executors.newSingleThreadExecutor()" in main and "manualLinkIo.shutdownNow()" in main),
     ("durable snapshot lookup is read-only",
      "public static SearchSnapshot recentSearch" in snapshots and
      "getReadableDatabase()" in snapshots[snapshots.index("public static SearchSnapshot recentSearch"):snapshots.index("/** Called only after",snapshots.index("public static SearchSnapshot recentSearch"))] and
