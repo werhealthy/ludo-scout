@@ -8,7 +8,7 @@ MARKET = (ROOT / "app/src/main/java/it/vintedaffari/app/MarketStore.java").read_
 SERVICE = (ROOT / "app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
 
 match = re.search(
-    r'private static final String CATALOG_VISIBILITY_BREAKDOWN_SQL\\s*=\\s*(.*?);\\s*\\n',
+    r'private static final String CATALOG_VISIBILITY_BREAKDOWN_SQL\s*=\s*(.*?);\s*\n',
     MARKET,
     re.S,
 )
