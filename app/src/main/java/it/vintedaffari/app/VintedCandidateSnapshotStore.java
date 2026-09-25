@@ -77,7 +77,9 @@ public final class VintedCandidateSnapshotStore {
         if(context==null||TextUtils.isEmpty(query))return null;
         DealDatabase helper=new DealDatabase(context.getApplicationContext());
         try{
-            SQLiteDatabase db=helper.getWritableDatabase();ensure(db);
+            // Read-only reuse must never join the cross-process writer queue. The table is created
+            // by capture(); if it does not exist yet this lookup simply falls back to normal HTTP.
+            SQLiteDatabase db=helper.getReadableDatabase();
             String key=norm(query);if(TextUtils.isEmpty(key))return null;
             long now=System.currentTimeMillis(),age=Math.max(60_000L,maxAgeMs);
             try(Cursor cur=db.rawQuery("SELECT last_at,payload FROM vinted_shadow_snapshots_v3 WHERE query_key=? AND last_at>=? LIMIT 1",
