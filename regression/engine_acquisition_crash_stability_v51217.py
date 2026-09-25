@@ -36,7 +36,7 @@ checks=[
     ("Accessibility same-card re-observation is bounded", "REANALYZE_SAME_CARD_MS = 10 * 60_000L" in radar and "RESIGHT_SAME_CARD_MS = 10 * 60_000L" in radar),
     ("SQLite persists dedupe across radar restarts", "ENGINE_DUPLICATE_SIGHTING_MS=10L*60_000L" in deal and "SELECT 1 FROM observations WHERE signature=? AND observed_at>=? LIMIT 1" in deal),
     ("same-card analysis is not requeued before TTL", "boolean analysisDue=lastAnalyzed == null || now - lastAnalyzed >= REANALYZE_SAME_CARD_MS" in radar and "else pendingForAnalysis.remove(sig)" in radar),
-    ("Motore reports unique cards instead of raw observation events", 'run.uniqueListings+" card Vinted uniche"' in ui and 'day.uniqueListings+" card uniche"' in ui and 'run.observations+" card Vinted lette"' not in ui),
+    ("Motore reports unique listings instead of raw observation events", 'run.uniqueListings+" annunci Vinted osservati"' in ui and 'day.uniqueListings+" annunci osservati"' in ui and 'run.observations+" card Vinted lette"' not in ui),
     ("uncaught journal persists header before stack formatting", crash.index("fos.write(header.getBytes") < crash.index("StringWriter sw=new StringWriter")),
     ("system exit diagnostics are epoch scoped", "systemExitSummary(Context context,long since)" in crash and "crashSince=" in crash and "since=" in crash),
     ("system exit diagnostics exclude WebView/sandbox processes", 'pn.equals(pkg)||pn.startsWith(pkg+":")' in crash),
