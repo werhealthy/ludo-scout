@@ -1430,6 +1430,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         int queueVintedCore=marketDiag.coreVintedActiveCount(),queueVintedDeep=marketDiag.deepMetadataActiveCount(),queueBgg=marketDiag.bggActiveCount(),queueBggBlocked=marketDiag.bggUnrunnableCount(),queueBggMatchRequired=marketDiag.bggMatchRequiredCount(),queueBggMatchReview=marketDiag.bggMatchReviewCount();
         int queueHistorical=marketDiag.historicalActiveCount(),queueMissingVinted=marketDiag.missingVintedCoreCount(),queuePartialVinted=marketDiag.partialVintedMetadataCount();
         String queueMissingBreakdown=marketDiag.vintedMissingBreakdown();
+        String catalogVisibilityBreakdown=marketDiag.catalogVisibilityBreakdown();
         long queueNextDue=marketDiag.nextDueAt();
         boolean queueVintedPaused=marketDiag.isVintedPaused(),queueBggPaused=marketDiag.isBggPaused(),queueHistoricalPaused=marketDiag.isHistoricalPaused();
         long vintedLaneHeartbeat=marketDiag.laneHeartbeatAt("vinted"),bggLaneHeartbeat=marketDiag.laneHeartbeatAt("bgg");
@@ -1540,7 +1541,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "lastClassifierBlock=" + p.getString("lastClassifierBlock", "") + "\n" +
                 "lastClassifierBlockMeta=ageMs=" + (p.getLong("lastClassifierBlockAt",0)<=0?-1L:Math.max(0L,System.currentTimeMillis()-p.getLong("lastClassifierBlockAt",0))) + "; build=" + p.getString("lastClassifierBlockBuild","unknown") + "\n" +
                 "catalogPipeline={"+marketDiag.catalogPipelineFunnel()+"}\n"+
-                "catalogStored="+p.getInt("catalogStored",-1)+"\n"+"catalogFiltered="+p.getInt("catalogFiltered",-1)+"\n"+"catalogPreset="+p.getString("catalogPreset","")+"\n"+"catalogFeed=" + all + "\n" +
+                "catalogVisibility={"+catalogVisibilityBreakdown+"}\n"+
+                "legacyStoredActive="+all+"\n"+
                 "hot=" + hot + "\n" +
                 "good=" + good + "\n" +
                 "observationsLast24h=" + today + "\n" +
