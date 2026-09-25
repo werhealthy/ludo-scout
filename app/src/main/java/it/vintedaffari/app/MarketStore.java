@@ -1000,12 +1000,12 @@ public final class MarketStore {
             }
             boolean allowHistory = vintedHistoryAllowed(db, now);
             DealDatabase.ObservationSession activeRun=test2bOwner?null:helper.activeObservationSession();
-            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY') OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH','CATALOG_RECOVERY')) OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
+            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY','OPENED_VERIFY') OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH','CATALOG_RECOVERY')) OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql = "SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
                     "FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                     "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE' " +
                     (allowHistory ? "" : "AND j.source<>? ") + runGate +
-                    "ORDER BY CASE WHEN j.job_type=? THEN 0 ELSE 1 END,j.priority DESC,CASE WHEN j.priority>=300 THEN j.created_at END DESC,j.next_attempt_at ASC,j.created_at ASC LIMIT 1";
+                    "ORDER BY CASE WHEN j.source='OPENED_VERIFY' THEN 0 ELSE 1 END,CASE WHEN j.job_type=? THEN 0 ELSE 1 END,j.priority DESC,CASE WHEN j.priority>=300 THEN j.created_at END DESC,j.next_attempt_at ASC,j.created_at ASC LIMIT 1";
             java.util.ArrayList<String> argList=new java.util.ArrayList<>();argList.add(JOB_VINTED);argList.add(JOB_VINTED_DEEP);argList.add(PENDING);argList.add(FAILED_RETRYABLE);argList.add(String.valueOf(now));if(!allowHistory)argList.add(HISTORICAL_SOURCE);if(!test2bOwner){long start=activeRun==null?0:activeRun.startAt,end=activeRun==null?0:activeRun.endAt;argList.add(String.valueOf(start));argList.add(String.valueOf(start));argList.add(String.valueOf(start));argList.add(String.valueOf(end));}argList.add(JOB_VINTED);
             try (Cursor c = db.rawQuery(sql, argList.toArray(new String[0]))) {
                 if (c.moveToFirst()) job = readJob(c);
