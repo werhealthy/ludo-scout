@@ -44,6 +44,56 @@ public final class VintedCandidateSnapshotStore {
         String label; int observations,candidates,strict,ambiguous,noMatch,titleOnly;
     }
 
+    /** Compact durable catalogue candidate exposed to the production resolver.
+     * Reading this structure never performs HTTP. */
+    public static final class SnapshotCandidate {
+        public final String id,title,brand,image;
+        public final int priceCents;
+        public final List<Integer> priceHints;
+        SnapshotCandidate(C c){
+            id=c.id;title=c.title;brand=c.brand;image=c.image;priceCents=c.priceCents;
+            priceHints=Collections.unmodifiableList(new ArrayList<>(c.priceHints));
+        }
+        public int bestPriceDiff(int observedPrice){
+            int best=Integer.MAX_VALUE;
+            if(priceCents!=Integer.MIN_VALUE)best=Math.min(best,Math.abs(priceCents-observedPrice));
+            for(Integer p:priceHints)if(p!=null)best=Math.min(best,Math.abs(p-observedPrice));
+            return best;
+        }
+    }
+
+    public static final class SearchSnapshot {
+        public final long lastAt;
+        public final List<SnapshotCandidate> candidates;
+        SearchSnapshot(long lastAt,List<SnapshotCandidate> candidates){
+            this.lastAt=lastAt;this.candidates=Collections.unmodifiableList(candidates);
+        }
+    }
+
+    /** Returns a recent catalogue response captured by an earlier normal resolver request.
+     * A snapshot may substitute the catalogue search only when it is not materially older than
+     * the listing observation. Exact item-page verification remains the resolver's responsibility. */
+    public static SearchSnapshot recentSearch(Context context,String query,long observedAt,long maxAgeMs){
+        if(context==null||TextUtils.isEmpty(query))return null;
+        DealDatabase helper=new DealDatabase(context.getApplicationContext());
+        try{
+            SQLiteDatabase db=helper.getReadableDatabase();ensure(db);
+            String key=norm(query);if(TextUtils.isEmpty(key))return null;
+            long now=System.currentTimeMillis(),age=Math.max(60_000L,maxAgeMs);
+            try(Cursor cur=db.rawQuery("SELECT last_at,payload FROM vinted_shadow_snapshots_v3 WHERE query_key=? AND last_at>=? LIMIT 1",
+                    new String[]{key,String.valueOf(now-age)})){
+                if(!cur.moveToFirst())return null;
+                long lastAt=cur.getLong(0);
+                if(observedAt>0&&lastAt+60_000L<observedAt)return null;
+                List<C> decoded=decode(cur.getString(1));if(decoded.isEmpty())return null;
+                List<SnapshotCandidate> out=new ArrayList<>();
+                for(C c:decoded)if(c!=null&&!TextUtils.isEmpty(c.id))out.add(new SnapshotCandidate(c));
+                return out.isEmpty()?null:new SearchSnapshot(lastAt,out);
+            }
+        }catch(Throwable ignored){return null;}
+        finally{try{helper.close();}catch(Throwable ignored){}}
+    }
+
     /** Called only after the normal resolver has already obtained a catalogue response. */
     public static void capture(Context context,String query,VintedStructuredData.Scan scan,String body) {
         if(context==null||TextUtils.isEmpty(query)||TextUtils.isEmpty(body))return;
