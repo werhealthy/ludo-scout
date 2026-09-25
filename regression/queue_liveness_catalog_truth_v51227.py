@@ -42,7 +42,8 @@ checks=[
      "urgentVintedReservationUntil(now)>now" in runner_block),
     ("near-due urgent work still preempts ordinary work",
      "urgentVintedReservationUntil" in urgent_block and
-     "ORDER BY CASE WHEN j.job_type=? THEN 0 ELSE 1 END,j.priority DESC" in market),
+     "CASE WHEN j.job_type=? THEN 0 ELSE 1 END,j.priority DESC" in market and
+     "CASE WHEN j.source='OPENED_VERIFY' THEN 0 ELSE 1 END" in market),
     ("lane reports intentional reservation instead of false idle",
      'urgentVintedReservationUntil(now)' in lane_block and
      '"WAITING","priorità Vinted tra "' in lane_block),

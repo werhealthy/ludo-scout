@@ -1,5 +1,12 @@
 # Ludo Scout — AI handoff
 
+## 5.12.63 — Opened Vinted verification priority
+- Field evidence on 5.12.62 showed an exact opened-listing fallback queued for listing 4512 while an unrelated Motore run still owned the ordinary Vinted lane. The queued fallback could therefore wait behind run ownership instead of confirming a sold/unavailable page immediately after the user returned to Ludo.
+- `OPENED_VERIFY` is now treated as interactive exact work in the Vinted claim gate and sorts ahead of ordinary automatic run jobs. Existing public-page pacing and hourly budget remain unchanged.
+- Existing sold reconciliation remains authoritative: a confirmed sold/gone exact page marks the canonical listing SOLD, completes its jobs, removes it from active product surfaces and preserves historical observations/price evidence.
+- Regression: `regression/opened_vinted_verification_priority_v51263.py`, also wired into PR and beta CI.
+- Pixel validation required: open a known Catalog listing on Vinted that is sold/unavailable, return to Ludo, wait through at most the next paced request, and confirm the listing disappears from active Catalog while historical market evidence remains.
+
 ## 5.12.60 — Authoritative Vinted miss breakdown
 - Debug derives a mutually exclusive breakdown for every active listing without a Vinted URL directly from shared SQLite state.
 - `notBggQualified` is kept separate from eligible Vinted outcomes; eligible categories reconcile exactly to queued, awaiting attempt, no candidate, ambiguous, weak match, unavailable, throttled, verification failed and other.

@@ -101,6 +101,8 @@ jobs:
         run: python3 regression/catalog_bridge_type_evidence_v51262.py
       - name: Run existing canonical Catalog recovery regression
         run: python3 regression/catalog_bridge_backfill_v51262.py
+      - name: Run opened Vinted verification priority regression
+        run: python3 regression/opened_vinted_verification_priority_v51263.py
       - name: Run Motore epoch/progress stability regression
         run: python3 regression/engine_epoch_progress_stability_v51216.py
       - name: Run acquisition/crash stability regression

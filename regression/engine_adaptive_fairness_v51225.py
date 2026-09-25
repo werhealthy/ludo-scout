@@ -85,8 +85,8 @@ checks=[
     ("timing observer remains non-destructive",
      "AUTO_FILTERED" not in timing and "AUTO_EXCLUDED" not in timing and
      "nonDestructive=true" in timing),
-    ("Hunt, manual and repaired cards still preempt ordinary run ownership",
-     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY')" in claim),
+    ("Hunt, manual, repaired and just-opened cards still preempt ordinary run ownership",
+     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY','OPENED_VERIFY')" in claim),
     ("Home remains trusted-only",
      'db.getDeals("trusted",320)' in ui and '"trusted".equals(filter)' in deal),
     ("Motore UI exposes remaining online candidates and continuation",

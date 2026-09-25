@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.63 — Verifica immediata dell’annuncio appena aperto (2026-09-25)
+
+- Il debug 5.12.62 mostra che il ritorno da un annuncio Vinted noto accoda correttamente una verifica esatta (`openedVintedVerify=QUEUED`), ma la coda ordinaria del Motore può impedirne la rivendicazione quando quell’annuncio non appartiene allo scroll attivo.
+- `OPENED_VERIFY` è ora una sorgente interattiva ammessa anche durante un run Motore diverso e viene scelta prima del lavoro automatico ordinario.
+- La verifica continua a usare la pagina pubblica Vinted già prevista e il pacing esistente: non aumenta il rate limit e non allenta identità, matching o criteri di pubblicazione.
+- Se la pagina esatta risulta venduta/non disponibile, il listing canonico viene marcato terminale e rimosso dalle superfici attive, mentre osservazioni e storico prezzi restano conservati.
+- Aggiunta regressione SQLite/source-level dedicata e collegata alla CI PR/beta.
+
 ## 5.12.62 — Ponte canonico verso il Catalogo (2026-09-25)
 
 - Un annuncio completato in modo asincrono viene materializzato nel Catalogo solo quando il grafo canonico conferma identità BGG, voto almeno 6, ID e URL Vinted esatti, assenza di review e assenza di job bloccanti.
