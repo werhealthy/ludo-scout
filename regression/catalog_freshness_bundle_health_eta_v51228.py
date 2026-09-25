@@ -41,8 +41,8 @@ checks=[
      "SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?" in promote),
     ("Motore UI shows factual remaining work instead of a minute forecast",
      "min di corsia" not in ui and
-     '" verifiche Vinted rimaste"' in ui and
-     '" · prossima richiesta "+retryCountdown(wait)' in ui),
+     "In attesa del prossimo controllo Vinted" in ui and
+     "verifiche online ancora necessarie" in ui),
     ("catalog health is idle-only, serial, and can repair both exact and missing-link history",
      'CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH"' in market and
      'CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY"' in market and
