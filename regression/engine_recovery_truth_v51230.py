@@ -42,10 +42,10 @@ checks=[
      "day.completeListings+day.reviewListings+day.heldListings>=day.validListings" in ui),
     ("user-facing fake minute ETA is gone",
      "min di corsia" not in ui and
-     "verifiche Vinted rimaste" in ui and
-     "prossima richiesta" in ui),
+     "In attesa del prossimo controllo Vinted" in ui and
+     "verifiche online ancora necessarie" in ui),
     ("recovery station is explicit",
-     'renderEngineHeader("Da completare"' in ui and
+     'renderEngineHeader("Serve il tuo aiuto"' in ui and
      '"Collegamento Vinted"' in ui and
      '"Gioco BGG"' in ui),
     ("catalog shows publishable cards and links recovery back to Motore",
