@@ -1,5 +1,17 @@
 # Ludo Scout — AI handoff
 
+## 5.12.66 — Motore outcome-oriented redesign
+- Motore is now organized around five user questions: what Ludo is doing now, what this scroll already produced, whether the user must intervene, which other scrolls remain unfinished, and recent activity.
+- The overview no longer renders a percentage/progress bar or the five-stage technical funnel. Current work is expressed with concrete states such as acquisition, game recognition, Vinted linking, paced waiting, result preparation and completion.
+- Ready counts are always scoped explicitly to the current scroll. The UI no longer labels a run-local count as the global Catalog total.
+- Actionable manual review is a separate conditional “Serve il tuo aiuto” inbox. Non-actionable held outcomes are described quietly as “non pubblicati automaticamente”.
+- Other unfinished runs are exposed with user-facing states “Riprenderà” and “In attesa”; fairness, scheduler, lane and retry internals remain diagnostic concepts.
+- The run inspector is outcome-oriented: Tutti / Pronti / In lavorazione. Individual cards use Pronto / In lavorazione / Serve una tua scelta / Non pubblicato automaticamente.
+- A dedicated “Lavoro automatico” drill-down explains the three product stages without exposing queue internals.
+- Existing asynchronous Activity snapshots remain the UI data boundary; the redesign adds no synchronous SQLite reads on the Android main thread.
+- No change to matching thresholds, publication gates, Vinted pacing, fairness ownership, schema, signing, applicationId or CI versionCode strategy.
+- Pixel validation required: verify overview hierarchy and navigation during acquisition, Vinted pacing, multi-scroll fairness, manual review, completion and idle states.
+
 ## 5.12.65 — Manual Vinted UI ANR
 - Field evidence on 5.12.64: `systemExitHistory` reported 6 UI ANRs after the install boundary, all input-dispatch timeouts; `activitySnapshot` took 7.3s and `vintedRequestLedger` hit `SQLiteDatabaseLockedException`.
 - Root cause in the manual recovery path: returning from Vinted via Android share and confirming a manual candidate still executed MarketStore/DealDatabase reads and writes synchronously on MainActivity. The DB intentionally has an 8s SQLite busy timeout, longer than Android’s ~5s input-dispatch ANR threshold.
@@ -98,8 +110,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.35-pricing-bundle-exploration`
-- versionCode: `149`
+- Baseline version: `5.12.66-motore-redesign`
+- versionCode: `168`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
