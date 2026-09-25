@@ -265,7 +265,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         v.put("analysis_status","matched");put(v,"bgg_id",d.bggId);put(v,"game_name",d.gameName);put(v,"display_name",d.displayName);put(v,"rating",d.rating);put(v,"bgg_rank",d.rank);put(v,"voters",d.voters);put(v,"quality_score",d.qualityScore);
         v.put("tier",decision.tier);put(v,"tier_label",decision.label);put(v,"total_cents",d.totalCents);put(v,"benchmark_cents",d.benchmarkCents);put(v,"offer_cents",d.offerCents);put(v,"shipping_cents",d.shippingCents);put(v,"discount",d.discount);
         put(v,"language_code",d.languageCode);put(v,"match_reason",d.matchReason);v.put("lifecycle","ACTIVE");v.put("confirmed",0);v.put("listing_type",d.listingType);v.put("verification_state","OK");v.putNull("verification_reason");
-        put(v,"vinted_url",d.vintedUrl);v.put("resolved_at",now);put(v,"vinted_item_id",d.vintedItemId);put(v,"image_url",d.imageUrl);v.put("link_confidence",100);v.put("link_reason","Sincronizzato dal record canonico verificato");
+        put(v,"vinted_url",d.vintedUrl);v.put("resolved_at",now);put(v,"vinted_item_id",d.vintedItemId);put(v,"image_url",d.imageUrl);v.putNull("link_confidence");v.put("link_reason","Identità esatta già verificata dal record canonico");
         put(v,"published_label",d.publishedLabel);put(v,"bgg_image_url",d.bggImageUrl);put(v,"bgg_categories",d.bggCategories);put(v,"bgg_minplayers",d.minPlayers);put(v,"bgg_maxplayers",d.maxPlayers);put(v,"bgg_weight",d.weight);put(v,"bgg_playtime",d.playtime);
         put(v,"seller_id",d.sellerId);put(v,"seller_name",d.sellerName);put(v,"listing_photos_csv",d.listingPhotosCsv);return v;
     }
