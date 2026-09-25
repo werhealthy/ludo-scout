@@ -36,8 +36,9 @@ public final class MainActivity extends Activity {
     private static final class EngineOverviewSnapshot {
         final long loadedAt; final DealDatabase.ObservationSession run; final int waitingRuns,recoveryCount;
         final List<DealDatabase.ObservationDay> days;
-        EngineOverviewSnapshot(long at,DealDatabase.ObservationSession r,int w,int recovery,List<DealDatabase.ObservationDay> d){
-            loadedAt=at;run=r;waitingRuns=w;recoveryCount=recovery;days=d==null?Collections.emptyList():d;
+        final List<DealDatabase.ObservationSession> unfinishedRuns;
+        EngineOverviewSnapshot(long at,DealDatabase.ObservationSession r,int w,int recovery,List<DealDatabase.ObservationDay> d,List<DealDatabase.ObservationSession> unfinished){
+            loadedAt=at;run=r;waitingRuns=w;recoveryCount=recovery;days=d==null?Collections.emptyList():d;unfinishedRuns=unfinished==null?Collections.emptyList():unfinished;
         }
     }
     private volatile EngineOverviewSnapshot engineOverviewSnapshot;
@@ -1216,6 +1217,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if("history".equals(engineSection)){renderEngineHistory();return;}
         if("day".equals(engineSection)){renderEngineDay();return;}
         if("run".equals(engineSection)){renderEngineRun();return;}
+        if("work".equals(engineSection)){renderEngineWork();return;}
         renderEngineOverview();
     }
 
@@ -1231,14 +1233,20 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private boolean engineRunSettled(DealDatabase.ObservationSession run,long now){return DealDatabase.engineAutomaticDone(run,now);}
 
     private EngineOverviewSnapshot loadEngineOverviewSnapshot(){
+        long now=System.currentTimeMillis();
         DealDatabase.ObservationSession run=db.activeObservationSession();
         int waitingRuns=db.waitingObservationSessionCount();
         int recoveryCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();
         List<DealDatabase.ObservationDay> days=db.recentObservationDays(3);
+        List<DealDatabase.ObservationSession> unfinished=new ArrayList<>();
+        for(DealDatabase.ObservationSession candidate:db.recentObservationSessions(now-7L*24L*60L*60_000L,12)){
+            if(!DealDatabase.engineAutomaticDone(candidate,now))unfinished.add(candidate);
+        }
         // Freshness starts when every read has completed. Using the start time made any load slower
         // than the TTL arrive already expired and trapped Activity in a refresh/placeholder loop.
-        return new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,days);
+        return new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,days,unfinished);
     }
+
     private void requestEngineOverviewSnapshot(){
         long requestedAt=System.currentTimeMillis();
         if(requestedAt<engineOverviewRetryAt||!engineOverviewLoading.compareAndSet(false,true))return;
@@ -1273,7 +1281,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
 
     private void renderEngineOverview(){
         long now=System.currentTimeMillis();EngineOverviewSnapshot snapshot=engineOverviewSnapshot;
-        renderEngineHeader("Motore","Il lavoro di Ludo, senza il rumore della coda tecnica",false);
+        renderEngineHeader("Motore","Ludo lavora sui tuoi scroll",false);
         if(snapshot==null){
             requestEngineOverviewSnapshot();
             String loadingCopy=!TextUtils.isEmpty(engineOverviewLoadError)&&now<engineOverviewRetryAt
@@ -1284,55 +1292,138 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         }
         // Stale-while-revalidate: never replace usable Activity data with an empty loading page.
         if(now-snapshot.loadedAt>30_000L)requestEngineOverviewSnapshot();
-        DealDatabase.ObservationSession run=snapshot.run;int waitingRuns=snapshot.waitingRuns;int recoveryCount=snapshot.recoveryCount;
-        body.addView(engineCurrentRunHero(run,now,waitingRuns));
-        if(waitingRuns>0){TextView waiting=text(waitingRuns+(waitingRuns==1?" altro scroll salvato":" altri scroll salvati")+" · saranno elaborati automaticamente a turno",12,MUTED,Typeface.BOLD);waiting.setPadding(dp(2),dp(10),0,0);body.addView(waiting);}
+        DealDatabase.ObservationSession run=snapshot.run;
+        body.addView(engineCurrentRunHero(run,now,snapshot.waitingRuns));
 
-        if(run!=null){
-            TextView funnel=text("Percorso di questo scroll",17,TEXT,Typeface.BOLD);funnel.setPadding(2,dp(24),0,dp(8));body.addView(funnel);
-            int outside=Math.max(0,run.uniqueListings-run.validListings-run.analysisPendingListings);
-            body.addView(engineFunnelRow("Card Vinted uniche",run.uniqueListings,run.analysisPendingListings>0?run.analysisPendingListings+" ancora da analizzare":"acquisizione completata",CYAN));
-            body.addView(engineFunnelRow("Giochi idonei",run.validListings,outside>0?outside+" card escluse automaticamente":"nessuna esclusione automatica",PURPLE));
-            body.addView(engineFunnelRow("BGG confermato · voto 6+",run.bggMatchedListings,"identità del gioco verificata",PURPLE));
-            body.addView(engineFunnelRow("Annunci Vinted collegati",run.vintedLinkedListings,"ID e link esatti",VINTED_BG));
-            body.addView(engineFunnelRow("Nel Catalogo",run.completeListings,"tutti i controlli superati",TEAL));
-
-            TextView process=text("Dettaglio del lavoro automatico",15,TEXT,Typeface.BOLD);process.setPadding(2,dp(24),0,dp(8));body.addView(process);
-            int total=Math.max(0,run.validListings);
-            body.addView(engineStepRow(R.drawable.provider_bgg_logo,"Riconoscimento BGG",run.analysisPendingListings>0?run.analysisPendingListings+" card ancora da classificare":run.bggMatchedListings+" giochi riconosciuti e filtrati",run.analysisPendingListings==0&&run.bggMatchedListings>=total,PURPLE,()->openEngineRun(run,"bgg")));
-            int vintedRemaining=Math.max(run.corePendingListings,run.coreRemainingListings);String vintedWork=total==0?"In attesa dei giochi trovati":(vintedRemaining>0?vintedRemaining+" verifiche online ancora necessarie · "+run.vintedLinkedListings+" già collegate":run.vintedLinkedListings+" annunci collegati · nessuna verifica core in attesa");
-            body.addView(engineStepRow(R.drawable.provider_vinted_logo,"Collegamento Vinted",vintedWork,vintedRemaining==0&&run.analysisPendingListings==0,VINTED_BG,()->openEngineRun(run,"vinted")));
-            body.addView(engineStepRow(R.drawable.ic_deal_good,"Card pronte",total==0?"Nessun gioco trovato in questo scroll":run.completeListings+" di "+total+" pronte da aprire",total==0?run.analysisPendingListings==0:run.completeListings>=total,TEAL,()->openEngineRun(run,"ready")));
+        if(run!=null&&(run.uniqueListings>0||run.validListings>0||run.completeListings>0)){
+            LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(14);
+            body.addView(engineCurrentResultsCard(run),rp);
         }
 
-        if(recoveryCount>0){TextView label=text("Serve una tua scelta",15,TEXT,Typeface.BOLD);label.setPadding(2,dp(24),0,dp(6));body.addView(label);String reviewCopy=recoveryCount+(recoveryCount==1?" caso separato":" casi separati")+" dal lavoro automatico · Il Motore continua anche senza una tua scelta";body.addView(engineNavRow("Rivedi i casi",reviewCopy,ORANGE,()->{engineSection="review";render();}),new LinearLayout.LayoutParams(-1,-2));}
-        if(run!=null&&run.heldListings>0){TextView held=text(run.heldListings+(run.heldListings==1?" risultato non pubblicato automaticamente":" risultati non pubblicati automaticamente")+" · nessuna azione richiesta",12,MUTED,Typeface.BOLD);held.setPadding(dp(2),dp(10),0,0);body.addView(held);}
+        if(snapshot.recoveryCount>0){
+            LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(14);
+            body.addView(engineAttentionCard(snapshot.recoveryCount),ap);
+        }
 
-        LinearLayout histHead=new LinearLayout(this);histHead.setGravity(Gravity.CENTER_VERTICAL);histHead.setPadding(2,dp(26),0,dp(8));TextView ht=text("Cronologia",17,TEXT,Typeface.BOLD);histHead.addView(ht,new LinearLayout.LayoutParams(0,-2,1));TextView all=text("Vedi tutto",13,CYAN,Typeface.BOLD);all.setOnClickListener(v->{engineSection="history";render();});histHead.addView(all);body.addView(histHead);
-        List<DealDatabase.ObservationDay> days=snapshot.days;if(days.isEmpty())body.addView(text("La cronologia partirà dal prossimo scroll su Vinted.",13,MUTED,Typeface.NORMAL));else for(int i=0;i<Math.min(3,days.size());i++)body.addView(engineDayRow(days.get(i),i==Math.min(3,days.size())-1));
-        // Queue broadcasts already trigger semantic refreshes. A timed full rebuild here made
-        // the Activity consume CPU even when no visible state changed.
+        View queue=engineWorkQueueCard(run,snapshot.unfinishedRuns);
+        if(queue!=null){LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(-1,-2);qp.topMargin=dp(22);body.addView(queue,qp);}
+
+        LinearLayout histHead=new LinearLayout(this);histHead.setGravity(Gravity.CENTER_VERTICAL);histHead.setPadding(dp(2),dp(26),0,dp(8));
+        TextView ht=text("Attività recente",17,TEXT,Typeface.BOLD);histHead.addView(ht,new LinearLayout.LayoutParams(0,-2,1));
+        TextView all=text("Vedi cronologia",13,CYAN,Typeface.BOLD);all.setOnClickListener(v->{engineSection="history";render();});histHead.addView(all);body.addView(histHead);
+        List<DealDatabase.ObservationDay> days=snapshot.days;
+        if(days.isEmpty())body.addView(text("La cronologia partirà dal prossimo scroll su Vinted.",13,MUTED,Typeface.NORMAL));
+        else for(int i=0;i<Math.min(3,days.size());i++)body.addView(engineDayRow(days.get(i),i==Math.min(3,days.size())-1));
         uiUpdates.removeCallbacks(activityStatusPulse);
     }
 
     private View engineCurrentRunHero(DealDatabase.ObservationSession run,long now,int waitingRuns){
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(20),dp(20),dp(20),dp(18));boolean active=engineScrollActive(run,now),settled=engineRunSettled(run,now);boolean automaticSettled=run!=null&&DealDatabase.engineContentSettled(run);int accent=run==null||automaticSettled?TEAL:CYAN;hero.setBackground(round(SURFACE,26,1,accent));
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(20),dp(20),dp(20),dp(18));
         if(run==null){
-            TextView eyebrow=text("PRONTO",12,TEAL,Typeface.BOLD);hero.addView(eyebrow);TextView title=text("Puoi fare un nuovo scroll",28,TEXT,Typeface.BOLD);title.setPadding(0,dp(8),0,0);hero.addView(title);hero.addView(text("Apri Vinted e scorri normalmente. Ludo creerà un nuovo lavoro separato da tutto ciò che c'era prima.",14,MUTED,Typeface.NORMAL));SharedPreferences p=getSharedPreferences("va_v3_diag",MODE_PRIVATE);if(p.getBoolean("v5121FreshStartApplied",false)){String reset="Ripartenza pulita · vecchio backlog rimosso";TextView note=text(reset,12,MUTED,Typeface.BOLD);note.setPadding(0,dp(18),0,0);hero.addView(note);}return hero;
+            hero.setBackground(round(SURFACE,26,1,TEAL));
+            hero.addView(text("PRONTO",12,TEAL,Typeface.BOLD));
+            TextView title=text("Puoi fare un nuovo scroll",28,TEXT,Typeface.BOLD);title.setPadding(0,dp(8),0,0);hero.addView(title);
+            hero.addView(text("Apri Vinted e scorri normalmente. Ludo inizierà a lavorare automaticamente.",14,MUTED,Typeface.NORMAL));
+            hero.setContentDescription("Motore pronto. Puoi fare un nuovo scroll.");
+            return hero;
         }
-        String eyebrow=active?"JOB ATTIVO · ACQUISIZIONE":"JOB ATTIVO · ELABORAZIONE AUTOMATICA";hero.addView(text(eyebrow,12,accent,Typeface.BOLD));
-        int automaticDone=Math.min(run.validListings,run.completeListings+run.reviewListings+run.heldListings);
-        int automaticRemaining=Math.max(0,run.validListings-automaticDone);
-        TextView title=text(automaticRemaining>0?"Sto elaborando":"Analisi conclusa",31,TEXT,Typeface.BOLD);title.setPadding(0,dp(8),0,0);hero.addView(title);
-        String workMeta=automaticDone+" di "+run.validListings+" risultati con un esito · "+run.completeListings+" nel Catalogo"+(run.reviewListings>0?" · "+run.reviewListings+" da rivedere":"")+(run.heldListings>0?" · "+run.heldListings+" esclusi":"")+" · "+run.uniqueListings+" card Vinted uniche";
-        int remoteRemaining=Math.max(run.corePendingListings,run.coreRemainingListings);if(remoteRemaining>0)workMeta+=" · "+remoteRemaining+" verifiche online";
-        hero.addView(text(workMeta,13,MUTED,Typeface.NORMAL));
-        ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,dp(7));pp.topMargin=dp(18);if(active&&run.validListings==0){progress.setIndeterminate(true);}else{progress.setIndeterminate(false);progress.setMax(Math.max(1,run.validListings));progress.setProgress(Math.min(run.validListings,automaticDone));}hero.addView(progress,pp);
-        String state;if(active)state="Sto ancora acquisendo questo scroll";else if(run.analysisPendingListings>0)state=run.analysisPendingListings+" card devono ancora essere classificate";else if(automaticRemaining>0){if(remoteRemaining>0){long wait=VintedPublicSession.waitUntil(this);state=remoteRemaining+" verifiche Vinted rimaste"+(wait>now?" · prossima richiesta "+retryCountdown(wait):"")+(waitingRuns>0?" · alterno gli scroll":"");}else state=automaticRemaining+" risultati da consolidare";}else state="Lavoro automatico concluso";TextView status=text(state,14,automaticSettled?TEAL:CYAN,Typeface.BOLD);status.setPadding(0,dp(10),0,0);hero.addView(status);
-        if(run.completeListings>0){TextView open=text("Apri le "+run.completeListings+" card pronte  ›",14,CYAN,Typeface.BOLD);open.setGravity(Gravity.CENTER_VERTICAL);open.setMinHeight(dp(46));open.setPadding(0,dp(8),0,0);open.setOnClickListener(v->openEngineRun(run,"ready"));hero.addView(open);}
-        hero.setOnClickListener(v->openEngineRun(run,"all"));
-        hero.setContentDescription("Apri tutte le card del job attivo");
+
+        boolean acquiring=engineScrollActive(run,now);
+        boolean settled=DealDatabase.engineContentSettled(run);
+        int remoteRemaining=Math.max(run.corePendingListings,run.coreRemainingListings);
+        long waitUntil=VintedPublicSession.waitUntil(this);
+        String eyebrow,title,detail;
+        int accent=settled?TEAL:CYAN;
+
+        if(acquiring){
+            eyebrow="STO RACCOGLIENDO";
+            title="Sto osservando questo scroll";
+            detail=run.uniqueListings+" annunci Vinted osservati finora.\nContinua a usare Vinted normalmente.";
+        }else if(settled){
+            eyebrow="COMPLETATO";
+            title="Questo scroll è stato elaborato";
+            detail=run.completeListings+" risultati pronti da questo scroll.";
+        }else if(run.analysisPendingListings>0){
+            eyebrow="IN LAVORAZIONE";
+            title="Sto riconoscendo i giochi";
+            detail=run.analysisPendingListings+(run.analysisPendingListings==1?" annuncio deve":" annunci devono")+" ancora essere riconosciut"+(run.analysisPendingListings==1?"o.":"i.");
+        }else if(remoteRemaining>0&&waitUntil>now){
+            eyebrow="IN LAVORAZIONE";
+            title="In attesa del prossimo controllo Vinted";
+            detail="Ludo riprenderà automaticamente.\n"+remoteRemaining+(remoteRemaining==1?" annuncio deve":" annunci devono")+" ancora essere verificat"+(remoteRemaining==1?"o.":"i.");
+        }else if(remoteRemaining>0){
+            eyebrow="IN LAVORAZIONE";
+            title="Sto collegando gli annunci";
+            detail=remoteRemaining+(remoteRemaining==1?" annuncio deve":" annunci devono")+" ancora essere verificat"+(remoteRemaining==1?"o":"i")+" su Vinted.";
+        }else{
+            eyebrow="IN LAVORAZIONE";
+            title="Sto preparando i risultati";
+            detail="I risultati già pronti sono disponibili.";
+        }
+
+        hero.setBackground(round(SURFACE,26,1,accent));
+        hero.addView(text(eyebrow,12,accent,Typeface.BOLD));
+        TextView titleView=text(title,28,TEXT,Typeface.BOLD);titleView.setPadding(0,dp(8),0,0);hero.addView(titleView);
+        TextView scrollLabel=text("Scroll delle "+engineTime(run.startAt),12,MUTED,Typeface.BOLD);scrollLabel.setPadding(0,dp(6),0,0);hero.addView(scrollLabel);
+        TextView detailView=text(detail,14,MUTED,Typeface.NORMAL);detailView.setPadding(0,dp(10),0,0);hero.addView(detailView);
+        if(!acquiring){
+            TextView more=text(settled?"Vedi cosa è successo  ›":"Vedi cosa sta facendo Ludo  ›",14,CYAN,Typeface.BOLD);
+            more.setGravity(Gravity.CENTER_VERTICAL);more.setMinHeight(dp(46));more.setPadding(0,dp(7),0,0);
+            more.setOnClickListener(v->openEngineWork(run));hero.addView(more);
+        }
+        hero.setContentDescription(eyebrow+". "+title+". "+detail.replace('\n',' '));
         return hero;
+    }
+
+    private View engineCurrentResultsCard(DealDatabase.ObservationSession run){
+        LinearLayout card=verticalCard();card.setPadding(dp(18),dp(16),dp(18),dp(16));card.setBackground(round(SURFACE,22,1,OUTLINE));
+        LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label=text("Risultati di questo scroll",16,TEXT,Typeface.BOLD);heading.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+        TextView arrow=text("›",26,MUTED,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);heading.addView(arrow,new LinearLayout.LayoutParams(dp(32),dp(40)));card.addView(heading);
+        TextView count=text(run.completeListings+(run.completeListings==1?" risultato pronto":" risultati pronti"),28,TEXT,Typeface.BOLD);count.setPadding(0,dp(8),0,0);card.addView(count);
+        card.addView(text("da questo scroll",13,MUTED,Typeface.NORMAL));
+        String meta=run.bggMatchedListings+" giochi riconosciuti · "+run.uniqueListings+" annunci osservati";
+        TextView metadata=text(meta,12,MUTED,Typeface.NORMAL);metadata.setPadding(0,dp(12),0,0);card.addView(metadata);
+        if(run.heldListings>0){TextView held=text(run.heldListings+(run.heldListings==1?" non pubblicato automaticamente":" non pubblicati automaticamente"),12,MUTED,Typeface.NORMAL);held.setPadding(0,dp(5),0,0);card.addView(held);}
+        if(run.completeListings>0){
+            Button open=button("Vedi "+(run.completeListings==1?"il risultato":"i "+run.completeListings+" risultati"),LIME);
+            open.setOnClickListener(v->openEngineRun(run,"ready"));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(48));bp.topMargin=dp(14);card.addView(open,bp);
+        }else{
+            TextView waiting=text("I primi risultati compariranno qui appena saranno pronti.",12,MUTED,Typeface.NORMAL);waiting.setPadding(0,dp(10),0,0);card.addView(waiting);
+        }
+        return card;
+    }
+
+    private View engineAttentionCard(int count){
+        LinearLayout card=new LinearLayout(this);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(16),dp(14),dp(12),dp(14));card.setBackground(round(SURFACE,20,1,ORANGE));
+        TextView icon=text("!",16,ORANGE,Typeface.BOLD);icon.setGravity(Gravity.CENTER);icon.setBackground(round(SURFACE2,999,1,ORANGE));card.addView(icon,new LinearLayout.LayoutParams(dp(34),dp(34)));
+        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(12),0,dp(8),0);
+        copy.addView(text("Serve il tuo aiuto",16,TEXT,Typeface.BOLD));
+        copy.addView(text(count+(count==1?" elemento richiede":" elementi richiedono")+" una scelta",12,MUTED,Typeface.NORMAL));
+        card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));TextView arrow=text("›",28,ORANGE,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);card.addView(arrow,new LinearLayout.LayoutParams(dp(34),dp(44)));
+        card.setOnClickListener(v->{engineSection="review";render();});card.setContentDescription("Serve il tuo aiuto. "+count+" elementi richiedono una scelta.");
+        return card;
+    }
+
+    private View engineWorkQueueCard(DealDatabase.ObservationSession active,List<DealDatabase.ObservationSession> unfinished){
+        if(unfinished==null||unfinished.isEmpty())return null;
+        List<DealDatabase.ObservationSession> others=new ArrayList<>();
+        for(DealDatabase.ObservationSession x:unfinished)if(active==null||x.startAt!=active.startAt)others.add(x);
+        if(others.isEmpty())return null;
+        Collections.sort(others,Comparator.comparingLong(x->x.startAt));
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);head.addView(text("Altri scroll",17,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));
+        if(others.size()>3){TextView all=text("Vedi tutti",13,CYAN,Typeface.BOLD);all.setOnClickListener(v->{engineSection="history";render();});head.addView(all);}box.addView(head);
+        int shown=Math.min(3,others.size());
+        for(int i=0;i<shown;i++){
+            DealDatabase.ObservationSession x=others.get(i);boolean deferred=active!=null&&x.startAt<active.startAt;
+            LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(12),0,dp(12));
+            LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.addView(text("Scroll · "+engineTime(x.startAt),15,TEXT,Typeface.BOLD));copy.addView(text(x.uniqueListings+" annunci osservati",12,MUTED,Typeface.NORMAL));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+            TextView status=text(deferred?"Riprenderà":"In attesa",12,deferred?PURPLE:MUTED,Typeface.BOLD);status.setGravity(Gravity.RIGHT);row.addView(status);
+            TextView arrow=text("›",26,MUTED,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(32),dp(44)));row.setOnClickListener(v->openObservationSession(x));box.addView(row);
+            if(i<shown-1)box.addView(engineDivider());
+        }
+        return box;
     }
 
     private View engineFunnelRow(String label,int value,String detail,int accent){
@@ -1354,29 +1445,76 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private String engineTime(long at){return new SimpleDateFormat("HH:mm",Locale.ITALY).format(new Date(at));}
 
     private View engineDayRow(DealDatabase.ObservationDay day,boolean last){
-        LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(LinearLayout.VERTICAL);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(13),0,dp(13));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.addView(text(engineDayLabel(day.startAt),16,TEXT,Typeface.BOLD));copy.addView(text(day.sessions+(day.sessions==1?" scroll":" scroll")+" · "+day.uniqueListings+" card uniche",12,MUTED,Typeface.NORMAL));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));LinearLayout state=new LinearLayout(this);state.setOrientation(LinearLayout.VERTICAL);state.setGravity(Gravity.RIGHT);String summary=day.validListings==0?"nessun gioco":day.completeListings+" pronte"+(day.reviewListings>0?" · "+day.reviewListings+" da completare":"")+(day.heldListings>0?" · "+day.heldListings+" chiuse":"");int color=day.validListings==0||day.completeListings+day.reviewListings+day.heldListings>=day.validListings?TEAL:CYAN;TextView st=text(summary,13,color,Typeface.BOLD);st.setGravity(Gravity.RIGHT);state.addView(st);TextView games=text(day.sessions+" job · "+day.validListings+" giochi elaborati",11,MUTED,Typeface.NORMAL);games.setGravity(Gravity.RIGHT);state.addView(games);row.addView(state);TextView arrow=text("›",28,MUTED,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(34),dp(48)));row.setOnClickListener(v->{engineDayStart=day.startAt;engineDayEnd=day.endAt;engineSection="day";render();});wrap.addView(row);if(!last)wrap.addView(engineDivider());return wrap;
+        LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(LinearLayout.VERTICAL);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(13),0,dp(13));
+        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.addView(text(engineDayLabel(day.startAt),16,TEXT,Typeface.BOLD));copy.addView(text(day.sessions+" scroll · "+day.uniqueListings+" annunci osservati",12,MUTED,Typeface.NORMAL));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout state=new LinearLayout(this);state.setOrientation(LinearLayout.VERTICAL);state.setGravity(Gravity.RIGHT);
+        String summary=day.validListings==0?"nessun risultato":day.completeListings+" risultati pronti"+(day.reviewListings>0?" · "+day.reviewListings+" da rivedere":"");
+        TextView st=text(summary,13,day.validListings==0||day.completeListings+day.reviewListings+day.heldListings>=day.validListings?TEAL:CYAN,Typeface.BOLD);st.setGravity(Gravity.RIGHT);state.addView(st);row.addView(state);
+        TextView arrow=text("›",28,MUTED,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(34),dp(48)));
+        row.setOnClickListener(v->{engineDayStart=day.startAt;engineDayEnd=day.endAt;engineSection="day";render();});wrap.addView(row);if(!last)wrap.addView(engineDivider());return wrap;
     }
 
     private void openEngineRun(DealDatabase.ObservationSession run,String filter){if(run==null)return;engineRunStart=run.startAt;engineRunEnd=run.endAt;engineRunFilter=TextUtils.isEmpty(filter)?"all":filter;engineRunPage=0;engineSection="run";render();if(scroll!=null)scroll.scrollTo(0,0);}
+    private void openEngineWork(DealDatabase.ObservationSession run){if(run==null)return;engineRunStart=run.startAt;engineRunEnd=run.endAt;engineSection="work";render();if(scroll!=null)scroll.scrollTo(0,0);}
     private void openObservationReady(DealDatabase.ObservationSession run){openEngineRun(run,"ready");}
     private void openObservationSession(DealDatabase.ObservationSession session){openEngineRun(session,"all");}
 
+    private void renderEngineWork(){
+        requestEngineRunSnapshot(engineRunStart,engineRunEnd,"all");
+        EngineRunSnapshot snapshot=engineRunSnapshot;
+        if(snapshot==null||snapshot.startAt!=engineRunStart||snapshot.endAt!=engineRunEnd||!"all".equals(snapshot.filter)){
+            renderEngineHeader("Lavoro automatico","Sto caricando lo stato dello scroll…",true);body.addView(engineSnapshotMessage("Lettura in corso"));return;
+        }
+        DealDatabase.ObservationSession run=snapshot.run;if(run==null){engineSection="overview";renderEngineOverview();return;}
+        long now=System.currentTimeMillis();int remoteRemaining=Math.max(run.corePendingListings,run.coreRemainingListings);long waitUntil=VintedPublicSession.waitUntil(this);
+        String current;
+        if(engineScrollActive(run,now))current="Sto osservando questo scroll";
+        else if(DealDatabase.engineContentSettled(run))current="Lavoro automatico concluso";
+        else if(run.analysisPendingListings>0)current="Sto riconoscendo i giochi";
+        else if(remoteRemaining>0&&waitUntil>now)current="In attesa del prossimo controllo Vinted";
+        else if(remoteRemaining>0)current="Sto collegando gli annunci";
+        else current="Sto preparando i risultati";
+        renderEngineHeader("Lavoro automatico","Scroll delle "+engineTime(run.startAt),true);
 
-    private String engineRunFilterLabel(){if("bgg".equals(engineRunFilter))return"Riconoscimento BGG";if("vinted".equals(engineRunFilter))return"Collegamento Vinted";if("ready".equals(engineRunFilter))return"Card pronte";if("review".equals(engineRunFilter))return"Da verificare";if("metadata".equals(engineRunFilter))return"Dati finali";return"Tutti i giochi";}
+        LinearLayout nowCard=verticalCard();nowCard.setPadding(dp(18),dp(16),dp(18),dp(16));nowCard.setBackground(round(SURFACE,22,1,CYAN));
+        nowCard.addView(text("ORA",11,CYAN,Typeface.BOLD));TextView currentView=text(current,22,TEXT,Typeface.BOLD);currentView.setPadding(0,dp(7),0,0);nowCard.addView(currentView);
+        String nowDetail=remoteRemaining>0?remoteRemaining+(remoteRemaining==1?" verifica online ancora necessaria":" verifiche online ancora necessarie"):run.completeListings+" risultati già pronti";
+        TextView nowDetailView=text(nowDetail,13,MUTED,Typeface.NORMAL);nowDetailView.setPadding(0,dp(6),0,0);nowCard.addView(nowDetailView);body.addView(nowCard);
+
+        TextView pathTitle=text("Percorso di questo scroll",17,TEXT,Typeface.BOLD);pathTitle.setPadding(dp(2),dp(24),0,dp(6));body.addView(pathTitle);
+        boolean recognitionDone=run.analysisPendingListings==0;
+        body.addView(engineStepRow(R.drawable.provider_bgg_logo,"Riconoscimento giochi",run.bggMatchedListings+" giochi riconosciuti",recognitionDone,PURPLE,null));
+        body.addView(engineStepRow(R.drawable.provider_vinted_logo,"Collegamento annunci",run.vintedLinkedListings+" collegati"+(remoteRemaining>0?" · "+remoteRemaining+" da verificare":""),recognitionDone&&remoteRemaining==0,VINTED_BG,null));
+        body.addView(engineStepRow(R.drawable.ic_deal_good,"Preparazione risultati",run.completeListings+" risultati pronti",DealDatabase.engineContentSettled(run),TEAL,null));
+
+        TextView how=text("Come funziona questo lavoro",17,TEXT,Typeface.BOLD);how.setPadding(dp(2),dp(24),0,dp(8));body.addView(how);
+        body.addView(engineExplanationRow("Riconoscimento giochi","Ludo confronta ciò che hai visto su Vinted con BoardGameGeek."));
+        body.addView(engineExplanationRow("Collegamento annunci","Quando il gioco è riconosciuto, prova a identificare l’annuncio Vinted esatto."));
+        body.addView(engineExplanationRow("Preparazione risultati","Solo i collegamenti abbastanza affidabili diventano risultati utilizzabili."));
+        if(run.completeListings>0){Button ready=button("Vedi "+run.completeListings+(run.completeListings==1?" risultato pronto":" risultati pronti"),LIME);ready.setOnClickListener(v->openEngineRun(run,"ready"));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(50));bp.topMargin=dp(20);body.addView(ready,bp);}
+        TextView all=text("Vedi tutte le card dello scroll  ›",14,CYAN,Typeface.BOLD);all.setGravity(Gravity.CENTER_VERTICAL);all.setMinHeight(dp(50));all.setOnClickListener(v->openEngineRun(run,"all"));body.addView(all);
+    }
+
+    private View engineExplanationRow(String title,String detail){
+        LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.VERTICAL);row.setPadding(dp(2),dp(10),dp(2),dp(10));row.addView(text(title,14,TEXT,Typeface.BOLD));row.addView(text(detail,12,MUTED,Typeface.NORMAL));return row;
+    }
+
+    private String engineRunFilterLabel(){if("ready".equals(engineRunFilter))return"Risultati pronti";if("working".equals(engineRunFilter))return"In lavorazione";return"Tutti i risultati";}
 
     private void renderEngineRun(){
         requestEngineRunSnapshot(engineRunStart,engineRunEnd,engineRunFilter);
         EngineRunSnapshot snapshot=engineRunSnapshot;
-        if(snapshot==null||snapshot.startAt!=engineRunStart||snapshot.endAt!=engineRunEnd||!snapshot.filter.equals(engineRunFilter)){renderEngineHeader("Job","Sto caricando i dettagli dello scroll…",true);body.addView(engineSnapshotMessage("Lettura in corso"));return;}
+        if(snapshot==null||snapshot.startAt!=engineRunStart||snapshot.endAt!=engineRunEnd||!snapshot.filter.equals(engineRunFilter)){renderEngineHeader("Scroll","Sto caricando i dettagli dello scroll…",true);body.addView(engineSnapshotMessage("Lettura in corso"));return;}
         DealDatabase.ObservationSession run=snapshot.run;if(run==null){engineSection="overview";renderEngineOverview();return;}
-        renderEngineHeader("Job · "+engineTime(run.startAt),engineRunFilterLabel()+" · "+run.validListings+" giochi trovati su "+run.uniqueListings+" card Vinted uniche",true);
-        LinearLayout tabs=new LinearLayout(this);tabs.setGravity(Gravity.CENTER_VERTICAL);String[][] opts={{"all","Tutti"},{"bgg","BGG"},{"vinted","Vinted"},{"ready","Pronte"}};for(int i=0;i<opts.length;i++){final String key=opts[i][0];boolean selected=key.equals(engineRunFilter);TextView chip=materialChip((selected?"✓ ":"")+opts[i][1],selected?SURFACE2:SURFACE,selected?TEXT:MUTED,selected);chip.setOnClickListener(v->{engineRunFilter=key;engineRunPage=0;render();});LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(38),1);if(i>0)cp.leftMargin=dp(6);tabs.addView(chip,cp);}body.addView(tabs);
+        renderEngineHeader("Scroll · "+engineTime(run.startAt),run.validListings+" giochi trovati · "+run.uniqueListings+" annunci Vinted osservati",true);
+        LinearLayout tabs=new LinearLayout(this);tabs.setGravity(Gravity.CENTER_VERTICAL);String[][] opts={{"all","Tutti"},{"ready","Pronti"},{"working","In lavorazione"}};for(int i=0;i<opts.length;i++){final String key=opts[i][0];boolean selected=key.equals(engineRunFilter);TextView chip=materialChip((selected?"✓ ":"")+opts[i][1],selected?SURFACE2:SURFACE,selected?TEXT:MUTED,selected);chip.setOnClickListener(v->{engineRunFilter=key;engineRunPage=0;render();});LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(38),1);if(i>0)cp.leftMargin=dp(6);tabs.addView(chip,cp);}body.addView(tabs);
         final int pageSize=24;List<DealDatabase.EngineRunItem> items=snapshot.items;int total=items.size();int pages=Math.max(1,(total+pageSize-1)/pageSize);if(engineRunPage>=pages)engineRunPage=pages-1;if(engineRunPage<0)engineRunPage=0;int pageStart=Math.min(total,engineRunPage*pageSize),pageEnd=Math.min(total,pageStart+pageSize);
-        String shown=total==0?"0 card":(pageStart+1)+"–"+pageEnd+" di "+total;TextView count=text(shown+("ready".equals(engineRunFilter)?" pronte":" nel job"),13,MUTED,Typeface.BOLD);count.setPadding(0,dp(16),0,dp(8));body.addView(count);
-        if(items.isEmpty()){String msg="ready".equals(engineRunFilter)?"Nessuna card è ancora completamente pronta.":"Nessuna card in questa fase.";body.addView(emptyState("Niente da mostrare",msg,R.drawable.ludo_refresh));return;}
+        String shown=total==0?"0 risultati":(pageStart+1)+"–"+pageEnd+" di "+total;TextView count=text(shown,13,MUTED,Typeface.BOLD);count.setPadding(0,dp(16),0,dp(8));body.addView(count);
+        if(items.isEmpty()){String msg="ready".equals(engineRunFilter)?"Nessun risultato è ancora pronto.":"working".equals(engineRunFilter)?"Non ci sono risultati ancora in lavorazione.":"Nessun risultato da mostrare.";body.addView(emptyState("Niente da mostrare",msg,R.drawable.ludo_refresh));return;}
         for(int i=pageStart;i<pageEnd;i++)body.addView(engineRunItemCard(items.get(i)));
         if(pages>1){LinearLayout pager=new LinearLayout(this);pager.setGravity(Gravity.CENTER_VERTICAL);pager.setPadding(0,dp(6),0,dp(6));Button prev=button("‹ Precedenti",SURFACE2);prev.setTextColor(engineRunPage>0?CYAN:MUTED);prev.setEnabled(engineRunPage>0);prev.setOnClickListener(v->{engineRunPage=Math.max(0,engineRunPage-1);render();if(scroll!=null)scroll.scrollTo(0,0);});pager.addView(prev,new LinearLayout.LayoutParams(0,dp(44),1));TextView page=text((engineRunPage+1)+" / "+pages,12,MUTED,Typeface.BOLD);page.setGravity(Gravity.CENTER);pager.addView(page,new LinearLayout.LayoutParams(dp(72),dp(44)));Button next=button("Successive ›",SURFACE2);next.setTextColor(engineRunPage+1<pages?CYAN:MUTED);next.setEnabled(engineRunPage+1<pages);next.setOnClickListener(v->{engineRunPage=Math.min(pages-1,engineRunPage+1);render();if(scroll!=null)scroll.scrollTo(0,0);});pager.addView(next,new LinearLayout.LayoutParams(0,dp(44),1));body.addView(pager);}
     }
+
     private View engineRunThumbnailView(DealDatabase.EngineRunItem item,int w,int h){
         FrameLayout frame=new FrameLayout(this);frame.setBackground(round(SURFACE2,14,1,OUTLINE));frame.setClipToOutline(true);ImageView im=new ImageView(this);im.setScaleType(ImageView.ScaleType.CENTER_CROP);frame.addView(im,new FrameLayout.LayoutParams(-1,-1));boolean loaded=false;
         if(item!=null&&!TextUtils.isEmpty(item.signature)){File local=ThumbnailStore.fileFor(this,item.signature);if(local.exists()&&local.length()>1024){im.setTag(item.signature);loadEngineRunThumbnail(im,local,item.signature,Math.max(140,w*2),Math.max(180,h*2));loaded=true;}}
@@ -1388,9 +1526,14 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
     private View engineRunItemCard(DealDatabase.EngineRunItem item){
-        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(10),dp(10),dp(12),dp(10));int accent=item.review?ORANGE:item.complete?TEAL:(!item.bggReady?PURPLE:(!item.vintedReady?VINTED_BG:YELLOW));card.setBackground(round(SURFACE,18,1,OUTLINE));LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(10),dp(10),dp(12),dp(10));
+        int accent=item.review?ORANGE:item.complete?TEAL:item.held?MUTED:CYAN;card.setBackground(round(SURFACE,18,1,OUTLINE));LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
         View art=engineRunThumbnailView(item,66,82);row.addView(art,new LinearLayout.LayoutParams(dp(66),dp(82)));
-        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(12),0,0,0);TextView title=text(TextUtils.isEmpty(item.title)?(TextUtils.isEmpty(item.canonical)?"Annuncio":item.canonical):item.title,15,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);String game=TextUtils.isEmpty(item.canonical)?"BGG da identificare":item.canonical+(TextUtils.isEmpty(item.bggId)?"":" · BGG #"+item.bggId);copy.addView(text(game,12,MUTED,Typeface.NORMAL));String status;if(item.review)status="Serve una tua risposta";else if(item.held)status="Non pubblicata automaticamente";else if(item.complete)status="Pronta";else if(!item.bggReady)status="Riconoscimento BGG";else if(!item.vintedReady)status="Collegamento Vinted";else if("BGG_VARIANT_PENDING".equals(item.listingMatchState))status="Confermo la variante BGG";else status=TextUtils.isEmpty(item.publishedLabel)?"Completo i dati Vinted":"Finalizzo la card";copy.addView(text(status,12,accent,Typeface.BOLD));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));if(item.priceCents>0)row.addView(text(money(item.priceCents),15,LIME,Typeface.BOLD));card.addView(row);card.setOnClickListener(v->openEngineRunItem(item));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);card.setLayoutParams(lp);return card;
+        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(12),0,dp(8),0);
+        TextView title=text(TextUtils.isEmpty(item.title)?(TextUtils.isEmpty(item.canonical)?"Annuncio":item.canonical):item.title,15,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);
+        String game=TextUtils.isEmpty(item.canonical)?"Gioco da riconoscere":item.canonical+(TextUtils.isEmpty(item.bggId)?"":" · BGG #"+item.bggId);copy.addView(text(game,12,MUTED,Typeface.NORMAL));
+        String status;if(item.review)status="Serve una tua scelta";else if(item.held)status="Non pubblicato automaticamente";else if(item.complete)status="Pronto";else if(!item.bggReady)status="Riconosco il gioco";else if(!item.vintedReady)status="Cerco l’annuncio Vinted esatto";else if("BGG_VARIANT_PENDING".equals(item.listingMatchState))status="Confermo la variante BGG";else status="Preparo il risultato";
+        copy.addView(text(status,12,accent,Typeface.BOLD));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));if(item.priceCents>0)row.addView(text(money(item.priceCents),15,LIME,Typeface.BOLD));card.addView(row);card.setOnClickListener(v->openEngineRunItem(item));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);card.setLayoutParams(lp);return card;
     }
 
     private void openEngineRunItem(DealDatabase.EngineRunItem item){
@@ -1410,7 +1553,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
     private void renderEngineReview(){
-        renderEngineHeader("Da completare","Qui Ludo ti chiede solo una decisione precisa: Vinted, gioco BGG o variante. Nessun caso generico.",true);
+        renderEngineHeader("Serve il tuo aiuto","Qui Ludo ti chiede solo una decisione precisa: collegamento Vinted, gioco BGG o variante.",true);
         List<MarketStore.Job> reviewJobs=marketStore.reviewJobs(80);List<GameRecord> bggReview=marketStore.bggMatchReviewGames(80);
         List<MarketStore.Job> vintedReviews=new ArrayList<>(),variantReviews=new ArrayList<>();
         for(MarketStore.Job job:reviewJobs){MarketListingRecord l=job==null?null:marketStore.listing(job.listingId);if(l!=null&&"BGG_VARIANT_REVIEW".equals(l.matchState))variantReviews.add(job);else vintedReviews.add(job);}
@@ -1449,18 +1592,16 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
 
     private void renderEngineDay(){
         if(engineDayStart<=0){engineSection="history";renderEngineHistory();return;}
-        String label=engineDayLabel(engineDayStart);renderEngineHeader(label,"Tutti gli scroll di questa giornata",true);
         requestEngineDaySnapshot(engineDayStart,engineDayEnd);
         EngineDaySnapshot snapshot=engineDaySnapshot;
-        if(snapshot==null||snapshot.startAt!=engineDayStart||snapshot.endAt!=engineDayEnd){body.addView(engineSnapshotMessage("Carico gli scroll di questa giornata…"));return;}
-        List<EngineDaySession> sessions=snapshot.sessions;
-        if(sessions.isEmpty()){body.addView(emptyState("Nessuno scroll","Non ci sono osservazioni in questa giornata.",R.drawable.ludo_refresh));return;}
-        int cards=0,valid=0,ready=0,review=0,held=0;
-        for(EngineDaySession item:sessions){DealDatabase.ObservationSession s=item.session;cards+=s.observations;valid+=s.validListings;ready+=s.completeListings;review+=s.reviewListings;held+=s.heldListings;}
-        LinearLayout summary=new LinearLayout(this);summary.setOrientation(LinearLayout.VERTICAL);summary.setPadding(0,dp(4),0,dp(18));summary.addView(text(valid+" giochi trovati",28,TEXT,Typeface.BOLD));summary.addView(text(cards+" card Vinted · "+sessions.size()+" scroll · "+ready+" pronti"+(review>0?" · "+review+" da controllare":"")+(held>0?" · "+held+" non pubblicati automaticamente":""),13,MUTED,Typeface.NORMAL));body.addView(summary);
-        for(int i=0;i<sessions.size();i++){EngineDaySession item=sessions.get(i);DealDatabase.ObservationSession s=item.session;LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(LinearLayout.VERTICAL);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(13),0,dp(13));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.addView(text("Scroll · "+engineTime(s.startAt),16,TEXT,Typeface.BOLD));copy.addView(text(s.observations+" card · "+s.validListings+" giochi trovati",12,MUTED,Typeface.NORMAL));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));String status=item.deferred?"In pausa · riprenderà":(item.waiting?"In attesa":(item.active?((s.completeListings+s.reviewListings+s.heldListings)+" / "+s.validListings+" elaborati · in corso"):(s.completeListings+" pronte"+(s.reviewListings>0?" · "+s.reviewListings+" da controllare":"")+(s.heldListings>0?" · "+s.heldListings+" trattenute":""))));int statusColor=(item.waiting||item.deferred)?MUTED:(item.active&&!DealDatabase.engineContentSettled(s)?YELLOW:(DealDatabase.engineContentSettled(s)?TEAL:YELLOW));TextView st=text(status,12,statusColor,Typeface.BOLD);st.setGravity(Gravity.RIGHT);row.addView(st);TextView arrow=text("›",28,MUTED,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(34),dp(48)));row.setOnClickListener(v->openObservationSession(s));wrap.addView(row);if(i<sessions.size()-1)wrap.addView(engineDivider());body.addView(wrap);}
+        if(snapshot==null||snapshot.startAt!=engineDayStart||snapshot.endAt!=engineDayEnd){renderEngineHeader(engineDayLabel(engineDayStart),"Sto caricando gli scroll di questa giornata…",true);body.addView(engineSnapshotMessage("Lettura in corso"));return;}
+        String label=engineDayLabel(engineDayStart);renderEngineHeader(label,"Tutti gli scroll di questa giornata",true);
+        if(snapshot.sessions.isEmpty()){body.addView(emptyState("Nessuno scroll","Non ci sono osservazioni in questa giornata.",R.drawable.ludo_refresh));return;}
+        int cards=0,valid=0,ready=0,review=0,held=0;for(EngineDaySession entry:snapshot.sessions){DealDatabase.ObservationSession x=entry.session;cards+=x.uniqueListings;valid+=x.validListings;ready+=x.completeListings;review+=x.reviewListings;held+=x.heldListings;}
+        LinearLayout summary=new LinearLayout(this);summary.setOrientation(LinearLayout.VERTICAL);summary.setPadding(0,dp(4),0,dp(18));summary.addView(text(ready+" risultati pronti",28,TEXT,Typeface.BOLD));summary.addView(text(cards+" annunci osservati · "+snapshot.sessions.size()+" scroll"+(review>0?" · "+review+" richiedono una scelta":"")+(held>0?" · "+held+" non pubblicati automaticamente":""),13,MUTED,Typeface.NORMAL));body.addView(summary);
+        for(int i=0;i<snapshot.sessions.size();i++){EngineDaySession entry=snapshot.sessions.get(i);DealDatabase.ObservationSession x=entry.session;LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(LinearLayout.VERTICAL);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(2),dp(13),0,dp(13));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.addView(text("Scroll · "+engineTime(x.startAt),16,TEXT,Typeface.BOLD));copy.addView(text(x.uniqueListings+" annunci osservati · "+x.validListings+" giochi trovati",12,MUTED,Typeface.NORMAL));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+            String status=entry.deferred?"Riprenderà":entry.waiting?"In attesa":entry.active&&!DealDatabase.engineContentSettled(x)?"In lavorazione":x.completeListings+" risultati pronti";int statusColor=entry.deferred?PURPLE:entry.waiting?MUTED:entry.active?CYAN:TEAL;TextView st=text(status,12,statusColor,Typeface.BOLD);st.setGravity(Gravity.RIGHT);row.addView(st);TextView arrow=text("›",28,MUTED,Typeface.NORMAL);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(34),dp(48)));row.setOnClickListener(v->openObservationSession(x));wrap.addView(row);if(i<snapshot.sessions.size()-1)wrap.addView(engineDivider());body.addView(wrap);}
     }
-
 
     private void addQueueControlPanels(){
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,dp(12),0,dp(4));View v=queueControlPanel(true);View b=queueControlPanel(false);row.addView(v,new LinearLayout.LayoutParams(0,dp(138),1));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(0,dp(138),1);bp.leftMargin=dp(10);row.addView(b,bp);body.addView(row);
