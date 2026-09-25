@@ -117,6 +117,11 @@ public final class MarketStore {
             "(SELECT COUNT(DISTINCT deal_id) FROM bgg_agreement),"+
             "(SELECT COUNT(DISTINCT deal_id) FROM job_clear),"+
             "(SELECT COUNT(*) FROM catalog_rows)";
+    private static final String BGG_PRODUCT_TYPE_EVIDENCE_SQL =
+            "SELECT o.listing_type FROM market_listings l JOIN observations o ON "+
+            "o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+            "WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND o.listing_type IN ('BASE_GAME','EXPANSION','GAME') "+
+            "ORDER BY CASE o.listing_type WHEN 'BASE_GAME' THEN 0 WHEN 'EXPANSION' THEN 1 WHEN 'GAME' THEN 2 ELSE 3 END,o.observed_at DESC,o.id DESC LIMIT 1";
     private static final String QUEUE_PREFS = "ludo_market_queue_controls";
     private static final String KEY_HISTORY_PAUSED = "history_paused";
     private static final String KEY_VINTED_PAUSED = "vinted_paused";
@@ -1285,6 +1290,7 @@ public final class MarketStore {
                 : helper.getWritableDatabase().update("processing_jobs",v,"id=?",new String[]{String.valueOf(job.id)});
         if(changed==0)return;
         updateListingState(job.listingId, COMPLETE, "");
+        if(job.listingId>0)helper.materializeCanonicalDeal(job.listingId);
         Log.i(TAG, "job=" + job.id + " state=COMPLETE attempt=" + job.attempt + " listing=" + job.listingId);
         notifyQueueChanged();
     }
@@ -1431,6 +1437,7 @@ public final class MarketStore {
             Long id = scalarLong(db, "SELECT id FROM games WHERE bgg_id=?", new String[]{m.bggId});
             if (id == null) { db.setTransactionSuccessful(); return; }
             String listingTypeRaw=scalarString(db,"SELECT listing_type FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE' ORDER BY CASE listing_type WHEN 'BASE_GAME' THEN 0 WHEN 'EXPANSION' THEN 1 ELSE 2 END,last_seen DESC LIMIT 1",new String[]{m.bggId});
+            if(TextUtils.isEmpty(listingTypeRaw))listingTypeRaw=scalarString(db,BGG_PRODUCT_TYPE_EVIDENCE_SQL,new String[]{String.valueOf(id)});
             ListingClassifier.Type listingType=ListingClassifier.Type.UNCERTAIN;
             try{ if(!TextUtils.isEmpty(listingTypeRaw))listingType=ListingClassifier.Type.valueOf(listingTypeRaw); }catch(Throwable ignored){}
             BggProductCompatibility.Verdict typeVerdict=BggProductCompatibility.validate(listingType.name(),m.itemType);
@@ -1493,6 +1500,9 @@ public final class MarketStore {
             if (!TextUtils.isEmpty(m.alternateNames)) for (String a : m.alternateNames.split("\\s*\\|\\s*")) addAlias(db, id, a, "BGG_ALTERNATE");
             ContentValues done = new ContentValues(); done.put("state", COMPLETE); done.put("updated_at", System.currentTimeMillis()); done.put("next_attempt_at", 0); done.put("last_error", ""); done.put("progress",100);
             db.update("processing_jobs", done, "job_key=?", new String[]{"bgg:" + id});
+            try(Cursor ready=db.rawQuery("SELECT id FROM market_listings WHERE game_id=? AND lifecycle='ACTIVE' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' AND vinted_url IS NOT NULL AND vinted_url<>''",new String[]{String.valueOf(id)})){
+                while(ready.moveToNext())helper.materializeCanonicalDeal(ready.getLong(0));
+            }
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
     }
@@ -2791,7 +2801,8 @@ public final class MarketStore {
             return "marketCoreListings="+c.getInt(0)+"; coreBridgedDeals="+c.getInt(1)+"; coreInCatalog="+c.getInt(2)+
                     "; coreNotCatalog="+c.getInt(3)+"; catalogOutsideCore="+c.getInt(4)+"; catalogBase="+c.getInt(5)+
                     "; dealIdentity="+c.getInt(6)+"; reviewClear="+c.getInt(7)+"; listingMatched="+c.getInt(8)+
-                    "; bggAgreement="+c.getInt(9)+"; noBlockingJobs="+c.getInt(10)+"; catalogEligible="+c.getInt(11);
+                    "; bggAgreement="+c.getInt(9)+"; noBlockingJobs="+c.getInt(10)+"; catalogEligible="+c.getInt(11)+
+                    "; "+helper.catalogBridgeBreakdown();
         }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
     }
     public int partialVintedMetadataCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (published_label IS NULL OR published_label=''))",null)){return c.moveToFirst()?c.getInt(0):0;}}

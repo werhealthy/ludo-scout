@@ -213,6 +213,76 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public synchronized DealRecord findByVintedTitle(String title){Cursor c=getReadableDatabase().rawQuery("SELECT "+COLS+" FROM deals WHERE LOWER(vinted_title)=LOWER(?) AND lifecycle='ACTIVE' ORDER BY last_seen DESC LIMIT 1",new String[]{title==null?"":title});DealRecord d=c.moveToFirst()?readDeal(c):null;c.close();return d;}
     public synchronized DealRecord findByBggId(String bggId){if(bggId==null||bggId.isEmpty())return null;Cursor c=getReadableDatabase().rawQuery("SELECT "+COLS+" FROM deals WHERE bgg_id=? AND lifecycle='ACTIVE' ORDER BY last_seen DESC LIMIT 1",new String[]{bggId});DealRecord d=c.moveToFirst()?readDeal(c):null;c.close();return d;}
     public synchronized DealRecord findByVintedItemId(String itemId){if(itemId==null||itemId.isEmpty())return null;Cursor c=getReadableDatabase().rawQuery("SELECT "+COLS+" FROM deals WHERE vinted_item_id=? AND lifecycle='ACTIVE' ORDER BY last_seen DESC LIMIT 1",new String[]{itemId});DealRecord d=c.moveToFirst()?readDeal(c):null;c.close();return d;}
+    /**
+     * Creates the legacy Catalog row only after the canonical graph already proves the complete
+     * product identity. The original observation remains the source for product type and price
+     * evidence; async BGG/Vinted enrichment is never allowed to invent either.
+     */
+    public synchronized String materializeCanonicalDeal(long listingId){
+        if(listingId<=0)return "INELIGIBLE";
+        SQLiteDatabase db=getWritableDatabase();long now=System.currentTimeMillis();
+        String sql="SELECT COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),l.first_seen,l.last_seen,"+
+                "l.vinted_title,l.brand,l.item_condition,l.current_price_cents,l.protected_price_cents,l.favorites,"+
+                "l.seller_id,l.seller_name,l.vinted_item_id,l.vinted_url,l.image_url,l.listing_photos_csv,l.published_label,l.language_code,"+
+                "g.bgg_id,g.canonical_name,g.rating,g.bgg_rank,g.voters,g.image_url,g.categories,g.min_players,g.max_players,g.weight,g.playtime,"+
+                "o.item_price_cents,o.quality_score,o.tier_label,o.total_cents,o.benchmark_cents,o.offer_cents,o.shipping_cents,o.discount,o.match_reason,o.listing_type,o.verification_state,"+
+                "(SELECT COUNT(*) FROM observations ox WHERE ox.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)) "+
+                "FROM market_listings l JOIN games g ON g.id=l.game_id "+
+                "JOIN observations o ON o.id=(SELECT ox.id FROM observations ox WHERE ox.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) ORDER BY ox.observed_at DESC,ox.id DESC LIMIT 1) "+
+                "WHERE l.id=? AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' "+
+                "AND COALESCE(l.manual_review_required,0)=0 AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
+                "AND g.match_state='MATCHED' AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.rating IS NOT NULL AND g.rating>=? "+
+                "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";
+        try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(listingId),String.valueOf(DealPolicy.MIN_BGG_RATING)})){
+            if(!c.moveToFirst()){recordCatalogBridgeOutcome(db,"INELIGIBLE",listingId,now);return "INELIGIBLE";}
+            String signature=c.getString(0),itemId=c.getString(11);
+            if(TextUtilsCompat.empty(signature)||TextUtilsCompat.empty(itemId)){recordCatalogBridgeOutcome(db,"INELIGIBLE",listingId,now);return "INELIGIBLE";}
+            try(Cursor duplicate=db.rawQuery("SELECT 1 FROM deals WHERE signature=? OR (vinted_item_id IS NOT NULL AND vinted_item_id=?) LIMIT 1",new String[]{signature,itemId})){
+                if(duplicate.moveToFirst()){recordCatalogBridgeOutcome(db,"EXISTING",listingId,now);return "EXISTING";}
+            }
+            DealRecord draft=new DealRecord();draft.signature=signature;draft.firstSeen=c.getLong(1);draft.lastSeen=c.getLong(2);
+            draft.vintedTitle=c.getString(3);draft.brand=c.getString(4);draft.condition=c.getString(5);draft.itemPriceCents=c.getInt(6);
+            draft.protectedPriceCents=c.isNull(7)?null:c.getInt(7);draft.favorites=c.isNull(8)?null:c.getInt(8);draft.sellerId=c.getString(9);draft.sellerName=c.getString(10);
+            draft.vintedItemId=itemId;draft.vintedUrl=c.getString(12);draft.imageUrl=c.getString(13);draft.listingPhotosCsv=c.getString(14);draft.publishedLabel=c.getString(15);draft.languageCode=c.getString(16);
+            draft.bggId=c.getString(17);draft.gameName=c.getString(18);draft.displayName=draft.gameName;draft.rating=c.getDouble(19);draft.rank=c.isNull(20)?null:c.getInt(20);draft.voters=c.isNull(21)?null:c.getInt(21);
+            draft.bggImageUrl=c.getString(22);draft.bggCategories=c.getString(23);draft.minPlayers=c.isNull(24)?null:c.getInt(24);draft.maxPlayers=c.isNull(25)?null:c.getInt(25);draft.weight=c.isNull(26)?null:c.getDouble(26);draft.playtime=c.isNull(27)?null:c.getInt(27);
+            int observedPrice=c.getInt(28);boolean samePrice=observedPrice==draft.itemPriceCents;
+            draft.qualityScore=c.isNull(29)?null:c.getInt(29);draft.tierLabel=c.getString(30);draft.benchmarkCents=c.isNull(32)?null:c.getInt(32);draft.shippingCents=c.isNull(34)?null:c.getInt(34);
+            draft.totalCents=samePrice?(c.isNull(31)?null:c.getInt(31)):(draft.protectedPriceCents!=null&&draft.shippingCents!=null?draft.protectedPriceCents+draft.shippingCents:null);
+            draft.offerCents=samePrice?(c.isNull(33)?null:c.getInt(33)):null;draft.discount=samePrice?(c.isNull(35)?null:c.getDouble(35)):null;draft.matchReason=c.getString(36);
+            draft.listingType=c.getString(37);draft.verificationState=c.getString(38);draft.lifecycle="ACTIVE";draft.analysisStatus="matched";
+            CatalogBridgePolicy.Result decision=CatalogBridgePolicy.decide(draft,true,false,false);
+            if(!decision.publish){recordCatalogBridgeOutcome(db,decision.reason,listingId,now);return decision.reason;}
+            ContentValues v=canonicalDealValues(draft,decision,now,Math.max(1,c.getInt(39)));
+            long inserted=db.insertWithOnConflict("deals",null,v,SQLiteDatabase.CONFLICT_IGNORE);
+            String outcome=inserted>0?"MATERIALIZED":"EXISTING";recordCatalogBridgeOutcome(db,outcome,listingId,now);
+            if(inserted>0)applyUserOverride(db,signature);return outcome;
+        }
+    }
+    private static ContentValues canonicalDealValues(DealRecord d,CatalogBridgePolicy.Result decision,long now,int seenCount){
+        ContentValues v=new ContentValues();v.put("signature",d.signature);v.put("first_seen",d.firstSeen>0?d.firstSeen:now);v.put("last_seen",d.lastSeen>0?d.lastSeen:now);v.put("seen_count",seenCount);
+        put(v,"vinted_title",d.vintedTitle);put(v,"brand",d.brand);put(v,"item_condition",d.condition);v.put("item_price_cents",d.itemPriceCents);put(v,"protected_price_cents",d.protectedPriceCents);put(v,"favorites",d.favorites);
+        v.put("analysis_status","matched");put(v,"bgg_id",d.bggId);put(v,"game_name",d.gameName);put(v,"display_name",d.displayName);put(v,"rating",d.rating);put(v,"bgg_rank",d.rank);put(v,"voters",d.voters);put(v,"quality_score",d.qualityScore);
+        v.put("tier",decision.tier);put(v,"tier_label",decision.label);put(v,"total_cents",d.totalCents);put(v,"benchmark_cents",d.benchmarkCents);put(v,"offer_cents",d.offerCents);put(v,"shipping_cents",d.shippingCents);put(v,"discount",d.discount);
+        put(v,"language_code",d.languageCode);put(v,"match_reason",d.matchReason);v.put("lifecycle","ACTIVE");v.put("confirmed",0);v.put("listing_type",d.listingType);v.put("verification_state","OK");v.putNull("verification_reason");
+        put(v,"vinted_url",d.vintedUrl);v.put("resolved_at",now);put(v,"vinted_item_id",d.vintedItemId);put(v,"image_url",d.imageUrl);v.put("link_confidence",100);v.put("link_reason","Sincronizzato dal record canonico verificato");
+        put(v,"published_label",d.publishedLabel);put(v,"bgg_image_url",d.bggImageUrl);put(v,"bgg_categories",d.bggCategories);put(v,"bgg_minplayers",d.minPlayers);put(v,"bgg_maxplayers",d.maxPlayers);put(v,"bgg_weight",d.weight);put(v,"bgg_playtime",d.playtime);
+        put(v,"seller_id",d.sellerId);put(v,"seller_name",d.sellerName);put(v,"listing_photos_csv",d.listingPhotosCsv);return v;
+    }
+    private static void recordCatalogBridgeOutcome(SQLiteDatabase db,String outcome,long listingId,long now){
+        String safe=TextUtilsCompat.empty(outcome)?"UNKNOWN":outcome;String key="catalog_bridge_"+safe.toLowerCase(Locale.ROOT);
+        long count=0;try(Cursor c=db.rawQuery("SELECT value FROM queue_controls WHERE name=?",new String[]{key})){if(c.moveToFirst())count=c.getLong(0);}
+        ContentValues v=new ContentValues();v.put("name",key);v.put("value",count+1);v.put("updated_at",now);v.put("text_value","listing="+listingId+";outcome="+safe);db.insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+        ContentValues last=new ContentValues();last.put("name","catalog_bridge_last");last.put("value",listingId);last.put("updated_at",now);last.put("text_value","outcome="+safe);db.insertWithOnConflict("queue_controls",null,last,SQLiteDatabase.CONFLICT_REPLACE);
+    }
+    public synchronized String catalogBridgeBreakdown(){
+        SQLiteDatabase db=getReadableDatabase();return "bridgeMaterialized="+controlValue(db,"catalog_bridge_materialized")+
+                "; bridgeExisting="+controlValue(db,"catalog_bridge_existing")+"; bridgeIneligible="+controlValue(db,"catalog_bridge_ineligible")+
+                "; bridgePriceRejected="+controlValue(db,"catalog_bridge_price_rejected")+"; bridgeLast="+controlText(db,"catalog_bridge_last");
+    }
+    private static long controlValue(SQLiteDatabase db,String name){try(Cursor c=db.rawQuery("SELECT value FROM queue_controls WHERE name=?",new String[]{name})){return c.moveToFirst()?c.getLong(0):0L;}}
+    private static String controlText(SQLiteDatabase db,String name){try(Cursor c=db.rawQuery("SELECT text_value FROM queue_controls WHERE name=?",new String[]{name})){return c.moveToFirst()?String.valueOf(c.getString(0)):"";}}
+    private static final class TextUtilsCompat{static boolean empty(String value){return value==null||value.trim().isEmpty();}}
     public synchronized void applySellerHint(String signature,String sellerId,String sellerName){if(signature==null||sellerId==null||sellerId.isEmpty())return;ContentValues v=new ContentValues();v.put("seller_id",sellerId);if(sellerName!=null&&!sellerName.isEmpty())v.put("seller_name",sellerName);getWritableDatabase().update("deals",v,"signature=? AND (seller_id IS NULL OR seller_id='' OR seller_id=?)",new String[]{signature,sellerId});}
     public synchronized void updateSellerNameHint(String signature,String sellerName){if(signature==null||signature.isEmpty())return;ContentValues v=new ContentValues();if(sellerName==null||sellerName.trim().isEmpty())v.putNull("seller_name");else v.put("seller_name",sellerName.trim());getWritableDatabase().update("deals",v,"signature=?",new String[]{signature});}
     public synchronized int countDeals(String tier){String w="lifecycle='ACTIVE' AND (rating IS NULL OR rating>=6.0)";String[]a=null;if(tier!=null){w+=" AND tier=?";a=new String[]{tier};}Cursor c=getReadableDatabase().rawQuery("SELECT COUNT(*) FROM deals WHERE "+w,a);int n=c.moveToFirst()?c.getInt(0):0;c.close();return n;}

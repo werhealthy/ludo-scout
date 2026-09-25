@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -73,16 +74,33 @@ public final class CatalogBridgePolicyHarness {
 with tempfile.TemporaryDirectory() as td:
     td = Path(td)
     harness_path = td / "CatalogBridgePolicyHarness.java"
-    harness_path.write_text(harness, encoding="utf-8")
     sources = [
         SRC / "DealRecord.java",
         SRC / "PurchaseMath.java",
         SRC / "DealEvaluator.java",
+        SRC / "DealPolicy.java",
         POLICY,
-        harness_path,
     ]
-    subprocess.run(["javac", "-d", str(td), *map(str, sources)], check=True)
-    subprocess.run(["java", "-cp", str(td), "it.vintedaffari.app.CatalogBridgePolicyHarness"], check=True)
+    # The workspace ships a Java 17 runtime but not the standalone javac executable. Java's
+    # source-file launcher still uses the real compiler. Combine the small pure-Java production
+    # units into one source file; only top-level public modifiers change for source-file legality.
+    production = []
+    for source in sources:
+        text = source.read_text(encoding="utf-8")
+        text = re.sub(r"^package it\.vintedaffari\.app;\s*", "", text)
+        text = re.sub(r"public final class (DealRecord|PurchaseMath|DealEvaluator|DealPolicy|CatalogBridgePolicy)", r"final class \1", text)
+        production.append(text)
+    compile_stubs = """
+final class VintedCard { double itemPrice; }
+final class GameAnalysis {
+    Integer totalCents, benchmarkCents, marketQ25Cents, offerCents, afterOfferCents, shippingCents;
+    boolean marketAllowHot;
+}
+"""
+    harness_body = re.sub(r"^\s*package it\.vintedaffari\.app;\s*", "", harness)
+    combined = "package it.vintedaffari.app;\n" + harness_body + "\n" + compile_stubs + "\n" + "\n".join(production)
+    harness_path.write_text(combined, encoding="utf-8")
+    subprocess.run(["java", str(harness_path)], check=True)
 
 database = (SRC / "DealDatabase.java").read_text(encoding="utf-8")
 market = (SRC / "MarketStore.java").read_text(encoding="utf-8")
