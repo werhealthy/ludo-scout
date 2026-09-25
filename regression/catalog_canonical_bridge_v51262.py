@@ -67,6 +67,16 @@ public final class CatalogBridgePolicyHarness {
         low.rating = 5.9;
         check(!CatalogBridgePolicy.decide(low, true, false, false).publish,
                 "BGG ratings below six must stay out of Catalog");
+
+        DealRecord wrongId = deal(1500, 1700, 3000, "BASE_GAME", "MATCH_UNCERTAIN");
+        wrongId.vintedUrl = "https://www.vinted.it/items/992-same-title";
+        check(!CatalogBridgePolicy.decide(wrongId, true, false, false).publish,
+                "the Vinted URL item id must equal the canonical item id");
+
+        DealRecord foreignHost = deal(1500, 1700, 3000, "BASE_GAME", "MATCH_UNCERTAIN");
+        foreignHost.vintedUrl = "https://example.com/items/991";
+        check(!CatalogBridgePolicy.decide(foreignHost, true, false, false).publish,
+                "a non-Vinted URL must never satisfy exact identity");
     }
 }
 '''
