@@ -76,38 +76,40 @@ public final class MarketStore {
             "AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
             "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
             "AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND COALESCE(l.manual_review_required,0)=0"+
-            "), bridged AS ("+
-            "SELECT DISTINCT d.id AS deal_id,c.listing_id FROM core c JOIN market_listings l ON l.id=c.listing_id "+
-            "JOIN deals d ON (l.legacy_signature=d.signature OR (d.vinted_item_id IS NOT NULL AND l.vinted_item_id=d.vinted_item_id))"+
-            "), deal_base AS ("+
-            "SELECT b.* FROM bridged b JOIN deals d ON d.id=b.deal_id WHERE d.lifecycle='ACTIVE' "+
+            "), catalog_base AS ("+
+            "SELECT d.id AS deal_id FROM deals d WHERE d.lifecycle='ACTIVE' "+
             "AND d.tier IN ('hot','good','offer','fair','insufficient','hunt') AND d.rating IS NOT NULL AND d.rating>=6.0"+
             "), deal_identity AS ("+
-            "SELECT b.* FROM deal_base b JOIN deals d ON d.id=b.deal_id WHERE d.bgg_id IS NOT NULL AND d.bgg_id<>'' "+
+            "SELECT b.deal_id FROM catalog_base b JOIN deals d ON d.id=b.deal_id WHERE d.bgg_id IS NOT NULL AND d.bgg_id<>'' "+
             "AND d.vinted_item_id IS NOT NULL AND d.vinted_item_id<>'' AND d.vinted_url IS NOT NULL AND d.vinted_url<>''"+
             "), review_clear AS ("+
-            "SELECT b.* FROM deal_identity b JOIN deals d ON d.id=b.deal_id WHERE COALESCE(d.verification_state,'') IN ('OK','USER_CONFIRMED') "+
+            "SELECT b.deal_id FROM deal_identity b JOIN deals d ON d.id=b.deal_id WHERE COALESCE(d.verification_state,'') IN ('OK','USER_CONFIRMED') "+
             "AND COALESCE(d.listing_type,'') IN ('BASE_GAME','EXPANSION','GAME')"+
             "), listing_matched AS ("+
-            "SELECT b.* FROM review_clear b JOIN market_listings l ON l.id=b.listing_id WHERE l.match_state='MATCHED'"+
+            "SELECT DISTINCT b.deal_id,l.id AS listing_id FROM review_clear b JOIN deals d ON d.id=b.deal_id "+
+            "JOIN market_listings l ON (l.legacy_signature=d.signature OR (d.vinted_item_id IS NOT NULL AND l.vinted_item_id=d.vinted_item_id)) "+
+            "WHERE l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' "+
+            "AND COALESCE(l.manual_review_required,0)=0"+
             "), bgg_agreement AS ("+
-            "SELECT b.* FROM listing_matched b JOIN market_listings l ON l.id=b.listing_id JOIN games g ON g.id=l.game_id "+
-            "JOIN deals d ON d.id=b.deal_id WHERE g.match_state='MATCHED' AND g.bgg_id=d.bgg_id "+
+            "SELECT b.deal_id,b.listing_id FROM listing_matched b JOIN market_listings l ON l.id=b.listing_id "+
+            "JOIN games g ON g.id=l.game_id JOIN deals d ON d.id=b.deal_id WHERE g.match_state='MATCHED' AND g.bgg_id=d.bgg_id "+
             "AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0"+
             "), job_clear AS ("+
-            "SELECT b.* FROM bgg_agreement b WHERE NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=b.listing_id "+
+            "SELECT b.deal_id,b.listing_id FROM bgg_agreement b WHERE NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=b.listing_id "+
             "AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') "+
             "AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))"+
+            "), catalog_rows AS ("+
+            "SELECT d.id AS deal_id FROM deals d JOIN (SELECT DISTINCT deal_id FROM job_clear) j ON j.deal_id=d.id "+
+            "ORDER BY d.last_seen DESC LIMIT 800"+
             ") SELECT "+
             "(SELECT COUNT(*) FROM core),"+
-            "(SELECT COUNT(DISTINCT deal_id) FROM bridged),"+
-            "(SELECT COUNT(DISTINCT deal_id) FROM deal_base),"+
-            "(SELECT COUNT(DISTINCT deal_id) FROM deal_identity),"+
-            "(SELECT COUNT(DISTINCT deal_id) FROM review_clear),"+
+            "(SELECT COUNT(*) FROM catalog_base),"+
+            "(SELECT COUNT(*) FROM deal_identity),"+
+            "(SELECT COUNT(*) FROM review_clear),"+
             "(SELECT COUNT(DISTINCT deal_id) FROM listing_matched),"+
             "(SELECT COUNT(DISTINCT deal_id) FROM bgg_agreement),"+
             "(SELECT COUNT(DISTINCT deal_id) FROM job_clear),"+
-            "(SELECT COUNT(DISTINCT deal_id) FROM job_clear)";
+            "(SELECT COUNT(*) FROM catalog_rows)";
     private static final String QUEUE_PREFS = "ludo_market_queue_controls";
     private static final String KEY_HISTORY_PAUSED = "history_paused";
     private static final String KEY_VINTED_PAUSED = "vinted_paused";
@@ -2779,9 +2781,9 @@ public final class MarketStore {
     public String catalogVisibilityBreakdown(){
         try(Cursor c=helper.getReadableDatabase().rawQuery(CATALOG_VISIBILITY_BREAKDOWN_SQL,null)){
             if(!c.moveToFirst())return"state=EMPTY";
-            return "marketCore="+c.getInt(0)+"; legacyBridge="+c.getInt(1)+"; dealBase="+c.getInt(2)+
-                    "; dealIdentity="+c.getInt(3)+"; reviewClear="+c.getInt(4)+"; listingMatched="+c.getInt(5)+
-                    "; bggAgreement="+c.getInt(6)+"; noBlockingJobs="+c.getInt(7)+"; catalogEligible="+c.getInt(8);
+            return "marketCore="+c.getInt(0)+"; catalogBase="+c.getInt(1)+"; dealIdentity="+c.getInt(2)+
+                    "; reviewClear="+c.getInt(3)+"; listingMatched="+c.getInt(4)+"; bggAgreement="+c.getInt(5)+
+                    "; noBlockingJobs="+c.getInt(6)+"; catalogEligible="+c.getInt(7);
         }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
     }
     public int partialVintedMetadataCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (published_label IS NULL OR published_label=''))",null)){return c.moveToFirst()?c.getInt(0):0;}}
