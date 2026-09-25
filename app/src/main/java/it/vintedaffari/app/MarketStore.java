@@ -76,6 +76,9 @@ public final class MarketStore {
             "AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
             "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
             "AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND COALESCE(l.manual_review_required,0)=0"+
+            "), core_bridged AS ("+
+            "SELECT DISTINCT d.id AS deal_id FROM core c JOIN market_listings l ON l.id=c.listing_id "+
+            "JOIN deals d ON (l.legacy_signature=d.signature OR (d.vinted_item_id IS NOT NULL AND l.vinted_item_id=d.vinted_item_id))"+
             "), catalog_base AS ("+
             "SELECT d.id AS deal_id FROM deals d WHERE d.lifecycle='ACTIVE' "+
             "AND d.tier IN ('hot','good','offer','fair','insufficient','hunt') AND d.rating IS NOT NULL AND d.rating>=6.0"+
@@ -103,6 +106,10 @@ public final class MarketStore {
             "ORDER BY d.last_seen DESC LIMIT 800"+
             ") SELECT "+
             "(SELECT COUNT(*) FROM core),"+
+            "(SELECT COUNT(*) FROM core_bridged),"+
+            "(SELECT COUNT(*) FROM core_bridged c WHERE EXISTS(SELECT 1 FROM catalog_rows r WHERE r.deal_id=c.deal_id)),"+
+            "(SELECT COUNT(*) FROM core_bridged c WHERE NOT EXISTS(SELECT 1 FROM catalog_rows r WHERE r.deal_id=c.deal_id)),"+
+            "(SELECT COUNT(*) FROM catalog_rows r WHERE NOT EXISTS(SELECT 1 FROM core_bridged c WHERE c.deal_id=r.deal_id)),"+
             "(SELECT COUNT(*) FROM catalog_base),"+
             "(SELECT COUNT(*) FROM deal_identity),"+
             "(SELECT COUNT(*) FROM review_clear),"+
@@ -2781,9 +2788,10 @@ public final class MarketStore {
     public String catalogVisibilityBreakdown(){
         try(Cursor c=helper.getReadableDatabase().rawQuery(CATALOG_VISIBILITY_BREAKDOWN_SQL,null)){
             if(!c.moveToFirst())return"state=EMPTY";
-            return "marketCore="+c.getInt(0)+"; catalogBase="+c.getInt(1)+"; dealIdentity="+c.getInt(2)+
-                    "; reviewClear="+c.getInt(3)+"; listingMatched="+c.getInt(4)+"; bggAgreement="+c.getInt(5)+
-                    "; noBlockingJobs="+c.getInt(6)+"; catalogEligible="+c.getInt(7);
+            return "marketCoreListings="+c.getInt(0)+"; coreBridgedDeals="+c.getInt(1)+"; coreInCatalog="+c.getInt(2)+
+                    "; coreNotCatalog="+c.getInt(3)+"; catalogOutsideCore="+c.getInt(4)+"; catalogBase="+c.getInt(5)+
+                    "; dealIdentity="+c.getInt(6)+"; reviewClear="+c.getInt(7)+"; listingMatched="+c.getInt(8)+
+                    "; bggAgreement="+c.getInt(9)+"; noBlockingJobs="+c.getInt(10)+"; catalogEligible="+c.getInt(11);
         }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
     }
     public int partialVintedMetadataCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (published_label IS NULL OR published_label=''))",null)){return c.moveToFirst()?c.getInt(0):0;}}
