@@ -91,6 +91,8 @@ for field in (
     "marketCore", "legacyBridge", "dealBase", "dealIdentity", "reviewClear",
     "listingMatched", "bggAgreement", "noBlockingJobs", "catalogEligible",
 ):
-    assert field in SERVICE, f"debug output is missing {field}"
+    assert field in MARKET, f"catalog breakdown is missing {field}"
+assert '"catalogVisibility={"' in SERVICE
+assert "marketDiag.catalogVisibilityBreakdown()" in SERVICE
 
 print("PASS catalog visibility stages are cumulative and reconcile to the exact UI population")
