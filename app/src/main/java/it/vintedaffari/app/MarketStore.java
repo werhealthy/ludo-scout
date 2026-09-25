@@ -128,7 +128,7 @@ public final class MarketStore {
             "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
             "AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
             "AND NOT EXISTS(SELECT 1 FROM deals d WHERE d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (d.vinted_item_id IS NOT NULL AND d.vinted_item_id=l.vinted_item_id)) "+
-            "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='catalog_bridge_seen:'||l.id) "+
+            "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='catalog_bridge_retry:'||l.id AND q.value>?) "+
             "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) "+
             "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?";
     private static final String QUEUE_PREFS = "ludo_market_queue_controls";
@@ -1302,6 +1302,12 @@ public final class MarketStore {
         if(job.listingId>0)helper.materializeCanonicalDeal(job.listingId);
         Log.i(TAG, "job=" + job.id + " state=COMPLETE attempt=" + job.attempt + " listing=" + job.listingId);
         notifyQueueChanged();
+    }
+
+    /** Completes the leased source job, then bridges the surviving listing returned by a merge. */
+    public void completeResolvedVintedJob(Job job,long canonicalListingId){
+        completeJob(job);
+        if(canonicalListingId>0)helper.materializeCanonicalDeal(canonicalListingId);
     }
 
     public MarketListingRecord listing(long id) {
@@ -2815,9 +2821,19 @@ public final class MarketStore {
         }catch(Throwable t){return "state=ERROR;type="+t.getClass().getSimpleName();}
     }
     public int materializeCanonicalCatalogBatch(int limit){
-        int bounded=Math.max(1,Math.min(24,limit));List<Long> ids=new ArrayList<>();
-        try(Cursor c=helper.getReadableDatabase().rawQuery(CATALOG_BRIDGE_BACKFILL_SQL,new String[]{String.valueOf(bounded)})){while(c.moveToNext())ids.add(c.getLong(0));}
+        int bounded=Math.max(1,Math.min(24,limit));long now=System.currentTimeMillis();List<Long> ids=new ArrayList<>();
+        try(Cursor c=helper.getReadableDatabase().rawQuery(CATALOG_BRIDGE_BACKFILL_SQL,new String[]{String.valueOf(now),String.valueOf(bounded)})){while(c.moveToNext())ids.add(c.getLong(0));}
         int inserted=0;for(Long id:ids)if("MATERIALIZED".equals(helper.materializeCanonicalDeal(id)))inserted++;return inserted;
+    }
+    /** Cross-process maintenance lease. SQLite is authoritative; SharedPreferences are process-local. */
+    public boolean claimCatalogBridgeSweep(long now,long intervalMs){
+        SQLiteDatabase db=helper.getWritableDatabase();boolean claimed=false;long next=now+Math.max(10_000L,intervalMs);
+        db.beginTransaction();try{
+            long current=0L;try(Cursor c=db.rawQuery("SELECT value FROM queue_controls WHERE name='catalog_bridge_sweep_lease_v1'",null)){if(c.moveToFirst())current=c.getLong(0);}
+            if(current<=now){ContentValues v=new ContentValues();v.put("name","catalog_bridge_sweep_lease_v1");v.put("value",next);v.put("updated_at",now);v.put("text_value","claimed");db.insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);claimed=true;}
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        return claimed;
     }
     public int partialVintedMetadataCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND vinted_url IS NOT NULL AND vinted_url<>'' AND ((seller_id IS NULL OR seller_id='') OR (published_label IS NULL OR published_label=''))",null)){return c.moveToFirst()?c.getInt(0):0;}}
 
