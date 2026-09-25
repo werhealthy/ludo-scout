@@ -220,7 +220,12 @@ public final class DealDatabase extends SQLiteOpenHelper {
      */
     public synchronized String materializeCanonicalDeal(long listingId){
         if(listingId<=0)return "INELIGIBLE";
-        SQLiteDatabase db=getWritableDatabase();long now=System.currentTimeMillis();
+        SQLiteDatabase db=getWritableDatabase();long now=System.currentTimeMillis();boolean ownTransaction=!db.inTransaction();
+        if(ownTransaction)db.beginTransaction();
+        try{String outcome=materializeCanonicalDealInTransaction(db,listingId,now);if(ownTransaction)db.setTransactionSuccessful();return outcome;}
+        finally{if(ownTransaction)db.endTransaction();}
+    }
+    private String materializeCanonicalDealInTransaction(SQLiteDatabase db,long listingId,long now){
         String sql="SELECT COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),l.first_seen,l.last_seen,"+
                 "l.vinted_title,l.brand,l.item_condition,l.current_price_cents,l.protected_price_cents,l.favorites,"+
                 "l.seller_id,l.seller_name,l.vinted_item_id,l.vinted_url,l.image_url,l.listing_photos_csv,l.published_label,l.language_code,"+
@@ -274,11 +279,19 @@ public final class DealDatabase extends SQLiteOpenHelper {
         long count=0;try(Cursor c=db.rawQuery("SELECT value FROM queue_controls WHERE name=?",new String[]{key})){if(c.moveToFirst())count=c.getLong(0);}
         ContentValues v=new ContentValues();v.put("name",key);v.put("value",count+1);v.put("updated_at",now);v.put("text_value","listing="+listingId+";outcome="+safe);db.insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
         ContentValues last=new ContentValues();last.put("name","catalog_bridge_last");last.put("value",listingId);last.put("updated_at",now);last.put("text_value","outcome="+safe);db.insertWithOnConflict("queue_controls",null,last,SQLiteDatabase.CONFLICT_REPLACE);
-        ContentValues seen=new ContentValues();seen.put("name","catalog_bridge_seen:"+listingId);seen.put("value",listingId);seen.put("updated_at",now);seen.put("text_value",safe);db.insertWithOnConflict("queue_controls",null,seen,SQLiteDatabase.CONFLICT_REPLACE);
+        String retryKey="catalog_bridge_retry:"+listingId;
+        if("MATERIALIZED".equals(safe)||"EXISTING".equals(safe))db.delete("queue_controls","name=?",new String[]{retryKey});
+        else{long delay="CANONICAL_NOT_QUALIFIED".equals(safe)||"INELIGIBLE".equals(safe)?5L*60_000L:6L*60L*60_000L;ContentValues retry=new ContentValues();retry.put("name",retryKey);retry.put("value",now+delay);retry.put("updated_at",now);retry.put("text_value",safe);db.insertWithOnConflict("queue_controls",null,retry,SQLiteDatabase.CONFLICT_REPLACE);}
     }
     public synchronized String catalogBridgeBreakdown(){
         SQLiteDatabase db=getReadableDatabase();return "bridgeMaterialized="+controlValue(db,"catalog_bridge_materialized")+
                 "; bridgeExisting="+controlValue(db,"catalog_bridge_existing")+"; bridgeIneligible="+controlValue(db,"catalog_bridge_ineligible")+
+                "; bridgeIdentityRejected="+(controlValue(db,"catalog_bridge_identity_incomplete")+controlValue(db,"catalog_bridge_vinted_identity_mismatch"))+
+                "; bridgeRatingRejected="+controlValue(db,"catalog_bridge_bgg_rating")+
+                "; bridgeReviewBlocked="+controlValue(db,"catalog_bridge_manual_review")+
+                "; bridgeJobBlocked="+controlValue(db,"catalog_bridge_blocking_job")+
+                "; bridgeTypeRejected="+(controlValue(db,"catalog_bridge_product_type")+controlValue(db,"catalog_bridge_expansion_unverified"))+
+                "; bridgeVerificationRejected="+controlValue(db,"catalog_bridge_verification_state")+
                 "; bridgePriceRejected="+controlValue(db,"catalog_bridge_price_rejected")+"; bridgeLast="+controlText(db,"catalog_bridge_last");
     }
     private static long controlValue(SQLiteDatabase db,String name){try(Cursor c=db.rawQuery("SELECT value FROM queue_controls WHERE name=?",new String[]{name})){return c.moveToFirst()?c.getLong(0):0L;}}
