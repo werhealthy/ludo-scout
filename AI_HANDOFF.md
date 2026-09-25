@@ -1,5 +1,14 @@
 # Ludo Scout — AI handoff
 
+## 5.12.65 — Manual Vinted UI ANR
+- Field evidence on 5.12.64: `systemExitHistory` reported 6 UI ANRs after the install boundary, all input-dispatch timeouts; `activitySnapshot` took 7.3s and `vintedRequestLedger` hit `SQLiteDatabaseLockedException`.
+- Root cause in the manual recovery path: returning from Vinted via Android share and confirming a manual candidate still executed MarketStore/DealDatabase reads and writes synchronously on MainActivity. The DB intentionally has an 8s SQLite busy timeout, longer than Android’s ~5s input-dispatch ANR threshold.
+- Manual share lookup and persistence now run on a dedicated `manualLinkIo` executor. UI callbacks only show confirmation/result, dismiss dialogs and schedule refresh/queue work.
+- Durable Vinted snapshot reuse no longer calls `getWritableDatabase()+CREATE TABLE IF NOT EXISTS` on every read; missing tables simply fall back to normal HTTP.
+- Request-ledger diagnostics are read-mostly and only request a writer when the current ledger epoch has not been initialized.
+- No schema migration, request pacing, matching threshold or publication-rule change.
+- Pixel validation: complete at least 3 manual Vinted links, including at least one Vinted Share → Ludo round trip. PASS: no UI freeze/ANR and links persist. Then copy diagnostics and confirm `anrAfterInstall=0`.
+
 ## 5.12.64 — Vinted request efficiency
 - The 5.12.63 field ratio `linkRequestsPerNewLink=15.46` was not a reliable current-throughput measurement: the ledger spanned older builds and inferred successes from the current number of active linked rows, so sold/unavailable cleanup could reduce the denominator.
 - The resolver now reuses a durable catalogue snapshot before spending a new catalogue-page request, but only when the snapshot is fresh relative to the listing observation and the same two-query ordering can be proven. Weak or ambiguous snapshots fall back to the existing network path.
