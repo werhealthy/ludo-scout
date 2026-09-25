@@ -269,6 +269,10 @@ public final class QueueJobRunner {
         if (r != null) {
             market.setJobProgress(job, 78);
             long canonical = market.applyResolvedLink(job, r);
+            boolean newlyResolvedIdentity=canonical>0&&MarketStore.JOB_VINTED.equals(job.type)
+                    &&TextUtils.isEmpty(listing.vintedItemId)&&TextUtils.isEmpty(listing.url)&&!TextUtils.isEmpty(r.itemId);
+            if(newlyResolvedIdentity)VintedPublicSession.recordResolvedLink(db.getWritableDatabase(),
+                    r.catalogFastPath?"catalog-fast":"resolver");
             DealRecord legacy = db.findBySignature(r.signature);
             if (r.sold) {
                 market.markSold(canonical);

@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.64 — Efficienza collegamenti Vinted (2026-09-25)
+
+- Il resolver prova prima a riusare una pagina Catalogo Vinted già scaricata e salvata nello snapshot persistente, purché sia recente e non precedente all’osservazione dell’annuncio oltre la tolleranza prevista.
+- Il riuso può evitare la richiesta di ricerca Catalogo, ma non abbassa la sicurezza: i candidati provenienti dallo snapshot non usano il fast path strutturato e devono ancora superare la verifica della pagina pubblica dell’articolo esatto.
+- Snapshot deboli, ambigui o mancanti ricadono sul percorso di rete precedente senza cambiare soglie, ranking o limiti.
+- Il vecchio rapporto richieste/link era distorto dalle rimozioni di annunci venduti e da più build accumulate. Il ledger v3 riparte da zero e divide le richieste fisiche per eventi reali di nuova identità Vinted risolta, includendo anche i link ottenuti a rete zero dal batch locale.
+- Invariati pacing di 55 secondi, budget massimo di 60 richieste/ora e policy di identità/pubblicazione.
+
 ## 5.12.63 — Verifica immediata dell’annuncio appena aperto (2026-09-25)
 
 - Il debug 5.12.62 mostra che il ritorno da un annuncio Vinted noto accoda correttamente una verifica esatta (`openedVintedVerify=QUEUED`), ma la coda ordinaria del Motore può impedirne la rivendicazione quando quell’annuncio non appartiene allo scroll attivo.

@@ -16,6 +16,8 @@ public final class MarketListingRecord {
     public DealRecord asDealRecord(GameRecord game) {
         DealRecord d = new DealRecord();
         d.signature = tempFingerprint;
+        d.firstSeen = firstSeen;
+        d.lastSeen = lastSeen;
         d.vintedItemId = vintedItemId;
         d.vintedTitle = title;
         d.brand = brand;
