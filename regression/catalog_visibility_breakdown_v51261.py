@@ -116,16 +116,27 @@ authoritative_ids = [row[0] for row in db.execute(authoritative_sql)]
 assert authoritative_ids == [14, 12, 11, 10, 9], authoritative_ids
 
 row = db.execute(sql).fetchone()
-expected = (14, 11, 10, 9, 8, 7, 5, 5)
+expected = (14, 12, 4, 8, 1, 11, 10, 9, 8, 7, 5, 5)
 assert row == expected, f"expected={expected} actual={row}"
 assert row[-1] == len(authoritative_ids), f"diagnostic={row[-1]} catalog={len(authoritative_ids)}"
 
 for field in (
-    "marketCore", "catalogBase", "dealIdentity", "reviewClear",
+    "marketCoreListings", "coreBridgedDeals", "coreInCatalog", "coreNotCatalog",
+    "catalogOutsideCore", "catalogBase", "dealIdentity", "reviewClear",
     "listingMatched", "bggAgreement", "noBlockingJobs", "catalogEligible",
 ):
     assert field in MARKET, f"catalog breakdown is missing {field}"
 assert '"catalogVisibility={"' in SERVICE
 assert "marketDiag.catalogVisibilityBreakdown()" in SERVICE
 
-print("PASS catalog visibility stages match the exact UI population and edge cases")
+# The UI asks for at most 800 newest rows. Exercise the cap rather than only checking its text.
+for index in range(1000, 1801):
+    add_game(index, str(1000 + index))
+    add_listing(index, index, f"sig-{index}", str(9000 + index), f"https://www.vinted.it/items/{9000 + index}")
+    add_deal(index, f"sig-{index}", str(1000 + index), str(9000 + index), f"https://www.vinted.it/items/{9000 + index}")
+bulk_authoritative = [row[0] for row in db.execute(authoritative_sql)]
+bulk_diagnostic = db.execute(sql).fetchone()
+assert len(bulk_authoritative) == 800, len(bulk_authoritative)
+assert bulk_diagnostic[-1] == 800, bulk_diagnostic
+
+print("PASS catalog visibility sets, exact UI population, edge cases, and 800-row cap")
