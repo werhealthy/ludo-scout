@@ -1,5 +1,13 @@
 # Ludo Scout — AI handoff
 
+## 5.12.64 — Vinted request efficiency
+- The 5.12.63 field ratio `linkRequestsPerNewLink=15.46` was not a reliable current-throughput measurement: the ledger spanned older builds and inferred successes from the current number of active linked rows, so sold/unavailable cleanup could reduce the denominator.
+- The resolver now reuses a durable catalogue snapshot before spending a new catalogue-page request, but only when the snapshot is fresh relative to the listing observation and the same two-query ordering can be proven. Weak or ambiguous snapshots fall back to the existing network path.
+- Durable snapshot candidates never use the structured-catalog fast path. Exact public item-page verification remains mandatory for this reuse path, preserving identity and product-safety gates.
+- Request ledger v3 starts a fresh epoch and counts actual resolved-link events, including zero-network batch links, so `linkRequestsPerNewLink` is monotonic with respect to sold cleanup.
+- Vinted pacing remains 55 seconds and the hourly ceiling remains 60. No matcher threshold, publication gate, database schema or private API policy changes.
+- Field validation: after several new resolutions, compare `resolvedLinks`, `linkPhysical`, `catalogPhysical` and `linkRequestsPerNewLink`; confirm some resolver runs report `linkVerifyMode=durable-snapshot+public-page`.
+
 ## 5.12.63 — Opened Vinted verification priority
 - Field evidence on 5.12.62 showed an exact opened-listing fallback queued for listing 4512 while an unrelated Motore run still owned the ordinary Vinted lane. The queued fallback could therefore wait behind run ownership instead of confirming a sold/unavailable page immediately after the user returned to Ludo.
 - `OPENED_VERIFY` is now treated as interactive exact work in the Vinted claim gate and sorts ahead of ordinary automatic run jobs. Existing public-page pacing and hourly budget remain unchanged.
