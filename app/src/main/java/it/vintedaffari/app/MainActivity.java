@@ -72,7 +72,7 @@ public final class MainActivity extends Activity {
     private final Set<String> photoRefreshes=Collections.synchronizedSet(new HashSet<>());
     private final Map<Long,Integer> jobProgressMemory=new HashMap<>();
     private final LocalIntelligenceBackend intelligence=new LocalIntelligenceBackend.Rules();
-    private final ExecutorService net=Executors.newFixedThreadPool(2);private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();private final ExecutorService uiDataIo=Executors.newSingleThreadExecutor();private static final ExecutorService diagnosticIo=Executors.newSingleThreadExecutor();private final ExecutorService galleryNet=Executors.newSingleThreadExecutor();private final android.util.LruCache<String,Bitmap> imageCache=new android.util.LruCache<String,Bitmap>(4*1024*1024){protected int sizeOf(String k,Bitmap b){return b.getByteCount();}};
+    private final ExecutorService net=Executors.newFixedThreadPool(2);private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();private final ExecutorService uiDataIo=Executors.newSingleThreadExecutor();private final ExecutorService manualLinkIo=Executors.newSingleThreadExecutor();private static final ExecutorService diagnosticIo=Executors.newSingleThreadExecutor();private final ExecutorService galleryNet=Executors.newSingleThreadExecutor();private final android.util.LruCache<String,Bitmap> imageCache=new android.util.LruCache<String,Bitmap>(4*1024*1024){protected int sizeOf(String k,Bitmap b){return b.getByteCount();}};
     private final BroadcastReceiver receiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){
         if(!"activity".equals(tab))updateActivityIndicator();
         long now=System.currentTimeMillis();
@@ -152,7 +152,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    @Override protected void onDestroy(){uiUpdates.removeCallbacksAndMessages(null);if(receiverRegistered)try{unregisterReceiver(receiver);}catch(Exception ignored){}if(Thread.getDefaultUncaughtExceptionHandler()==installedCrashHandler)Thread.setDefaultUncaughtExceptionHandler(previousCrashHandler);if(db!=null)db.close();if(bundleDb!=null)bundleDb.close();if(libraryDb!=null)libraryDb.close();if(accessoryDb!=null)accessoryDb.close();if(huntDb!=null)huntDb.close();if(bggSearch!=null)bggSearch.shutdown();net.shutdownNow();maintenanceIo.shutdownNow();uiDataIo.shutdownNow();galleryNet.shutdownNow();imageCache.evictAll();super.onDestroy();}
+    @Override protected void onDestroy(){uiUpdates.removeCallbacksAndMessages(null);if(receiverRegistered)try{unregisterReceiver(receiver);}catch(Exception ignored){}if(Thread.getDefaultUncaughtExceptionHandler()==installedCrashHandler)Thread.setDefaultUncaughtExceptionHandler(previousCrashHandler);if(db!=null)db.close();if(bundleDb!=null)bundleDb.close();if(libraryDb!=null)libraryDb.close();if(accessoryDb!=null)accessoryDb.close();if(huntDb!=null)huntDb.close();if(bggSearch!=null)bggSearch.shutdown();net.shutdownNow();maintenanceIo.shutdownNow();uiDataIo.shutdownNow();manualLinkIo.shutdownNow();galleryNet.shutdownNow();imageCache.evictAll();super.onDestroy();}
 
 private void buildShell(){
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
@@ -1649,7 +1649,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         long listingId=p.getLong("listing_id",0),jobId=p.getLong("job_id",0),at=p.getLong("at",0);
         String title=p.getString("title","");
         if(listingId<=0||at<=0||System.currentTimeMillis()-at>MANUAL_VINTED_SHARE_TTL){Toast.makeText(this,"Apri prima un caso da collegare e usa ‘Cerca su Vinted’.",Toast.LENGTH_LONG).show();return;}
-        uiDataIo.execute(()->{
+        manualLinkIo.execute(()->{
             MarketListingRecord loaded=null;
             try{loaded=marketStore.listing(listingId);}catch(Throwable ignored){}
             final MarketListingRecord l=loaded;
@@ -1666,7 +1666,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
 
     private void applySharedVintedLink(long jobId,long listingId,String url,String itemId){
         Toast.makeText(this,"Salvo il collegamento…",Toast.LENGTH_SHORT).show();
-        maintenanceIo.execute(()->{
+        manualLinkIo.execute(()->{
             long canonical=0L;String sig="";DealRecord fresh=null;String error="";
             try{
                 canonical=marketStore.applyManualVintedLink(jobId,listingId,url,itemId,null,null);
@@ -1700,7 +1700,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if(job==null)return;
         if(dialog!=null&&dialog.isShowing())dialog.dismiss();
         Toast.makeText(this,"Salvo il collegamento…",Toast.LENGTH_SHORT).show();
-        maintenanceIo.execute(()->{
+        manualLinkIo.execute(()->{
             long canonical=0L;String error="";
             try{
                 canonical=marketStore.applyManualVintedLink(job.id,job.listingId,url,itemId,seller,image);
