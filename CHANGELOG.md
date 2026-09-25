@@ -1,5 +1,14 @@
 # Ludo Scout — Changelog
 
+## 5.12.65 — Collegamenti manuali senza bloccare la UI (2026-09-25)
+
+- Il debug 5.12.64 ha mostrato 6 ANR della UI dopo l’installazione, con input dispatch oltre 5 secondi, mentre gli snapshot SQLite arrivavano a oltre 7 secondi e il ledger Vinted riportava `SQLiteDatabaseLockedException`.
+- Il flusso Vinted → Condividi → Ludo e la conferma manuale dei candidati eseguivano ancora letture/scritture SQLite direttamente sul main thread; con `busy_timeout=8000` una collisione poteva bloccare la UI abbastanza da generare ANR.
+- Lookup e salvataggi dei collegamenti manuali passano ora su una corsia I/O dedicata; la UI mostra subito feedback e riceve solo il risultato finale.
+- Il riuso degli snapshot Vinted della 5.12.64 è ora realmente read-only: non apre più inutilmente il writer SQLite per una semplice lookup.
+- Il ledger richieste usa una lettura read-mostly e acquisisce il writer soltanto se deve inizializzare una nuova epoca diagnostica.
+- Nessuna modifica a database/schema, matching, rate limit o priorità del Motore.
+
 ## 5.12.64 — Efficienza collegamenti Vinted (2026-09-25)
 
 - Il resolver prova prima a riusare una pagina Catalogo Vinted già scaricata e salvata nello snapshot persistente, purché sia recente e non precedente all’osservazione dell’annuncio oltre la tolleranza prevista.
