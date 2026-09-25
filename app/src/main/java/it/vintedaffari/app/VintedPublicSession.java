@@ -182,6 +182,23 @@ public final class VintedPublicSession {
     private static void incLedger(SQLiteDatabase db,String key,long now){long v=control(db,LEDGER_PREFIX+key);putControl(db,LEDGER_PREFIX+key,v+1L,now,null);}
     private static String controlText(SQLiteDatabase db,String name){try(Cursor c=db.rawQuery("SELECT text_value FROM queue_controls WHERE name=? LIMIT 1",new String[]{name})){return c.moveToFirst()&&!c.isNull(0)?c.getString(0):"";}catch(Throwable ignored){return"";}}
 
+    private static SQLiteDatabase ledgerReadDb(DealDatabase helper,long now){
+        SQLiteDatabase db=helper.getReadableDatabase();
+        if(LEDGER_BUILD.equals(controlText(db,LEDGER_PREFIX+"build")))return db;
+        SQLiteDatabase writable=null;
+        try{
+            writable=helper.getWritableDatabase();
+            writable.beginTransactionNonExclusive();
+            ensureLedgerEpoch(writable,now);
+            writable.setTransactionSuccessful();
+            return writable;
+        }catch(Throwable ignored){
+            return db;
+        }finally{
+            try{if(writable!=null&&writable.inTransaction())writable.endTransaction();}catch(Throwable ignored){}
+        }
+    }
+
     public static final class LedgerSnapshot {
         public long physical,cacheHits,linkPhysical,linkCacheHits,bundlePhysical,catalogPhysical,itemPhysical,linkedNow,resolvedLinks;
     }
@@ -190,15 +207,14 @@ public final class VintedPublicSession {
     public static LedgerSnapshot requestLedgerSnapshot(Context context){
         LedgerSnapshot out=new LedgerSnapshot();DealDatabase h=new DealDatabase(context.getApplicationContext());SQLiteDatabase db=null;
         try{
-            db=h.getWritableDatabase();long now=System.currentTimeMillis();
-            db.beginTransactionNonExclusive();ensureLedgerEpoch(db,now);db.setTransactionSuccessful();db.endTransaction();
+            long now=System.currentTimeMillis();db=ledgerReadDb(h,now);
             out.physical=control(db,LEDGER_PREFIX+"physical");out.cacheHits=control(db,LEDGER_PREFIX+"cache");
             out.linkPhysical=control(db,LEDGER_PREFIX+"link:physical");out.linkCacheHits=control(db,LEDGER_PREFIX+"link:cache");
             out.bundlePhysical=control(db,LEDGER_PREFIX+"bundle:physical");
             out.catalogPhysical=control(db,LEDGER_PREFIX+"route:catalog:physical");out.itemPhysical=control(db,LEDGER_PREFIX+"route:item:physical");
             out.resolvedLinks=control(db,LEDGER_PREFIX+"link:resolved");
             try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM market_listings WHERE vinted_item_id IS NOT NULL AND vinted_item_id<>''",null)){if(c.moveToFirst())out.linkedNow=c.getLong(0);}
-        }catch(Throwable ignored){}finally{try{if(db!=null&&db.inTransaction())db.endTransaction();}catch(Throwable ignored){}try{h.close();}catch(Throwable ignored){}}
+        }catch(Throwable ignored){}finally{try{h.close();}catch(Throwable ignored){}}
         return out;
     }
 
@@ -206,15 +222,15 @@ public final class VintedPublicSession {
     public static String requestLedgerSummary(Context context){
         DealDatabase h=new DealDatabase(context.getApplicationContext());SQLiteDatabase db=null;
         try{
-            db=h.getWritableDatabase();long now=System.currentTimeMillis();
-            db.beginTransactionNonExclusive();ensureLedgerEpoch(db,now);db.setTransactionSuccessful();db.endTransaction();
+            long now=System.currentTimeMillis();db=ledgerReadDb(h,now);
+            if(!LEDGER_BUILD.equals(controlText(db,LEDGER_PREFIX+"build")))return "build="+LEDGER_BUILD+", state=INITIALIZING";
             long startAt=control(db,LEDGER_PREFIX+"start_at"),startLinked=control(db,LEDGER_PREFIX+"start_linked");
             long linkedNow=0L;try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM market_listings WHERE vinted_item_id IS NOT NULL AND vinted_item_id<>''",null)){if(c.moveToFirst())linkedNow=c.getLong(0);}catch(Throwable ignored){}
             long activeDelta=Math.max(0L,linkedNow-startLinked),resolvedLinks=control(db,LEDGER_PREFIX+"link:resolved"),linkPhysical=control(db,LEDGER_PREFIX+"link:physical"),bundlePhysical=control(db,LEDGER_PREFIX+"bundle:physical"),physical=control(db,LEDGER_PREFIX+"physical"),cache=control(db,LEDGER_PREFIX+"cache");
             String ratio=resolvedLinks>0?String.format(Locale.US,"%.2f",linkPhysical/(double)resolvedLinks):"n/a";
             return "build="+LEDGER_BUILD+", ageMs="+(startAt<=0?-1:Math.max(0L,now-startAt))+", physical="+physical+", cacheHits="+cache+", linkPhysical="+linkPhysical+", linkCacheHits="+control(db,LEDGER_PREFIX+"link:cache")+", bundlePhysical="+bundlePhysical+", catalogPhysical="+control(db,LEDGER_PREFIX+"route:catalog:physical")+", itemPhysical="+control(db,LEDGER_PREFIX+"route:item:physical")+", http200="+control(db,LEDGER_PREFIX+"http:200")+", http403="+control(db,LEDGER_PREFIX+"http403")+", http429="+control(db,LEDGER_PREFIX+"http429")+", linkedStart="+startLinked+", linkedNow="+linkedNow+", activeLinkedDelta="+activeDelta+", resolvedLinks="+resolvedLinks+", linkRequestsPerNewLink="+ratio+", last="+controlText(db,LEDGER_PREFIX+"last");
         }catch(Throwable t){return "error="+t.getClass().getSimpleName();}
-        finally{try{if(db!=null&&db.inTransaction())db.endTransaction();}catch(Throwable ignored){}try{h.close();}catch(Throwable ignored){}}
+        finally{try{h.close();}catch(Throwable ignored){}}
     }
 
     /** Earliest authoritative request time shared by all Ludo Scout processes. */
