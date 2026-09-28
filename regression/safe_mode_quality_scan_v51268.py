@@ -7,6 +7,7 @@ market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text
 policy=(ROOT/"app/src/main/java/it/vintedaffari/app/DealPolicy.java").read_text(encoding="utf-8")
 runner=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueJobRunner.java").read_text(encoding="utf-8")
 radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
+main=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
 service=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueKeepAliveService.java").read_text(encoding="utf-8")
 manifest=(ROOT/"app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
@@ -36,6 +37,9 @@ checks=[
     ("Children's Game is an authoritative scouting exclusion",
      "childrenCategory" in policy and "BGG_CHILDRENS_GAME" in metadata_block and
      "qualityRejected=childrenGame||ratingRejected" in metadata_block),
+    ("manual BGG picker applies the same quality gate",
+     "DealPolicy.queueCandidateEligible(candidate)" in main and
+     "BGG 6+ e non Children's Game" in main),
     ("existing low-quality rows receive one-time background cutover",
      "applySafeModeQualityCutover" in market and "safe_mode_quality_v51268" in market and
      "market.applySafeModeQualityCutover()" in service),
@@ -43,6 +47,11 @@ checks=[
      "private boolean scanEnabled=false;" in radar and
      "if(!scanEnabled)return;" in schedule_block and
      "if (!scanEnabled || database == null) return;" in radar),
+    ("diagnostics expose safe-mode state cross-process",
+     'diagnosticState("scan_opt_in")' in radar and
+     "scanOptIn={authoritative=" in radar and
+     "pricingSafeMode=BGG_ONLY; localVinted=history-only" in radar and
+     "publishScanOptInDiagnostic" in radar),
     ("Accessibility overlay controls explicit capture without draw-over-apps permission",
      "TYPE_ACCESSIBILITY_OVERLAY" in radar and "Ludo · SCANSIONE ON" in radar and "Ludo · OFF" in radar and
      "SYSTEM_ALERT_WINDOW" not in manifest),
