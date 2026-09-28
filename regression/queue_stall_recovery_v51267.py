@@ -36,6 +36,12 @@ supervise=service[service.index("private synchronized void superviseLanes"):serv
 active_deferred=market[market.index("public int activeRunDeferredVintedCount"):market.index("public boolean listingBelongsToActiveRun")]
 
 checks=[
+    ("foreground watchdog applies a bounded stale-work lease to BGG",
+     "market.deferStuckBggProcessing(180_000L,10*60_000L)" in service),
+    ("BGG recovery only releases rows whose processing lease exceeded the threshold",
+     "public int deferStuckBggProcessing(long maxAgeMs,long retryDelayMs)" in market and
+     "job_type=? AND state=? AND processing_started_at>0 AND processing_started_at<?" in market and
+     "new String[]{JOB_BGG,PROCESSING,String.valueOf(cutoff)}" in market),
     ("cold-start ownership still prevents duplicate worker startup",
      "if(QueueKeepAliveService.isStarting())return Result.success();" in worker_head),
     ("running service no longer causes unconditional WorkManager exit",
