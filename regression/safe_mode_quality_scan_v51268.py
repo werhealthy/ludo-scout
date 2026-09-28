@@ -38,7 +38,7 @@ checks=[
      "childrenCategory" in policy and "BGG_CHILDRENS_GAME" in metadata_block and
      "qualityRejected=childrenGame||ratingRejected" in metadata_block),
     ("manual BGG picker applies the same quality gate",
-     "DealPolicy.queueCandidateEligible(candidate)" in main and
+     "DealPolicy.queueCandidateEligible(candidate.rating,candidate.categories)" in main and
      "BGG 6+ e non Children's Game" in main),
     ("existing low-quality rows receive one-time background cutover",
      "applySafeModeQualityCutover" in market and "safe_mode_quality_v51268" in market and
