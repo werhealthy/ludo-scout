@@ -2158,6 +2158,28 @@ public final class MarketStore {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM processing_jobs WHERE job_type<>? AND state=? AND updated_at>=? AND (last_error IS NULL OR last_error='' OR (last_error NOT LIKE 'historical sighting preserved%' AND last_error NOT LIKE 'not runnable anymore%' AND last_error NOT LIKE 'BGG match necessario%'))",new String[]{JOB_VINTED_DEEP,COMPLETE,String.valueOf(Math.max(0L,since))})){return c.moveToFirst()?c.getInt(0):0;}
     }
 
+    /** Compact, privacy-safe view of active queue leases for diagnostics. */
+    public String processingLeaseSummary(long now) {
+        StringBuilder out=new StringBuilder();
+        int total=0;
+        try(Cursor c=helper.getReadableDatabase().rawQuery(
+                "SELECT job_type,COUNT(*),MIN(CASE WHEN COALESCE(processing_started_at,0)>0 THEN processing_started_at END),SUM(CASE WHEN COALESCE(processing_started_at,0)<=0 THEN 1 ELSE 0 END) FROM processing_jobs WHERE state=? GROUP BY job_type ORDER BY job_type",
+                new String[]{PROCESSING})) {
+            while(c.moveToNext()) {
+                if(out.length()>0)out.append(';');
+                String type=c.getString(0);
+                int count=c.getInt(1);
+                long oldestStarted=c.isNull(2)?0L:c.getLong(2);
+                int missingStart=c.getInt(3);
+                total+=count;
+                out.append(type).append("={count=").append(count)
+                        .append(";oldestAgeMs=").append(oldestStarted>0?Math.max(0L,now-oldestStarted):-1L)
+                        .append(";withoutStartAt=").append(missingStart).append('}');
+            }
+        }
+        return "total="+total+";byType="+(out.length()==0?"none":out.toString());
+    }
+
     public int processingVintedCount() {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM processing_jobs WHERE job_type IN (?,?) AND state=?",new String[]{JOB_VINTED,JOB_VINTED_DEEP,PROCESSING})){return c.moveToFirst()?c.getInt(0):0;}
     }
