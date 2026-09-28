@@ -192,7 +192,7 @@ public final class QueueJobRunner {
         // Keep only a tiny network window. Deferred listings live outside processing_jobs until the
         // lane is actually available, so thousands of eventual links never block a fresh deal.
         int activeRunCore=market.activeRunCoreVintedCount();
-        if(activeRunCore<6&&market.activeRunDeferredVintedCount()>0)market.promoteDeferredVintedBatch(6-activeRunCore);
+        if(activeRunCore<8&&market.activeRunDeferredVintedCount()>0)market.promoteDeferredVintedBatch(8-activeRunCore);
         MarketStore.Job job = test2bOwner?market.claimNextVintedJobForTest2b(now):market.claimNextVintedJob(now);
         if (job == null) return false;
         processVinted(context, db, market, resolver, job);
