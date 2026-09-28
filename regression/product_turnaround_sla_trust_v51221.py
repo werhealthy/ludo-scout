@@ -12,6 +12,7 @@ normalizer=(ROOT/"app/src/main/java/it/vintedaffari/app/BggTitleNormalizer.java"
 hunt=(ROOT/"app/src/main/java/it/vintedaffari/app/HuntDatabase.java").read_text(encoding="utf-8")
 radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
 ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
+startup=(ROOT/"app/src/main/java/it/vintedaffari/app/EngineStartupMaintenance.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
 # Product timing model: ten minutes is a target for small scrolls, never a correctness cutoff.
@@ -79,10 +80,10 @@ checks=[
     ("deep metadata failure only excludes a genuinely pending BGG variant",
      "isBggVariantPending(job.listingId)" in runner and "if(!market.isBggVariantPending(job.listingId)){market.completeJob(job);return;}" in runner),
     ("old automatic review debt has a non-destructive cutover",
-     "archiveAutomaticReviewDebtBefore" in market and "v51221ReviewTurnaroundApplied" in ui and "EPOCH_ARCHIVED_REVIEW" in market),
-    ("existing accessory/non-game pollution is re-swept without blocking UI startup",
+     "archiveAutomaticReviewDebtBefore" in market and "v51221ReviewTurnaroundApplied" in startup and "EPOCH_ARCHIVED_REVIEW" in market),
+    ("existing accessory/non-game pollution is re-swept in the background queue owner",
      "autoHideStrongNonGameListings" in market and "ListingClassifier.classify(card)" in market and
-     "v51221ProductNoiseSweepApplied" in ui and "maintenanceIo.execute" in ui),
+     "v51221ProductNoiseSweepApplied" in startup and "SWEEP_EXEC.execute" in startup),
     ("video-game platform signals are filtered before BGG",
      '"ps5"' in classifier and '"nintendo switch"' in classifier and '"xbox series"' in classifier and
      '"ps5"' in gate and '"nintendo switch"' in gate),
