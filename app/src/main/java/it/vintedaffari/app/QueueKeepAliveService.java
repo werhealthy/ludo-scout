@@ -129,7 +129,7 @@ public final class QueueKeepAliveService extends Service {
 
     private synchronized void superviseLanes(boolean userWake){
         if(!alive||market==null)return;long now=System.currentTimeMillis();
-        boolean vintedNeeds=market.runnableVintedDueCount(now)>0||market.deferredVintedReadyCount(now)>0;
+        boolean vintedNeeds=market.runnableVintedDueCount(now)>0||market.deferredVintedReadyCount(now)>0||market.activeRunDeferredVintedCount()>0;
         long gate=VintedPublicSession.nextAllowedAt(this);
         boolean vintedCanRun=gate<=now;
         long vh=market.laneHeartbeatAt("vinted");
