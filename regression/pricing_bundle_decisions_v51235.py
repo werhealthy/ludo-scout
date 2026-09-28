@@ -22,7 +22,10 @@ checks=[
     ("typical BGG value is median","cents: Math.round(p.usedMedianEUR * 100)" in bridge and "marketMedianCents: Math.round(p.usedMedianEUR * 100)" in bridge),
     ("Q25 remains separate","marketQ25Cents: Math.round(p.usedQ25EUR * 100)" in bridge),
     ("compact BGG fallback reads median column","c.length>=3?c[2]:c[1]" in bgg and "int median=" in bgg),
-    ("small Vinted samples are shrunk","priorWeight=5" in market and "s.count>=8" in market and "resolveVintedReference" in market),
+    ("safe mode keeps local Vinted evidence out of decisions",
+     "Safe mode: local Vinted asks are retained as market history only" in market and
+     "return priorCents!=null&&priorCents>0?priorCents:null;" in market and
+     "refreshLocalVintedBenchmarksForBgg" in market),
     ("local quartiles are explicit","q25Cents,q75Cents" in market and "q25Offset" in market),
     ("price rejects leave product surfaces",'"PRICE_FILTERED"' in db and '"lifecycle","REMOVED"' in db and '"tier","filtered"' in db),
     ("discover stays selective","tier IN ('hot','good','offer')" in db),
@@ -68,13 +71,14 @@ assert .05 <= (3500-offer)/3500 <= .15
 assert total(900,450)==1465
 assert 1500-total(900,450)==35
 
-# The local shrinkage example is deliberately stable: N=3 cannot jump fully to Vinted.
-local=2000
-prior=3000
-n=3
-hybrid=round((n*local+5*prior)/(n+5))
-assert hybrid==2625
-assert hybrid!=local
+# Safe mode invariant: local market evidence can be 20€ or 200€, but the decision reference
+# remains the BGG prior until identity cleanup is explicitly re-enabled.
+def safe_reference(local, prior):
+    return prior if prior and prior > 0 else None
 
-print("PASS executable offer-target and local-benchmark arithmetic")
+assert safe_reference(2000,3000)==3000
+assert safe_reference(8000,3000)==3000
+assert safe_reference(2000,None) is None
+
+print("PASS executable offer-target and BGG-only safe-mode arithmetic")
 print(f"PASS {len(checks)+1}/{len(checks)+1} 5.12.35 pricing/bundle guards")

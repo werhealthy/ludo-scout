@@ -50,14 +50,14 @@ public final class QueueJobRunner {
                     String learned=market.learnedBggIdForTitle(q);
                     if(TextUtils.isEmpty(learned))continue;
                     BggSearchClient.Game remembered=matcher.localById(learned);
-                    if(remembered!=null){chosen=remembered;confidence=99.5;break;}
+                    if(remembered!=null&&DealPolicy.queueCandidateEligible(remembered.rating,remembered.categories)){chosen=remembered;confidence=99.5;break;}
                 }
 
                 // 2) Exact primary-name/alias match after conservative marketplace cleanup.
                 boolean sawAmbiguousExact=false,searchTimedOut=false;
                 if(chosen==null){
                     for(String q:variants){
-                        List<BggSearchClient.Game> exact=matcher.localExactCandidates(q);
+                        List<BggSearchClient.Game> exact=qualityCandidates(matcher.localExactCandidates(q));
                         if(matcher.queueSearchTimedOut()){searchTimedOut=true;reviewReason="Ricerca BGG locale oltre il budget di stabilità";break;}
                         if(exact.size()==1){chosen=exact.get(0);confidence=q.equals(BggTitleNormalizer.clean(g.name))?99:98;break;}
                         if(exact.size()>1)sawAmbiguousExact=true;
@@ -70,7 +70,7 @@ public final class QueueJobRunner {
                 if(chosen==null&&!sawAmbiguousExact&&!searchTimedOut){
                     String q=variants.get(variants.size()-1);
                     fuzzySearches++;
-                    fuzzyCandidates=matcher.localCandidatesIndexed(q);
+                    fuzzyCandidates=qualityCandidates(matcher.localCandidatesIndexed(q));
                     searchTimedOut=matcher.queueSearchTimedOut();
                     if(searchTimedOut)reviewReason="Ricerca BGG fuzzy oltre il budget di stabilità";
                     else if(!fuzzyCandidates.isEmpty()){
@@ -114,6 +114,16 @@ public final class QueueJobRunner {
                         ";quarantined="+quarantined+";timedOut="+timedOut+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
         return handled;
         }finally{BGG_IDENTITY_RUNNING.set(false);}
+    }
+
+    /** Known sub-6 BGG candidates must never create automatic matches or human review work.
+     * Categories are not present in the compact local index; the Children's Game gate is applied
+     * after authoritative BGG metadata enrichment. */
+    private static List<BggSearchClient.Game> qualityCandidates(List<BggSearchClient.Game> candidates){
+        if(candidates==null||candidates.isEmpty())return java.util.Collections.emptyList();
+        ArrayList<BggSearchClient.Game> out=new ArrayList<>();
+        for(BggSearchClient.Game g:candidates)if(g!=null&&DealPolicy.queueCandidateEligible(g.rating,g.categories))out.add(g);
+        return out;
     }
 
     public static boolean processOneBgg(Context context, MarketStore market, BggEnricher bgg) {
