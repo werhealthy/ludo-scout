@@ -36,6 +36,11 @@ supervise=service[service.index("private synchronized void superviseLanes"):serv
 active_deferred=market[market.index("public int activeRunDeferredVintedCount"):market.index("public boolean listingBelongsToActiveRun")]
 
 checks=[
+    ("diagnostics identify active queue job types and the age of their oldest lease",
+     "public String processingLeaseSummary(long now)" in market and
+     "processing_started_at>0 THEN processing_started_at" in market and
+     "oldestAgeMs=" in market and
+     '"processingLeases={"+marketDiag.processingLeaseSummary(queueNow)+"}"' in service),
     ("foreground watchdog applies a bounded stale-work lease to BGG",
      "market.deferStuckBggProcessing(180_000L,10*60_000L)" in service),
     ("BGG recovery only releases rows whose processing lease exceeded the threshold",
