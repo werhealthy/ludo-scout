@@ -58,6 +58,7 @@ public final class QueueKeepAliveService extends Service {
             // delay WorkManager's SystemJobService.onStartJob acknowledgement.
             if(market!=null)market.touchProcessorHeartbeat();
             if(market!=null)market.deferStuckVintedProcessing(180_000L,10*60_000L);
+            if(market!=null)market.deferStuckBggProcessing(180_000L,10*60_000L);
             if(market!=null&&now-lastReconcileAt>=30_000L){market.reconcileQueue();lastReconcileAt=now;}
             if(market!=null&&now-lastLocalMaintenanceAt>=20_000L){try{market.inferDeferredLanguages(80);}catch(Throwable ignored){}lastLocalMaintenanceAt=now;}
             superviseLanes(false);

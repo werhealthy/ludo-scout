@@ -1214,6 +1214,21 @@ public final class MarketStore {
         return changed;
     }
 
+    /** Safety net: a BGG item must not hold its lane forever when its owner stops making progress. */
+    public int deferStuckBggProcessing(long maxAgeMs,long retryDelayMs) {
+        long now=System.currentTimeMillis(),cutoff=now-Math.max(60_000L,maxAgeMs);
+        ContentValues v=new ContentValues();
+        v.put("state",FAILED_RETRYABLE);
+        v.put("next_attempt_at",now+Math.max(60_000L,retryDelayMs));
+        v.put("updated_at",now);
+        v.put("last_error","interrotto automaticamente: elaborazione troppo lunga");
+        v.put("progress",15);
+        v.put("processing_started_at",0);
+        int changed=helper.getWritableDatabase().update("processing_jobs",v,"job_type=? AND state=? AND processing_started_at>0 AND processing_started_at<?",new String[]{JOB_BGG,PROCESSING,String.valueOf(cutoff)});
+        if(changed>0){notifyQueueChanged();Log.w(TAG,"watchdog deferred "+changed+" stuck BGG job(s)");}
+        return changed;
+    }
+
     public void retryJob(Job job, String error, long nextAt) {
         if (job == null) return;
         ContentValues v = new ContentValues();
