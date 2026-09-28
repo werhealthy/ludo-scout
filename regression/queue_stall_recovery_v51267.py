@@ -6,6 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 worker=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueDrainWorker.java").read_text(encoding="utf-8")
 service=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueKeepAliveService.java").read_text(encoding="utf-8")
 market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")
+diagnostics=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
 # Model the service-health decision that caused the field stall: a running process is not healthy
@@ -40,8 +41,8 @@ checks=[
      "public String processingLeaseSummary(long now)" in market and
      "COALESCE(processing_started_at,0)>0 THEN processing_started_at" in market and
      "oldestAgeMs=" in market and
-     '"processingLeases={"' in service and
-     "marketDiag.processingLeaseSummary(queueNow)" in service),
+     '"processingLeases={"' in diagnostics and
+     "marketDiag.processingLeaseSummary(queueNow)" in diagnostics),
     ("foreground watchdog applies a bounded stale-work lease to BGG",
      "market.deferStuckBggProcessing(180_000L,10*60_000L)" in service),
     ("BGG recovery only releases rows whose processing lease exceeded the threshold",
