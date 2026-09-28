@@ -65,18 +65,17 @@ checks=[
     ("Motore UI separates recovery actions from held results",
      'renderEngineHeader("Serve il tuo aiuto"' in ui and "engineAttentionCard" in ui and
      "non pubblicato automaticamente" in ui),
-    ("extreme price filter runs before deferred Vinted promotion",
-     "filterClearlyOverpricedAutomaticListings(now);" in promotion and
-     "d.item_price_cents>=d.benchmark_cents*2.0" in market and
-     "d.item_price_cents-d.benchmark_cents>=2500" in market),
-    ("price optimization never sacrifices Hunt/manual or in-flight work",
+    ("legacy benchmark-based early price shortcut is disabled in safe mode",
+     "filterClearlyOverpricedAutomaticListings(now);" not in promotion and
+     "+filterClearlyOverpricedAutomaticListings(now)+" not in market and
+     "Safe mode intentionally does not run the legacy benchmark-based early price shortcut" in promotion),
+    ("legacy price optimization remains documented but cannot execute automatically",
      "p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY')" in market and
      "COALESCE(source,'AUTO') NOT IN ('HUNT_PRIORITY','MANUAL_PRIORITY')" in market and
-     "p.job_type=? AND p.state=?" in market and
-     'state IN (?,?)' in market[market.index("public int filterClearlyOverpricedAutomaticListings"):market.index("public int reconcileQueue")]),
-    ("price-filtered rows keep history but leave the automatic product path",
-     '"PRICE_FILTERED"' in market and '"AUTO_FILTERED"' in market and
-     "verifica Vinted evitata" in market),
+     "public int filterClearlyOverpricedAutomaticListings" in market),
+    ("price-filtered history remains recoverable in BGG-only safe mode",
+     '"PRICE_FILTERED"' in market and "restorePriceFilteredFromBgg" in market and
+     "Ricalcolato in safe mode con riferimento BGG" in market),
     ("queue reconciliation is no longer synchronous in Activity onCreate",
      "marketStore.reconcileQueue()" not in oncreate and "buildShell();startPostCreateMaintenance()" in oncreate and
      "QueueKeepAliveService.ensureRunning(this);" in ui[ui.index("private void startPostCreateMaintenance"):ui.index("private void applyUxFreshStartIfNeeded")]),
