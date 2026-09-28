@@ -6,6 +6,8 @@ deal=(ROOT/"app/src/main/java/it/vintedaffari/app/DealDatabase.java").read_text(
 market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")
 ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
 radar=(ROOT/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
+runner=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueJobRunner.java").read_text(encoding="utf-8")
+keep_alive=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueKeepAliveService.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
 MIN=10*60_000
@@ -87,6 +89,15 @@ checks=[
      "nonDestructive=true" in timing),
     ("Hunt, manual, repaired and just-opened cards still preempt ordinary run ownership",
      "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY','OPENED_VERIFY')" in claim),
+    ("active run keeps a bounded eight-link window despite waiting-run backlog",
+     "activeRunCore=market.activeRunCoreVintedCount()" in runner and
+     "activeRunCore<8&&market.activeRunDeferredVintedCount()>0" in runner and
+     "promoteDeferredVintedBatch(8-activeRunCore)" in runner and
+     "activeRunCore<8&&market.activeRunDeferredVintedCount()>0" in keep_alive and
+     "promoteDeferredVintedBatch(8-activeRunCore)" in keep_alive),
+    ("near-due urgent Vinted work stays ahead of deferred links",
+     keep_alive.index("if(urgentReserve>now)") < keep_alive.index("int activeRunCore=") and
+     runner.index("urgentVintedReservationUntil(now)>now") < runner.index("int activeRunCore=")),
     ("Home remains trusted-only",
      'db.getDeals("trusted",320)' in ui and '"trusted".equals(filter)' in deal),
     ("Motore UI exposes remaining online candidates and continuation",
