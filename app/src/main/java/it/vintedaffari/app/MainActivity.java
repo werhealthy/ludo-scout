@@ -90,7 +90,7 @@ public final class MainActivity extends Activity {
         // Database ordering/content does not need to repaint for each background job completion.
     }};
 
-    @Override protected void onCreate(Bundle b){super.onCreate(b);installCrashJournal();restoreUiState(b);if(b==null)restoreTransientUiSession();db=new DealDatabase(this);marketStore=new MarketStore(this,db);applyUxFreshStartIfNeeded();applyOperationalEpochIfNeeded();applyTurnaroundReviewCutoverIfNeeded();bundleDb=new BundleDatabase(this);libraryDb=new LibraryDatabase(this);accessoryDb=new AccessoryDatabase(this);huntDb=new HuntDatabase(this);bggSearch=new BggSearchClient(this);upgradeOperationLedger();try{android.content.SharedPreferences maintenance=getSharedPreferences("va_v3_diag",MODE_PRIVATE);if(!maintenance.getBoolean("v51124ReviewBacklogReset",false)){int quarantined=marketStore.quarantineLegacyBggReviewBacklog();maintenance.edit().putBoolean("v51124ReviewBacklogReset",true).putInt("v51124LegacyReviewsQuarantined",quarantined).apply();}if(!maintenance.getBoolean("v51125CollisionCleanup",false)){maintenance.edit().putBoolean("v51125CollisionCleanup",true).apply();}if(!maintenance.getBoolean("v51126CollisionRepair",false)){int repaired=marketStore.repairV51125CollisionCleanup();maintenance.edit().putBoolean("v51126CollisionRepair",true).putInt("v51126CollisionListingsRepaired",repaired).apply();}if(!maintenance.getBoolean("v51126MarketMedian",false)){maintenance.edit().putBoolean("v51126MarketMedian",true).putLong("marketReferenceRefreshAt",0L).apply();lastMarketReferenceRefreshAt=0L;}if(!maintenance.getBoolean("v51268SafeModePricing",false)){maintenance.edit().putBoolean("v51268SafeModePricing",true).putLong("marketReferenceRefreshAt",0L).apply();lastMarketReferenceRefreshAt=0L;}if(!maintenance.getBoolean("v51125VintedLiveLane",false)){int compacted=marketStore.compactVintedBacklogToLiveLane();maintenance.edit().putBoolean("v51125VintedLiveLane",true).putInt("v51125VintedJobsCompacted",compacted).apply();}}catch(Throwable ignored){}buildShell();startPostCreateMaintenance();refreshMarketReferencesIfStale();uiUpdates.postDelayed(this::requestNotificationPermission,1400);if(getIntent().getBooleanExtra("open_engine_review",false)){engineSection="review";tab="activity";}else if(getIntent().getBooleanExtra("open_engine",false)){tab="activity";}else if(getIntent().getBooleanExtra("open_hunts",false)){tab="companion";}if(!TextUtils.isEmpty(libraryWizardStep))uiUpdates.postDelayed(this::restoreLibraryWizard,260);if(restoredScrollY>0)uiUpdates.postDelayed(()->scroll.scrollTo(0,restoredScrollY),180);boolean incomingShare=Intent.ACTION_SEND.equals(getIntent().getAction());uiUpdates.postDelayed(this::restoreTransientRoute,incomingShare?120:220);uiUpdates.postDelayed(()->handleExternalIntent(getIntent()),incomingShare?420:120);}
+    @Override protected void onCreate(Bundle b){super.onCreate(b);installCrashJournal();restoreUiState(b);if(b==null)restoreTransientUiSession();db=new DealDatabase(this);marketStore=new MarketStore(this,db);bundleDb=new BundleDatabase(this);libraryDb=new LibraryDatabase(this);accessoryDb=new AccessoryDatabase(this);huntDb=new HuntDatabase(this);bggSearch=new BggSearchClient(this);upgradeOperationLedger();buildShell();startPostCreateMaintenance();refreshMarketReferencesIfStale();uiUpdates.postDelayed(this::requestNotificationPermission,1400);if(getIntent().getBooleanExtra("open_engine_review",false)){engineSection="review";tab="activity";}else if(getIntent().getBooleanExtra("open_engine",false)){tab="activity";}else if(getIntent().getBooleanExtra("open_hunts",false)){tab="companion";}if(!TextUtils.isEmpty(libraryWizardStep))uiUpdates.postDelayed(this::restoreLibraryWizard,260);if(restoredScrollY>0)uiUpdates.postDelayed(()->scroll.scrollTo(0,restoredScrollY),180);boolean incomingShare=Intent.ACTION_SEND.equals(getIntent().getAction());uiUpdates.postDelayed(this::restoreTransientRoute,incomingShare?120:220);uiUpdates.postDelayed(()->handleExternalIntent(getIntent()),incomingShare?420:120);}
     @Override protected void onNewIntent(Intent i){super.onNewIntent(i);setIntent(i);if(i!=null&&i.getBooleanExtra("open_engine_review",false)){engineSection="review";navigate("activity");}else if(i!=null&&i.getBooleanExtra("open_engine",false))navigate("activity");else if(i!=null&&i.getBooleanExtra("open_hunts",false))navigate("companion");uiUpdates.post(()->handleExternalIntent(i));}
     @Override public void onConfigurationChanged(android.content.res.Configuration c){super.onConfigurationChanged(c);if(body!=null)render();}
     /** SQLite reconciliation can contend with :radar. Keep it off the UI thread so a queue pulse
@@ -99,43 +99,6 @@ public final class MainActivity extends Activity {
         // The foreground queue process owns reconciliation and maintenance writes. Running the
         // same sweeps from :ui competed with :radar/:queue for the single SQLite writer.
         QueueKeepAliveService.ensureRunning(this);
-    }
-
-    private void applyUxFreshStartIfNeeded(){
-        try{SharedPreferences p=getSharedPreferences("va_v3_diag",MODE_PRIVATE);if(p.getBoolean("v5121FreshStartApplied",false))return;long cutoff=System.currentTimeMillis();MarketStore.FreshStartSummary s=marketStore.freshStartLegacyBacklog(cutoff);getSharedPreferences(OperationCenter.PREFS,MODE_PRIVATE).edit().remove("tasks").apply();p.edit().putBoolean("v5121FreshStartApplied",true).putLong("v5121FreshStartAt",cutoff).putInt("v5121FreshJobsRemoved",s.jobsRemoved).putInt("v5121FreshListingsArchived",s.listingsArchived).putInt("v5121FreshDealsArchived",s.dealsArchived).putInt("v5121FreshGamesHidden",s.gamesHidden).putString("v5121FreshSummary",s.toString()).apply();}
-        catch(Throwable t){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("v5121FreshResetError",String.valueOf(t)).apply();}
-    }
-
-    private void applyOperationalEpochIfNeeded(){
-        try{
-            MarketStore.OperationalEpochSummary cut=marketStore.startOperationalEpochIfMissing();
-            SharedPreferences p=getSharedPreferences("va_v3_diag",MODE_PRIVATE);
-            if(!p.getBoolean("v51216OperationalEpochApplied",false)){
-                getSharedPreferences(OperationCenter.PREFS,MODE_PRIVATE).edit().remove("tasks").apply();
-                p.edit().putBoolean("v51216OperationalEpochApplied",true).putLong("v51216OperationalEpochAt",cut.epochAt).putString("v51216OperationalEpochSummary",cut.toString()).apply();
-            }
-        }catch(Throwable t){
-            getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("v51216OperationalEpochError",String.valueOf(t)).apply();
-        }
-    }
-
-    private void applyTurnaroundReviewCutoverIfNeeded(){
-        try{
-            SharedPreferences p=getSharedPreferences("va_v3_diag",MODE_PRIVATE);
-            if(p.getBoolean("v51221ReviewTurnaroundApplied",false))return;
-            long cutoff=System.currentTimeMillis();
-            int archived=marketStore.archiveAutomaticReviewDebtBefore(cutoff);
-            p.edit().putBoolean("v51221ReviewTurnaroundApplied",true).putLong("v51221ReviewTurnaroundAt",cutoff).putInt("v51221ReviewTurnaroundArchived",archived).apply();
-            if(!p.getBoolean("v51221ProductNoiseSweepApplied",false))maintenanceIo.execute(()->{
-                try{
-                    int hidden=marketStore.autoHideStrongNonGameListings();
-                    getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putBoolean("v51221ProductNoiseSweepApplied",true).putInt("v51221ProductNoiseSweepHidden",hidden).apply();
-                    runOnUiThread(()->{if(!isDestroyed()&&"discover".equals(tab))scheduleRender(80);});
-                }catch(Throwable x){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("v51221ProductNoiseSweepError",String.valueOf(x)).apply();}
-            });
-        }catch(Throwable t){
-            getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("v51221ReviewTurnaroundError",String.valueOf(t)).apply();
-        }
     }
 
     @Override protected void onResume(){super.onResume();if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,f);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
