@@ -1,5 +1,16 @@
 # Ludo Scout — Changelog
 
+## 5.12.68 — Safe mode prezzi e scansione Vinted (2026-09-28)
+
+- Il prezzo medio costruito dagli annunci Vinted interni non decide più convenienza o esclusione: resta storico osservato. Per ora DealEvaluator usa soltanto il riferimento usato BGG disponibile.
+- Le card già finite in PRICE_FILTERED vengono riesaminate con il solo benchmark BGG e possono tornare attive se erano state escluse da un riferimento locale contaminato.
+- I candidati BGG con voto noto sotto 6 vengono eliminati prima di match/review. Quando arrivano i metadati BGG autorevoli, anche la categoria Children's Game viene esclusa da Database, review, linking Vinted e superfici prodotto senza cancellare lo storico.
+- Nessun editore, incluso Asmodee, viene escluso come scorciatoia: publisher e qualità restano segnali distinti.
+- Aprire Vinted non avvia più automaticamente la raccolta. L'AccessibilityService mostra un piccolo overlay Ludo · OFF; solo il tap su SCANSIONE ON abilita nuove osservazioni. Uscendo da Vinted lo stato torna OFF.
+- L'overlay usa TYPE_ACCESSIBILITY_OVERLAY e non richiede il permesso Android “mostra sopra altre app”.
+- La diagnostica espone scanOptIn e pricingSafeMode=BGG_ONLY; la scheda gioco presenta i valori locali come Storico Vinted / Min osservato.
+- Questa release non modifica pacing/budget Vinted, signing, applicationId o schema DB e non viene considerata una soluzione al separato problema delle corsie Motore stale osservato sulla 5.12.67.
+
 ## 5.12.67 — Recupero degli scroll bloccati (2026-09-28)
 
 - Il debug reale mostrava uno scroll attivo da quasi 3 giorni con una sola verifica Vinted residua, nessun job Vinted rivendicabile e heartbeat delle corsie vecchi di circa 7 ore: il Motore era fermo, non semplicemente lento.
