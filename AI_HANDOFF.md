@@ -1,5 +1,14 @@
 # Ludo Scout — AI handoff
 
+## 5.12.67 — Queue stall recovery
+- Field debug after ~3 days without fresh Vinted input showed an active Motore run ~252M ms old with one DEFERRED_LINK remaining, zero runnable Vinted jobs, and Vinted/BGG lane heartbeats ~26M ms stale. The issue was queue liveness, not legitimate processing time.
+- Root cause 1: QueueDrainWorker returned immediately whenever QueueKeepAliveService.isRunning() was true, making its later lane-health check unreachable. A living default process could therefore suppress WorkManager recovery even when the service consumer lanes were stalled.
+- Root cause 2: WorkManager recovery could claim persisted jobs but never materialised DEFERRED_LINK rows for the active run, so a deferred-only scroll could remain unfinished indefinitely after the foreground lane stopped.
+- Recovery now stands down only during service cold start. Once the service reports RUNNING, WorkManager inspects SQLite-backed lane heartbeats and active-run deferred work; stale lanes can be taken over after the bounded heartbeat window.
+- Recovery materialises deferred Vinted identities for the current Motore run before attempting a claim. The foreground supervisor also treats active-run deferred rows as liveness demand.
+- Vinted pacing, request budget, matching thresholds, publication gates, fairness ownership, schema, signing and applicationId are unchanged.
+- Pixel validation: after installing, do not open Vinted. Confirm the existing old scroll starts advancing on its own, queue lane heartbeat age stays under a few minutes, and active/waiting scroll count eventually drains without new Accessibility events.
+
 ## 5.12.66 — Motore outcome-oriented redesign
 - Motore is now organized around five user questions: what Ludo is doing now, what this scroll already produced, whether the user must intervene, which other scrolls remain unfinished, and recent activity.
 - The overview no longer renders a percentage/progress bar or the five-stage technical funnel. Current work is expressed with concrete states such as acquisition, game recognition, Vinted linking, paced waiting, result preparation and completion.
@@ -110,8 +119,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.66-motore-redesign`
-- versionCode: `168`
+- Baseline version: `5.12.67-queue-stall-recovery`
+- versionCode: `169`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
