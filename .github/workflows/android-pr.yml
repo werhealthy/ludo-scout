@@ -99,6 +99,8 @@ jobs:
         run: python3 regression/engine_acquisition_crash_stability_v51217.py
       - name: Run WorkManager/main-thread stability regression
         run: python3 regression/workmanager_mainthread_stability_v51218.py
+      - name: Run queue stall recovery regression
+        run: python3 regression/queue_stall_recovery_v51267.py
       - name: Run queue single-owner/engine-order regression
         run: python3 regression/queue_single_owner_engine_order_v51219.py
       - name: Run engine cross-process telemetry regression

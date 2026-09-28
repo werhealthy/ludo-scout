@@ -1,5 +1,14 @@
 # Ludo Scout — Changelog
 
+## 5.12.67 — Recupero degli scroll bloccati (2026-09-28)
+
+- Il debug reale mostrava uno scroll attivo da quasi 3 giorni con una sola verifica Vinted residua, nessun job Vinted rivendicabile e heartbeat delle corsie vecchi di circa 7 ore: il Motore era fermo, non semplicemente lento.
+- WorkManager usciva subito se il servizio risultava `RUNNING`, quindi non poteva recuperare il caso servizio vivo ma executor/corsia bloccata.
+- Il worker di recovery ora si ferma solo durante l'avvio del servizio; dopo l'avvio verifica heartbeat SQLite, lavoro differito dello scroll attivo e stato reale delle corsie prima di lasciare il controllo al foreground service.
+- Se la corsia è realmente stantia, il worker può riprendere il drain e rimaterializza i `DEFERRED_LINK` dello scroll attivo prima di provare a rivendicare un job.
+- Anche il supervisore del servizio considera i `DEFERRED_LINK` dello scroll corrente come lavoro che richiede una corsia Vinted viva.
+- Nessuna modifica a pacing Vinted, budget orario, matching, soglie di pubblicazione, fairness, database/schema, signing o applicationId.
+
 ## 5.12.66 — Redesign completo Motore (2026-09-25)
 
 - La overview del Motore non è più una dashboard della pipeline: mette in ordine stato del lavoro automatico, risultati dello scroll corrente, eventuali scelte umane, altri scroll non conclusi e attività recente.

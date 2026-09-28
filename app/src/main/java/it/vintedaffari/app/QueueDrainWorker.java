@@ -30,22 +30,29 @@ public final class QueueDrainWorker extends Worker {
     @NonNull @Override public Result doWork() {
         Context context = getApplicationContext();
         QueueWorkScheduler.ensureRecovery(context);
-        // WorkManager is recovery only. If the foreground owner exists (including cold start),
-        // stand down before opening SQLite or constructing duplicate resolver/matcher working sets.
-        if(QueueKeepAliveService.isStarting()||QueueKeepAliveService.isRunning())return Result.success();
+        // During service cold start there is no safe second owner yet. Once startup has finished,
+        // however, RUNNING alone is not proof of liveness: Android can leave the Service process alive
+        // while a consumer/control executor is stalled. WorkManager therefore checks SQLite-backed lane
+        // heartbeats and only stands down when the foreground owner is actually healthy.
+        if(QueueKeepAliveService.isStarting())return Result.success();
         DealDatabase db = new DealDatabase(context);
         MarketStore market = new MarketStore(context, db);
-        // WorkManager is recovery, but a living Service process is not enough evidence that its
-        // consumer lanes are alive. v5.11.11's process heartbeat could stay fresh even while the
-        // Vinted executor had stopped making progress. Only stand down when every due lane has a
-        // fresh lane-specific heartbeat (or Vinted is intentionally pacing).
         if (QueueKeepAliveService.isRunning()) {
             long now=System.currentTimeMillis();
-            int vd=market.runnableVintedDueCount(now), bd=market.runnableBggDueCount(now), hp=market.historicalBggRevalidationPendingCount();
+            int vd=market.runnableVintedDueCount(now), activeDeferred=market.activeRunDeferredVintedCount();
+            int bd=market.runnableBggDueCount(now), hp=market.historicalBggRevalidationPendingCount();
             long vh=market.laneHeartbeatAt("vinted"), bh=market.laneHeartbeatAt("bgg");
-            boolean vHealthy=vd<=0 || VintedPublicSession.nextAllowedAt(context)>now || market.processingVintedCount()>0 || (vh>0&&now-vh<45_000L);
-            boolean bHealthy=(bd<=0&&hp<=0) || market.processingCount(MarketStore.JOB_BGG)>0 || (bh>0&&now-bh<45_000L);
+            long vAge=vh<=0?Long.MAX_VALUE:Math.max(0L,now-vh),bAge=bh<=0?Long.MAX_VALUE:Math.max(0L,now-bh);
+            boolean vNeeds=vd>0||activeDeferred>0;
+            boolean bNeeds=bd>0||hp>0;
+            boolean vHealthy=!vNeeds || VintedPublicSession.nextAllowedAt(context)>now || vAge<45_000L ||
+                    (market.processingVintedCount()>0&&vAge<180_000L);
+            boolean bHealthy=!bNeeds || bAge<45_000L ||
+                    (market.processingCount(MarketStore.JOB_BGG)>0&&bAge<180_000L);
             if(vHealthy&&bHealthy)return Result.success();
+            market.setDiagnosticState("queue_recovery",1,"build=queue-recovery-v2;state=TAKEOVER;vDue="+vd+
+                    ";vDeferred="+activeDeferred+";vHeartbeatAgeMs="+vAge+";bDue="+bd+";bHistorical="+hp+
+                    ";bHeartbeatAgeMs="+bAge+";serviceRunning=true");
         }
         market.resetStaleProcessingOlderThan(15 * 60_000L);
         market.reconcileQueue();
@@ -67,6 +74,11 @@ public final class QueueDrainWorker extends Worker {
                 int bggDone=QueueJobRunner.processBggBatch(context,market,bgg,Math.min(20,room));
                 if(bggDone>0){didWork=true;processed+=bggDone;}
                 if (isStopped() || processed >= MAX_ITEMS || System.currentTimeMillis() - started >= MAX_RUN_MS) break;
+                int activeRunCore=market.activeRunCoreVintedCount();
+                if(activeRunCore<6&&market.activeRunDeferredVintedCount()>0){
+                    int promoted=market.promoteDeferredVintedBatch(6-activeRunCore);
+                    if(promoted>0)didWork=true;
+                }
                 if (QueueJobRunner.processOneVinted(context, db, market, resolver)) { didWork = true; processed++; }
                 if (!didWork) break;
             }

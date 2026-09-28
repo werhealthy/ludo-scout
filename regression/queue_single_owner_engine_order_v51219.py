@@ -53,8 +53,10 @@ continuation=radar[continue_start:continue_end]
 checks=[
     ("ACTION_NOW has foreground owner only",
      "QueueKeepAliveService.ensureRunning(app)" in action_now and "return;" in action_now and "scheduleLocal" not in action_now),
-    ("WorkManager stands down before opening DB under service owner",
-     "isStarting()||QueueKeepAliveService.isRunning()" in worker_head and worker_head.index("isRunning()") < worker_head.index("new DealDatabase")),
+    ("WorkManager stands down before opening DB only during service cold start",
+     "if(QueueKeepAliveService.isStarting())return Result.success();" in worker_head and
+     worker_head.index("isStarting()") < worker_head.index("new DealDatabase") and
+     "isStarting()||QueueKeepAliveService.isRunning()" not in worker_head),
     ("local classifier is independent of the active remote run",
      "activeObservationSession()" not in pending and "ORDER BY last_seen DESC LIMIT ?" in pending and "Math.min(8,limit)" in pending),
     ("RAM hints cannot directly bypass active-run ordering",
