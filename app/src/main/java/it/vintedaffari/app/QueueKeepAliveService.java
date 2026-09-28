@@ -174,7 +174,7 @@ public final class QueueKeepAliveService extends Service {
                 long urgentReserve=market.urgentVintedReservationUntil(now);
                 if(urgentReserve>now){long sec=Math.max(1L,(urgentReserve-now+999L)/1000L);market.setLaneStatus("vinted","WAITING","priorità Vinted tra "+sec+" s",urgentReserve);sleep(Math.min(8_000L,Math.max(1_000L,urgentReserve-now)));continue;}
                 int due=market.runnableVintedDueCount(now);
-                int activeRunCore=market.activeRunCoreVintedCount();if(activeRunCore<6&&market.deferredVintedCount()>0){int promoted=market.promoteDeferredVintedBatch(6-activeRunCore);if(promoted>0)due=market.runnableVintedDueCount(System.currentTimeMillis());}
+                int activeRunCore=market.activeRunCoreVintedCount();if(activeRunCore<8&&market.activeRunDeferredVintedCount()>0){int promoted=market.promoteDeferredVintedBatch(8-activeRunCore);if(promoted>0)due=market.runnableVintedDueCount(System.currentTimeMillis());}
                 if(due<=0){long next=market.nextRunnableVintedDueAt(),deferredDue=market.nextDeferredVintedDueAt();if(deferredDue>0&&(next<=0||deferredDue<next))next=deferredDue;int deferred=market.deferredVintedCount();market.setLaneStatus("vinted","IDLE",deferred>0?(deferred+" annunci da collegare gradualmente"):"nessuna attività Vinted pronta",next);sleepUntil(next);continue;}
                 market.setLaneStatus("vinted","CLAIMING",due+" attività pronte",0L);
                 if(resolver==null)resolver=new AutoLinkResolver(this);
