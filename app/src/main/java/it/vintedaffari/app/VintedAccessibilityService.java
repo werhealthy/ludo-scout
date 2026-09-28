@@ -357,15 +357,20 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         lp.gravity=Gravity.TOP|Gravity.END;lp.x=overlayDp(12);lp.y=overlayDp(92);
-        try{scanOverlayManager.addView(pill,lp);diag().edit().putBoolean("scanOptInVisible",true).putBoolean("scanOptInEnabled",false).apply();if(marketStore!=null)marketStore.setDiagnosticState("scan_opt_in",0,"build=scan-opt-in-v1;state=OFF;visible=true");handler.removeCallbacks(scanOverlayWatch);handler.postDelayed(scanOverlayWatch,750L);}
+        try{scanOverlayManager.addView(pill,lp);diag().edit().putBoolean("scanOptInVisible",true).putBoolean("scanOptInEnabled",false).apply();publishScanOptInDiagnostic(false,true);handler.removeCallbacks(scanOverlayWatch);handler.postDelayed(scanOverlayWatch,750L);}
         catch(Throwable t){scanOverlay=null;diag().edit().putString("scanOverlayError",String.valueOf(t.getMessage())).apply();}
     }
 
     private void setScanEnabled(boolean enabled){
         scanEnabled=enabled;diag().edit().putBoolean("scanOptInEnabled",enabled).apply();updateScanOverlay();
-        if(marketStore!=null)marketStore.setDiagnosticState("scan_opt_in",enabled?1:0,
-                "build=scan-opt-in-v1;state="+(enabled?"ON":"OFF")+";visible="+(scanOverlay!=null));
+        publishScanOptInDiagnostic(enabled,scanOverlay!=null);
         if(enabled)scheduleScan(0L);else{handler.removeCallbacks(scanRunnable);scanScheduled=false;}
+    }
+
+    private void publishScanOptInDiagnostic(boolean enabled,boolean visible){
+        try{diagnosticIo.execute(()->{try{MarketStore store=marketStore;if(store!=null)store.setDiagnosticState("scan_opt_in",enabled?1:0,
+                "build=scan-opt-in-v1;state="+(enabled?"ON":"OFF")+";visible="+visible);}catch(Throwable ignored){}});}
+        catch(RuntimeException ignored){}
     }
 
     private void updateScanOverlay(){
@@ -381,7 +386,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         TextView pill=scanOverlay;scanOverlay=null;
         if(pill!=null&&scanOverlayManager!=null)try{scanOverlayManager.removeView(pill);}catch(Throwable ignored){}
         scanOverlayManager=null;diag().edit().putBoolean("scanOptInVisible",false).putBoolean("scanOptInEnabled",false).apply();
-        if(marketStore!=null)marketStore.setDiagnosticState("scan_opt_in",0,"build=scan-opt-in-v1;state=OFF;visible=false");
+        publishScanOptInDiagnostic(false,false);
     }
 
     private void scheduleScan(long delay) {
