@@ -98,7 +98,7 @@ public final class QueueKeepAliveService extends Service {
 
     private void initializeBackground(){
         try{
-            db=new DealDatabase(this);market=new MarketStore(this,db);market.startOperationalEpochIfMissing();market.touchProcessorHeartbeat();
+            db=new DealDatabase(this);market=new MarketStore(this,db);EngineStartupMaintenance.run(this,market);market.touchProcessorHeartbeat();
         }catch(Throwable t){
             STARTING=false;Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);stopSelf();return;
         }

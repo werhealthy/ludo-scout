@@ -6,7 +6,7 @@ root=Path(__file__).resolve().parents[1]
 ui=(root/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
 service=(root/"app/src/main/java/it/vintedaffari/app/QueueKeepAliveService.java").read_text(encoding="utf-8")
 
-maintenance=ui[ui.index("private void startPostCreateMaintenance()"):ui.index("private void applyUxFreshStartIfNeeded()")]
+maintenance=ui[ui.index("private void startPostCreateMaintenance()"):ui.index("@Override protected void onResume()")]
 overview=ui[ui.index("private void renderEngineOverview()"):ui.index("private View engineCurrentRunHero",ui.index("private void renderEngineOverview()"))]
 pulse=ui[ui.index("private final Runnable activityStatusPulse"):ui.index("private static final class PhotoMatch",ui.index("private final Runnable activityStatusPulse"))]
 
