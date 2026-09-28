@@ -33,6 +33,7 @@ public final class DealPolicy {
 
     /** Queue-local candidates have rating but usually no categories until BGG enrichment. */
     public static boolean queueCandidateEligible(BggSearchClient.Game game) {
-        return game != null && (game.rating == null || game.rating >= MIN_BGG_RATING);
+        return game != null && (game.rating == null || game.rating >= MIN_BGG_RATING) &&
+                !childrenCategory(game.categories);
     }
 }
