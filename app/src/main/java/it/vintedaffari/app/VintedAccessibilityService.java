@@ -7,6 +7,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Rect;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Build;
@@ -16,6 +19,9 @@ import android.text.Spanned;
 import android.text.style.ClickableSpan;
 import android.text.style.URLSpan;
 import android.view.WindowManager;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.TextView;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -91,6 +97,17 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private BundleDatabase bundleDatabase;
     private SellerBundleScanner bundleScanner;
     private boolean scanScheduled = false;
+    /** Vinted capture is explicit opt-in per foreground session. Existing backlog may continue to
+     * process in background, but no new Vinted cards are persisted while this switch is OFF. */
+    private boolean scanEnabled=false;
+    private WindowManager scanOverlayManager;
+    private TextView scanOverlay;
+    private final Runnable scanOverlayWatch=new Runnable(){@Override public void run(){
+        if(scanOverlay==null)return;
+        AccessibilityNodeInfo visible=findVisibleVintedRoot();
+        if(visible==null){setScanEnabled(false);hideScanOverlay();return;}
+        handler.postDelayed(this,750L);
+    }};
     private volatile long lastVintedEventAt=0L;private long pendingVintedEventDiag=0L,lastVintedEventDiagFlushAt=0L;
     private boolean retryRegistered = false;
     private volatile boolean manualMetadataRefresh=false;
@@ -163,6 +180,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
     @Override public void onServiceConnected() {
         super.onServiceConnected();
+        scanEnabled=false;diag().edit().putBoolean("scanOptInEnabled",false).putBoolean("scanOptInVisible",false).apply();
         QueueKeepAliveService.ensureRunning(this);
         QueueWorkScheduler.ensureRecovery(this);
         QueueWorkScheduler.schedule(this);
@@ -254,6 +272,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if (event == null) return;
         CharSequence pkg = event.getPackageName();
         if (pkg == null || !VINTED_PACKAGE.contentEquals(pkg)) return;
+        showScanOverlay();
 
         long eventNow=System.currentTimeMillis();pendingVintedEventDiag++;
         if(lastVintedEventDiagFlushAt==0L||eventNow-lastVintedEventDiagFlushAt>=2_000L||pendingVintedEventDiag>=64L){
@@ -325,16 +344,53 @@ public final class VintedAccessibilityService extends AccessibilityService {
         return fallback;
     }
 
+    private int overlayDp(float value){return Math.max(1,Math.round(value*getResources().getDisplayMetrics().density));}
+
+    private void showScanOverlay(){
+        if(scanOverlay!=null)return;
+        scanEnabled=false;
+        scanOverlayManager=(WindowManager)getSystemService(Context.WINDOW_SERVICE);
+        TextView pill=new TextView(this);scanOverlay=pill;pill.setTextSize(13);pill.setGravity(Gravity.CENTER);pill.setPadding(overlayDp(14),overlayDp(9),overlayDp(14),overlayDp(9));pill.setElevation(overlayDp(8));
+        pill.setOnClickListener(v->setScanEnabled(!scanEnabled));updateScanOverlay();
+        WindowManager.LayoutParams lp=new WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        lp.gravity=Gravity.TOP|Gravity.END;lp.x=overlayDp(12);lp.y=overlayDp(92);
+        try{scanOverlayManager.addView(pill,lp);diag().edit().putBoolean("scanOptInVisible",true).putBoolean("scanOptInEnabled",false).apply();handler.removeCallbacks(scanOverlayWatch);handler.postDelayed(scanOverlayWatch,750L);}
+        catch(Throwable t){scanOverlay=null;diag().edit().putString("scanOverlayError",String.valueOf(t.getMessage())).apply();}
+    }
+
+    private void setScanEnabled(boolean enabled){
+        scanEnabled=enabled;diag().edit().putBoolean("scanOptInEnabled",enabled).apply();updateScanOverlay();
+        if(enabled)scheduleScan(0L);else{handler.removeCallbacks(scanRunnable);scanScheduled=false;}
+    }
+
+    private void updateScanOverlay(){
+        TextView pill=scanOverlay;if(pill==null)return;
+        pill.setText(scanEnabled?"Ludo · SCANSIONE ON":"Ludo · OFF");
+        pill.setTextColor(scanEnabled?Color.rgb(7,19,25):Color.rgb(235,238,232));
+        GradientDrawable bg=new GradientDrawable();bg.setCornerRadius(overlayDp(999));bg.setColor(scanEnabled?Color.rgb(216,255,32):Color.rgb(31,45,50));bg.setStroke(overlayDp(1),scanEnabled?Color.rgb(216,255,32):Color.rgb(130,150,152));pill.setBackground(bg);
+        pill.setContentDescription(scanEnabled?"Ludo sta leggendo i giochi Vinted. Tocca per fermare.":"Ludo non sta leggendo Vinted. Tocca per iniziare la scansione.");
+    }
+
+    private void hideScanOverlay(){
+        handler.removeCallbacks(scanOverlayWatch);
+        TextView pill=scanOverlay;scanOverlay=null;
+        if(pill!=null&&scanOverlayManager!=null)try{scanOverlayManager.removeView(pill);}catch(Throwable ignored){}
+        scanOverlayManager=null;diag().edit().putBoolean("scanOptInVisible",false).putBoolean("scanOptInEnabled",false).apply();
+    }
+
     private void scheduleScan(long delay) {
-        // Throttle/coalesce instead of trailing-edge debounce: never postpone an already scheduled
-        // scan just because Vinted keeps emitting scroll/content events.
+        // New observations are explicit opt-in. Background processing of already captured work is independent.
+        if(!scanEnabled)return;
         if (scanScheduled) return;
         scanScheduled = true;
         handler.postDelayed(scanRunnable, Math.max(0L,delay));
     }
 
     private void scanVisibleVintedCards() {
-        if (database == null) return;
+        if (!scanEnabled || database == null) return;
 
         SharedPreferences p = diag();
         p.edit().putLong("scans", p.getLong("scans", 0) + 1).apply();
@@ -556,15 +612,10 @@ public final class VintedAccessibilityService extends AccessibilityService {
                             continue;
                         }
                     }
-                    // Local Vinted asking prices refine the used-market prior. With a small sample
-                    // they are blended with BGG; only a mature local sample may stand alone.
-                    Integer localRef=null;
-                    if(marketStore!=null&&ga!=null&&!TextUtils.isEmpty(ga.bggId)){
-                        localRef=marketStore.localVintedReferenceCents(ga.bggId,DealDatabase.signature(card),ga.languageCode,ga.benchmarkCents);
-                        if(localRef!=null&&localRef>0)ga=ga.withUsedMarketBenchmark(localRef,"vinted_local_evidence","Vinted locale + riferimento usato");
-                    }
+                    // Safe mode: the embedded BGG used-price reference remains authoritative.
+                    // Vinted observations are still stored for history/audit but never reprice this analysis.
                     database.record(card, ga, analyzedListing, t);
-                    if(marketStore!=null){marketStore.applyAnalysis(card,ga,analyzedListing,t);if(ga!=null&&!TextUtils.isEmpty(ga.bggId))marketStore.refreshLocalVintedBenchmarksForBgg(ga.bggId);}
+                    if(marketStore!=null)marketStore.applyAnalysis(card,ga,analyzedListing,t);
                     boolean huntCandidate=ga!=null&&"matched".equals(ga.status)&&!TextUtils.isEmpty(ga.bggId)
                             &&HuntDatabase.wantsCandidate(getApplicationContext(),ga.bggId,ga.totalCents);
                     if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);
@@ -1694,6 +1745,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     @Override public void onInterrupt() { }
 
     @Override public void onDestroy() {
+        setScanEnabled(false);hideScanOverlay();
         handler.removeCallbacksAndMessages(null);
         if(retryRegistered)try{unregisterReceiver(retryReceiver);}catch(Exception ignored){}
         diag().edit().putBoolean("serviceConnected", false).putBoolean("engineReady",false).apply();
