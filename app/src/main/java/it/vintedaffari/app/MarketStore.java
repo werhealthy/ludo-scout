@@ -564,6 +564,33 @@ public final class MarketStore {
         db.execSQL("UPDATE processing_jobs SET priority=120 WHERE state IN ('PENDING','FAILED_RETRYABLE') AND source='RECOVERY'");
     }
 
+    /** One-time safe-mode cleanup for already persisted data. Raw observations and price history
+     * are preserved; low-rated/children rows simply leave active product/review surfaces. */
+    public int applySafeModeQualityCutover(){
+        final String marker="safe_mode_quality_v51268";SQLiteDatabase db=helper.getWritableDatabase();
+        try(Cursor c=db.rawQuery("SELECT 1 FROM queue_controls WHERE name=? LIMIT 1",new String[]{marker})){if(c.moveToFirst())return 0;}
+        long now=System.currentTimeMillis();int changed=0;db.beginTransaction();try{
+            ContentValues low=new ContentValues();low.put("database_visible",0);low.put("filter_reason","BGG_RATING_BELOW_6");
+            changed+=db.update("games",low,"rating IS NOT NULL AND rating<?",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)});
+            String childWhere="LOWER(COALESCE(categories,'')) LIKE '%children%game%' OR LOWER(COALESCE(categories,'')) LIKE '%gioc%per%bambin%'";
+            ContentValues child=new ContentValues();child.put("database_visible",0);child.put("filter_reason","BGG_CHILDRENS_GAME");
+            changed+=db.update("games",child,childWhere,null);
+
+            ContentValues listing=new ContentValues();listing.put("lifecycle","AUTO_FILTERED");listing.put("enrichment_state","AUTO_FILTERED");listing.put("manual_review_required",0);listing.putNull("manual_review_reason");listing.put("last_error","Escluso dal safe mode qualità BGG");
+            changed+=db.update("market_listings",listing,"lifecycle='ACTIVE' AND game_id IN (SELECT id FROM games WHERE database_visible=0 AND filter_reason IN ('BGG_RATING_BELOW_6','BGG_CHILDRENS_GAME'))",null);
+
+            ContentValues deal=new ContentValues();deal.put("lifecycle","REMOVED");deal.put("verification_reason","Escluso dal safe mode qualità BGG");
+            changed+=db.update("deals",deal,"lifecycle='ACTIVE' AND bgg_id IN (SELECT bgg_id FROM games WHERE bgg_id IS NOT NULL AND bgg_id<>'' AND database_visible=0 AND filter_reason IN ('BGG_RATING_BELOW_6','BGG_CHILDRENS_GAME'))",null);
+
+            ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("progress",100);done.put("next_attempt_at",0);done.put("updated_at",now);done.put("processing_started_at",0);done.put("last_error","safe mode: gioco fuori target qualità");
+            changed+=db.update("processing_jobs",done,"state IN (?,?,?) AND (game_id IN (SELECT id FROM games WHERE database_visible=0 AND filter_reason IN ('BGG_RATING_BELOW_6','BGG_CHILDRENS_GAME')) OR listing_id IN (SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE g.database_visible=0 AND g.filter_reason IN ('BGG_RATING_BELOW_6','BGG_CHILDRENS_GAME')))",new String[]{PENDING,FAILED_RETRYABLE,PROCESSING});
+
+            ContentValues q=new ContentValues();q.put("name",marker);q.put("value",changed);q.put("updated_at",now);q.put("text_value","build=safe-mode-v1;changed="+changed);db.insertWithOnConflict("queue_controls",null,q,SQLiteDatabase.CONFLICT_REPLACE);
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        setDiagnosticState("safe_mode_quality",changed,"build=safe-mode-v1;changed="+changed);if(changed>0)notifyQueueChanged();return changed;
+    }
+
     /** v5.11.2: keep raw market history, but the Game Database only admits BGG-rated games >= 6.0.
      * Unknown/unconfirmed ratings remain visible until BGG metadata is authoritative. */
     public static void upgradeV10ToV11(SQLiteDatabase db) {
