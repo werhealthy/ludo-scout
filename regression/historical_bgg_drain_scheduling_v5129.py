@@ -20,7 +20,7 @@ checks = [
     ("historical burst requires no current match work", "remainingCurrent<=0&&historicalPending>0" in loop),
     ("historical burst remains bounded", "BggHistoricalRevalidator.runSlice(market,bggMatcher,24)" in loop and "Math.min(32,limit)" in reval),
     ("historical loop yields between bursts", 'sleep(350L);continue;' in loop),
-    ("WorkManager health includes historical lane", "hp=market.historicalBggRevalidationPendingCount()" in worker and "(bd<=0&&hp<=0)" in worker),
+    ("WorkManager health includes historical lane", "hp=market.historicalBggRevalidationPendingCount()" in worker and "bNeeds=bd>0||hp>0" in worker and "!bNeeds" in worker),
     ("WorkManager reschedules while history remains", "market.historicalBggRevalidationPendingCount() > 0" in worker),
     ("per-game broadcasts suppressed in bulk", "independentlyVerified,false" in reval and "notifyHistoricalBggRevalidationChanged()" in reval),
     ("one coalesced notification API exists", "public void notifyHistoricalBggRevalidationChanged(){notifyQueueChanged();}" in market),
