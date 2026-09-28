@@ -357,13 +357,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         lp.gravity=Gravity.TOP|Gravity.END;lp.x=overlayDp(12);lp.y=overlayDp(92);
-        try{scanOverlayManager.addView(pill,lp);diag().edit().putBoolean("scanOptInVisible",true).putBoolean("scanOptInEnabled",false).apply();handler.removeCallbacks(scanOverlayWatch);handler.postDelayed(scanOverlayWatch,750L);}
+        try{scanOverlayManager.addView(pill,lp);diag().edit().putBoolean("scanOptInVisible",true).putBoolean("scanOptInEnabled",false).apply();if(marketStore!=null)marketStore.setDiagnosticState("scan_opt_in",0,"build=scan-opt-in-v1;state=OFF;visible=true");handler.removeCallbacks(scanOverlayWatch);handler.postDelayed(scanOverlayWatch,750L);}
         catch(Throwable t){scanOverlay=null;diag().edit().putString("scanOverlayError",String.valueOf(t.getMessage())).apply();}
     }
 
     private void setScanEnabled(boolean enabled){
         scanEnabled=enabled;diag().edit().putBoolean("scanOptInEnabled",enabled).apply();updateScanOverlay();
-        if(enabled)scheduleScan(0L);else{handler.removeCallbacks(scanRunnable);scanScheduled=false;}
+        if(marketStore!=null)marketStore.setDiagnosticState("scan_opt_in",enabled?1:0,
+                "build=scan-opt-in-v1;state="+(enabled?"ON":"OFF")+";visible="+(scanOverlay!=null));
+        if(enabled)scheduleScan(0L);
     }
 
     private void updateScanOverlay(){
@@ -379,18 +381,19 @@ public final class VintedAccessibilityService extends AccessibilityService {
         TextView pill=scanOverlay;scanOverlay=null;
         if(pill!=null&&scanOverlayManager!=null)try{scanOverlayManager.removeView(pill);}catch(Throwable ignored){}
         scanOverlayManager=null;diag().edit().putBoolean("scanOptInVisible",false).putBoolean("scanOptInEnabled",false).apply();
+        if(marketStore!=null)marketStore.setDiagnosticState("scan_opt_in",0,"build=scan-opt-in-v1;state=OFF;visible=false");
     }
 
     private void scheduleScan(long delay) {
-        // New observations are explicit opt-in. Background processing of already captured work is independent.
-        if(!scanEnabled)return;
+        // The event pass still runs while OFF so an exact listing explicitly opened from Ludo can
+        // reconcile sold/metadata state. Ordinary feed capture is gated later by scanEnabled.
         if (scanScheduled) return;
         scanScheduled = true;
         handler.postDelayed(scanRunnable, Math.max(0L,delay));
     }
 
     private void scanVisibleVintedCards() {
-        if (!scanEnabled || database == null) return;
+        if (database == null) return;
 
         SharedPreferences p = diag();
         p.edit().putLong("scans", p.getLong("scans", 0) + 1).apply();
@@ -408,6 +411,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
         long productNow=System.currentTimeMillis();
         MarketStore.ManualVintedRecovery opened=marketStore==null?null:marketStore.activeOpenedVintedTarget(productNow);
         boolean exactOpened=opened!=null&&opened.active(productNow);
+        MarketStore.ManualVintedRecovery recovery=marketStore==null?null:marketStore.activeManualVintedRecovery(productNow);
+        boolean recoveryActive=recovery!=null&&recovery.active(productNow);
+        // OFF means no ambient Vinted reading. The only exception is a short-lived explicit
+        // Ludo-originated exact/recovery flow, which never creates ordinary Motore observations.
+        if(!scanEnabled&&!exactOpened&&!recoveryActive)return;
         ProductPage product = ProductPageParser.parse(root);
         if(product==null&&exactOpened&&ProductPageParser.hasStrongUnavailableSignal(root)){
             reconcileOpenedSold(null,opened.listingId,true,"strong-unavailable-signal");
@@ -455,8 +463,6 @@ public final class VintedAccessibilityService extends AccessibilityService {
         }
 
         List<VintedCard> discovered = new ArrayList<>();
-        MarketStore.ManualVintedRecovery recovery=marketStore==null?null:marketStore.activeManualVintedRecovery(System.currentTimeMillis());
-        boolean recoveryActive=recovery!=null&&recovery.active(System.currentTimeMillis());
         // A Vinted item-detail page contains seller/recommendation rails that may be shoes, books,
         // glasses, etc. The product itself is already handled above by ProductPageParser; those
         // rails must not become new catalog games just because they are visible on the same page.
@@ -1492,6 +1498,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String a11yCrossPayload=TextUtils.isEmpty(a11yCross.detail)?"":a11yCross.detail;
         MarketStore.RuntimeStatus radarService=marketDiag.diagnosticState("radar_service");
         long radarServiceAgeMs=radarService.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-radarService.updatedAt);
+        MarketStore.RuntimeStatus scanOptIn=marketDiag.diagnosticState("scan_opt_in");
+        long scanOptInAgeMs=scanOptIn.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-scanOptIn.updatedAt);
         MarketStore.RuntimeStatus engineRuntime=marketDiag.diagnosticState("engine_runtime");
         long engineRuntimeAgeMs=engineRuntime.updatedAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-engineRuntime.updatedAt);
         String engineRuntimePayload=TextUtils.isEmpty(engineRuntime.detail)?"":engineRuntime.detail;
@@ -1570,12 +1578,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
         boolean engineReadyAuthoritative=engineRuntime.updatedAt>0?engineRuntime.value>0:p.getBoolean("engineReady",false);
         int engineGamesAuthoritative=engineRuntime.value>0?(int)Math.min(Integer.MAX_VALUE,engineRuntime.value):p.getInt("engineGames",0);
         return "LUDO SCOUT V5 — RADAR + BUNDLE\n" +
-                "mode=observer-only (no visual overlays)\n" +
+                "mode=opt-in-vinted-capture (accessibility overlay)\n" +
                 "serviceConnected=" + serviceConnectedAuthoritative + "\n" +
                 "engineReady=" + engineReadyAuthoritative + "\n" +
                 "engineGames=" + engineGamesAuthoritative + "\n" +
                 "engineRuntime={authoritative="+(engineRuntime.updatedAt>0)+", ageMs="+engineRuntimeAgeMs+", value="+engineRuntime.value+", payload="+engineRuntimePayload+"}\n" +
-                "radarService={authoritative="+(radarService.updatedAt>0)+", ageMs="+radarServiceAgeMs+", value="+radarService.value+", payload="+radarService.detail+"}\n" +
+                "radarService={authoritative="+(radarService.updatedAt>0)+", ageMs="+radarServiceAgeMs+", value="+radarService.value+", payload="+radarService.detail+"}\n" +                "scanOptIn={authoritative="+(scanOptIn.updatedAt>0)+", ageMs="+scanOptInAgeMs+", enabled="+(scanOptIn.value==1)+", payload="+scanOptIn.detail+"}\n" +
+                "pricingSafeMode=BGG_ONLY; localVinted=history-only\n" +
                 "vintedEvents=" + a11yEvents + "\n" +
                 "scans=" + a11yScans + "\n" +
                 "lastVintedEventAgeMs=" + (a11yEventAt<=0?-1L:Math.max(0L,System.currentTimeMillis()-a11yEventAt)) + "; eventType=" + a11yEventType + "\n" +
