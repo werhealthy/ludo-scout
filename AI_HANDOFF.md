@@ -1,5 +1,16 @@
 # Ludo Scout — AI handoff
 
+## 5.12.68 — Pricing / intake safe mode
+- Product decision: local Vinted asking-price history is temporarily evidence-only. It is still collected for charts/audit, but it cannot blend with or replace the BGG used-price reference used by DealEvaluator.
+- Fresh analyses no longer call GameAnalysis.withUsedMarketBenchmark from Accessibility. Targeted local-Vinted repricing is disabled, and the periodic deal rebuild uses only fresh BGG market stats or the bundled BGG used-price index.
+- Existing rows removed as PRICE_FILTERED are re-evaluated against BGG-only evidence and may be restored when that authoritative benchmark says the price is still eligible. Raw price history is never deleted.
+- Known BGG candidates below 6 are removed before automatic match/review. Authoritative BGG metadata also excludes Children's Game entries from Database, review, Vinted linking and active deal surfaces while preserving observations/history. Asmodee or any publisher is not itself an exclusion criterion.
+- Vinted Accessibility intake is explicit opt-in per foreground Vinted session. An accessibility overlay appears as “Ludo · OFF”; tapping it switches to “Ludo · SCANSIONE ON”. Leaving Vinted resets OFF. While OFF, ordinary Vinted tree/card parsing and new Motore observations are disabled.
+- Diagnostics now expose scanOptIn and pricingSafeMode=BGG_ONLY. Game detail labels local Vinted prices as historical evidence rather than a decision benchmark.
+- No new Android overlay permission is required: the control uses TYPE_ACCESSIBILITY_OVERLAY from the already-authorized AccessibilityService.
+- Existing Motore queue-stall investigation remains separate: 5.12.68 does not claim to fix the stale-lane/ANR evidence observed on 5.12.67.
+- Next product step after Pixel validation: redesign historical listing cards so stale Vinted URLs are not implicitly actionable, preserve/review local photos, and expose explicit association-cleanup actions.
+
 ## 5.12.67 — Queue stall recovery
 - Field debug after ~3 days without fresh Vinted input showed an active Motore run ~252M ms old with one DEFERRED_LINK remaining, zero runnable Vinted jobs, and Vinted/BGG lane heartbeats ~26M ms stale. The issue was queue liveness, not legitimate processing time.
 - Root cause 1: QueueDrainWorker returned immediately whenever QueueKeepAliveService.isRunning() was true, making its later lane-health check unreachable. A living default process could therefore suppress WorkManager recovery even when the service consumer lanes were stalled.
@@ -119,8 +130,8 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## Current baseline
 - App: Ludo Scout Android
 - Package / applicationId: `it.vintedaffari.app`
-- Baseline version: `5.12.67-queue-stall-recovery`
-- versionCode: `169`
+- Baseline version: `5.12.68-safe-mode`
+- versionCode: `170`
 - compileSdk / targetSdk: 35
 - minSdk: 28
 - Java: 17
@@ -162,7 +173,7 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 ## 5.12.35 pricing / bundle product invariants
 - User-facing deal decisions are centralized in `DealEvaluator`: Offertona, Buon prezzo, Prova un'offerta, Prezzo giusto and Pochi dati. `REJECT` is internal only; it removes the listing from product surfaces while preserving market history.
 - “Typical used price” means median. Q25 is a separate low-market band. The compact BGG used-price fallback reads its median column.
-- Three to seven comparable Vinted asking prices refine the global/prior benchmark; they do not replace it outright. Eight or more comparable listings may make the local median primary.
+- 5.12.68 safe mode supersedes local repricing: Vinted asking prices are history/audit only. Deal decisions use BGG used-price evidence until identity cleanup is explicitly validated and local pricing is deliberately re-enabled.
 - Offer targets solve for a good all-in total and must remain within a plausible 5–15% reduction.
 - Discover is selective; Catalog may retain fair/insufficient-data rows. Explicit Hunt intent remains separate from normal deal filtering.
 - Bundle prospecting may start from a strong game even when the single purchase is not itself a bargain. Existing BundleExploration intent is reused; do not add aggressive seller scraping.
@@ -170,10 +181,10 @@ Do not reconstruct the project from an older ZIP when the repository is availabl
 - Notifications remain stricter than cards: exact identities, existing safety gates, GREAT_BUY, and the legacy 30% all-in saving threshold.
 
 ## Current engine invariants
-- Vinted Accessibility observation remains the core UX: user scrolls Vinted normally.
+- Vinted Accessibility intake is explicit opt-in: opening Vinted shows a small Ludo control OFF by default; only SCANSIONE ON may create ordinary observations/Motore scrolls, and leaving Vinted resets OFF.
 - No anti-bot bypass, CAPTCHA bypass, cookie stealing, private abusive API use or artificial request-rate increase.
 - Prefer local filtering, caching, batching and snapshot reuse before public-page requests.
-- BGG rating below 6 is filtered before ordinary Vinted linking where possible.
+- Known BGG rating below 6 is filtered before match/review/linking; authoritative BGG Children's Game metadata is also outside the scouting database. Publisher alone is never a quality exclusion.
 - Exact Vinted identity and exact BGG identity are separate facts.
 - Elapsed time alone must never classify, hide, exclude, complete or discard a listing. Correctness comes only from matching/classification/trust state.
 - Motore timing is workload-aware: the target uses core Vinted identity work, while the live ETA counts exact Vinted identities still missing even when their durable job is temporarily parked. The displayed `~N min di corsia` is service-lane work, not a wall-clock promise when fairness rotates multiple scrolls.
