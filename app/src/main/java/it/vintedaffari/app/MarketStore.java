@@ -1791,7 +1791,7 @@ public final class MarketStore {
     public int reconcileQueue() {
         SQLiteDatabase db=helper.getWritableDatabase();
         long now=System.currentTimeMillis();
-        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+filterClearlyOverpricedAutomaticListings(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         db.beginTransaction();
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -2048,9 +2048,8 @@ public final class MarketStore {
      * VintedPublicSession's cache across several listings, while LIVE/HUNT/MANUAL priorities still preempt. */
     public int promoteDeferredVintedBatch(int limit){
         long now=System.currentTimeMillis();
-        // Enforce the price gate immediately before remote work is materialised, not only on the
-        // slower reconciliation pulse.
-        filterClearlyOverpricedAutomaticListings(now);
+        // Safe mode intentionally does not run the legacy benchmark-based early price shortcut.
+        // Fresh DealEvaluator decisions already use BGG-only evidence; old benchmark rows are being repaired separately.
         int wanted=Math.max(1,Math.min(8,limit));SQLiteDatabase db=helper.getWritableDatabase();int queued=0;db.beginTransaction();
         try{
             if(activeRunCoreVintedCount()>=8){db.setTransactionSuccessful();return 0;}
