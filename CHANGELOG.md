@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.69 — Manutenzione Motore con un solo responsabile (2026-09-28)
+
+- Le pulizie e i passaggi di avvio del Motore non partono più dalla schermata principale.
+- Il servizio della coda esegue i passaggi una sola volta, in background, mantenendo le protezioni di ripartenza già esistenti.
+- Il controllo automatico PR e beta verifica che le scritture di avvio restino fuori dall’apertura della schermata.
+- Nessuna modifica a matching, soglie di pubblicazione, ritmo delle richieste Vinted o dati storici.
+
 ## 5.12.68 — Safe mode prezzi e scansione Vinted (2026-09-28)
 
 - Il prezzo medio costruito dagli annunci Vinted interni non decide più convenienza o esclusione: resta storico osservato. Per ora DealEvaluator usa soltanto il riferimento usato BGG disponibile.
