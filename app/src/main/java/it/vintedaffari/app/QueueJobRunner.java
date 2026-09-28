@@ -50,7 +50,7 @@ public final class QueueJobRunner {
                     String learned=market.learnedBggIdForTitle(q);
                     if(TextUtils.isEmpty(learned))continue;
                     BggSearchClient.Game remembered=matcher.localById(learned);
-                    if(DealPolicy.queueCandidateEligible(remembered)){chosen=remembered;confidence=99.5;break;}
+                    if(remembered!=null&&DealPolicy.queueCandidateEligible(remembered.rating,remembered.categories)){chosen=remembered;confidence=99.5;break;}
                 }
 
                 // 2) Exact primary-name/alias match after conservative marketplace cleanup.
@@ -122,7 +122,7 @@ public final class QueueJobRunner {
     private static List<BggSearchClient.Game> qualityCandidates(List<BggSearchClient.Game> candidates){
         if(candidates==null||candidates.isEmpty())return java.util.Collections.emptyList();
         ArrayList<BggSearchClient.Game> out=new ArrayList<>();
-        for(BggSearchClient.Game g:candidates)if(DealPolicy.queueCandidateEligible(g))out.add(g);
+        for(BggSearchClient.Game g:candidates)if(g!=null&&DealPolicy.queueCandidateEligible(g.rating,g.categories))out.add(g);
         return out;
     }
 
