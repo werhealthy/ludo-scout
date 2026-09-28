@@ -365,7 +365,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         scanEnabled=enabled;diag().edit().putBoolean("scanOptInEnabled",enabled).apply();updateScanOverlay();
         if(marketStore!=null)marketStore.setDiagnosticState("scan_opt_in",enabled?1:0,
                 "build=scan-opt-in-v1;state="+(enabled?"ON":"OFF")+";visible="+(scanOverlay!=null));
-        if(enabled)scheduleScan(0L);
+        if(enabled)scheduleScan(0L);else{handler.removeCallbacks(scanRunnable);scanScheduled=false;}
     }
 
     private void updateScanOverlay(){
@@ -385,15 +385,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void scheduleScan(long delay) {
-        // The event pass still runs while OFF so an exact listing explicitly opened from Ludo can
-        // reconcile sold/metadata state. Ordinary feed capture is gated later by scanEnabled.
+        // OFF is strict: no Vinted tree/card parsing and no new observations until the user opts in.
+        if(!scanEnabled)return;
         if (scanScheduled) return;
         scanScheduled = true;
         handler.postDelayed(scanRunnable, Math.max(0L,delay));
     }
 
     private void scanVisibleVintedCards() {
-        if (database == null) return;
+        if (!scanEnabled || database == null) return;
 
         SharedPreferences p = diag();
         p.edit().putLong("scans", p.getLong("scans", 0) + 1).apply();
@@ -413,9 +413,6 @@ public final class VintedAccessibilityService extends AccessibilityService {
         boolean exactOpened=opened!=null&&opened.active(productNow);
         MarketStore.ManualVintedRecovery recovery=marketStore==null?null:marketStore.activeManualVintedRecovery(productNow);
         boolean recoveryActive=recovery!=null&&recovery.active(productNow);
-        // OFF means no ambient Vinted reading. The only exception is a short-lived explicit
-        // Ludo-originated exact/recovery flow, which never creates ordinary Motore observations.
-        if(!scanEnabled&&!exactOpened&&!recoveryActive)return;
         ProductPage product = ProductPageParser.parse(root);
         if(product==null&&exactOpened&&ProductPageParser.hasStrongUnavailableSignal(root)){
             reconcileOpenedSold(null,opened.listingId,true,"strong-unavailable-signal");
