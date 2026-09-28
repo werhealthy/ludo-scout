@@ -1979,6 +1979,16 @@ public final class MarketStore {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=?",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)})){return c.moveToFirst()?c.getInt(0):0;}
     }
 
+    /** Deferred Vinted identities that belong to the scroll currently owning Motore. These rows
+     * have no processing job until materialised, so queue liveness checks must count them explicitly. */
+    public int activeRunDeferredVintedCount(){
+        DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return 0;
+        String sql="SELECT COUNT(*) FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' "+
+                "AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=? "+
+                "AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
+        try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
+    }
+
     /** True only for the scroll that currently owns the ordinary automatic pipeline. */
     public boolean listingBelongsToActiveRun(long listingId){
         if(listingId<=0)return false;DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return false;
