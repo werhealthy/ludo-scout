@@ -272,7 +272,7 @@ public final class QueueKeepAliveService extends Service {
         if(market==null)return baseNotification("Avvio…",0,0,true);MarketStore.JobSummary summary=market.jobSummary();int deferred=market.deferredVintedCount(),allRemaining=summary.active()+deferred,remaining=market.userVisibleActiveCount(),processing=market.userVisibleProcessingCount();long now=System.currentTimeMillis();int dueNow=market.dueNowCount(now);if(sessionStartRemaining<0)sessionStartRemaining=remaining;if(lastRemaining<0)lastRemaining=remaining;if(remaining<lastRemaining){lastProgressAt=now;lastRemaining=remaining;}
         java.util.Calendar cal=java.util.Calendar.getInstance();cal.set(java.util.Calendar.HOUR_OF_DAY,0);cal.set(java.util.Calendar.MINUTE,0);cal.set(java.util.Calendar.SECOND,0);cal.set(java.util.Calendar.MILLISECOND,0);int completedToday=market.userVisibleCompletedSince(cal.getTimeInMillis());String current=market.currentUserVisibleProcessingLabel();int currentProgress=market.currentUserVisibleProcessingProgress();int deep=market.deepMetadataActiveCount();
         String title=remaining>0?"Ludo Scout · "+remaining+" da completare":(deferred>0?"Ludo Scout · "+deferred+" da collegare":"Ludo Scout · aggiornato");String text;
-        if(processing>0&&!TextUtils.isEmpty(current))text=current+" · "+Math.max(15,currentProgress)+"%";
+        if(processing>0)text=TextUtils.isEmpty(current)?"Elaborazione in corso":current+" · "+Math.max(15,currentProgress)+"%";
         else{
             int vDue=market.runnableVintedDueCount(now),bDue=market.runnableBggDueCount(now);
             long wait=VintedPublicSession.waitUntil(this);String reason=VintedPublicSession.waitReason(this);
@@ -286,13 +286,13 @@ public final class QueueKeepAliveService extends Service {
             else if(vDue>0&&"STARTING".equals(vs.state))text="Avvio il motore Vinted";
             else if(bDue>0&&"STARTING".equals(bs.state))text="Avvio il motore Database";
             else if(remaining>0&&dueNow==0){long due=market.nextDueAt();text=due>now?"In attesa · riprendo "+shortWait(due-now):"In attesa";}
-            else if(remaining>0)text=completedToday+" completate oggi · coda attiva";
+            else if(remaining>0)text=completedToday+" completate oggi · "+remaining+" attività in coda";
             else if(deferred>0)text="Collegamenti Vinted graduali";
             else if(deep>0)text="Metadati opzionali in background";
             else text=completedToday>0?completedToday+" completate oggi":"Nessuna attività in attesa";
         }
         String sub=deep>0?deep+" dettagli in background":(completedToday>0?completedToday+" completate oggi":null);
-        NotificationCompat.Builder b=builder().setContentTitle(title).setContentText(text).setSubText(sub).setOngoing(allRemaining>0).setOnlyAlertOnce(true).setSilent(true);if(processing>0)b.setProgress(100,Math.max(1,Math.min(99,currentProgress)),false);else if(remaining>0||deferred>0)b.setProgress(0,0,true);else b.setProgress(0,0,false);return b.build();
+        NotificationCompat.Builder b=builder().setContentTitle(title).setContentText(text).setSubText(sub).setOngoing(allRemaining>0).setOnlyAlertOnce(true).setSilent(true);if(processing>0)b.setProgress(100,Math.max(1,Math.min(99,currentProgress)),false);else b.setProgress(0,0,false);return b.build();
     }
 
     private static String waitText(String reason,long ms){String prefix="REMOTE_LIMIT".equals(reason)?"Vinted ha chiesto una pausa":"LOCAL_BUDGET".equals(reason)?"Budget Vinted in pausa":"COORDINATOR_BUSY".equals(reason)?"Coordino la coda":"Prossima richiesta Vinted";return prefix+" · "+shortWait(ms);}
