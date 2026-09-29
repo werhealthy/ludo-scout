@@ -39,7 +39,7 @@ assert [x[0] for x in rows]==["new-b","new-a","old-b","old-a"], rows
 action_start=receiver.index("if (QueueWorkScheduler.ACTION_NOW.equals(action))")
 action_end=receiver.index("final BroadcastReceiver.PendingResult pending",action_start)
 action_now=receiver[action_start:action_end]
-worker_head=worker[worker.index("Context context = getApplicationContext()"):worker.index("DealDatabase db = new DealDatabase(context)")+50]
+worker_head=worker[worker.index("Context context = getApplicationContext()"):worker.index("market.resetStaleProcessingOlderThan")+len("market.resetStaleProcessingOlderThan")]
 pending_start=market.index("public List<VintedCard> pendingAnalysisCards")
 pending_end=market.index("/** Imports current legacy feed rows",pending_start)
 pending=market[pending_start:pending_end]
@@ -53,9 +53,10 @@ continuation=radar[continue_start:continue_end]
 checks=[
     ("ACTION_NOW has foreground owner only",
      "QueueKeepAliveService.ensureRunning(app)" in action_now and "return;" in action_now and "scheduleLocal" not in action_now),
-    ("WorkManager stands down before opening DB only during service cold start",
-     "if(QueueKeepAliveService.isStarting())return Result.success();" in worker_head and
-     worker_head.index("isStarting()") < worker_head.index("new DealDatabase") and
+    ("WorkManager records cold-start skip before queue recovery",
+     "if(QueueKeepAliveService.isStarting()){" in worker_head and
+     "state=SKIPPED_STARTING" in worker_head and
+     worker_head.index("return Result.success();") < worker_head.index("market.resetStaleProcessingOlderThan") and
      "isStarting()||QueueKeepAliveService.isRunning()" not in worker_head),
     ("local classifier is independent of the active remote run",
      "activeObservationSession()" not in pending and "ORDER BY last_seen DESC LIMIT ?" in pending and "Math.min(8,limit)" in pending),
