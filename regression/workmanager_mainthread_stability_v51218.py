@@ -38,11 +38,14 @@ assert db.execute(sql,(900,1400)).fetchone()[0]==0, "completed canonical listing
 
 oncreate=service[service.index("@Override public void onCreate()"):service.index("private void initializeBackground")]
 onstart=service[service.index("@Override public int onStartCommand"):service.index("private synchronized void superviseLanes")]
+cold_start=worker.index("if(QueueKeepAliveService.isStarting()){")
+cold_start_return=worker.index("return Result.success();",cold_start)
+work_start=worker.index("market.resetStaleProcessingOlderThan")
 checks=[
     ("foreground startup keeps heavy initialization off main callback", "startForeground(" in oncreate and "controlExecutor.execute(this::initializeBackground)" in oncreate and "new DealDatabase" not in oncreate and "reconcileQueue" not in oncreate),
     ("onStartCommand acknowledges before serialized maintenance", "controlExecutor.execute(()->" in onstart and "QueueJobRunner.sweepMissing" in onstart and "return START_STICKY" in onstart),
     ("supervisor pulse runs on control executor", "controlExecutor.schedule(this,8_000L,TimeUnit.MILLISECONDS)" in service and "Handler" not in service and "Looper" not in service),
-    ("worker stands down during service cold start", "if(QueueKeepAliveService.isStarting())return Result.success();" in worker and worker.index("isStarting()") < worker.index("new DealDatabase")),
+    ("worker records and then stands down during service cold start", "state=SKIPPED_STARTING" in worker and cold_start < cold_start_return < work_start),
     ("receiver uses goAsync for WorkManager scheduling", "goAsync()" in receiver and "WAKE_EXEC.execute" in receiver and "scheduleLocal(app)" in receiver),
     ("default-process scheduler dispatches main-thread calls", "runLocalOffMain" in scheduler and "Looper.myLooper()==Looper.getMainLooper()" in scheduler and "SCHEDULER_EXEC.execute" in scheduler),
     ("Motore analysis pending follows canonical listing state", "l.enrichment_state='PENDING_ANALYSIS'" in deal and "COUNT(DISTINCT l.id)" in deal),
