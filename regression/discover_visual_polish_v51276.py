@@ -27,7 +27,7 @@ checks = [
     ("generated hero and category PNG assets are packaged",
      (app / "res/drawable-nodpi/discover_hero_background.png").exists() and
      (app / "res/drawable-nodpi/discover_category_icons_sheet.png").exists() and
-     "R.drawable.discover_hero_background" in hero and "R.drawable.discover_category_icons_sheet" in category_tile),
+     "R.drawable.discover_hero_background" in hero and "R.drawable.discover_category_icons_sheet" in categories),
     ("featured offer hierarchy shows title, BGG stars, price, and discount",
      "name(d)" in hero and "total(d)" in hero and "★" in hero and "saved" in hero and "OCCASIONE" in hero),
     ("only the featured offer uses a perspective game box made from its real cover",
