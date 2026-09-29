@@ -7,7 +7,7 @@ build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 system=(ROOT/"UX_SYSTEM_V1.md").read_text(encoding="utf-8")
 
 home=ui[ui.index("private void renderDiscover()"):ui.index("private void addBundleEmptyState",ui.index("private void renderDiscover()"))]
-header=ui[ui.index("private View discoverHeader"):ui.index("private void discoverActionButton",ui.index("private View discoverHeader"))]
+header=ui[ui.index("private View discoverHeader"):ui.index("private View discoverActionButton",ui.index("private View discoverHeader"))]
 categories=home
 fresh=ui[ui.index("private View discoverFreshCard"):ui.index("private void addDiscoverTopRatedRail",ui.index("private View discoverFreshCard"))]
 top=ui[ui.index("private View discoverTopRatedCard"):ui.index("private void addDiscoverValueRail",ui.index("private View discoverTopRatedCard"))]
