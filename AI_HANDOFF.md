@@ -1,5 +1,11 @@
 # Ludo Scout — AI handoff
 
+## 5.12.78 — Deferred queue truth
+- The active-run deferred count and promotion path now use the same BGG identity and review/hold guards as Motore core remaining work.
+- Rows with manual review, BGG variant review, uncertain identity, price anomaly or expansion verification remain untouched and are not promoted automatically into the core Vinted window.
+- No threshold, Vinted request pace, schema, historical row or publication rule changed.
+- Regression: `regression/regression_deferred_run_truth_v51278.py`, wired into PR and beta CI.
+
 ## 5.12.77 — Queue liveness diagnostics
 - Copyable diagnostics now expose the queue supervisor heartbeat, the latest WorkManager recovery attempt and decision, and the age of the oldest due Vinted job.
 - Instrumentation only; queue thresholds, priorities, publication behavior, and historical data are unchanged.

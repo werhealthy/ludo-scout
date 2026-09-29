@@ -2067,13 +2067,17 @@ public final class MarketStore {
      * have no processing job until materialised, so queue liveness checks must count them explicitly. */
     public int activeRunDeferredVintedCount(){
         DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return 0;
-        String sql="SELECT COUNT(*) FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' "+
+        String sql="SELECT COUNT(*) FROM market_listings l JOIN games g ON g.id=l.game_id "+
+                "LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' "+
                 "AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=? "+
+                "AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
+                "AND COALESCE(l.manual_review_required,0)=0 AND l.match_state<>'BGG_VARIANT_REVIEW' "+
+                "AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') "+
                 "AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
         try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(run.startAt),String.valueOf(run.endAt)})){return c.moveToFirst()?c.getInt(0):0;}
     }
 
-    /** True only for the scroll that currently owns the ordinary automatic pipeline. */
     public boolean listingBelongsToActiveRun(long listingId){
         if(listingId<=0)return false;DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return false;
         String sql="SELECT 1 FROM market_listings l WHERE l.id=? AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) LIMIT 1";
@@ -2102,9 +2106,9 @@ public final class MarketStore {
             // deferred_retry_at is a background-parking throttle only. Once this scroll owns the
             // Motore lane again, its unresolved listings must be rematerialised now rather than wait
             // hours for a retry timestamp that was assigned while another run was active.
-            Long gameId=scalarLong(db,"SELECT l.game_id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=? AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) GROUP BY l.game_id ORDER BY MIN(l.first_seen) ASC LIMIT 1",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt)});
+            Long gameId=scalarLong(db,"SELECT l.game_id FROM market_listings l JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=? AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.match_state<>'BGG_VARIANT_REVIEW' AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) GROUP BY l.game_id ORDER BY MIN(l.first_seen) ASC LIMIT 1",new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt)});
             if(gameId==null){db.setTransactionSuccessful();return 0;}
-            try(Cursor c=db.rawQuery("SELECT l.id FROM market_listings l WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND (l.vinted_url IS NULL OR l.vinted_url='') AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) ORDER BY l.first_seen ASC LIMIT ?",new String[]{String.valueOf(gameId),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt),String.valueOf(wanted)})){
+            try(Cursor c=db.rawQuery("SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) WHERE l.game_id=? AND l.lifecycle='ACTIVE' AND l.enrichment_state='DEFERRED_LINK' AND (l.vinted_url IS NULL OR l.vinted_url='') AND g.database_visible=1 AND g.rating>=? AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.match_state<>'BGG_VARIANT_REVIEW' AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) ORDER BY l.first_seen ASC LIMIT ?",new String[]{String.valueOf(gameId),String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(activeRun.startAt),String.valueOf(activeRun.endAt),String.valueOf(wanted)})){
                 while(c.moveToNext()){long id=c.getLong(0);ContentValues st=new ContentValues();st.put("enrichment_state","PENDING_ENRICHMENT");db.update("market_listings",st,"id=?",new String[]{String.valueOf(id)});enqueueListingJob(db,id,JOB_VINTED,now,80,"DEFERRED_LINK");queued++;}
             }
             db.setTransactionSuccessful();

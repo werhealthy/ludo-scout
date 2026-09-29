@@ -138,6 +138,8 @@ jobs:
         run: python3 regression/recovery_review_price_gates_v51226.py
       - name: Run queue liveness/catalog truth regression
         run: python3 regression/queue_liveness_catalog_truth_v51227.py
+      - name: Run deferred queue truth regression
+        run: python3 regression/regression_deferred_run_truth_v51278.py
       - name: Run queue retry diagnostics regression
         run: python3 regression/queue_retry_diagnostics_v51273.py
       - name: Run queue notification truth regression

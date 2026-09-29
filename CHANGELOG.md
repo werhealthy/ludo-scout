@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.78 — Coda dei collegamenti differiti (2026-09-30)
+
+- Conteggio e promozione dei collegamenti differiti limitati agli annunci BGG confermati e senza revisione manuale, variante o verifica incerta già aperta.
+- Annunci in revisione e trattenuti restano invariati e non vengono promossi automaticamente nella finestra di lavoro core.
+- Nessuna modifica a soglie, rate limit, schema, dati storici o pubblicazione.
+- Regressione: `regression/regression_deferred_run_truth_v51278.py`, eseguita in CI PR e beta.
+
 ## 5.12.77 — Diagnostica liveness coda (2026-09-29)
 
 - Il testo diagnostico copiabile riporta l’ultimo controllo del supervisore, l’ultimo tentativo WorkManager con esito e motivo, e l’età del lavoro Vinted in attesa più vecchio.
