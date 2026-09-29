@@ -6,7 +6,6 @@ ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(en
 hunts=(ROOT/"app/src/main/java/it/vintedaffari/app/HuntDatabase.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
-home=ui[ui.index("private View discoverHeader(List<DealRecord> deals)"):ui.index("private DealRecord bestStrongOffer")]
 catalog=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
 library=ui[ui.index("private void renderLibrary()"):ui.index("private View libraryRow",ui.index("private void renderLibrary()"))]
 companion=ui[ui.index("private void renderCompanion()"):ui.index("private void renderLibraryInsights",ui.index("private void renderCompanion()"))]
@@ -17,9 +16,11 @@ checks=[
      "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
-    ("Home restores large Ludo illustration",
-     "ludo_logo" in home and "ludo_hello" in home and
-     "new LinearLayout.LayoutParams(-1,dp(278))" in home),
+    ("Home uses a compact Discover editorial composition",
+     "private void renderDiscover()" in ui and
+     "private View discoverHeader" not in ui and
+     "addDiscoverFreshRail" in ui and
+     "addDiscoverTopRatedRail" in ui),
     ("Catalog preview is a true horizontal listing row",
      "new LinearLayout(this)" in catalog and
      "setOrientation(LinearLayout.HORIZONTAL)" in catalog and
