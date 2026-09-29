@@ -1,5 +1,12 @@
 # Ludo Scout — AI handoff
 
+## 5.12.75 — Discover editorial home
+- Scopri uses the warm, compact visual language of the supplied Home reference. Other screens keep their current shell.
+- Category tiles are aggregated from actual categories on visible, matched BGG games already stored locally; tapping a tile opens Database with that category query.
+- Home rails use trusted active listings: latest listing publication labels, highest BGG ratings among those listings, and discoverable value decisions. Featured opportunity is the only faux-3D cover; all other artwork remains flat.
+- Price evaluation, trusted-surface eligibility, Vinted observation and history are unchanged.
+- Regression coverage is in `ux_system_v1_v51239.py`. Android PR validation must pass before integration; verify the warm system bars, category navigation, empty/loading images and scroll rails on Pixel after build.
+
 ## 5.12.68 — Pricing / intake safe mode
 - Product decision: local Vinted asking-price history is temporarily evidence-only. It is still collected for charts/audit, but it cannot blend with or replace the BGG used-price reference used by DealEvaluator.
 - Fresh analyses no longer call GameAnalysis.withUsedMarketBenchmark from Accessibility. Targeted local-Vinted repricing is disabled, and the periodic deal rebuild uses only fresh BGG market stats or the bundled BGG used-price index.
