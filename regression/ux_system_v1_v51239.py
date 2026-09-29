@@ -32,7 +32,7 @@ checks=[
      "heroOpportunityCard" in home),
     ("BGG categories come from the canonical visible game catalog",
      "marketStore.popularCategories(" in categories and
-     'databaseQuery=category.getKey()' in categories and
+     'databaseQuery=category;' in categories and
      "FROM games" in (ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")),
     ("fresh rail leads with the listing publication time",
      "publicationDisplay(d)" in fresh and "firstSeen" not in fresh),
