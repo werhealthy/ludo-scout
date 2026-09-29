@@ -156,8 +156,7 @@ private View makeCompanionFab(){
 
     private void render(){
         if(body==null||renderInProgress)return;renderInProgress=true;long started=System.currentTimeMillis();
-        applyDiscoverChrome();
-        try{if(!"activity".equals(tab))updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp(18),dp(4),dp(18),"discover".equals(tab)?0:dp(24));if(activityButton!=null)activityButton.setVisibility("activity".equals(tab)||"discover".equals(tab)?View.GONE:View.VISIBLE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
+        try{applyDiscoverChrome();if(!"activity".equals(tab))updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp(18),dp(4),dp(18),"discover".equals(tab)?0:dp(24));if(activityButton!=null)activityButton.setVisibility("activity".equals(tab)||"discover".equals(tab)?View.GONE:View.VISIBLE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
         finally{renderInProgress=false;long elapsed=System.currentTimeMillis()-started;getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putLong("uiLastRenderMs",elapsed).putString("uiLastRenderTab",tab).apply();}
     }
     private void cancelImageRequests(View view){if(view==null)return;if(view instanceof ImageView)view.setTag(new Object());if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)cancelImageRequests(group.getChildAt(i));}}
@@ -302,7 +301,7 @@ private void applyDiscoverChrome(){
         if(deals.isEmpty()){addDiscoverEmptyState();return;}
         List<DealRecord> urgent=urgentDeals(deals);lastUrgentIds=new HashSet<>();
         for(DealRecord item:urgent)if(item!=null&&!TextUtils.isEmpty(item.signature))lastUrgentIds.add(item.signature);
-        List<DealRecord> newest=new ArrayList<>(deals);newest.sort((a,b)->Long.compare(b.firstSeen,a.firstSeen));
+        List<DealRecord> newest=new ArrayList<>(deals);newest.sort((a,b)->Long.compare(publicationAgeMinutes(a),publicationAgeMinutes(b)));
         addDiscoverFreshRail(limitDeals(newest,12));
         List<DealRecord> topRated=new ArrayList<>(deals);
         topRated.sort((a,b)->{int c=Double.compare(b.rating==null?0:b.rating,a.rating==null?0:a.rating);return c!=0?c:Integer.compare(nz(b.voters,0),nz(a.voters,0));});
@@ -318,6 +317,29 @@ private void applyDiscoverChrome(){
     private List<DealRecord> limitDeals(List<DealRecord> input,int max){
         if(input==null||input.isEmpty()||max<=0)return new ArrayList<>();
         return new ArrayList<>(input.subList(0,Math.min(max,input.size())));
+    }
+
+    private long publicationAgeMinutes(DealRecord d){
+        String label=ageLabel(d);
+        if(TextUtils.isEmpty(label))return d.firstSeen>0?Math.max(0,System.currentTimeMillis()-d.firstSeen)/60_000L:Long.MAX_VALUE;
+        String raw=label.trim().toLowerCase(Locale.ROOT);
+        if("ora".equals(raw))return 0L;
+        String[] parts=raw.split("\\s+");
+        if(parts.length>=2)try{
+            long count=Long.parseLong(parts[0]);String unit=parts[1];
+            if(unit.startsWith("min"))return count;
+            if("h".equals(unit)||unit.startsWith("or"))return count*60L;
+            if("g".equals(unit)||unit.startsWith("gior"))return count*24L*60L;
+            if(unit.startsWith("settiman"))return count*7L*24L*60L;
+            if(unit.startsWith("mes"))return count*30L*24L*60L;
+            if(unit.startsWith("ann"))return count*365L*24L*60L;
+        }catch(NumberFormatException ignored){}
+        if(raw.matches("\\d{2}/\\d{2}"))try{
+            int year=Calendar.getInstance().get(Calendar.YEAR);SimpleDateFormat f=new SimpleDateFormat("dd/MM/yyyy",Locale.ITALY);f.setLenient(false);
+            Date date=f.parse(raw+"/"+year);long now=System.currentTimeMillis();if(date!=null&&date.getTime()>now+24L*60L*60_000L)date=f.parse(raw+"/"+(year-1));
+            if(date!=null)return Math.max(0,now-date.getTime())/60_000L;
+        }catch(Exception ignored){}
+        return d.firstSeen>0?Math.max(0,System.currentTimeMillis()-d.firstSeen)/60_000L:Long.MAX_VALUE;
     }
 
     private List<DealRecord> uniqueDiscoverGames(List<DealRecord> input,int max){
