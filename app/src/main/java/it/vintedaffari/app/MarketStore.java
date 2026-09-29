@@ -16,6 +16,8 @@ import org.json.JSONObject;
 import java.io.File;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -1575,6 +1577,33 @@ public final class MarketStore {
             }
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
+    }
+
+    /** Counts real BGG categories attached to visible, matched games for the Discover category rail. */
+    public Map<String,Integer> popularCategories(int limit){
+        Map<String,Integer> counts=new HashMap<>();
+        String sql="SELECT categories FROM games WHERE database_visible=1 AND bgg_id IS NOT NULL AND bgg_id<>'' AND match_state='MATCHED' AND rating>=? AND categories IS NOT NULL AND categories<>''";
+        try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING)})){
+            while(c.moveToNext()){
+                String raw=c.getString(0);
+                if(TextUtils.isEmpty(raw))continue;
+                Set<String> seen=new LinkedHashSet<>();
+                for(String value:raw.split("\\s*·\\s*")){
+                    String label=value.trim();
+                    if(!label.isEmpty())seen.add(label);
+                }
+                for(String label:seen)counts.put(label,counts.getOrDefault(label,0)+1);
+            }
+        }
+        List<Map.Entry<String,Integer>> entries=new ArrayList<>(counts.entrySet());
+        Collections.sort(entries,(a,b)->{
+            int count=Integer.compare(b.getValue(),a.getValue());
+            return count!=0?count:a.getKey().compareToIgnoreCase(b.getKey());
+        });
+        int size=limit<=0?entries.size():Math.min(limit,entries.size());
+        Map<String,Integer> result=new LinkedHashMap<>();
+        for(int i=0;i<size;i++)result.put(entries.get(i).getKey(),entries.get(i).getValue());
+        return result;
     }
 
     public List<GameRecord> searchGames(String rawQuery, int limit) { return searchGames(rawQuery,limit,true,"all"); }
