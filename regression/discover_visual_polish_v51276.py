@@ -41,7 +41,7 @@ checks = [
      "publicationDisplay(d)" in fresh and "total(d)" in fresh),
     ("BGG favorites use a vertical ranked list with scores",
      "HorizontalScrollView" not in top_rail and "LinearLayout.VERTICAL" in top_rail and
-     "discoverTopRatedCard(deals.get(i),i+1) in top_rail and "rank" in top_card.lower() and "d.rating" in top_card),
+     "discoverTopRatedCard(deals.get(i),i+1)" in top_rail and "rank" in top_card.lower() and "d.rating" in top_card),
     ("Discover navigation uses rounded bold labels and a selected pill",
      "discoverText(label,12" in nav_item and "Typeface.BOLD" in nav_item and
      "round(Color.rgb(239,230,244),18" in nav_item),
