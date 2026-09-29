@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.76 — Scopri rifinito (2026-09-29)
+
+- Sfondo crema con sfumatura lavanda e illustrazioni originali in PNG; l’occasione in evidenza usa una scatola prospettica composta dalla copertina BGG reale, prezzo, voto e chip dello sconto.
+- Le categorie mostrano icone illustrate e un accesso “Vedi tutte”, senza contatori. Gli annunci recenti usano foto a tutta larghezza con data e prezzo sotto; i più votati BGG diventano una classifica verticale.
+- Navigazione inferiore più leggibile con icone e testo arrotondato e stato selezionato in evidenza.
+- Aggiunta regressione visiva alle verifiche PR e beta. Prezzi, dati attendibili e cronologia annunci restano invariati.
+
 ## 5.12.75 — Scopri editoriale (2026-09-29)
 
 - Scopri adotta una superficie crema più vicina alla reference: titolo compatto, tile categorie BGG e sezioni orizzontali con gerarchie diverse.

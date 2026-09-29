@@ -1,5 +1,13 @@
 # Ludo Scout — AI handoff
 
+## 5.12.76 — Discover visual polish
+- Scopri now uses generated lavender, cream and apricot artwork behind the featured opportunity; live game title, BGG rating, price and discount remain real listing data.
+- The featured offer alone uses a perspective box composed from the BGG cover. Latest listings use full-bleed listing photos with publication age and price underneath; the BGG favorites section is a vertical ranked list.
+- Category tiles use the generated illustrated PNG sheet, hide item counts, and open a full category directory. Tapping a category still routes to the verified Database filter.
+- The four-item bottom navigation uses a selected lavender pill and rounded heavier labels. Other screens retain their own shell.
+- Regression coverage: `regression/discover_visual_polish_v51276.py`, run in PR validation and beta build. Check actual phone layout for image crop, hero text fit, and scroll/nav spacing after Firebase distribution.
+- No changes to trusted-surface eligibility, price evaluation, Vinted observation or listing history.
+
 ## 5.12.75 — Discover editorial home
 - Scopri uses the warm, compact visual language of the supplied Home reference. Other screens keep their current shell.
 - Category tiles are aggregated from actual categories on visible, matched BGG games already stored locally; tapping a tile opens Database with that category query.

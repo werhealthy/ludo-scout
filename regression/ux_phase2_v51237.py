@@ -6,6 +6,7 @@ ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(en
 hunts=(ROOT/"app/src/main/java/it/vintedaffari/app/HuntDatabase.java").read_text(encoding="utf-8")
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 
+discover=ui[ui.index("private View discoverHeader()"):ui.index("private void addDiscoverCategories",ui.index("private View discoverHeader()"))]
 catalog=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
 library=ui[ui.index("private void renderLibrary()"):ui.index("private View libraryRow",ui.index("private void renderLibrary()"))]
 companion=ui[ui.index("private void renderCompanion()"):ui.index("private void renderLibraryInsights",ui.index("private void renderCompanion()"))]
@@ -16,9 +17,9 @@ checks=[
      "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
-    ("Home uses a compact Discover editorial composition",
+    ("Home uses the updated Discover editorial composition",
      "private void renderDiscover()" in ui and
-     'text("Scopri",26,DISCOVER_TEXT' in ui and
+     '"Scopri"' in discover and
      "addDiscoverFreshRail" in ui and
      "addDiscoverTopRatedRail" in ui),
     ("Catalog preview is a true horizontal listing row",

@@ -17,6 +17,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Run Discover visual polish regression
+        run: python3 regression/discover_visual_polish_v51276.py
+
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
