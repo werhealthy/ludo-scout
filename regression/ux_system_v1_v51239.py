@@ -21,9 +21,24 @@ checks=[
      "quiet, premium, data-smart" in system and
      "Context / corrective actions" in system and
      "Do not reuse the same card grammar" in system),
-    ("Home uses multiple presentation grammars",
-     all(x in home for x in ["addUrgentList","addDealRail","addRankedRatingList","addDiscountRail","addRecentTimeline"]) and
-     "addBundleSpotlight" in home),
+    ("Discover uses distinct, data-backed editorial rails",
+     all(x in home for x in ["addDiscoverCategories","addDiscoverFreshRail","addDiscoverTopRatedRail","addDiscoverValueRail"]) and
+     "heroOpportunityCard" in home),
+    ("BGG categories come from the canonical visible game catalog",
+     "marketStore.popularCategories(" in categories and
+     'databaseQuery=category.getKey()' in categories and
+     "FROM games" in (ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")),
+    ("fresh rail leads with the listing publication time",
+     "publicationDisplay(d)" in fresh and "firstSeen" not in fresh),
+    ("top-rated rail makes BGG rating the primary signal",
+     "d.rating" in top and "d.voters" in top),
+    ("faux 3D box is reserved for the featured opportunity",
+     "discoverBoxArtwork" in opportunity and
+     "discoverBoxArtwork" not in flat and
+     "discoverFlatArtwork" in flat),
+    ("Discover uses compact screen title",
+     'text("Scopri",26' in header and
+     "Scopri il tuo prossimo gioco da tavolo" not in header),
     ("section headers rely on typography instead of icon tiles",
      "TextView ic=text(icon" not in section and "text(title,21,TEXT" in section),
     ("Market has one search and two explicit utility controls",
