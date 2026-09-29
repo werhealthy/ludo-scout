@@ -52,7 +52,7 @@ checks=[
      "new String[]{JOB_BGG,PROCESSING,String.valueOf(cutoff)}" in market),
     ("cold-start ownership records the skip before queue recovery begins",
      "state=SKIPPED_STARTING" in cold_start_gate and
-     cold_start_gate.index("return Result.success();") < worker_head.index("market.resetStaleProcessingOlderThan")),
+     cold_start_gate.index("return Result.success();") < worker.index("market.resetStaleProcessingOlderThan")),
     ("running service no longer causes unconditional WorkManager exit",
      "isStarting()||QueueKeepAliveService.isRunning()" not in worker_head and
      "if (QueueKeepAliveService.isRunning())" in worker_head),
