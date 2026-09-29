@@ -18,7 +18,7 @@ checks=[
      "1000000 + ciVersionCode.toInteger()" in build),
     ("Home uses a compact Discover editorial composition",
      "private void renderDiscover()" in ui and
-     "private View discoverHeader" not in ui and
+     'text("Scopri",26,DISCOVER_TEXT' in ui and
      "addDiscoverFreshRail" in ui and
      "addDiscoverTopRatedRail" in ui),
     ("Catalog preview is a true horizontal listing row",
