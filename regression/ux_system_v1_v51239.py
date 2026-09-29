@@ -7,6 +7,12 @@ build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 system=(ROOT/"UX_SYSTEM_V1.md").read_text(encoding="utf-8")
 
 home=ui[ui.index("private void renderDiscover()"):ui.index("private void addBundleEmptyState",ui.index("private void renderDiscover()"))]
+header=ui[ui.index("private View discoverHeader"):ui.index("private DealRecord bestStrongOffer",ui.index("private View discoverHeader"))]
+categories=ui[ui.index("private void addDiscoverCategories"):ui.index("private View discoverCategoryTile",ui.index("private void addDiscoverCategories"))]
+fresh=ui[ui.index("private void addDiscoverFreshRail"):ui.index("private View discoverFreshCard",ui.index("private void addDiscoverFreshRail"))]
+top=ui[ui.index("private void addDiscoverTopRatedRail"):ui.index("private View discoverTopRatedCard",ui.index("private void addDiscoverTopRatedRail"))]
+opportunity=ui[ui.index("private View heroOpportunityCard"):ui.index("private View discoverFlatArtwork",ui.index("private View heroOpportunityCard"))]
+flat=ui[ui.index("private View discoverFlatArtwork"):ui.index("private View discoverCategoryTile",ui.index("private View discoverFlatArtwork"))]
 section=ui[ui.index("private void sectionHeader"):ui.index("private void openCatalogPreset",ui.index("private void sectionHeader"))]
 market=ui[ui.index("private void renderCatalog()"):ui.index("private void loadMoreCatalog",ui.index("private void renderCatalog()"))]
 row=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
