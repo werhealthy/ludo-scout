@@ -32,6 +32,7 @@ assert not healthy(True, True, False, 10*60_000, True)
 assert healthy(True, False, False, 7*60*60_000, False)
 
 worker_head=worker[worker.index("Context context = getApplicationContext()"):worker.index("market.resetStaleProcessingOlderThan")]
+cold_start_gate=worker_head[worker_head.index("if(QueueKeepAliveService.isStarting()){"):]
 worker_loop=worker[worker.index("while (!isStopped()"):worker.index("} catch (Throwable t)",worker.index("while (!isStopped()"))]
 supervise=service[service.index("private synchronized void superviseLanes"):service.index("private synchronized void restartVintedLane")]
 active_deferred=market[market.index("public int activeRunDeferredVintedCount"):market.index("public boolean listingBelongsToActiveRun")]
@@ -49,8 +50,9 @@ checks=[
      "public int deferStuckBggProcessing(long maxAgeMs,long retryDelayMs)" in market and
      "job_type=? AND state=? AND processing_started_at>0 AND processing_started_at<?" in market and
      "new String[]{JOB_BGG,PROCESSING,String.valueOf(cutoff)}" in market),
-    ("cold-start ownership still prevents duplicate worker startup",
-     "if(QueueKeepAliveService.isStarting())return Result.success();" in worker_head),
+    ("cold-start ownership records the skip before queue recovery begins",
+     "state=SKIPPED_STARTING" in cold_start_gate and
+     cold_start_gate.index("return Result.success();") < worker_head.index("market.resetStaleProcessingOlderThan")),
     ("running service no longer causes unconditional WorkManager exit",
      "isStarting()||QueueKeepAliveService.isRunning()" not in worker_head and
      "if (QueueKeepAliveService.isRunning())" in worker_head),
