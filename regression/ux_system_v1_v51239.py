@@ -36,6 +36,9 @@ checks=[
      "FROM games" in (ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")),
     ("fresh rail leads with the listing publication time",
      "publicationDisplay(d)" in fresh and "firstSeen" not in fresh),
+    ("newest rail sorts by Vinted publication time",
+     "publicationAgeMinutes(a)" in home and
+     "publicationAgeMinutes(b)" in home),
     ("top-rated rail makes BGG rating the primary signal",
      "d.rating" in top and "d.voters" in top),
     ("faux 3D box is reserved for the featured opportunity",
