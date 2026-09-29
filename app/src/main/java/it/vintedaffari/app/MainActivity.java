@@ -393,7 +393,7 @@ private void applyDiscoverChrome(){
 
     private View discoverFreshCard(DealRecord d){
         LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(9),dp(9),dp(9),dp(10));card.setBackground(round(DISCOVER_SURFACE,18,0,0));
-        TextView published=text(publicationDisplay(d),13,ageColor(d),Typeface.BOLD);published.setMaxLines(1);published.setEllipsize(TextUtils.TruncateAt.END);card.addView(published,new LinearLayout.LayoutParams(-1,dp(25)));
+        int publishedColor=TextUtils.isEmpty(ageLabel(d))?DISCOVER_MUTED:ageColor(d);TextView published=text(publicationDisplay(d),13,publishedColor,Typeface.BOLD);published.setMaxLines(1);published.setEllipsize(TextUtils.TruncateAt.END);card.addView(published,new LinearLayout.LayoutParams(-1,dp(25)));
         card.addView(discoverFlatArtwork(d,dp(138),dp(106)));
         TextView title=text(name(d),14,DISCOVER_TEXT,Typeface.BOLD);title.setMaxLines(1);title.setEllipsize(TextUtils.TruncateAt.END);title.setPadding(0,dp(7),0,dp(2));card.addView(title);
         card.addView(text(total(d),15,DISCOVER_TEXT,Typeface.BOLD));
@@ -457,12 +457,15 @@ private void applyDiscoverChrome(){
     private View discoverBoxArtwork(DealRecord d,int width,int height){
         FrameLayout box=new FrameLayout(this);box.setClipChildren(false);box.setClipToPadding(false);
         View side=new View(this);side.setBackground(round(DISCOVER_BOX_SIDE,8,0,0));FrameLayout.LayoutParams sideLp=new FrameLayout.LayoutParams(dp(12),-1,Gravity.END);sideLp.rightMargin=dp(2);box.addView(side,sideLp);
-        View front=dealArtworkView(d,width-dp(12),height);front.setElevation(dp(5));front.setRotationY(-5f);FrameLayout.LayoutParams frontLp=new FrameLayout.LayoutParams(width-dp(14),height,Gravity.START);box.addView(front,frontLp);
+        View front=discoverFlatArtwork(d,width-dp(12),height);front.setElevation(dp(5));front.setRotationY(-5f);FrameLayout.LayoutParams frontLp=new FrameLayout.LayoutParams(width-dp(14),height,Gravity.START);box.addView(front,frontLp);
         box.setContentDescription(name(d)+" · copertina BGG");return box;
     }
 
     private View discoverFlatArtwork(DealRecord d,int width,int height){
-        View artwork=dealArtworkView(d,width,height);artwork.setElevation(0);artwork.setRotationY(0f);return artwork;
+        FrameLayout artwork=new FrameLayout(this);artwork.setBackground(round(DISCOVER_SURFACE,14,0,0));artwork.setClipToOutline(true);
+        TextView placeholder=text(coverPlaceholder(d),10,DISCOVER_MUTED,Typeface.BOLD);placeholder.setGravity(Gravity.CENTER);placeholder.setPadding(dp(6),dp(6),dp(6),dp(6));artwork.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
+        ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);image.setPadding(dp(3),dp(3),dp(3),dp(3));artwork.addView(image,new FrameLayout.LayoutParams(-1,-1));setDealArtwork(image,placeholder,d);
+        artwork.setLayoutParams(new LinearLayout.LayoutParams(width,height));return artwork;
     }
 
     private void addDiscoverBundleSpotlight(DealRecord d){
