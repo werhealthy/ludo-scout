@@ -69,6 +69,12 @@ Use mixed module types so the page has rhythm:
 - optional bundle spotlight
 - recent timeline
 
+Discover implementation contract (5.12.75):
+- Use a warm cream surface and compact “Scopri” title for this screen only.
+- Build the category rail from labels present on visible, matched games in the local BGG catalog. Selecting a label opens the game database filtered by that label.
+- Give recent listings, BGG rating and price/value separate editorial rails; put the real publication label first in the recent rail and BGG rating first in the rating rail.
+- Use faux 3D only for the featured opportunity. Other rail artwork stays flat and uses the real BGG cover.
+
 Do not render every section as the same horizontal carousel.
 
 ### Mercato
