@@ -16,12 +16,15 @@ checks=[
      "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
-    ("Home keeps semantic sections independently populated",
-     all(label in home for label in ["Affari migliori","Più votati","Sconti maggiori","Appena trovati"]) and
-     "takeDiscoverUnused" not in home and "limitDeals" in home),
+    ("Home independently populates the fresh, BGG-rated and value rails",
+     "addDiscoverFreshRail(limitDeals(newest,12))" in home and
+     "addDiscoverTopRatedRail(uniqueDiscoverGames(topRated,12))" in home and
+     "addDiscoverValueRail(limitDeals(value,12))" in home and
+     "publicationAgeMinutes(a)" in home and "b.rating" in home),
     ("real bundles can return to Home",
      "uniqueBundleSources(deals)" in home and
-     ("addBundleSpotlight" in home or '"Bundle reali"' in home)),
+     "bundleSources.removeIf(d->bundleDealsForSource(d).size()<2)" in home and
+     "addDiscoverBundleSpotlight(bundleSources.get(0))" in home),
     ("section subtitles are actually rendered",
      "if(!TextUtils.isEmpty(sub))" in section and "text(sub,12,MUTED" in section),
     ("Home rail cards are visual first",

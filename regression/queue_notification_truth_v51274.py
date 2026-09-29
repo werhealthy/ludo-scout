@@ -7,8 +7,8 @@ build = (ROOT / "app/build.gradle").read_text(encoding="utf-8")
 notification = queue[queue.index("private Notification notification(){"):queue.index("private static String waitText", queue.index("private Notification notification(){"))]
 
 checks = [
-    ("beta version identifies the notification clarity fix",
-     "versionName '5.12.74-queue-notification-truth'" in build),
+    ("build version advances beyond the notification clarity fix baseline",
+     "versionName '5.12.75-discover-editorial-home'" in build),
     ("queued work is described as queued, not active",
      '" attività in coda"' in notification and '"coda attiva"' not in notification),
     ("a missing activity label still says work is being processed",

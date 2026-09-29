@@ -7,6 +7,12 @@ build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 system=(ROOT/"UX_SYSTEM_V1.md").read_text(encoding="utf-8")
 
 home=ui[ui.index("private void renderDiscover()"):ui.index("private void addBundleEmptyState",ui.index("private void renderDiscover()"))]
+header=ui[ui.index("private View discoverHeader"):ui.index("private View discoverActionButton",ui.index("private View discoverHeader"))]
+categories=home
+fresh=ui[ui.index("private View discoverFreshCard"):ui.index("private void addDiscoverTopRatedRail",ui.index("private View discoverFreshCard"))]
+top=ui[ui.index("private View discoverTopRatedCard"):ui.index("private void addDiscoverValueRail",ui.index("private View discoverTopRatedCard"))]
+opportunity=ui[ui.index("private View heroOpportunityCard"):ui.index("private View discoverFlatArtwork",ui.index("private View heroOpportunityCard"))]
+flat=ui[ui.index("private View discoverFlatArtwork"):ui.index("private void addDiscoverBundleSpotlight",ui.index("private View discoverFlatArtwork"))]
 section=ui[ui.index("private void sectionHeader"):ui.index("private void openCatalogPreset",ui.index("private void sectionHeader"))]
 market=ui[ui.index("private void renderCatalog()"):ui.index("private void loadMoreCatalog",ui.index("private void renderCatalog()"))]
 row=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
@@ -21,9 +27,27 @@ checks=[
      "quiet, premium, data-smart" in system and
      "Context / corrective actions" in system and
      "Do not reuse the same card grammar" in system),
-    ("Home uses multiple presentation grammars",
-     all(x in home for x in ["addUrgentList","addDealRail","addRankedRatingList","addDiscountRail","addRecentTimeline"]) and
-     "addBundleSpotlight" in home),
+    ("Discover uses distinct, data-backed editorial rails",
+     all(x in home for x in ["addDiscoverCategories","addDiscoverFreshRail","addDiscoverTopRatedRail","addDiscoverValueRail"]) and
+     "heroOpportunityCard" in home),
+    ("BGG categories come from the canonical visible game catalog",
+     "marketStore.popularCategories(" in categories and
+     'databaseQuery=category;' in categories and
+     "FROM games" in (ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")),
+    ("fresh rail leads with the listing publication time",
+     "publicationDisplay(d)" in fresh and "firstSeen" not in fresh),
+    ("newest rail sorts by Vinted publication time",
+     "publicationAgeMinutes(a)" in home and
+     "publicationAgeMinutes(b)" in home),
+    ("top-rated rail makes BGG rating the primary signal",
+     "d.rating" in top and "d.voters" in top),
+    ("faux 3D box is reserved for the featured opportunity",
+     "discoverBoxArtwork" in opportunity and
+     "discoverBoxArtwork" not in flat and
+     "discoverFlatArtwork" in flat),
+    ("Discover uses compact screen title",
+     'text("Scopri",26' in header and
+     "Scopri il tuo prossimo gioco da tavolo" not in header),
     ("section headers rely on typography instead of icon tiles",
      "TextView ic=text(icon" not in section and "text(title,21,TEXT" in section),
     ("Market has one search and two explicit utility controls",

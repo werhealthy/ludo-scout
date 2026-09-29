@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.75 — Scopri editoriale (2026-09-29)
+
+- Scopri adotta una superficie crema più vicina alla reference: titolo compatto, tile categorie BGG e sezioni orizzontali con gerarchie diverse.
+- La corsia categorie conta le categorie reali dei giochi BGG visibili e confermati nel catalogo locale; toccarne una apre Database già filtrato.
+- Aggiunte corsie per annunci più recenti (con data di pubblicazione), voto BGG e rapporto qualità-prezzo; tutte usano la superficie trusted già esistente.
+- Il faux 3D è limitato all’occasione in evidenza. Le cover delle altre corsie restano immagini piatte.
+- Non cambiano filtri di fiducia, valutazione dei prezzi, acquisizione Vinted o dati storici.
+
 ## 5.12.74 — Notifica chiara sulla coda (2026-09-29)
 
 - La notifica distingue le attività realmente in elaborazione da quelle soltanto in coda o in attesa del prossimo permesso Vinted.
