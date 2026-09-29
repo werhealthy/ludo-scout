@@ -20,8 +20,8 @@ box = between(ui, "private View discoverBoxArtwork", "private View discoverFlatA
 nav_item = between(ui, "private View navItem", "private void addMarketHeader")
 
 checks = [
-    ("visual polish build identity advances to 5.12.76",
-     "versionName '5.12.76-discover-visual-polish'" in build),
+    ("build identity advances beyond v5.12.76",
+     "versionName '5.12.76-discover-visual-polish'" not in build),
     ("lavender-to-cream background gradient",
      "GradientDrawable.Orientation.TOP_BOTTOM" in chrome and "DISCOVER_LAVENDER" in chrome and "DISCOVER_BG" in chrome),
     ("generated hero and category PNG assets are packaged",
