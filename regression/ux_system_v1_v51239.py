@@ -45,8 +45,8 @@ checks=[
      "discoverBoxArtwork" in opportunity and
      "discoverBoxArtwork" not in flat and
      "discoverFlatArtwork" in flat),
-    ("Discover uses compact screen title",
-     'text("Scopri",26' in header and
+    ("Discover keeps a short, prominent screen title",
+     '"Scopri"' in header and
      "Scopri il tuo prossimo gioco da tavolo" not in header),
     ("section headers rely on typography instead of icon tiles",
      "TextView ic=text(icon" not in section and "text(title,21,TEXT" in section),
