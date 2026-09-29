@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.74 — Notifica chiara sulla coda (2026-09-29)
+
+- La notifica distingue le attività realmente in elaborazione da quelle soltanto in coda o in attesa del prossimo permesso Vinted.
+- La barra di avanzamento compare solo mentre un’attività è davvero in elaborazione; quando Ludo aspetta, la notifica mostra il motivo e non simula un avanzamento.
+- Nessuna modifica a matching, soglie, pacing, dati storici o risultati.
+
+
 ## 5.12.69 — Manutenzione Motore con un solo responsabile (2026-09-28)
 
 - Le pulizie e i passaggi di avvio del Motore non partono più dalla schermata principale.
