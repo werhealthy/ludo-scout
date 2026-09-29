@@ -2883,7 +2883,7 @@ public final class MarketStore {
     /** Human-readable identities for the few cards still blocking the current run. */
     public String engineCoreRemainingSummary(){
         DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return"state=NONE";SQLiteDatabase db=helper.getReadableDatabase();StringBuilder out=new StringBuilder();int n=0;
-        String sql="SELECT l.id,COALESCE(l.vinted_title,g.canonical_name,''),COALESCE(l.enrichment_state,''),COALESCE(j.attempt,0),COALESCE(j.state,''),COALESCE(j.last_error,'') "+
+        String sql="SELECT l.id,COALESCE(l.vinted_title,g.canonical_name,''),COALESCE(l.enrichment_state,''),COALESCE(j.attempt,0),COALESCE(j.state,''),COALESCE(j.last_error,''),COALESCE(j.job_type,''),COALESCE(j.source,''),COALESCE(j.next_attempt_at,0) "+
                 "FROM market_listings l JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) LEFT JOIN processing_jobs j ON j.id=(SELECT jj.id FROM processing_jobs jj WHERE jj.listing_id=l.id AND jj.job_type=? ORDER BY jj.updated_at DESC,jj.id DESC LIMIT 1) "+
                 "WHERE l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=? AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
                 "AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) "+
@@ -2891,7 +2891,7 @@ public final class MarketStore {
                 "AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') "+
                 "AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='') ORDER BY l.last_seen ASC LIMIT 8";
         try(Cursor x=db.rawQuery(sql,new String[]{JOB_VINTED,String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(run.startAt),String.valueOf(run.endAt)})){
-            while(x.moveToNext()){if(n++>0)out.append(" | ");out.append("#").append(x.getLong(0)).append(" ").append(safe(x.getString(1))).append(" [").append(x.getString(2)).append(";attempt=").append(x.getInt(3)).append(";job=").append(x.getString(4));String err=x.getString(5);if(!TextUtils.isEmpty(err))out.append(";why=").append(safe(err));out.append("]");}
+            while(x.moveToNext()){if(n++>0)out.append(" | ");out.append("#").append(x.getLong(0)).append(" ").append(safe(x.getString(1))).append(" [").append(x.getString(2)).append(";attempt=").append(x.getInt(3)).append(";job=").append(x.getString(4)).append(";type=").append(safe(x.getString(6))).append(";source=").append(safe(x.getString(7))).append(";nextAttemptInMs=").append(Math.max(0L,x.getLong(8)-System.currentTimeMillis()));String err=x.getString(5);if(!TextUtils.isEmpty(err))out.append(";why=").append(safe(err));out.append("]");}
         }
         return "count="+n+"; "+(out.length()==0?"none":out.toString());
     }
