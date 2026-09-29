@@ -34,9 +34,13 @@ public final class QueueDrainWorker extends Worker {
         // however, RUNNING alone is not proof of liveness: Android can leave the Service process alive
         // while a consumer/control executor is stalled. WorkManager therefore checks SQLite-backed lane
         // heartbeats and only stands down when the foreground owner is actually healthy.
-        if(QueueKeepAliveService.isStarting())return Result.success();
         DealDatabase db = new DealDatabase(context);
         MarketStore market = new MarketStore(context, db);
+        if(QueueKeepAliveService.isStarting()){
+            market.setDiagnosticState("queue_recovery",1,"build=queue-recovery-v3;state=SKIPPED_STARTING;reason=service-cold-start");
+            return Result.success();
+        }
+        market.setDiagnosticState("queue_recovery",1,"build=queue-recovery-v3;state=STARTED;serviceRunning="+QueueKeepAliveService.isRunning());
         if (QueueKeepAliveService.isRunning()) {
             long now=System.currentTimeMillis();
             int vd=market.runnableVintedDueCount(now), activeDeferred=market.activeRunDeferredVintedCount();
@@ -45,12 +49,20 @@ public final class QueueDrainWorker extends Worker {
             long vAge=vh<=0?Long.MAX_VALUE:Math.max(0L,now-vh),bAge=bh<=0?Long.MAX_VALUE:Math.max(0L,now-bh);
             boolean vNeeds=vd>0||activeDeferred>0;
             boolean bNeeds=bd>0||hp>0;
-            boolean vHealthy=!vNeeds || VintedPublicSession.nextAllowedAt(context)>now || vAge<45_000L ||
+            long gateUntil=VintedPublicSession.nextAllowedAt(context);
+            boolean vHealthy=!vNeeds || gateUntil>now || vAge<45_000L ||
                     (market.processingVintedCount()>0&&vAge<180_000L);
             boolean bHealthy=!bNeeds || bAge<45_000L ||
                     (market.processingCount(MarketStore.JOB_BGG)>0&&bAge<180_000L);
-            if(vHealthy&&bHealthy)return Result.success();
-            market.setDiagnosticState("queue_recovery",1,"build=queue-recovery-v2;state=TAKEOVER;vDue="+vd+
+            if(vHealthy&&bHealthy){
+                String vReason=!vNeeds?"NO_WORK":gateUntil>now?"GATE":"HEARTBEAT";
+                String bReason=!bNeeds?"NO_WORK":"HEARTBEAT";
+                market.setDiagnosticState("queue_recovery",1,"build=queue-recovery-v3;state=SKIPPED_SERVICE_HEALTHY;vReason="+vReason+
+                        ";vDue="+vd+";vDeferred="+activeDeferred+";vHeartbeatAgeMs="+vAge+";vGateRemainingMs="+Math.max(0L,gateUntil-now)+
+                        ";bReason="+bReason+";bDue="+bd+";bHistorical="+hp+";bHeartbeatAgeMs="+bAge);
+                return Result.success();
+            }
+            market.setDiagnosticState("queue_recovery",1,"build=queue-recovery-v3;state=TAKEOVER;vDue="+vd+
                     ";vDeferred="+activeDeferred+";vHeartbeatAgeMs="+vAge+";bDue="+bd+";bHistorical="+hp+
                     ";bHeartbeatAgeMs="+bAge+";serviceRunning=true");
         }
@@ -113,6 +125,9 @@ public final class QueueDrainWorker extends Worker {
             QueueWorkScheduler.scheduleAfter(context, Math.min(delay, 15 * 60_000L));
         }
         try{bggMatcher.shutdown();}catch(Throwable ignored){}
+        market.setDiagnosticState("queue_recovery",1,"build=queue-recovery-v3;state=FINISHED;processed="+processed+
+                ";remainingActive="+remaining.active()+";deferred="+market.deferredVintedCount()+
+                ";historical="+market.historicalBggRevalidationPendingCount()+";elapsedMs="+(System.currentTimeMillis()-started));
         return Result.success();
     }
 

@@ -1,5 +1,10 @@
 # Ludo Scout — AI handoff
 
+## 5.12.77 — Queue liveness diagnostics
+- Copyable diagnostics now expose the queue supervisor heartbeat, the latest WorkManager recovery attempt and decision, and the age of the oldest due Vinted job.
+- Instrumentation only; queue thresholds, priorities, publication behavior, and historical data are unchanged.
+- Regression: `regression/queue_liveness_diagnostics_v51277.py`.
+
 ## 5.12.76 — Discover visual polish
 - Scopri now uses generated lavender, cream and apricot artwork behind the featured opportunity; live game title, BGG rating, price and discount remain real listing data.
 - The featured offer alone uses a perspective box composed from the BGG cover. Latest listings use full-bleed listing photos with publication age and price underneath; the BGG favorites section is a vertical ranked list.

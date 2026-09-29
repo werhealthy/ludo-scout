@@ -19,6 +19,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Discover visual polish regression
         run: python3 regression/discover_visual_polish_v51276.py
+      - name: Run queue liveness diagnostics regression
+        run: python3 regression/queue_liveness_diagnostics_v51277.py
 
 
       - name: Set up Java 17

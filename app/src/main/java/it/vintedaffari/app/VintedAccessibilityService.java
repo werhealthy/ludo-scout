@@ -1481,6 +1481,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
         MarketStore marketDiag=new MarketStore(context,db);
         MarketStore.JobSummary queueSummary=marketDiag.jobSummary();
         long queueNow=System.currentTimeMillis();
+        MarketStore.RuntimeStatus recoveryDiag=marketDiag.diagnosticState("queue_recovery");
+        long supervisorHeartbeat=marketDiag.supervisorHeartbeatAt();
+        long oldestRunnableVintedAge=marketDiag.oldestRunnableVintedAgeMs(queueNow);
         int queueVintedDue=marketDiag.runnableVintedDueCount(queueNow),queueBggDue=marketDiag.runnableBggDueCount(queueNow);
         int queueUrgentVinted=marketDiag.urgentVintedWorkCount(queueNow),queueUrgentVintedDue=marketDiag.urgentVintedDueCount(queueNow);
         long queueUrgentNext=marketDiag.nextUrgentVintedDueAt(queueNow),queueUrgentReserve=marketDiag.urgentVintedReservationUntil(queueNow);
@@ -1739,6 +1742,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "refreshPausedUntil="+p.getLong("refreshPausedUntil",0)+"; authoritative="+p.getLong("refreshVintedAuthoritativeUntil",0)+"; gapMs="+p.getLong("refreshVintedGapMs",0)+"; reason="+p.getString("refreshPauseReason","")+"\n"+
                 "persistentJobs={PENDING="+queueSummary.pending+", PROCESSING="+queueSummary.processing+", FAILED_RETRYABLE="+queueSummary.retryable+", FAILED_PERMANENT="+queueSummary.permanent+"}\n"+
                 "processingLeases={"+marketDiag.processingLeaseSummary(queueNow)+"}\n"+
+                "queueSupervisor={heartbeatAgeMs="+(supervisorHeartbeat<=0?-1:Math.max(0,queueNow-supervisorHeartbeat))+
+                "; recoveryAgeMs="+(recoveryDiag.updatedAt<=0?-1:Math.max(0,queueNow-recoveryDiag.updatedAt))+
+                "; recovery="+firstLine(recoveryDiag.detail)+"; oldestRunnableVintedAgeMs="+oldestRunnableVintedAge+"}\n"+
                 "queueRunnable={vinted="+queueVintedDue+", bgg="+queueBggDue+", total="+queueDueNow+"}; nextDueAt="+queueNextDue+"; vintedActive="+queueVinted+"; vintedCore="+queueVintedCore+"; vintedDeep="+queueVintedDeep+"; bggActive="+queueBgg+"; bggUnrunnable="+queueBggBlocked+"; bggMatchRequired="+queueBggMatchRequired+"; bggMatchReview="+queueBggMatchReview+"; historicalActive="+queueHistorical+"; vintedPaused="+queueVintedPaused+"; bggPaused="+queueBggPaused+"; historicalPaused="+queueHistoricalPaused+"\n"+                "vintedUrgent={active="+queueUrgentVinted+", due="+queueUrgentVintedDue+", nextDueAt="+queueUrgentNext+", reserveUntil="+queueUrgentReserve+"}\n"+
                 "vintedData={missingLink="+queueMissingVinted+", partialMetadata="+queuePartialVinted+"}\n"+
                 "vintedMissingBreakdown={"+queueMissingBreakdown+"}\n"+

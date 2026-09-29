@@ -2232,6 +2232,22 @@ public final class MarketStore {
     }
 
 
+    /** Age of the oldest due, active Vinted job using the same eligibility filters as the claimable count. */
+    public long oldestRunnableVintedAgeMs(long now) {
+        if(isVintedPaused())return -1L;
+        SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=vintedHistoryAllowed(db,now);DealDatabase.ObservationSession run=helper.activeObservationSession();
+        String historyExtra=allowHistory?"":" AND j.source<>?";
+        String runExtra=run==null?" AND j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')":" AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))";
+        String sql="SELECT MIN(j.created_at) FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id "+
+                "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'"+historyExtra+runExtra;
+        java.util.ArrayList<String> a=new java.util.ArrayList<>();a.add(JOB_VINTED);a.add(JOB_VINTED_DEEP);a.add(PENDING);a.add(FAILED_RETRYABLE);a.add(String.valueOf(now));if(!allowHistory)a.add(HISTORICAL_SOURCE);if(run!=null){a.add(String.valueOf(run.startAt));a.add(String.valueOf(run.endAt));}
+        try(Cursor c=db.rawQuery(sql,a.toArray(new String[0]))){
+            if(!c.moveToFirst()||c.isNull(0))return -1L;
+            return Math.max(0L,now-c.getLong(0));
+        }catch(Throwable ignored){return -1L;}
+    }
+
+
     public int runnableBggDueCount(long now) {
         if(isBggPaused())return 0;
         SQLiteDatabase db=helper.getReadableDatabase();boolean allowHistory=historyAllowed(db,now,JOB_BGG);DealDatabase.ObservationSession run=helper.activeObservationSession();
@@ -3137,6 +3153,18 @@ public final class MarketStore {
 
     public long processorHeartbeatAt() {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT updated_at FROM queue_controls WHERE name='processor_heartbeat' LIMIT 1",null)){
+            return c.moveToFirst()?c.getLong(0):0L;
+        }catch(Throwable ignored){return 0L;}
+    }
+
+    /** Updated after a supervisor pass completes, so it does not make a stalled control thread look alive. */
+    public void touchSupervisorHeartbeat() {
+        ContentValues v=new ContentValues();v.put("name","supervisor_heartbeat");v.put("value",1);v.put("updated_at",System.currentTimeMillis());
+        helper.getWritableDatabase().insertWithOnConflict("queue_controls",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public long supervisorHeartbeatAt() {
+        try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT updated_at FROM queue_controls WHERE name='supervisor_heartbeat' LIMIT 1",null)){
             return c.moveToFirst()?c.getLong(0):0L;
         }catch(Throwable ignored){return 0L;}
     }

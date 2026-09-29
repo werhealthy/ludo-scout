@@ -1,5 +1,11 @@
 # Ludo Scout — Changelog
 
+## 5.12.77 — Diagnostica liveness coda (2026-09-29)
+
+- Il testo diagnostico copiabile riporta l’ultimo controllo del supervisore, l’ultimo tentativo WorkManager con esito e motivo, e l’età del lavoro Vinted in attesa più vecchio.
+- Solo diagnostica: soglie di recupero, priorità, pubblicazione e dati storici non cambiano.
+- Regressione: `regression/queue_liveness_diagnostics_v51277.py`.
+
 ## 5.12.76 — Scopri rifinito (2026-09-29)
 
 - Sfondo crema con sfumatura lavanda e illustrazioni originali in PNG; l’occasione in evidenza usa una scatola prospettica composta dalla copertina BGG reale, prezzo, voto e chip dello sconto.

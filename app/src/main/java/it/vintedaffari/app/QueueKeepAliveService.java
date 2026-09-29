@@ -143,6 +143,7 @@ public final class QueueKeepAliveService extends Service {
         long bh=market.laneHeartbeatAt("bgg");boolean bggStale=bh<=0||now-bh>LANE_STALE_MS;
         if(bggExecutor==null||bggExecutor.isShutdown()||bggFuture==null||bggFuture.isDone()||bggFuture.isCancelled())restartBggLane("start");
         else if(bggNeeds&&market.processingCount(MarketStore.JOB_BGG)==0&&bggStale&&(userWake||now-bh>LANE_STALE_MS+10_000L))restartBggLane("stale heartbeat");
+        market.touchSupervisorHeartbeat();
     }
 
     private synchronized void restartVintedLane(String why){
