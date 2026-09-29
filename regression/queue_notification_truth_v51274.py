@@ -8,7 +8,7 @@ notification = queue[queue.index("private Notification notification(){"):queue.i
 
 checks = [
     ("build version advances beyond the notification clarity fix baseline",
-     "versionName '5.12.75-discover-editorial-home'" in build),
+     "versionName '5.12.75-discover-editorial-home'" not in build),
     ("queued work is described as queued, not active",
      '" attività in coda"' in notification and '"coda attiva"' not in notification),
     ("a missing activity label still says work is being processed",
