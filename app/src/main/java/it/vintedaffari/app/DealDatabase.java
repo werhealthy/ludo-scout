@@ -459,6 +459,14 @@ public final class DealDatabase extends SQLiteOpenHelper {
         return out;
     }
 
+    public synchronized int[] enginePipelineCounts(long startAt,long endAt){
+        int[] counts=new int[5];startAt=clampEngineStart(startAt);if(endAt<startAt)return counts;
+        try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.query(),new String[]{String.valueOf(startAt),String.valueOf(endAt)})){
+            while(c.moveToNext()){int phase=c.getInt(0);if(phase>=0&&phase<counts.length)counts[phase]=c.getInt(1);}
+        }
+        return counts;
+    }
+
     public synchronized List<EngineRunItem> engineRunItems(long startAt,long endAt,String filter,int limit){
         List<EngineRunItem> out=new ArrayList<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;String mode=filter==null?"all":filter;
         String sql="SELECT l.id,COALESCE(l.game_id,0),COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),"+
@@ -467,10 +475,10 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "COALESCE(l.published_label,''),COALESCE(l.language_code,''),l.current_price_cents,"+
                 "CASE WHEN g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' THEN 1 ELSE 0 END,"+
                 "CASE WHEN l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' THEN 1 ELSE 0 END,"+
-                "CASE WHEN l.enrichment_state='COMPLETE' AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
+                "CASE WHEN l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND d.lifecycle='ACTIVE' AND d.verification_state IN ('OK','USER_CONFIRMED') AND d.listing_type IN ('BASE_GAME','EXPANSION','GAME') AND d.tier IN ('hot','good','offer','fair','insufficient','hunt') AND d.rating>=6.0 AND g.rating>=6.0 AND d.bgg_id=g.bgg_id AND COALESCE(d.vinted_item_id,'')<>'' AND COALESCE(d.vinted_url,'')<>'' AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
                 "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
                 "AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.enrichment_state<>'NEEDS_REVIEW' "+
-                "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) THEN 1 ELSE 0 END,"+
+                "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) THEN 1 ELSE 0 END,"+
                 "CASE WHEN COALESCE(l.manual_review_required,0)=1 OR (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id='')) THEN 1 ELSE 0 END,"+
                 "CASE WHEN COALESCE(l.manual_review_required,0)=0 AND NOT (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id='')) AND (l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' "+
                 "OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')) THEN 1 ELSE 0 END "+

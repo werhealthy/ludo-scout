@@ -24,4 +24,13 @@ public class HomePresentationTest {
         org.junit.Assert.assertTrue(DiscoverCategories.matches(5,"Space Exploration"));
         org.junit.Assert.assertFalse(DiscoverCategories.matches(5,null));
     }
+    @Test public void editionAndDependenceFiltersNeverConflateUnknownWithDependent(){
+        assertTrue(HomePresentation.matchesLanguage("IT|DEP","IT"));
+        assertFalse(HomePresentation.matchesLanguage("IT|DEP","unknown"));
+        assertTrue(HomePresentation.matchesLanguage("IND","unknown"));
+        assertTrue(HomePresentation.matchesDependence("IT|DEP","DEP"));
+        assertFalse(HomePresentation.matchesDependence("IT|DEP","unknown"));
+        assertTrue(HomePresentation.matchesDependence("FR","unknown"));
+        assertTrue(HomePresentation.matchesDependence("IT|IND|DEP","unknown"));
+    }
 }

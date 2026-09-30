@@ -4,7 +4,20 @@ import java.util.Locale;
 /** Pure presentation decisions; missing language evidence remains explicitly unknown. */
 final class HomePresentation {
     static final int SQUARE=0,WIDE=1,TALL=2;
-    private HomePresentation(){}
+ private HomePresentation(){}
+ static boolean matchesLanguage(String value,String filter){
+  if("all".equals(filter))return true;
+  if("IND".equals(filter))return matchesDependence(value,filter);
+  String edition=languageLabel(value).split(" · ")[0];
+  return "unknown".equals(filter)?"?".equals(edition):edition.equals(filter);
+ }
+ static boolean matchesDependence(String value,String filter){
+  if("all".equals(filter))return true;
+  String label=languageLabel(value);
+  return "unknown".equals(filter)?label.endsWith("testo n/d"):
+    "IND".equals(filter)?label.endsWith("indipendente"):
+    "DEP".equals(filter)&&label.endsWith(" · testo");
+ }
     static int coverMode(int width,int height){
         if(width<=0||height<=0)return SQUARE;
         float ratio=width/(float)height;

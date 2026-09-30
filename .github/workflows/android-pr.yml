@@ -41,6 +41,9 @@ jobs:
       - name: Run Home category SQLite fixtures
         run: python3 regression/discover_category_sql_v51284.py
 
+      - name: Run exclusive Motore pipeline SQLite fixtures
+        run: python3 regression/engine_pipeline_sql_v51286.py
+
       - name: Validate Android SDK
         run: |
           test -n "$ANDROID_HOME" || (echo "ANDROID_HOME is not set" && exit 1)

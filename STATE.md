@@ -1,3 +1,15 @@
+
+## 5.12.86 — Unified UI and five-phase Motore (2026-09-30)
+- Home/Catalog cards reserve exactly two title lines with ellipsis, taller covers and a consistent price slot; catalog status reserves two lines too.
+- Catalog uses pill search plus circular filters, sort at result count, no floating engine overlay. Filter pages share navy surfaces/Remus typography; edition and text dependence are distinct, include all known edition codes, preserve unknown, reset/apply transactionally, persist category/dependence/discount through recreation.
+- Global palette, typography, navigation, shared cards, buttons, sheets and full-screen panels now follow the approved dark system. Ludo has a compact heading and explicit Motore entry; Library and market pages use the same shell. Existing detail/actions remain available.
+- Motore presents Osservati → Giochi → Idonei → Verifiche Vinted → Pronti in the reference circle. Large fonts/narrow phones use an accessible ordered list. Phase explanations and ready-announcement drilldown remain accessible.
+- Counts are exclusive read-only current-state counts for the active scroll (latest scroll when idle), not cumulative funnel counts or global Catalog totals. Known BGG/game identities group listings at their furthest usable phase; unresolved signatures remain distinct. Center excludes Pronti. Review/holds/archived entries are excluded. Ready requires the same legacy/canonical trust, identity, type, rating, lifecycle and pending-job gates as Catalog; no queue/publication logic changed.
+- Attention is the existing actionable inbox (global); recent section shows actual recent scrolls, not fabricated per-game events. Reads run on uiDataIo, snapshot clock starts after all reads, stale data remains visible.
+- No DB migration/dependency/signing/pacing changes. Added production-generated SQLite fixture (five phases, duplicate sightings/identities, advanced listing selection, manual/price/identity holds, sold/untrusted/type/identity gates, deep/manual jobs and time scope), wired in PR/beta CI; expanded language filter JUnit cases.
+- Verification: 61 local source regressions plus SQLite fixture (--source-eval) passed; Java/Android checks delegated to PR CI due missing local JDK. Independent review addressed filter transaction/reset/restore and ready gate/drilldown mismatches. Visual validation on Android remains manual: 320–393dp, large fonts, long names, catalogue filter cancel/apply/reset/sort/pagination, Ludo→Motore and phase counts.
+- User preference persists: automatically merge verified updates to beta and distribute on Firebase App Tester; confirm upload and tester distribution success before availability claims.
+
 ## Delivery preference — 2026-09-30
 
 User explicitly authorizes publishing each Ludo Scout update immediately to Firebase App Tester after automated checks pass, including the necessary beta PR merge. Do not wait for another merge/distribution request. Confirm actual Firebase distribution success before claiming availability. Manual visual feedback follows installation.
