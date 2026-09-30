@@ -1,29 +1,37 @@
 # Ludo Scout — Current state
 
-## Verified release — 2026-09-30
+## Verified release
 
-Version: 5.12.87-catalog-engine-motion (1000104). PR95 merged to beta at c4014b0ca019008e8b463fa6c446ef5c20efc98f. Final PR head 2fccc53e026cde7fdf0e264dc171ecea0b568750 passed Android PR run255 (36755674527). Android beta run36756069912 built signed APK and Firebase confirmed successful upload and distribution to configured testers at 18:09 UTC.
+5.12.88-home-material (1000105), distributed 2026-10-01 00:01 Europe/Rome (2026-09-30 22:01 UTC). PR96 merged to beta at 8021556cf81f8a3a24282f7d759cc7809d4ae33c. Head c64412f46eb7f45299334ab29be2d2faf3090aab passed Android PR run256 (36782398800). Signed beta run36782726617 passed and Firebase confirmed successful new release upload and tester/group distribution.
 
-## User delivery preference
+## Delivery preference
 
-Automatically merge verified Ludo Scout updates to beta and publish to Firebase App Tester, without waiting for another merge/distribution request. Confirm actual tester-distribution success before claiming availability. Documentation-only status commits can skip CI to avoid duplicate identical APK releases.
+Automatically merge verified Ludo Scout updates to beta and publish to Firebase App Tester. Do not ask again for merge or distribution approval. Confirm successful tester distribution before claiming availability. Documentation-only status commits may skip CI to avoid duplicate APKs.
 
-## Current UI
+## Current completed step — Home
 
-- Catalog Giochi: two cover-first columns, roomy portrait covers, fixed two-line ellipsized titles, raw BGG rating, player/time facts, current price and availability. Historical market details remain in game detail. Four advanced filters and sorting remain functional; pill search and circular filter control replace the clipped old toolbar.
-- Ludo: redundant metric summary and Motore button removed, tabs/modules spaced, recommendation cards use calm cover-first composition and raw BGG rating.
-- Motore opens through Home; the overview has the exclusive five-phase wheel and conditional actionable attention. No work hero, other-scroll cards or recent-scroll list in overview.
-- Each phase opens its exact grouped elements directly without an intermediate modal. Central number opens phase<4 work elements and current work status. Zero/empty phases also open directly. Lists load on the data executor, show observation titles for unidentified elements, and keep known game detail navigation.
-- Shared read-only SQL produces counts and phase membership with unchanged identity/readiness/review/price gates. Recognized game identities are deduplicated into their most advanced usable phase.
-- Same-scroll visual baseline persists. On fresh return/change, numbers interpolate once with a small zoom and green/red delta, then settle. Same-snapshot rerenders do not replay. Actual PROCESSING listing/game jobs pulse the corresponding occupied phase; optional automatic deep jobs are excluded. Motion respects disabled system animators and foreground lifecycle.
-- FontAwesome language/text-dependence indicators distinguish edition, independence, dependence and unknown from exact existing facts. No invented game-wide edition language.
+- One Home gear opens Motore. Engine ellipsis opens existing settings/diagnostics.
+- Featured Scopri di più is visibly52dp tall with ripple and larger text.
+- Edition flags/names and distinct dependence labels use ordinary Italian, with explicit unknown states and no invented language evidence. Detail language has its own row to preserve BGG visibility.
+- Home covers, hero and BGG ranking crop to their frames. Shared section titles use FontAwesome.
+- Category Vedi tutte removed, interpreting user transcription as “eviterei”; all categories remain accessible in the horizontal rail.
+- Real same-seller bundle spotlight emphasizes2–3covers and direct detail. No invented combined price or explanatory filler. Discovery is bounded40candidates, cached60s and off main thread; rendering receives resolved partners.
+- Critical v87 empty-phase-list bug reproduced and fixed: Android rawQuery binds Strings; computed numeric phase has no SQLite column affinity and never equaled the text filter. Phase parameters now explicitly CAST AS INTEGER. Tests bind strings like Android and evaluate actual query methods; count/list parity and trust gates pass.
+- Existing dark palette, typography, fixed two-line preview titles, filter functionality, direct phase navigation and eligibility gates preserved.
 
 ## Validation
 
-All current PR and beta workflow regressions passed, including production Java-generated SQL fixtures for count/list parity, identity/trust holds and actual processing ownership. Android JUnit (including motion state tests), Java compilation and signed APK build passed. No Android emulator/device visual verification was available locally; the delivered App Tester build is the device review surface.
+All PR/beta workflows passed, including production Java-generated SQLite fixtures, Android JUnit, Java compilation and signed APK.62 current workflow source/SQL regressions also passed locally; code review caught and verified fixes for bundle UI cost and detail language clipping. No local Android emulator/device visual validation. User reviews this step through App Tester.
 
-## Retained product behavior
+## Remaining work — do not claim fixed
 
-Application identity, signing/versionCode strategy, queue ownership, acquisition/reconciliation, catalog publication eligibility and trust/price gates unchanged. Previous Home adaptive cover layout, taller shared previews, category-colored outlines, transactional filters and dark Remus typography remain.
+Latest user diagnostic on v87 reports five post-install UI crashes and one ANR; SQLiteDatabaseLockedException; busy_timeout8000ms; Activity snapshot load5751ms; Vinted PROCESSING lease around94min; queue heartbeat around95min; eight runnable Vinted jobs; current scroll active over five hours. Root cause of queue stalling and lock contention is not yet established. This Home step does not fix those crashes/ANR or claim to unblock the queue.
 
-See AI_HANDOFF.md for implementation continuity and UX_SYSTEM files for the established product context.
+User requested ordered, reviewable steps rather than one broad rewrite. See docs/specs/2026-09-30-ui-refinement.md:
+1. Home — delivered; validate on phone.
+2. Motore/stability — NEXT: UI SQLite work, queue leases/watchdog, truthful loading, balanced layout, clear delta baseline/duration.
+3. Catalog/detail — clickable filters, meaningful offer labels, larger BGG rating, Material provider actions, finger-controlled transition and navigation relationship. Replacement of Annunci/Bundle/Giochi selector remains an open product decision.
+4. Ludo — minimal purple pet inspired by attached reference; large opening presence, collapses on scroll.
+5. Collection/shared interactions — bookshelf exploration, liking0–5 with preserved existing ratings, sale-price entry/backfill, bottom-slide modals and purposeful motion.
+
+Recommended next action: inspect Home on1000105, then address Motore crashes/stalled queue before deeper animations. Application identity, signing, acquisition, queue ownership and publish/readiness/review/price gates unchanged.
