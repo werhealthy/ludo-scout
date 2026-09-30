@@ -1,3 +1,8 @@
+## 5.12.88 — Home refinement, step1 (2026-09-30)
+Home: one gear→Motore, engine ellipsis→settings/diagnostics;52dp visible ripple CTA; readable flag/edition and dependence labels; crop Home/BGG/hero covers; FontAwesome section icons; category Vedi tutte removed per interpreted transcription; real same-seller cover-led bundle spotlight discovered off main thread, bounded40candidates/cache60s, no invented bundle price. Language fact unknown/conflicts remain unknown; separate detail row avoids clipping provider rating.
+
+Reproduced/fixed critical v87 empty-phase-list bug: Android rawQuery binds selectionArgs as strings; computed numeric phase has no affinity. Explicit CAST phase parameters; SQL test now binds strings exactly like Android and locally evaluates actual production query method, preserving count/list parity/trust gates. This does not fix reported SQLite crashes/ANR or stalled queue. See docs/specs/2026-09-30-ui-refinement.md for five-step roadmap and diagnostic evidence; next step is Motore/stability before detail/pet/collection.
+
 ## 5.12.87 — Catalog Giochi and Motore motion (2026-09-30)
 - Giochi uses two cover-first columns, equal two-line ellipsized titles, BGG rating/players/current availability. All four advanced filters and sorting preserved; history remains in game detail.
 - Ludo removes redundant metric summary and Motore shortcut, adds module spacing, calm cover-first recommendations and truthful raw BGG rating.

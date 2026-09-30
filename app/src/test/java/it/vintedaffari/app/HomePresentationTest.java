@@ -33,4 +33,9 @@ public class HomePresentationTest {
         assertTrue(HomePresentation.matchesDependence("FR","unknown"));
         assertTrue(HomePresentation.matchesDependence("IT|IND|DEP","unknown"));
     }
+    @Test public void flagsNeverInventEditionFromTextIndependence(){
+        assertEquals("🇮🇹",HomePresentation.editionFlag("IT|IND"));assertEquals("Italiano",HomePresentation.editionName("IT|IND"));
+        assertEquals("",HomePresentation.editionFlag("IND"));assertEquals("Edizione da verificare",HomePresentation.editionName("IND"));
+        assertEquals("Non serve la lingua",HomePresentation.dependenceLabel("IND"));assertEquals("Testo da verificare",HomePresentation.dependenceLabel("IT|IND|DEP"));assertEquals("Serve la lingua",HomePresentation.dependenceLabel("FR|DEP"));
+    }
 }
