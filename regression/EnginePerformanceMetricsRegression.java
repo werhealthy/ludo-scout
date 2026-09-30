@@ -35,6 +35,10 @@ public final class EnginePerformanceMetricsRegression {
         capped.sample(0L, 0L, 61_000L, 0L, false, false, 1, 0, "WAITING", "PACING");
         check(capped.summary(61_000L).contains("pacingMs=12000"),
                 "a missed pulse must not count the whole service/process downtime as queue wait");
+        check(capped.summary(61_000L).contains("unobservedMs=48000"),
+                "time outside the capped measurement interval must remain visible as unobserved");
+        check(EnginePerformanceMetrics.restore(capped.serialize()).summary(61_000L).equals(capped.summary(61_000L)),
+                "unobserved duration must survive persistence");
         System.out.println("PASS engine timing separates pacing, processing, first result, and completion");
         System.out.println("PASS persisted timing survives restart and caps missed-pulse gaps");
     }

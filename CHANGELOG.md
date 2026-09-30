@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.80 — Copertura dei campioni (2026-09-30)
+
+- La diagnostica mostra in `unobservedMs` il tempo tra campioni che supera i 12 secondi misurabili, invece di nasconderlo nei tempi attribuiti alla coda.
+- Questo intervallo può includere servizio inattivo, app sospesa o campioni in ritardo; non viene presentato come tempo di elaborazione né come errore della coda.
+- La versione dei dati diagnostici avanza e i vecchi totali non confrontabili vengono azzerati. Nessun cambio a elaborazione, pubblicazione o limiti di rete.
+- Regressione: `regression/engine_performance_metrics_v51279.py` e `regression/EnginePerformanceMetricsRegression.java`.
+
+
 ## 5.12.79 — Tempi reali del Motore (2026-09-30)
 
 - La diagnostica misura il tempo Vinted in attesa di pacing/limiti, il tempo con lavoro rivendicabile, il tempo con lease attive e gli altri intervalli osservati.

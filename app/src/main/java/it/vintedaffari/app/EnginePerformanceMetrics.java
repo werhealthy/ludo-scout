@@ -9,7 +9,7 @@ import java.util.Map;
 
 /** Small diagnostic-only accumulator. It stores timings and run timestamps, never listing data. */
 public final class EnginePerformanceMetrics {
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final int MAX_HISTORY = 20;
     private static final int MAX_ACTIVE_RUNS = 80;
     private static final long MAX_SAMPLE_GAP_MS = 12_000L;
@@ -42,12 +42,16 @@ public final class EnginePerformanceMetrics {
     private long runnableMs;
     private long processingMs;
     private long otherMs;
+    private long unobservedMs;
 
     /** Returns true when a first-result or completion event needs an immediate persistence flush. */
     public synchronized boolean sample(long runStartAt, long scrollEndAt, long now, long progressMarker,
             boolean hasResult, boolean complete, int due, int processing,
             String laneState, String laneDetail) {
-        long delta = lastSampleAt <= 0L ? 0L : Math.min(MAX_SAMPLE_GAP_MS, Math.max(0L, now - lastSampleAt));
+        long elapsed = lastSampleAt <= 0L ? 0L : Math.max(0L, now - lastSampleAt);
+        long delta = Math.min(MAX_SAMPLE_GAP_MS, elapsed);
+        // Do not mistake delayed pulses or app downtime for engine work; report the gap explicitly.
+        unobservedMs += Math.max(0L, elapsed - delta);
         String state = laneState == null ? "" : laneState;
         String detail = laneDetail == null ? "" : laneDetail;
         String reason = detail.toUpperCase(java.util.Locale.ROOT);
@@ -115,11 +119,11 @@ public final class EnginePerformanceMetrics {
         for(Run run:activeRuns.values())noProgressWorst=Math.max(noProgressWorst,run.noProgressMs);
         Collections.sort(first);
         Collections.sort(completion);
-        return "build=engine-performance-v1;sampleCount=" + history.size() +
+        return "build=engine-performance-v2;sampleCount=" + history.size() +
                 ";firstResultN=" + first.size() + ";firstResultMedianMs=" + median(first) + ";firstResultWorstMs=" + worst(first) +
                 ";completionN=" + completion.size() + ";completionMedianMs=" + median(completion) + ";completionWorstMs=" + worst(completion) +
                 ";noProgressWorstMs="+noProgressWorst+
-                ";scrollEndAnchor=last_observation_at;sampleWindow=last20;pacingMs=" + pacingMs + ";gateMs=" + gateMs + ";sqliteBusyMs=" + sqliteBusyMs + ";runnableMs=" + runnableMs + ";processingMs=" + processingMs + ";otherMs=" + otherMs +
+                ";scrollEndAnchor=last_observation_at;sampleWindow=last20;pacingMs=" + pacingMs + ";gateMs=" + gateMs + ";sqliteBusyMs=" + sqliteBusyMs + ";runnableMs=" + runnableMs + ";processingMs=" + processingMs + ";otherMs=" + otherMs + ";unobservedMs=" + unobservedMs +
                 ";activeRuns=" + activeRuns.size() + ";lastSampleAgeMs=" + (lastSampleAt <= 0L ? -1L : Math.max(0L, now - lastSampleAt));
     }
 
@@ -135,7 +139,7 @@ public final class EnginePerformanceMetrics {
     public synchronized String serialize() {
         StringBuilder out = new StringBuilder("v=").append(VERSION).append(";last=").append(lastSampleAt)
                 .append(";pacing=").append(pacingMs).append(";gate=").append(gateMs).append(";sqliteBusy=").append(sqliteBusyMs).append(";runnable=").append(runnableMs)
-                .append(";processing=").append(processingMs).append(";other=").append(otherMs).append(";active=");
+                .append(";processing=").append(processingMs).append(";other=").append(otherMs).append(";unobserved=").append(unobservedMs).append(";active=");
         boolean comma = false;
         for (Map.Entry<Long, Run> entry : activeRuns.entrySet()) {
             if (comma) out.append(',');
@@ -169,6 +173,7 @@ public final class EnginePerformanceMetrics {
         out.runnableMs = parse(fields.get("runnable"), 0L);
         out.processingMs = parse(fields.get("processing"), 0L);
         out.otherMs = parse(fields.get("other"), 0L);
+        out.unobservedMs = parse(fields.get("unobserved"), 0L);
         String active = fields.get("active");
         if (active != null && !active.isEmpty()) for (String row : active.split(",")) {
             String[] parts = row.split(":", -1);

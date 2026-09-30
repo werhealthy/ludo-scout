@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the diagnostics-only queue timing contract for build 5.12.79."""
+"""Guard queue timing and explicit accounting for gaps between samples."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,4 +20,6 @@ assert "recordEnginePerformance(activeRun,now)" in queue and "enginePerformance.
 assert '"enginePerformance={' in diagnostics, "copied diagnostics must expose queue timing"
 assert "MedianMs" in tracker_source and "WorstMs" in tracker_source and "sampleCount" in tracker_source
 assert "noProgressWorstMs" in tracker_source, "diagnostics must expose observed time without run progress"
+assert "unobservedMs" in tracker_source, "sample gaps outside the measured interval must be reported, not discarded"
+assert "build=engine-performance-v2" in tracker_source, "gap accounting must be visible as the updated metric contract"
 print("PASS engine timing exposes bounded per-run medians/worst and queue-state durations")
