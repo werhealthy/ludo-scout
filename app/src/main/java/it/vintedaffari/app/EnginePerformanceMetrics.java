@@ -9,7 +9,7 @@ import java.util.Map;
 
 /** Small diagnostic-only accumulator. It stores timings and run timestamps, never listing data. */
 public final class EnginePerformanceMetrics {
-    private static final int VERSION = 2;
+    private static final int VERSION = 4;
     private static final int MAX_HISTORY = 20;
     private static final int MAX_ACTIVE_RUNS = 80;
     private static final long MAX_SAMPLE_GAP_MS = 12_000L;
@@ -35,6 +35,7 @@ public final class EnginePerformanceMetrics {
 
     private final LinkedHashMap<Long, Run> activeRuns = new LinkedHashMap<>();
     private final ArrayDeque<FinishedRun> history = new ArrayDeque<>();
+    private long trackingStartedAt;
     private long lastSampleAt;
     private long pacingMs;
     private long gateMs;
@@ -48,6 +49,7 @@ public final class EnginePerformanceMetrics {
     public synchronized boolean sample(long runStartAt, long scrollEndAt, long now, long progressMarker,
             boolean hasResult, boolean complete, int due, int processing,
             String laneState, String laneDetail) {
+        if (trackingStartedAt <= 0L) trackingStartedAt = Math.max(1L, now);
         long elapsed = lastSampleAt <= 0L ? 0L : Math.max(0L, now - lastSampleAt);
         long delta = Math.min(MAX_SAMPLE_GAP_MS, elapsed);
         // Do not mistake delayed pulses or app downtime for engine work; report the gap explicitly.
@@ -68,7 +70,11 @@ public final class EnginePerformanceMetrics {
         lastSampleAt = Math.max(0L, now);
 
         boolean changed = false;
-        if (runStartAt > 0L) {
+        // Existing observation sessions can be reloaded from SQLite after install/startup.
+        // Their endAt may be days old, so only time sessions anchored at or just before
+        // the start of this measurement epoch (one pulse of grace) are eligible.
+        boolean freshAnchor = scrollEndAt > 0L && scrollEndAt >= trackingStartedAt - MAX_SAMPLE_GAP_MS;
+        if (runStartAt > 0L && freshAnchor) {
             if (wasCompleted(runStartAt)) return false;
             Run run = activeRuns.get(runStartAt);
             if (run == null) {
@@ -122,7 +128,7 @@ public final class EnginePerformanceMetrics {
         }
         Collections.sort(first);
         Collections.sort(completion);
-        return "build=engine-performance-v3;sampleCount=" + history.size() +
+        return "build=engine-performance-v4;sampleCount=" + history.size() +
                 ";firstResultN=" + first.size() + ";firstResultMedianMs=" + median(first) + ";firstResultWorstMs=" + worst(first) +
                 ";completionN=" + completion.size() + ";completionMedianMs=" + median(completion) + ";completionWorstMs=" + worst(completion) +
                 ";noProgressWorstMs="+noProgressWorst+
@@ -140,7 +146,7 @@ public final class EnginePerformanceMetrics {
 
     /** Compact key/value persistence in the existing cross-process diagnostics row; no schema change. */
     public synchronized String serialize() {
-        StringBuilder out = new StringBuilder("v=").append(VERSION).append(";last=").append(lastSampleAt)
+        StringBuilder out = new StringBuilder("v=").append(VERSION).append(";epoch=").append(trackingStartedAt).append(";last=").append(lastSampleAt)
                 .append(";pacing=").append(pacingMs).append(";gate=").append(gateMs).append(";sqliteBusy=").append(sqliteBusyMs).append(";runnable=").append(runnableMs)
                 .append(";processing=").append(processingMs).append(";other=").append(otherMs).append(";unobserved=").append(unobservedMs).append(";active=");
         boolean comma = false;
@@ -169,6 +175,7 @@ public final class EnginePerformanceMetrics {
             if (cut > 0) fields.put(item.substring(0, cut), item.substring(cut + 1));
         }
         if (parse(fields.get("v"), 0L) != VERSION) return out;
+        out.trackingStartedAt = parse(fields.get("epoch"), 0L);
         out.lastSampleAt = parse(fields.get("last"), 0L);
         out.pacingMs = parse(fields.get("pacing"), 0L);
         out.gateMs = parse(fields.get("gate"), 0L);

@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.82 — Esclusione delle sessioni storiche dai tempi (2026-09-30)
+
+- Il misuratore non usa più sessioni di osservazione già presenti nel database all’avvio come nuovi campioni; evita così tempi del primo risultato di giorni, calcolati da un’ultima osservazione storica.
+- Mantiene le misure dei run ancorati all’avvio del misuratore o entro un battito del supervisore, e continua a separare tempo classificato, intervalli non osservati, primo risultato e completamento.
+- Solo diagnostica: nessun cambio al flusso del Motore, alle soglie, ai limiti o alla pubblicazione.
+- Regressione: `regression/engine_performance_metrics_v51279.py` e `regression/EnginePerformanceMetricsRegression.java`.
+
+
 ## 5.12.81 — Primo risultato senza attesa di completamento (2026-09-30)
 
 - La mediana e il tempo peggiore del primo risultato includono anche i run ancora aperti; il numero `firstResultN` mostra quanti casi hanno già prodotto un risultato.

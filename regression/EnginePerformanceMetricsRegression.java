@@ -47,6 +47,14 @@ public final class EnginePerformanceMetricsRegression {
                 "first-result latency must be visible before the run completes");
         check(activeFirst.summary(9_000L).contains("completionN=0;completionMedianMs=-1;completionWorstMs=-1"),
                 "an active run must not be counted as completed");
+
+        EnginePerformanceMetrics oldObservation = new EnginePerformanceMetrics();
+        oldObservation.sample(10L, 1_000L, 100_000_000L, 4L, true, false, 1, 0, "WAITING", "PACING");
+        oldObservation.sample(10L, 1_000L, 108_000_000L, 4L, true, false, 1, 0, "WAITING", "PACING");
+        check(oldObservation.summary(108_000_000L).contains("firstResultN=0;firstResultMedianMs=-1;firstResultWorstMs=-1"),
+                "a persisted observation session predating measurement must not create multi-day first-result latency");
+        check(oldObservation.summary(108_000_000L).contains("activeRuns=0"),
+                "stale observation sessions must not be treated as active measured runs");
         System.out.println("PASS engine timing separates pacing, processing, first result, and completion");
         System.out.println("PASS persisted timing survives restart and caps missed-pulse gaps");
     }
