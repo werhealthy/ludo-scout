@@ -8,9 +8,9 @@ system=(ROOT/"UX_SYSTEM_V1.md").read_text(encoding="utf-8")
 
 home=ui[ui.index("private void renderDiscover()"):ui.index("private void addBundleEmptyState",ui.index("private void renderDiscover()"))]
 header=ui[ui.index("private View discoverHeader"):ui.index("private String discoverGreetingName",ui.index("private View discoverHeader"))]
-categories=home
-fresh=ui[ui.index("private View discoverFreshCard"):ui.index("private void addDiscoverTopRatedRail",ui.index("private View discoverFreshCard"))]
-top=ui[ui.index("private View discoverTopRatedCard"):ui.index("private void addDiscoverValueRail",ui.index("private View discoverTopRatedCard"))]
+categories=ui[ui.index("private void addDiscoverCategories()"):ui.index("private GameRecord discoverGame",ui.index("private void addDiscoverCategories()"))]
+product=ui[ui.index("private View discoverProductCard"):ui.index("private void addDiscoverTopRatedRail",ui.index("private View discoverProductCard"))]
+top=ui[ui.index("private View discoverTopRatedCard"):ui.index("private View heroOpportunityCard",ui.index("private View discoverTopRatedCard"))]
 opportunity=ui[ui.index("private View heroOpportunityCard"):ui.index("private View discoverFlatArtwork",ui.index("private View heroOpportunityCard"))]
 section=ui[ui.index("private void sectionHeader"):ui.index("private void openCatalogPreset",ui.index("private void sectionHeader"))]
 market=ui[ui.index("private void renderCatalog()"):ui.index("private void loadMoreCatalog",ui.index("private void renderCatalog()"))]
@@ -29,19 +29,20 @@ checks=[
     ("Discover uses distinct, data-backed editorial rails",
      all(x in home for x in ["addDiscoverCategories","addDiscoverFreshRail","addDiscoverTopRatedRail","addDiscoverValueRail"]) and
      "heroOpportunityCard" in home),
-    ("BGG categories come from the canonical visible game catalog",
-     "marketStore.popularCategories(" in categories and
-     'databaseQuery=category;' in categories and
-     "FROM games" in (ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")),
-    ("fresh rail leads with the listing publication time",
-     "publicationDisplay(d)" in fresh and "firstSeen" not in fresh),
+    ("Home categories are five stable product clusters",
+     all(x in categories for x in ["Strategia","Cooperativi","Fantasy","Filler","Eurogame"]) and
+     "openDiscoverCluster" in categories),
+    ("fresh rail leads with listing publication time",
+     "publicationDisplay(d)" in product),
     ("newest rail sorts by Vinted publication time",
      "publicationAgeMinutes(a)" in home and
      "publicationAgeMinutes(b)" in home),
     ("BGG rail exposes rank, votes and rating",
-     "d.rating" in top and "d.voters" in top and "d.rank" in top),
-    ("featured opportunity uses the real game cover and prominent deal signals",
-     "discoverFlatArtwork(d" in opportunity and
+     "d.rating" in top and "d.voters" in top and "d.rank" in top and
+     "discoverRankCategory(d)" in top),
+    ("featured opportunity uses canonical BGG content",
+     "discoverBggCover(d" in opportunity and
+     "discoverGameDescription(d)" in opportunity and
      "name(d)" in opportunity and "total(d)" in opportunity and "saving(d)" in opportunity),
     ("Discover greeting matches the approved Home reference",
      '"Bentornato,"' in header and
