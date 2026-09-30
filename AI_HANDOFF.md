@@ -1,5 +1,11 @@
 # Ludo Scout — AI handoff
 
+## 5.12.92 — Home render and loading correction (2026-10-01)
+- User feedback: default dismissal is announcement-specific; long press opens compact native menu to exclude game, with Undo. Uses v2 preference namespace so legacy broad dismissals do not incorrectly hide games; positive interest remains per game.
+- Hero rebuilds occur after Android layout traversal, fixing hierarchy mutation during onLayout; preserves the beta 2.5D featured-box artwork. Price and Material CTA share footer, square/tall metadata sits beside artwork. Device visual confirmation still required.
+- Wider Home product cards expose next-card edge rather than forcing 2.5 cards; square artwork, rating/language on one row, larger section icons. BGG ranking discounts return to minimal inline styling.
+- Database filter stays adjacent to search as a sibling; only count/chips indicate selection. Motore uses dedicated read executor, omits unused day/history reads, shows animated native loader, and diagnoses owner/review/pipeline timing. Shared SQLite lock contention and queue liveness not claimed solved.
+
 ## 5.12.89 — Personalized Home (2026-10-01)
 - User approved implementation and automatic merge/distribution. Home interest preferences persist per BGG identity; dismiss swaps the hero and has Undo. Owned (unsold) Library games and confirmed non-IT/EN language-dependent editions are excluded from Home; unknown language facts remain unknown.
 - Hero has square/tall/wide cover compositions, a 52dp CTA, compact flags and dependence icons, and actual discount bands 0–9/10–29/30–79/80+.
