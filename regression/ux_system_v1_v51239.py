@@ -41,9 +41,12 @@ checks=[
      "d.rating" in top and "d.voters" in top and "d.rank" in top and
      '" BGG"' in top),
     ("featured opportunity uses canonical BGG content",
-     "setDiscoverBggArtwork(image,placeholder,d,arrange)" in opportunity and
+     "FeaturedBoxArtwork featured=featuredBoxArtwork(d)" in opportunity and
+     "setDiscoverBggArtwork(featured.source,featured.placeholder,d" in opportunity and
      "discoverGameDescription(d)" in opportunity and
      "name(d)" in opportunity and "total(d)" in opportunity and "discoverDiscountBadge(d" in opportunity),
+    ("featured opportunity renders the BGG cover as an adaptive 2.5D box",
+     "setPolyToPoly" in ui and "topFace=quad(topPts)" in ui and "sideFace=quad(sidePts)" in ui and "sampleEdge(bitmap)" in ui),
     ("Discover greeting matches the approved Home reference",
      '"Bentornato,"' in header and
      "discoverGreetingName()" in header),
