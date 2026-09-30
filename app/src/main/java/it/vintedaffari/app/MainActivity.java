@@ -641,26 +641,91 @@ private void applyDiscoverChrome(){
         TextView description=discoverTextWeight(discoverGameDescription(d),12,DISCOVER_MUTED,400);description.setMaxLines(2);description.setEllipsize(TextUtils.TruncateAt.END);copy.addView(description);
         copy.addView(discoverLanguageIndicator(d));TextView price=discoverTextWeight(total(d),27,DISCOVER_TEXT,700);price.setPadding(0,dp(4),0,0);copy.addView(price);
         TextView action=discoverTextWeight("Scopri di più",14,Color.BLACK,500);action.setSingleLine(true);action.setGravity(Gravity.CENTER);action.setPadding(dp(16),0,dp(16),0);action.setMinHeight(dp(52));action.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(40,0,0,0)),round(Color.WHITE,999,0,0),null));action.setContentDescription("Scopri di più: "+name(d));action.setOnClickListener(v->openDetail(d));LinearLayout.LayoutParams actionLp=new LinearLayout.LayoutParams(-1,dp(52));actionLp.topMargin=dp(10);copy.addView(action,actionLp);
-        FrameLayout art=new FrameLayout(this);art.setBackground(round(DISCOVER_SURFACE,12,0,0));art.setClipToOutline(true);
-        TextView placeholder=discoverTextWeight(coverPlaceholder(d),11,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
-        ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);art.addView(image,new FrameLayout.LayoutParams(-1,-1));
+        FeaturedBoxArtwork featured=featuredBoxArtwork(d);FrameLayout art=featured.root;
         TextView badge=discoverDiscountBadge(d,14);if(badge!=null){FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);bp.setMargins(dp(8),dp(8),dp(8),0);art.addView(badge,bp);}
         final int[] previous={-1,-1};Runnable arrange=()->{
-            Drawable cover=image.getDrawable();int w=cover==null?1:cover.getIntrinsicWidth(),h=cover==null?1:cover.getIntrinsicHeight();int mode=HomePresentation.coverMode(w,h);
+            Drawable cover=featured.source.getDrawable();int w=cover==null?1:cover.getIntrinsicWidth(),h=cover==null?1:cover.getIntrinsicHeight();int mode=HomePresentation.coverMode(w,h);
             int available=row.getWidth()-row.getPaddingLeft()-row.getPaddingRight();if(available<=0)available=getResources().getDisplayMetrics().widthPixels-dp(72);
             if(previous[0]==mode&&previous[1]==available)return;previous[0]=mode;previous[1]=available;row.removeAllViews();
-            if(mode==HomePresentation.WIDE){row.setOrientation(LinearLayout.VERTICAL);int height=Math.max(dp(100),Math.min(dp(230),(int)(available*(h/(float)Math.max(1,w)))));row.addView(art,new LinearLayout.LayoutParams(-1,height));copy.setPadding(0,dp(12),0,0);row.addView(copy,new LinearLayout.LayoutParams(-1,-2));}
-            else{row.setOrientation(LinearLayout.HORIZONTAL);copy.setPadding(0,0,dp(14),0);row.addView(copy,new LinearLayout.LayoutParams(0,-2,.54f));int aw=(int)(available*.46f);int height=mode==HomePresentation.TALL?Math.min(dp(260),(int)(aw*(h/(float)Math.max(1,w)))):aw;row.addView(art,new LinearLayout.LayoutParams(0,Math.max(dp(100),height),.46f));}
+            if(mode==HomePresentation.WIDE){row.setOrientation(LinearLayout.VERTICAL);int height=Math.max(dp(118),Math.min(dp(238),(int)(available*(h/(float)Math.max(1,w))*.92f)+dp(28)));row.addView(art,new LinearLayout.LayoutParams(-1,height));copy.setPadding(0,dp(12),0,0);row.addView(copy,new LinearLayout.LayoutParams(-1,-2));}
+            else{row.setOrientation(LinearLayout.HORIZONTAL);copy.setPadding(0,0,dp(14),0);row.addView(copy,new LinearLayout.LayoutParams(0,-2,.52f));int aw=(int)(available*.48f);int height=mode==HomePresentation.TALL?Math.min(dp(272),(int)(aw*(h/(float)Math.max(1,w))*.94f)+dp(22)):aw+dp(18);row.addView(art,new LinearLayout.LayoutParams(0,Math.max(dp(118),height),.48f));}
         };
         row.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->arrange.run());card.addView(row,new FrameLayout.LayoutParams(-1,-2));arrange.run();
-        setDiscoverBggArtwork(image,placeholder,d,arrange);card.setOnClickListener(v->openDetail(d));card.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return card;
+        setDiscoverBggArtwork(featured.source,featured.placeholder,d,()->{featured.sync();arrange.run();});card.setOnClickListener(v->openDetail(d));card.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return card;
     }
 
     private View discoverFlatArtwork(DealRecord d,int width,int height){
         return discoverBggCover(d,width,height,14);
     }
 
-    
+    private FeaturedBoxArtwork featuredBoxArtwork(DealRecord d){
+        FrameLayout root=new FrameLayout(this);root.setClipChildren(false);root.setClipToPadding(false);
+        FeaturedBoxView box=new FeaturedBoxView();root.addView(box,new FrameLayout.LayoutParams(-1,-1));
+        TextView placeholder=discoverTextWeight(coverPlaceholder(d),10,DISCOVER_MUTED,500);placeholder.setGravity(Gravity.CENTER);placeholder.setPadding(dp(8),dp(8),dp(8),dp(8));root.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
+        ImageView source=new ImageView(this);source.setAlpha(.001f);FrameLayout.LayoutParams sourceLp=new FrameLayout.LayoutParams(dp(1),dp(1));sourceLp.gravity=Gravity.TOP|Gravity.START;root.addView(source,sourceLp);
+        return new FeaturedBoxArtwork(root,box,source,placeholder);
+    }
+
+    private final class FeaturedBoxArtwork{
+        final FrameLayout root;final FeaturedBoxView box;final ImageView source;final TextView placeholder;
+        FeaturedBoxArtwork(FrameLayout root,FeaturedBoxView box,ImageView source,TextView placeholder){this.root=root;this.box=box;this.source=source;this.placeholder=placeholder;}
+        void sync(){Drawable drawable=source.getDrawable();if(drawable instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap);placeholder.setVisibility(View.GONE);}}}
+    }
+
+    private final class FeaturedBoxView extends View{
+        private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+        private final Paint fillPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint strokePaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Matrix coverMatrix=new Matrix();
+        private Bitmap cover;private int edgeColor=Color.rgb(58,50,76);
+
+        FeaturedBoxView(){super(MainActivity.this);setLayerType(View.LAYER_TYPE_SOFTWARE,null);setContentDescription("Scatola del gioco in prospettiva");}
+
+        void setCover(Bitmap bitmap){cover=bitmap;edgeColor=sampleEdge(bitmap);invalidate();}
+
+        @Override protected void onDraw(Canvas canvas){
+            super.onDraw(canvas);if(cover==null||cover.isRecycled()||getWidth()<=0||getHeight()<=0)return;
+            float vw=getWidth(),vh=getHeight(),pad=dp(7);float ratio=cover.getWidth()/(float)Math.max(1,cover.getHeight());
+            int mode=HomePresentation.coverMode(cover.getWidth(),cover.getHeight());float depthRatio=mode==HomePresentation.WIDE?.075f:mode==HomePresentation.TALL?.065f:.082f;
+            float maxW=Math.max(dp(48),vw-pad*2),maxH=Math.max(dp(54),vh-pad*2-dp(10));
+            float frontW=Math.min(maxW/(1f+depthRatio),maxH*ratio);float frontH=frontW/Math.max(.2f,ratio);
+            float depth=Math.max(dp(8),Math.min(dp(22),frontW*depthRatio)),topDepth=Math.max(dp(3),depth*.30f),tilt=Math.min(dp(7),frontH*.018f);
+            float objectW=frontW+depth,left=(vw-objectW)/2f,top=(vh-frontH)/2f-dp(3),right=left+frontW,bottom=top+frontH;
+            float outerRight=right+depth,outerTop=top+topDepth,outerBottom=bottom-topDepth;
+
+            // Broad ambient shadow plus tighter contact shadow keep the box grounded without a fake glow.
+            fillPaint.setShader(null);fillPaint.setColor(Color.argb(30,0,0,0));canvas.drawOval(left-dp(4),bottom-dp(2),outerRight+dp(7),bottom+dp(14),fillPaint);
+            fillPaint.setColor(Color.argb(50,0,0,0));canvas.drawOval(left+frontW*.08f,bottom+dp(1),outerRight-dp(1),bottom+dp(9),fillPaint);
+            fillPaint.setColor(Color.argb(76,0,0,0));canvas.drawOval(left+frontW*.18f,bottom+dp(2),right+depth*.58f,bottom+dp(6),fillPaint);
+
+            float[] frontPts={left,top+tilt,right,top,right,bottom,left,bottom-tilt};
+            float[] topPts={left,top+tilt,right,top,outerRight,outerTop,left+depth*.78f,top+tilt+topDepth};
+            float[] sidePts={right,top,outerRight,outerTop,outerRight,outerBottom,right,bottom};
+            Path topFace=quad(topPts),sideFace=quad(sidePts),frontFace=quad(frontPts);
+
+            int sideDark=shade(edgeColor,.44f),sideLight=shade(edgeColor,.66f),topDark=shade(edgeColor,.62f),topLight=shade(edgeColor,.88f);
+            fillPaint.setShader(new LinearGradient(left,top,outerRight,outerTop,topLight,topDark,Shader.TileMode.CLAMP));canvas.drawPath(topFace,fillPaint);
+            fillPaint.setShader(new LinearGradient(right,0,outerRight,0,sideLight,sideDark,Shader.TileMode.CLAMP));canvas.drawPath(sideFace,fillPaint);
+            fillPaint.setShader(null);
+
+            coverMatrix.reset();float[] src={0,0,cover.getWidth(),0,cover.getWidth(),cover.getHeight(),0,cover.getHeight()};coverMatrix.setPolyToPoly(src,0,frontPts,0,4);canvas.drawBitmap(cover,coverMatrix,bitmapPaint);
+
+            // A restrained light sweep across the front suggests coated cardboard without changing the artwork.
+            int save=canvas.save();canvas.clipPath(frontFace);fillPaint.setShader(new LinearGradient(left,top,right,bottom,new int[]{Color.argb(18,255,255,255),Color.TRANSPARENT,Color.argb(22,0,0,0)},new float[]{0f,.55f,1f},Shader.TileMode.CLAMP));canvas.drawRect(left,top,right,bottom,fillPaint);canvas.restoreToCount(save);fillPaint.setShader(null);
+
+            strokePaint.setStyle(Paint.Style.STROKE);strokePaint.setStrokeWidth(Math.max(1f,dp(.55f)));strokePaint.setColor(Color.argb(54,255,255,255));canvas.drawPath(topFace,strokePaint);strokePaint.setColor(Color.argb(42,255,255,255));canvas.drawLine(right,top,right,bottom,strokePaint);
+            strokePaint.setColor(Color.argb(55,0,0,0));canvas.drawLine(left,top+tilt,left,bottom-tilt,strokePaint);strokePaint.setStyle(Paint.Style.FILL);
+        }
+
+        private Path quad(float[] p){Path path=new Path();path.moveTo(p[0],p[1]);path.lineTo(p[2],p[3]);path.lineTo(p[4],p[5]);path.lineTo(p[6],p[7]);path.close();return path;}
+        private int sampleEdge(Bitmap bitmap){
+            if(bitmap==null||bitmap.getWidth()<2||bitmap.getHeight()<2)return Color.rgb(58,50,76);
+            long rr=0,gg=0,bb=0;int count=0,x=Math.max(0,Math.min(bitmap.getWidth()-1,(int)(bitmap.getWidth()*.90f)));
+            for(int i=1;i<=7;i++){int y=Math.min(bitmap.getHeight()-1,(int)(bitmap.getHeight()*(i/8f)));int c=bitmap.getPixel(x,y);rr+=Color.red(c);gg+=Color.green(c);bb+=Color.blue(c);count++;}
+            int base=Color.rgb((int)(rr/count),(int)(gg/count),(int)(bb/count));float[] hsv=new float[3];Color.colorToHSV(base,hsv);hsv[1]=Math.min(.72f,hsv[1]*.82f+.08f);hsv[2]=Math.max(.18f,Math.min(.56f,hsv[2]*.72f));return Color.HSVToColor(hsv);
+        }
+        private int shade(int color,float factor){return Color.rgb(Math.max(0,Math.min(255,(int)(Color.red(color)*factor))),Math.max(0,Math.min(255,(int)(Color.green(color)*factor))),Math.max(0,Math.min(255,(int)(Color.blue(color)*factor))));}
+    }
 
     private View discoverBoxArtwork(DealRecord d,int width,int height){
         FrameLayout box=new FrameLayout(this);box.setClipChildren(false);box.setClipToPadding(false);
