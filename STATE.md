@@ -2,7 +2,7 @@
 
 User explicitly authorizes publishing each Ludo Scout update immediately to Firebase App Tester after automated checks pass, including the necessary beta PR merge. Do not wait for another merge/distribution request. Confirm actual Firebase distribution success before claiming availability. Manual visual feedback follows installation.
 
-PR93 merged to beta at 3f8370154fe82be50df80dfb6536cbf06b70aec7; source and final PR-head Android CI passed. Signed beta build and Firebase delivery are underway.
+PR93 merged to beta at 3f8370154fe82be50df80dfb6536cbf06b70aec7; source and final PR-head Android CI passed. Signed beta build completed; Firebase App Distribution step succeeded in Android beta run 36741783795. Version 5.12.85-home-catalog-refinement is published to the configured testers. Manual visual validation remains pending.
 
 ## UI milestone 5.12.85 — 2026-09-30
 
