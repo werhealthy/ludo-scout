@@ -2,7 +2,7 @@
 
 ## Verified release
 
-5.12.90-featured-box-poc (1000107), distributed 2026-10-01 00:40 Europe/Rome (2026-09-30 22:40 UTC). PR99 merged to beta at 8039f8ed81e69c350413552f809fb8cb9177ff30. Head 53502a2b3eeae414f9a9ff6906a58545887150f1 passed Android PR run262 (36786299279). Signed beta run107 (36786535211) passed; Firebase confirmed successful new release upload and tester/group distribution.
+5.12.91-featured-box-layout-fix (1000108), distributed 2026-10-01 00:51 Europe/Rome (2026-09-30 22:51 UTC). PR100 merged to beta at b195e6c5f2ecb3065f44c05e5d663a5fb27ffe09. Head 6019d1f78f4a8dcc47385ffd8987b7d0786f5bd8 passed Android PR run263 (36787381685). Signed beta run108 (36787603862) passed; Firebase confirmed successful upload and tester/group distribution.
 
 ## Delivery preference
 
@@ -12,6 +12,7 @@ Automatically merge verified Ludo Scout updates to beta and publish to Firebase 
 
 - One Home gear opens Motore. Engine ellipsis opens existing settings/diagnostics.
 - Featured hero proof of concept uses the real BGG cover in an adaptive 2.5D box renderer: perspective-mapped front, separate top/side planes, cover-derived side tone, restrained front light, and layered contact/ambient shadows. Personalized Mi interessa / Non mi interessa behavior from v89 is preserved; no new dependency was added.
+- v90 device screenshot exposed a blank featured card. Root cause was the renderer wrapper being coupled to the hero's dynamic layout rebuild. v91 restores the known-good personalized hero layout and isolates the renderer inside the artwork layer; title, price, CTA and preference controls render independently of the 2.5D box.
 - Featured Scopri di più is visibly52dp tall with ripple and larger text.
 - Edition flags/names and distinct dependence labels use ordinary Italian, with explicit unknown states and no invented language evidence. Detail language has its own row to preserve BGG visibility.
 - Home covers, hero and BGG ranking crop to their frames. Shared section titles use FontAwesome.
@@ -22,7 +23,7 @@ Automatically merge verified Ludo Scout updates to beta and publish to Firebase 
 
 ## Validation
 
-PR99 Android validation passed all regressions and Java compilation. Signed beta run107 passed, uploaded 5.12.90-featured-box-poc (1000107) to Firebase, and Firebase reported distribution to testers/groups successful. No emulator/device visual validation was performed: the renderer's realism, shadow quality, and behavior across real wide/tall/square BGG covers must be judged on the user's phone before treating this visual direction as approved.
+PR100 Android validation passed all regressions and Java compilation. Signed beta run108 passed and Firebase uploaded 5.12.91-featured-box-layout-fix (1000108), added release notes, and distributed to testers/groups successfully. Device screenshot from v90 was used to identify the blank-card regression. v91 still requires user visual validation on device for both content visibility and the actual realism of the 2.5D box.
 
 ## Remaining work — do not claim fixed
 
@@ -35,4 +36,4 @@ User requested ordered, reviewable steps rather than one broad rewrite. See docs
 4. Ludo — minimal purple pet inspired by attached reference; large opening presence, collapses on scroll.
 5. Collection/shared interactions — bookshelf exploration, liking0–5 with preserved existing ratings, sale-price entry/backfill, bottom-slide modals and purposeful motion.
 
-Recommended next action: inspect the featured card on 5.12.90-featured-box-poc with several real BGG covers; decide whether the 2.5D renderer is visually credible before refining it or extending it elsewhere.
+Recommended next action: install 5.12.91-featured-box-layout-fix and verify that the featured card content is visible again; only then judge whether the 2.5D box itself is visually credible.
