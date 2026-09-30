@@ -1,5 +1,15 @@
 # Ludo Scout — AI handoff
 
+## 5.12.84 — Official dark Home (2026-09-30)
+- Implements the approved screenshot/CSS: navy radial background, white hierarchy, purple hero with real rating/name/description/cover/price/discount and white CTA; settings opens the existing sheet.
+- Uses all eight supplied category icons, sampled once and cached. DiscoverCategories maps every supplied BGG category; SQL filters whole category labels with OR semantics, retaining verified/visible eligibility. Famiglia does not override the existing Children's Game exclusion.
+- Offers/latest are bordered horizontal cards; BGG is a vertical top three from all unique games in the current trusted Home snapshot, ranked before limiting. Rank metadata explicitly refers to overall BGG rank.
+- Navigation is Home / Catalogo / Ludo / Libreria. All cards and section links retain existing destinations.
+- No database migration, matching/pricing/publication/queue/pacing changes or new dependencies.
+- Updated visual guards for the approved design. Added DiscoverCategoriesTest and executable production-generated SQLite fixtures for exact category membership, title collisions, hidden/review/missing identities, count and paging parity.
+- Pixel visual validation remains required: long titles, missing covers, 320–393dp width, increased font size, hero CTA/settings, category directory and section links.
+
+
 ## 5.12.78 — Deferred queue truth
 - The active-run deferred count and promotion path now use the same BGG identity and review/hold guards as Motore core remaining work.
 - Rows with manual review, BGG variant review, uncertain identity, price anomaly or expansion verification remain untouched and are not promoted automatically into the core Vinted window.
@@ -571,3 +581,4 @@ Il processo UI non deve invocare MarketStore.reconcileQueue né sweep/cleanup su
 ## 5.12.45 Activity snapshot recovery (2026-09-22)
 
 Invariante UI: renderEngineOverview ed engineCurrentRunHero non devono accedere direttamente a DealDatabase o MarketStore. Tutte le letture per Attività passano da EngineOverviewSnapshot caricato su uiDataIo con single-flight; il main thread mostra un placeholder e renderizza solo dati già pronti.
+

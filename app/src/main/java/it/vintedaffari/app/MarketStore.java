@@ -1645,7 +1645,7 @@ public final class MarketStore {
     }
     public int countReviewGames(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='' OR match_state<>'MATCHED')",null)){return c.moveToFirst()?c.getInt(0):0;}}
     public List<GameRecord> searchGamesAdvanced(String rawQuery,int limit,String scope,boolean activeOnly,Double minRating,Integer maxPrice,String sort){
-        String q=normalize(rawQuery);String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();
+        String q=normalize(DiscoverCategories.searchText(rawQuery));String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();where.append(DiscoverCategories.appendFilter(rawQuery,args));
         if("review".equals(scope))where.append(" AND (g.bgg_id IS NULL OR g.bgg_id='' OR g.match_state<>'MATCHED')");else if(!"all".equals(scope))where.append(" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'");
         if(activeOnly)where.append(" AND EXISTS(SELECT 1 FROM market_listings lx WHERE lx.game_id=g.id AND lx.lifecycle='ACTIVE')");
         if(minRating!=null){where.append(" AND g.rating>=?");args.add(String.valueOf(minRating));}
@@ -1665,7 +1665,7 @@ public final class MarketStore {
     }
 
     public int countVisibleGamesAdvanced(String rawQuery,String scope,boolean activeOnly,Double minRating,Integer maxPrice){
-        String q=normalize(rawQuery);String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();
+        String q=normalize(DiscoverCategories.searchText(rawQuery));String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();where.append(DiscoverCategories.appendFilter(rawQuery,args));
         if("review".equals(scope))where.append(" AND (g.bgg_id IS NULL OR g.bgg_id='' OR g.match_state<>'MATCHED')");else if(!"all".equals(scope))where.append(" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'");
         if(activeOnly)where.append(" AND EXISTS(SELECT 1 FROM market_listings lx WHERE lx.game_id=g.id AND lx.lifecycle='ACTIVE')");
         if(minRating!=null){where.append(" AND g.rating>=?");args.add(String.valueOf(minRating));}
@@ -3503,3 +3503,4 @@ public final class MarketStore {
     private static String safe(String s){return s==null?"":(s.length()>600?s.substring(0,600):s);}
     private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Long)v.put(k,(Long)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
+

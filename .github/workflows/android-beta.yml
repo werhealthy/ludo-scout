@@ -39,6 +39,9 @@ jobs:
           javac -d .regression-build app/src/main/java/it/vintedaffari/app/EnginePerformanceMetrics.java regression/EnginePerformanceMetricsRegression.java
           java -cp .regression-build EnginePerformanceMetricsRegression
 
+      - name: Run Home category SQLite fixtures
+        run: python3 regression/discover_category_sql_v51284.py
+
       - name: Validate Android SDK
         run: |
           test -n "$ANDROID_HOME" || (echo "ANDROID_HOME is not set" && exit 1)
@@ -234,3 +237,4 @@ jobs:
             --app "$FIREBASE_APP_ID" \
             --testers "$FIREBASE_TESTERS" \
             --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+

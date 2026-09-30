@@ -69,11 +69,15 @@ Use mixed module types so the page has rhythm:
 - optional bundle spotlight
 - recent timeline
 
-Discover implementation contract (5.12.75):
-- Use a warm cream surface and compact “Scopri” title for this screen only.
-- Build the category rail from labels present on visible, matched games in the local BGG catalog. Selecting a label opens the game database filtered by that label.
-- Give recent listings, BGG rating and price/value separate editorial rails; put the real publication label first in the recent rail and BGG rating first in the rating rail.
-- Use faux 3D only for the featured opportunity. Other rail artwork stays flat and uses the real BGG cover.
+Discover implementation contract (5.12.84, approved 2026-09-30 reference):
+- Navy-to-black radial background with white Helvetica-compatible typography; only Home uses this chrome.
+- Greeting and settings, purple featured offer, categories, best offers, BGG top three, latest listings in that order.
+- Hero uses the actual game name, BGG rating/description/cover and eligible listing price/discount, with a white “Scopri di più” action. Never copy the mismatched placeholder names/covers from the mockup.
+- Eight fixed categories: Strategia, Famiglia, Party, Fantasy, Carte, Sci-Fi, Mistero, Guerra. Supplied transparent artwork is decoded at a bounded sample size and reused. No category counts.
+- The shared DiscoverCategories mapping filters whole BGG category labels with OR semantics. Only verified, visible games are returned by Home category navigation; all existing eligibility rules remain in force, including the Children's Game exclusion.
+- Best offers/latest are horizontal rails with BGG cover, rating, real price and purple discount; latest additionally shows publication age. BGG is a vertical ranked list over all unique games in the current trusted Home snapshot, labelled with the overall BGG rank.
+- Bottom navigation is Home / Catalogo / Ludo / Libreria. “Vedi tutte” opens the existing relevant destination.
+- Device validation is required for long titles, missing covers, large fonts and narrow screens.
 
 Do not render every section as the same horizontal carousel.
 
@@ -138,3 +142,4 @@ Before merging UI changes:
 - Is the same card type being reused only because it already exists?
 - Can any metadata move behind progressive disclosure?
 - Is a corrective/manual action cluttering the main hierarchy?
+
