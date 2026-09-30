@@ -7,12 +7,11 @@ build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 system=(ROOT/"UX_SYSTEM_V1.md").read_text(encoding="utf-8")
 
 home=ui[ui.index("private void renderDiscover()"):ui.index("private void addBundleEmptyState",ui.index("private void renderDiscover()"))]
-header=ui[ui.index("private View discoverHeader"):ui.index("private View discoverActionButton",ui.index("private View discoverHeader"))]
+header=ui[ui.index("private View discoverHeader"):ui.index("private String discoverGreetingName",ui.index("private View discoverHeader"))]
 categories=home
 fresh=ui[ui.index("private View discoverFreshCard"):ui.index("private void addDiscoverTopRatedRail",ui.index("private View discoverFreshCard"))]
 top=ui[ui.index("private View discoverTopRatedCard"):ui.index("private void addDiscoverValueRail",ui.index("private View discoverTopRatedCard"))]
 opportunity=ui[ui.index("private View heroOpportunityCard"):ui.index("private View discoverFlatArtwork",ui.index("private View heroOpportunityCard"))]
-flat=ui[ui.index("private View discoverFlatArtwork"):ui.index("private void addDiscoverBundleSpotlight",ui.index("private View discoverFlatArtwork"))]
 section=ui[ui.index("private void sectionHeader"):ui.index("private void openCatalogPreset",ui.index("private void sectionHeader"))]
 market=ui[ui.index("private void renderCatalog()"):ui.index("private void loadMoreCatalog",ui.index("private void renderCatalog()"))]
 row=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
@@ -39,15 +38,14 @@ checks=[
     ("newest rail sorts by Vinted publication time",
      "publicationAgeMinutes(a)" in home and
      "publicationAgeMinutes(b)" in home),
-    ("top-rated rail makes BGG rating the primary signal",
-     "d.rating" in top and "d.voters" in top),
-    ("faux 3D box is reserved for the featured opportunity",
-     "discoverBoxArtwork" in opportunity and
-     "discoverBoxArtwork" not in flat and
-     "discoverFlatArtwork" in flat),
-    ("Discover keeps a short, prominent screen title",
-     '"Scopri"' in header and
-     "Scopri il tuo prossimo gioco da tavolo" not in header),
+    ("BGG rail exposes rank, votes and rating",
+     "d.rating" in top and "d.voters" in top and "d.rank" in top),
+    ("featured opportunity uses the real game cover and prominent deal signals",
+     "discoverFlatArtwork(d" in opportunity and
+     "name(d)" in opportunity and "total(d)" in opportunity and "saving(d)" in opportunity),
+    ("Discover greeting matches the approved Home reference",
+     '"Bentornato,"' in header and
+     "discoverGreetingName()" in header),
     ("section headers rely on typography instead of icon tiles",
      "TextView ic=text(icon" not in section and "text(title,21,TEXT" in section),
     ("Market has one search and two explicit utility controls",
