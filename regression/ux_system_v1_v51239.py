@@ -41,7 +41,7 @@ checks=[
      "d.rating" in top and "d.voters" in top and "d.rank" in top and
      '" BGG"' in top),
     ("featured opportunity uses canonical BGG content",
-     "discoverBggCover(d" in opportunity and
+     "setDiscoverBggArtwork(image,placeholder,d,arrange)" in opportunity and
      "discoverGameDescription(d)" in opportunity and
      "name(d)" in opportunity and "total(d)" in opportunity and "discoverDiscountBadge(d" in opportunity),
     ("Discover greeting matches the approved Home reference",
@@ -53,10 +53,8 @@ checks=[
      'marketToolbarButton(activeFilterCount()>0?"Filtri' in market and
      "marketToolbarButton(sortLabel()" in market and
      "addCatalogToggleChip(quick" not in market),
-    ("Market result is a list row rather than a dashboard card",
-     "setBackgroundColor(Color.TRANSPARENT)" in row and
-     "View divider=new View(this)" in row and
-     "decision=text(" not in row),
+    ("Catalog uses the shared product grammar in a two-column grid",
+     "appendCatalogCards(results,list" in market and "col<2" in market and "catalogProductCard(deals.get(index))" in market),
     ("Listing detail has one dominant Vinted provider action",
      'providerLinkCard(R.drawable.provider_vinted_logo,"Vinted"' in detail and
      'if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);' in detail and

@@ -1,3 +1,9 @@
+## UI milestone 5.12.85 — 2026-09-30
+
+Home cards/categories enlarged; tonal category outlines; hero adapts to loaded BGG cover aspect ratio, discount over artwork, compact CTA. Explicit edition/text-dependence labels preserve unknown data. Catalog uses two-column shared product cards and pagination. No database migration.
+
+Base: PR92 merged to beta at 9f9e38739b65c2a5fe1e6344977ec04db717263f. Android/Java checks pending PR CI; manual Android layout checks required (square/wide/tall covers, large font, narrow phone, pagination). Engine and remaining pages are outstanding: current engine counters overlap and count listings; do not sum them or label them unique games. Define exclusive phase membership before implementing reference.
+
 # Ludo Scout — Current UI work
 
 Updated 2026-09-30. GitHub `beta` remains the source of truth.

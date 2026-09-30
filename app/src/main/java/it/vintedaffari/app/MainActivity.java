@@ -162,14 +162,14 @@ private View makeCompanionFab(){
     private void cancelImageRequests(View view){if(view==null)return;if(view instanceof ImageView)view.setTag(new Object());if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)cancelImageRequests(group.getChildAt(i));}}
     private boolean isMarketTab(){return "catalog".equals(tab)||"database".equals(tab)||"bundles".equals(tab);}
     private void renderNav(){
-        boolean home="discover".equals(tab);nav.setBackgroundColor(home?Color.BLACK:SURFACE);nav.removeAllViews();
+        boolean home="discover".equals(tab)||"catalog".equals(tab);nav.setBackgroundColor(home?Color.BLACK:SURFACE);nav.removeAllViews();
         nav.addView(navItem(LudoIcons.HOUSE,"Home","discover"),navLp());
         nav.addView(navItem(LudoIcons.SEARCH,"Catalogo","catalog"),navLp());
         nav.addView(navItem(LudoIcons.STAR,"Ludo","companion"),navLp());
         nav.addView(navItem(LudoIcons.BOOK_OPEN,"Libreria","library"),navLp());
     }
     private View navItem(String glyph,String label,String value){
-        boolean on=value.equals(tab)||("catalog".equals(value)&&isMarketTab()),home="discover".equals(tab);
+        boolean on=value.equals(tab)||("catalog".equals(value)&&isMarketTab()),home="discover".equals(tab)||"catalog".equals(tab);
         int active=home?Color.WHITE:LIME,inactive=home?Color.WHITE:MUTED;
         LinearLayout x=new LinearLayout(this);x.setOrientation(LinearLayout.VERTICAL);x.setGravity(Gravity.CENTER);x.setPadding(dp(3),dp(5),dp(3),dp(3));
         FrameLayout pill=new FrameLayout(this);pill.setBackground(round(on?(home?DISCOVER_NAV_ACTIVE:SURFACE2):Color.TRANSPARENT,14,on&&home?1:0,Color.rgb(43,43,43)));
@@ -179,10 +179,10 @@ private View makeCompanionFab(){
     }
 
     private void addMarketHeader(String active){
-        LinearLayout head=new LinearLayout(this);head.setOrientation(LinearLayout.VERTICAL);head.setPadding(0,dp(8),dp(58),dp(10));head.addView(text("Mercato",32,TEXT,Typeface.BOLD));TextView sub=text("Annunci attivi, giochi incontrati e bundle.",13,MUTED,Typeface.NORMAL);sub.setPadding(0,dp(3),0,0);head.addView(sub);body.addView(head);
-        LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(SURFACE2,18,1,OUTLINE));addMarketTab(tabs,"Annunci","catalog",active);addMarketTab(tabs,"Giochi","database",active);addMarketTab(tabs,"Bundle","bundles",active);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,dp(50));tp.bottomMargin=dp(14);body.addView(tabs,tp);
+        LinearLayout head=new LinearLayout(this);head.setOrientation(LinearLayout.VERTICAL);head.setPadding(0,dp(8),dp(58),dp(10));head.addView(discoverTextWeight("Catalogo",32,DISCOVER_TEXT,700));TextView sub=text("Annunci attivi, giochi incontrati e bundle.",13,MUTED,Typeface.NORMAL);sub.setPadding(0,dp(3),0,0);head.addView(sub);body.addView(head);
+        LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(DISCOVER_SURFACE,18,1,DISCOVER_OUTLINE));addMarketTab(tabs,"Annunci","catalog",active);addMarketTab(tabs,"Bundle","bundles",active);addMarketTab(tabs,"Giochi","database",active);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,dp(50));tp.bottomMargin=dp(14);body.addView(tabs,tp);
     }
-    private void addMarketTab(LinearLayout row,String label,String target,String active){boolean on=target.equals(active);TextView item=text(label,14,on?BG:MUTED,Typeface.BOLD);item.setGravity(Gravity.CENTER);item.setBackground(round(on?LIME:Color.TRANSPARENT,14,0,0));item.setOnClickListener(v->openMarketTab(target));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(row.getChildCount()>0)lp.leftMargin=dp(4);row.addView(item,lp);}
+    private void addMarketTab(LinearLayout row,String label,String target,String active){boolean on=target.equals(active);TextView item=discoverTextWeight(label,14,on?DISCOVER_TEXT:DISCOVER_MUTED,500);item.setGravity(Gravity.CENTER);item.setBackground(round(on?Color.rgb(61,42,90):Color.TRANSPARENT,14,0,0));item.setOnClickListener(v->openMarketTab(target));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(row.getChildCount()>0)lp.leftMargin=dp(4);row.addView(item,lp);}
     private void openMarketTab(String target){if(TextUtils.isEmpty(target)||target.equals(tab))return;selectedGameId=0;databaseDetailReturnTab="";if(scroll!=null)tabScrollPositions.put(tab,scroll.getScrollY());tab=target;persistTransientUiSession();renderNav();scheduleRender(0);uiUpdates.postDelayed(()->{if(scroll!=null)scroll.scrollTo(0,0);},35);}
     private void navigate(String value){
         if("database".equals(value)&&"database".equals(tab)&&selectedGameId>0){closeDatabaseGame();return;}
@@ -290,7 +290,7 @@ private View makeCompanionFab(){
 
     // ---------- SCOPRI: editorial dashboard ----------
 private void applyDiscoverChrome(){
-        boolean home="discover".equals(tab);int barColor=home?DISCOVER_BG:BG;
+        boolean home="discover".equals(tab)||"catalog".equals(tab);int barColor=home?DISCOVER_BG:BG;
         getWindow().setStatusBarColor(barColor);getWindow().setNavigationBarColor(home?Color.BLACK:barColor);
         getWindow().getDecorView().setSystemUiVisibility(0);
         if(refreshHost!=null)refreshHost.setBackgroundColor(barColor);
@@ -481,13 +481,13 @@ private void applyDiscoverChrome(){
     private View discoverCategoryTile(String label,int index){
         int[] colors={0xff302d64,0xff361d27,0xff102c25,0xff302a18,0xff443d80,0xff14274a,0xff3b3415,0xff10313e};
         LinearLayout tile=new LinearLayout(this);tile.setOrientation(LinearLayout.VERTICAL);tile.setGravity(Gravity.CENTER);
-        tile.setBackground(round(colors[index],13,1,Color.argb(75,137,130,210)));
+        tile.setPadding(dp(8),dp(10),dp(8),dp(10));tile.setBackground(round(colors[index],13,1,new int[]{0xff7770c6,0xffa45e78,0xff43866c,0xff9c8844,0xff8e82d1,0xff517bb2,0xff9d9047,0xff468794}[index]));
         ImageView icon=new ImageView(this);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);icon.setImageBitmap(discoverCategoryIcon(index));
-        tile.addView(icon,new LinearLayout.LayoutParams(dp(38),dp(38)));
-        TextView labelView=discoverTextWeight(label,11,DISCOVER_TEXT,400);labelView.setGravity(Gravity.CENTER);labelView.setSingleLine(true);
+        tile.addView(icon,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        TextView labelView=discoverTextWeight(label,12,DISCOVER_TEXT,400);labelView.setGravity(Gravity.CENTER);labelView.setSingleLine(true);
         LinearLayout.LayoutParams textLp=new LinearLayout.LayoutParams(-1,-2);textLp.topMargin=dp(5);tile.addView(labelView,textLp);
         tile.setContentDescription(label);tile.setOnClickListener(v->openDiscoverCluster(index));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(76),dp(76));lp.rightMargin=dp(8);tile.setLayoutParams(lp);return tile;
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(90),dp(94));lp.rightMargin=dp(8);tile.setLayoutParams(lp);return tile;
     }
 
     private GameRecord discoverGame(DealRecord d){
@@ -516,17 +516,18 @@ private void applyDiscoverChrome(){
         return"Family";
     }
 
-    private void setDiscoverBggArtwork(ImageView image,TextView placeholder,DealRecord d){
+    private void setDiscoverBggArtwork(ImageView image,TextView placeholder,DealRecord d){setDiscoverBggArtwork(image,placeholder,d,null);}
+    private void setDiscoverBggArtwork(ImageView image,TextView placeholder,DealRecord d,Runnable loaded){
         image.setImageDrawable(null);image.setBackgroundColor(Color.TRANSPARENT);if(d==null)return;
         File local=TextUtils.isEmpty(d.bggId)?null:ArtworkStore.bggFile(this,d.bggId);
         if(local!=null&&local.exists()&&local.length()>1024){
-            Bitmap bitmap=decodeLocalBitmap(local,420,520);if(bitmap!=null){image.setImageBitmap(bitmap);if(placeholder!=null)placeholder.setVisibility(View.GONE);return;}
+            Bitmap bitmap=decodeLocalBitmap(local,420,520);if(bitmap!=null){image.setImageBitmap(bitmap);if(placeholder!=null)placeholder.setVisibility(View.GONE);if(loaded!=null)image.post(loaded);return;}
         }
         String url=d.bggImageUrl;GameRecord game=null;
         if(TextUtils.isEmpty(url)){game=discoverGame(d);if(game!=null)url=!TextUtils.isEmpty(game.imageUrl)?game.imageUrl:game.thumbnailUrl;}
         if(TextUtils.isEmpty(url))return;
         if(!TextUtils.isEmpty(d.bggId))ArtworkStore.downloadBgg(this,d.bggId,url);
-        final TextView ph=placeholder;loadFirstRemote(image,Collections.singletonList(url),()->{if(ph!=null)ph.setVisibility(View.GONE);},null);
+        final TextView ph=placeholder;loadFirstRemote(image,Collections.singletonList(url),()->{if(ph!=null)ph.setVisibility(View.GONE);if(loaded!=null)image.post(loaded);},null);
     }
 
     private View discoverBggCover(DealRecord d,int width,int height,float radius){return discoverBggCover(d,width,height,radius,false);}
@@ -565,28 +566,28 @@ private void applyDiscoverChrome(){
     private View discoverFreshCard(DealRecord d){return discoverProductCard(d,true);}
     private View discoverValueCard(DealRecord d){return discoverProductCard(d,false);}
 
+    private TextView discoverLanguageIndicator(DealRecord d){
+        TextView label=discoverTextWeight(HomePresentation.languageLabel(d.languageCode),10,DISCOVER_MUTED,400);
+        label.setPadding(0,dp(5),0,dp(5));label.setContentDescription("Lingua dell’edizione e dipendenza dal testo: "+HomePresentation.languageLabel(d.languageCode));
+        label.setOnClickListener(v->showLanguageHelp());return label;
+    }
+
     private View discoverProductCard(DealRecord d,boolean fresh){
-        int width=dp(132);
-        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(8),dp(8),dp(8),dp(8));
-        card.setBackground(round(fresh?Color.argb(215,18,22,40):Color.argb(130,27,33,59),9,1,fresh?Color.rgb(13,15,24):DISCOVER_OUTLINE));
-        if(fresh){
-            LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);
-            TextView title=discoverTextWeight(name(d),15,DISCOVER_TEXT,700);title.setSingleLine(true);title.setEllipsize(TextUtils.TruncateAt.END);top.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-            TextView age=discoverTextWeight(publicationDisplay(d),8,DISCOVER_MUTED,400);age.setMaxWidth(dp(48));age.setSingleLine(true);age.setEllipsize(TextUtils.TruncateAt.END);top.addView(age);
-            LinearLayout.LayoutParams topLp=new LinearLayout.LayoutParams(-1,-2);topLp.bottomMargin=dp(8);card.addView(top,topLp);
-        }
-        card.addView(discoverBggCover(d,-1,dp(94),10),new LinearLayout.LayoutParams(-1,dp(94)));
-        if(!fresh){TextView title=discoverTextWeight(name(d),15,DISCOVER_TEXT,700);title.setSingleLine(true);title.setEllipsize(TextUtils.TruncateAt.END);title.setPadding(0,dp(6),0,0);card.addView(title);}
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));
+        card.setBackground(round(DISCOVER_SURFACE,14,1,DISCOVER_OUTLINE));
+        View cover=discoverBggCover(d,-1,dp(142),10,true);card.addView(cover,new LinearLayout.LayoutParams(-1,dp(142)));
+        card.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{int size=r-l-card.getPaddingLeft()-card.getPaddingRight();if(size>0&&cover.getLayoutParams().height!=size){cover.getLayoutParams().height=size;cover.requestLayout();}});
+        TextView title=discoverTextWeight(name(d),17,DISCOVER_TEXT,700);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setPadding(0,dp(9),0,dp(4));card.addView(title);
+        if(fresh)card.addView(discoverTextWeight(publicationDisplay(d),10,DISCOVER_MUTED,400));
         LinearLayout rating=new LinearLayout(this);rating.setGravity(Gravity.CENTER_VERTICAL);
-        rating.addView(appIcon(LudoIcons.STAR,12,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(17),dp(19)));
-        rating.addView(discoverTextWeight(d.rating==null?"—":String.format(Locale.ITALY,"%.1f",d.rating),13,DISCOVER_TEXT,500));
-        LinearLayout.LayoutParams ratingLp=new LinearLayout.LayoutParams(-1,-2);ratingLp.topMargin=dp(5);card.addView(rating,ratingLp);
+        rating.addView(appIcon(LudoIcons.STAR,14,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(21),dp(24)));
+        rating.addView(discoverTextWeight(d.rating==null?"—":String.format(Locale.ITALY,"%.1f",d.rating),16,DISCOVER_TEXT,500));
+        LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(7);card.addView(rating,rp);card.addView(discoverLanguageIndicator(d));
         LinearLayout bottom=new LinearLayout(this);bottom.setGravity(Gravity.CENTER_VERTICAL);
-        TextView price=discoverTextWeight(total(d),20,DISCOVER_TEXT,700);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(13,20,1,android.util.TypedValue.COMPLEX_UNIT_SP);bottom.addView(price,new LinearLayout.LayoutParams(0,dp(30),1));
-        TextView badge=discoverDiscountBadge(d,10);if(badge!=null)bottom.addView(badge);
-        LinearLayout.LayoutParams bottomLp=new LinearLayout.LayoutParams(-1,-2);bottomLp.topMargin=dp(3);card.addView(bottom,bottomLp);
+        TextView price=discoverTextWeight(total(d),24,DISCOVER_TEXT,700);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(14,24,1,android.util.TypedValue.COMPLEX_UNIT_SP);bottom.addView(price,new LinearLayout.LayoutParams(0,dp(34),1));
+        TextView badge=discoverDiscountBadge(d,11);if(badge!=null)bottom.addView(badge);card.addView(bottom);
         card.setContentDescription(name(d)+", "+total(d));card.setOnClickListener(v->openDetail(d));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(width,-2);lp.rightMargin=dp(10);card.setLayoutParams(lp);return card;
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(166),-2);lp.rightMargin=dp(12);card.setLayoutParams(lp);return card;
     }
 
     private void addDiscoverTopRatedRail(List<DealRecord> deals){
@@ -620,20 +621,28 @@ private void applyDiscoverChrome(){
 
     private View heroOpportunityCard(DealRecord d){
         FrameLayout card=new FrameLayout(this);card.setClipToOutline(true);
-        GradientDrawable background=new GradientDrawable();background.setColors(new int[]{Color.rgb(10,6,40),Color.rgb(60,29,73)});background.setGradientType(GradientDrawable.RADIAL_GRADIENT);background.setGradientCenter(.5f,.5f);background.setGradientRadius(dp(180));background.setCornerRadius(dp(14));background.setStroke(dp(1),Color.rgb(106,48,131));card.setBackground(background);
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(17),dp(14),dp(17),dp(14));
-        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(0,0,dp(8),0);
-        LinearLayout rating=new LinearLayout(this);rating.setGravity(Gravity.CENTER_VERTICAL);rating.addView(appIcon(LudoIcons.STAR,18,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(24),dp(24)));rating.addView(discoverTextWeight(d.rating==null?"—":String.format(Locale.ITALY,"%.1f",d.rating),18,DISCOVER_TEXT,700));copy.addView(rating);
-        TextView title=discoverTextWeight(name(d),31,DISCOVER_TEXT,900);title.setLetterSpacing(-.025f);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setAutoSizeTextTypeUniformWithConfiguration(23,31,1,android.util.TypedValue.COMPLEX_UNIT_SP);
-        LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,dp(67));tp.topMargin=dp(4);copy.addView(title,tp);
-        TextView description=discoverTextWeight(discoverGameDescription(d),11,DISCOVER_TEXT,400);description.setMaxLines(3);description.setEllipsize(TextUtils.TruncateAt.END);copy.addView(description,new LinearLayout.LayoutParams(-1,-2));
-        TextView price=discoverTextWeight(total(d),26,DISCOVER_TEXT,700);price.setPadding(0,dp(12),0,dp(8));copy.addView(price);
-        LinearLayout action=new LinearLayout(this);action.setGravity(Gravity.CENTER);action.setPadding(dp(9),0,dp(9),0);action.setBackground(round(Color.WHITE,999,0,0));
-        TextView label=discoverTextWeight("SCOPRI DI PIÙ",10,Color.BLACK,500);action.addView(label);TextView arrow=appIcon(LudoIcons.CHEVRON_RIGHT,12,Color.BLACK);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(dp(18),dp(22));ap.leftMargin=dp(5);action.addView(arrow,ap);action.setContentDescription("Scopri di più: "+name(d));action.setOnClickListener(v->openDetail(d));copy.addView(action,new LinearLayout.LayoutParams(-1,dp(48)));
-        row.addView(copy,new LinearLayout.LayoutParams(0,-2,.52f));
-        row.addView(discoverBggCover(d,0,dp(186),16,true),new LinearLayout.LayoutParams(0,dp(186),.48f));card.addView(row,new FrameLayout.LayoutParams(-1,-2));
-        TextView badge=discoverDiscountBadge(d,16);if(badge!=null){FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-2,dp(33),Gravity.TOP|Gravity.RIGHT);bp.topMargin=dp(7);bp.rightMargin=dp(11);card.addView(badge,bp);}
-        card.setOnClickListener(v->openDetail(d));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);card.setLayoutParams(lp);return card;
+        GradientDrawable background=new GradientDrawable();background.setColors(new int[]{Color.rgb(10,6,40),Color.rgb(60,29,73)});background.setGradientType(GradientDrawable.RADIAL_GRADIENT);background.setGradientCenter(.5f,.5f);background.setGradientRadius(dp(240));background.setCornerRadius(dp(16));background.setStroke(dp(1),Color.rgb(106,48,131));card.setBackground(background);
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);row.setPadding(dp(16),dp(16),dp(16),dp(12));
+        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout rating=new LinearLayout(this);rating.setGravity(Gravity.CENTER_VERTICAL);rating.addView(appIcon(LudoIcons.STAR,16,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(23),dp(24)));rating.addView(discoverTextWeight(d.rating==null?"—":String.format(Locale.ITALY,"%.1f",d.rating),17,DISCOVER_TEXT,700));copy.addView(rating);
+        TextView title=discoverTextWeight(name(d),27,DISCOVER_TEXT,700);title.setLetterSpacing(-.025f);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,-2);tp.topMargin=dp(5);tp.bottomMargin=dp(6);copy.addView(title,tp);
+        TextView description=discoverTextWeight(discoverGameDescription(d),12,DISCOVER_MUTED,400);description.setMaxLines(3);description.setEllipsize(TextUtils.TruncateAt.END);copy.addView(description);
+        copy.addView(discoverLanguageIndicator(d));TextView price=discoverTextWeight(total(d),27,DISCOVER_TEXT,700);price.setPadding(0,dp(4),0,0);copy.addView(price);
+        FrameLayout touch=new FrameLayout(this);TextView action=discoverTextWeight("Scopri di più →",12,Color.BLACK,500);action.setGravity(Gravity.CENTER);action.setPadding(dp(13),0,dp(13),0);action.setBackground(round(Color.WHITE,999,0,0));touch.addView(action,new FrameLayout.LayoutParams(-2,dp(32),Gravity.START|Gravity.CENTER_VERTICAL));touch.setContentDescription("Scopri di più: "+name(d));touch.setOnClickListener(v->openDetail(d));copy.addView(touch,new LinearLayout.LayoutParams(-1,dp(48)));
+        FrameLayout art=new FrameLayout(this);art.setBackground(round(DISCOVER_SURFACE,12,0,0));art.setClipToOutline(true);
+        TextView placeholder=discoverTextWeight(coverPlaceholder(d),11,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
+        ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);art.addView(image,new FrameLayout.LayoutParams(-1,-1));
+        TextView badge=discoverDiscountBadge(d,14);if(badge!=null){FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);bp.setMargins(dp(8),dp(8),dp(8),0);art.addView(badge,bp);}
+        final int[] previous={-1,-1};Runnable arrange=()->{
+            Drawable cover=image.getDrawable();int w=cover==null?1:cover.getIntrinsicWidth(),h=cover==null?1:cover.getIntrinsicHeight();int mode=HomePresentation.coverMode(w,h);
+            int available=row.getWidth()-row.getPaddingLeft()-row.getPaddingRight();if(available<=0)available=getResources().getDisplayMetrics().widthPixels-dp(72);
+            if(previous[0]==mode&&previous[1]==available)return;previous[0]=mode;previous[1]=available;row.removeAllViews();
+            if(mode==HomePresentation.WIDE){row.setOrientation(LinearLayout.VERTICAL);int height=Math.max(dp(100),Math.min(dp(230),(int)(available*(h/(float)Math.max(1,w)))));row.addView(art,new LinearLayout.LayoutParams(-1,height));copy.setPadding(0,dp(12),0,0);row.addView(copy,new LinearLayout.LayoutParams(-1,-2));}
+            else{row.setOrientation(LinearLayout.HORIZONTAL);copy.setPadding(0,0,dp(14),0);row.addView(copy,new LinearLayout.LayoutParams(0,-2,.54f));int aw=(int)(available*.46f);int height=mode==HomePresentation.TALL?Math.min(dp(260),(int)(aw*(h/(float)Math.max(1,w)))):aw;row.addView(art,new LinearLayout.LayoutParams(0,Math.max(dp(100),height),.46f));}
+        };
+        row.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->arrange.run());card.addView(row,new FrameLayout.LayoutParams(-1,-2));arrange.run();
+        setDiscoverBggArtwork(image,placeholder,d,arrange);card.setOnClickListener(v->openDetail(d));card.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return card;
     }
 
     private View discoverFlatArtwork(DealRecord d,int width,int height){
@@ -738,7 +747,7 @@ private void sectionHeader(String icon,String title,String sub,String action,Str
     // ---------- CATALOGO: utility-first ----------
 private void renderDatabase(){
         addMarketHeader("database");
-        LinearLayout searchBox=new LinearLayout(this);searchBox.setGravity(Gravity.CENTER_VERTICAL);searchBox.setPadding(dp(14),0,dp(8),0);searchBox.setBackground(round(SURFACE2,16,0,0));TextView si=appIcon(LudoIcons.SEARCH,15,MUTED);searchBox.addView(si,new LinearLayout.LayoutParams(dp(34),dp(34)));EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Cerca titolo, tag, meccanica…");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setTextSize(16);search.setText(databaseQuery);search.setSelection(search.length());search.setBackgroundColor(Color.TRANSPARENT);search.setPadding(dp(6),0,dp(4),0);searchBox.addView(search,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,15,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(databaseQuery.isEmpty()?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{databaseQuery="";databaseVisible=24;render();});searchBox.addView(clear,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,dp(54));sp.topMargin=dp(8);sp.bottomMargin=dp(12);body.addView(searchBox,sp);
+        LinearLayout searchBox=new LinearLayout(this);searchBox.setGravity(Gravity.CENTER_VERTICAL);searchBox.setPadding(dp(14),0,dp(8),0);searchBox.setBackground(round(DISCOVER_SURFACE,999,1,DISCOVER_OUTLINE));TextView si=appIcon(LudoIcons.SEARCH,15,MUTED);searchBox.addView(si,new LinearLayout.LayoutParams(dp(34),dp(34)));EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Cerca titolo, tag, meccanica…");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setTextSize(16);search.setText(databaseQuery);search.setSelection(search.length());search.setBackgroundColor(Color.TRANSPARENT);search.setPadding(dp(6),0,dp(4),0);searchBox.addView(search,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,15,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(databaseQuery.isEmpty()?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{databaseQuery="";databaseVisible=24;render();});searchBox.addView(clear,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,dp(54));sp.topMargin=dp(8);sp.bottomMargin=dp(12);body.addView(searchBox,sp);
 
         LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER_VERTICAL);TextView advanced=marketToolbarButton(databaseAdvancedFilterCount()>0?"Filtri · "+databaseAdvancedFilterCount():"Filtri",LudoIcons.SLIDERS);advanced.setOnClickListener(v->showDatabaseFilterSheet());controls.addView(advanced,new LinearLayout.LayoutParams(0,dp(46),1));TextView sortControl=marketToolbarButton(databaseSortLabel(),LudoIcons.SORT);sortControl.setOnClickListener(v->showDatabaseSortMenu());LinearLayout.LayoutParams slp=new LinearLayout.LayoutParams(0,dp(46),1);slp.leftMargin=dp(8);controls.addView(sortControl,slp);body.addView(controls);
 
@@ -877,12 +886,15 @@ private void renderDatabase(){
 
     private final class PriceHistoryView extends View{private final List<MarketStore.PricePoint> points;private final Paint line=new Paint(Paint.ANTI_ALIAS_FLAG),grid=new Paint(Paint.ANTI_ALIAS_FLAG),label=new Paint(Paint.ANTI_ALIAS_FLAG);PriceHistoryView(Context c,List<MarketStore.PricePoint> p){super(c);points=p;line.setColor(CYAN);line.setStrokeWidth(dp(3));line.setStyle(Paint.Style.STROKE);grid.setColor(OUTLINE);grid.setStrokeWidth(dp(1));label.setColor(MUTED);label.setTextSize(dp(11));setPadding(dp(12),dp(14),dp(12),dp(18));}protected void onDraw(Canvas c){super.onDraw(c);if(points==null||points.size()<2)return;int l=getPaddingLeft(),r=getWidth()-getPaddingRight(),t=getPaddingTop(),b=getHeight()-getPaddingBottom();int min=Integer.MAX_VALUE,max=Integer.MIN_VALUE;for(MarketStore.PricePoint p:points){min=Math.min(min,p.priceCents);max=Math.max(max,p.priceCents);}if(max==min){max+=100;min=Math.max(0,min-100);}for(int i=0;i<=3;i++){float y=t+(b-t)*i/3f;c.drawLine(l,y,r,y,grid);}Path path=new Path();for(int i=0;i<points.size();i++){float x=l+(r-l)*(i/(float)(points.size()-1));float y=b-(points.get(i).priceCents-min)/(float)(max-min)*(b-t);if(i==0)path.moveTo(x,y);else path.lineTo(x,y);}c.drawPath(path,line);c.drawText(money(max),l,t+dp(11),label);c.drawText(money(min),l,b,label);}}
 
+private int catalogCategory=-1;
 private void renderCatalog(){
         addMarketHeader("catalog");
-        LinearLayout searchBox=new LinearLayout(this);searchBox.setGravity(Gravity.CENTER_VERTICAL);searchBox.setPadding(dp(14),0,dp(8),0);searchBox.setBackground(round(SURFACE2,16,0,0));TextView si=appIcon(LudoIcons.SEARCH,15,MUTED);searchBox.addView(si,new LinearLayout.LayoutParams(dp(34),dp(34)));EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Cerca un gioco");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setText(query);search.setTextSize(16);search.setBackgroundColor(Color.TRANSPARENT);search.setPadding(dp(6),0,dp(4),0);search.setOnEditorActionListener((v,a,e)->{query=v.getText().toString().trim();catalogVisible=24;render();return true;});searchBox.addView(search,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,15,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{query="";render();});searchBox.addView(clear,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout.LayoutParams slp=new LinearLayout.LayoutParams(-1,dp(54));slp.bottomMargin=dp(12);body.addView(searchBox,slp);
+        LinearLayout searchBox=new LinearLayout(this);searchBox.setGravity(Gravity.CENTER_VERTICAL);searchBox.setPadding(dp(14),0,dp(8),0);searchBox.setBackground(round(DISCOVER_SURFACE,999,1,DISCOVER_OUTLINE));TextView si=appIcon(LudoIcons.SEARCH,15,MUTED);searchBox.addView(si,new LinearLayout.LayoutParams(dp(34),dp(34)));EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Cerca un gioco");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setText(query);search.setTextSize(16);search.setBackgroundColor(Color.TRANSPARENT);search.setPadding(dp(6),0,dp(4),0);search.setOnEditorActionListener((v,a,e)->{query=v.getText().toString().trim();catalogVisible=24;render();return true;});searchBox.addView(search,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,15,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{query="";render();});searchBox.addView(clear,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout.LayoutParams slp=new LinearLayout.LayoutParams(-1,dp(54));slp.bottomMargin=dp(12);body.addView(searchBox,slp);
 
         LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER_VERTICAL);TextView filter=marketToolbarButton(activeFilterCount()>0?"Filtri · "+activeFilterCount():"Filtri",LudoIcons.SLIDERS);filter.setOnClickListener(v->showFilterSheet());controls.addView(filter,new LinearLayout.LayoutParams(0,dp(46),1));TextView sortControl=marketToolbarButton(sortLabel(),LudoIcons.SORT);sortControl.setOnClickListener(v->showSortMenu(sortControl));LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(0,dp(46),1);sortLp.leftMargin=dp(8);controls.addView(sortControl,sortLp);body.addView(controls);
 
+        HorizontalScrollView categories=new HorizontalScrollView(this);categories.setHorizontalScrollBarEnabled(false);LinearLayout tiles=new LinearLayout(this);String[] labels=DiscoverCategories.labels();
+        for(int i=0;i<labels.length;i++){final int index=i;View tile=discoverCategoryTile(labels[i],i);tile.setSelected(catalogCategory==i);tile.setAlpha(catalogCategory<0||catalogCategory==i?1f:.6f);tile.setOnClickListener(v->{catalogCategory=catalogCategory==index?-1:index;catalogVisible=24;render();});tiles.addView(tile);}categories.addView(tiles);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.topMargin=dp(16);cp.bottomMargin=dp(6);body.addView(categories,cp);
         int blockedCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();if(blockedCount>0){TextView recovery=text(blockedCount+" annunci da completare · Apri Motore",12,CYAN,Typeface.BOLD);recovery.setGravity(Gravity.CENTER_VERTICAL);recovery.setMinHeight(dp(40));recovery.setOnClickListener(v->{engineSection="review";navigate("activity");});body.addView(recovery);}
 
         LinearLayout selectedRow=new LinearLayout(this);selectedRow.setGravity(Gravity.CENTER_VERTICAL);if(catalogBatchSignatures!=null&&!catalogBatchSignatures.isEmpty()){addFilterChip(selectedRow,catalogBatchLabel,()->{catalogBatchSignatures=null;catalogBatchLabel="";});}if(!"all".equals(catalogPreset))addFilterChip(selectedRow,catalogPresetLabel(),()->{catalogPreset="all";urgentSnapshot=null;});if(catalogMinRatingFilter!=null)addFilterChip(selectedRow,"BGG "+catalogMinRatingFilter.intValue()+"+",()->catalogMinRatingFilter=null);if(catalogMinDiscountFilter!=null)addFilterChip(selectedRow,"−"+catalogMinDiscountFilter+"%+",()->catalogMinDiscountFilter=null);if(!"all".equals(languageFilter))addFilterChip(selectedRow,languageShort(languageFilter),()->languageFilter="all");if(maxPriceFilter!=null)addFilterChip(selectedRow,"≤ "+money(maxPriceFilter),()->maxPriceFilter=null);if(filterBundle)addFilterChip(selectedRow,"Bundle",()->filterBundle=false);if(filterShipping)addFilterChip(selectedRow,"Spedizione ≤ 3 €",()->filterShipping=false);if(filterVerify)addFilterChip(selectedRow,"Da verificare",()->filterVerify=false);if(!"all".equals(linkFilter))addFilterChip(selectedRow,"Dati Vinted",()->linkFilter="all");if(!"all".equals(typeFilter))addFilterChip(selectedRow,"base".equals(typeFilter)?"Base":"Espansione",()->typeFilter="all");if(selectedRow.getChildCount()>0){HorizontalScrollView activeFilters=new HorizontalScrollView(this);activeFilters.setHorizontalScrollBarEnabled(false);activeFilters.addView(selectedRow);LinearLayout.LayoutParams afp=new LinearLayout.LayoutParams(-1,dp(48));afp.topMargin=dp(8);body.addView(activeFilters,afp);}
@@ -892,15 +904,28 @@ private void renderCatalog(){
         List<DealRecord> list=db.getDeals("trusted_any_price",800);
         final int catalogEligible=list.size();
         final int catalogStoredAll=db.countDeals(null);
-        applyCatalogPreset(list);applyCatalogFilter(list);if(catalogBatchSignatures!=null&&!catalogBatchSignatures.isEmpty())list.removeIf(d->d==null||!catalogBatchSignatures.contains(d.signature));if(!query.isEmpty()){String q=query.toLowerCase(Locale.ROOT);list.removeIf(d->!(name(d).toLowerCase(Locale.ROOT).contains(q)||(d.brand!=null&&d.brand.toLowerCase(Locale.ROOT).contains(q))));}sortDeals(list);
+        applyCatalogPreset(list);applyCatalogFilter(list);if(catalogCategory>=0)list.removeIf(d->!DiscoverCategories.matches(catalogCategory,d.bggCategories));if(catalogBatchSignatures!=null&&!catalogBatchSignatures.isEmpty())list.removeIf(d->d==null||!catalogBatchSignatures.contains(d.signature));if(!query.isEmpty()){String q=query.toLowerCase(Locale.ROOT);list.removeIf(d->!(name(d).toLowerCase(Locale.ROOT).contains(q)||(d.brand!=null&&d.brand.toLowerCase(Locale.ROOT).contains(q))));}sortDeals(list);
         getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("catalogStoredAll",catalogStoredAll).putInt("catalogEligible",catalogEligible).putInt("catalogVisible",list.size()).putString("catalogPreset",catalogPreset).apply();
         LinearLayout titleRow=new LinearLayout(this);titleRow.setGravity(Gravity.CENTER_VERTICAL);titleRow.setPadding(0,dp(18),0,dp(10));titleRow.addView(text("Annunci",20,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));TextView count=text(list.size()+" di "+catalogEligible+" pronti",12,MUTED,Typeface.NORMAL);count.setGravity(Gravity.END);titleRow.addView(count);body.addView(titleRow);
-        if(list.isEmpty()){String detail=catalogEligible>0?catalogEligible+" annunci pronti nel Catalogo; questa ricerca o questi filtri non ne trovano nessuno.":"Nessun annuncio è ancora pronto per il Catalogo.";body.addView(emptyState("Nessun annuncio in questa vista",detail,R.drawable.ludo_refresh));TextView reset=secondaryTextAction("Azzera filtri");reset.setOnClickListener(v->{catalogPreset=filterMode=languageFilter=linkFilter=typeFilter="all";maxPriceFilter=null;catalogMinRatingFilter=null;catalogMinDiscountFilter=null;filterShipping=filterBundle=filterVerify=false;query="";urgentSnapshot=null;render();});body.addView(reset);return;}
-        catalogResultSnapshot=new ArrayList<>(list);LinearLayout results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);catalogResultsHost=results;body.addView(results,new LinearLayout.LayoutParams(-1,-2));for(int i=0;i<Math.min(catalogVisible,list.size());i++)results.addView(catalogRowV51(list.get(i)));if(list.size()>catalogVisible)addLoadMoreHint(results,"Scorri per caricare altri "+(list.size()-catalogVisible)+" annunci…");
+        if(list.isEmpty()){String detail=catalogEligible>0?catalogEligible+" annunci pronti nel Catalogo; questa ricerca o questi filtri non ne trovano nessuno.":"Nessun annuncio è ancora pronto per il Catalogo.";body.addView(emptyState("Nessun annuncio in questa vista",detail,R.drawable.ludo_refresh));TextView reset=secondaryTextAction("Azzera filtri");reset.setOnClickListener(v->{catalogPreset=filterMode=languageFilter=linkFilter=typeFilter="all";maxPriceFilter=null;catalogMinRatingFilter=null;catalogMinDiscountFilter=null;filterShipping=filterBundle=filterVerify=false;catalogCategory=-1;query="";urgentSnapshot=null;render();});body.addView(reset);return;}
+        catalogResultSnapshot=new ArrayList<>(list);LinearLayout results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);catalogResultsHost=results;body.addView(results,new LinearLayout.LayoutParams(-1,-2));appendCatalogCards(results,list,0,Math.min(catalogVisible,list.size()));if(list.size()>catalogVisible)addLoadMoreHint(results,"Scorri per caricare altri "+(list.size()-catalogVisible)+" annunci…");
+    }
+    private View catalogProductCard(DealRecord d){
+        LinearLayout card=(LinearLayout)discoverProductCard(d,true);
+        LinearLayout tools=new LinearLayout(this);tools.setGravity(Gravity.CENTER_VERTICAL);
+        String signal=vintedDataIncomplete(d)?"Dati da completare":hasLiveBundle(d)?"Bundle":DealEvaluator.evaluate(d).label;
+        TextView status=discoverTextWeight(signal,10,vintedDataIncomplete(d)?ORANGE:DISCOVER_MUTED,400);status.setMaxLines(2);tools.addView(status,new LinearLayout.LayoutParams(0,-2,1));
+        TextView more=discoverTextWeight("⋯",22,DISCOVER_MUTED,500);more.setGravity(Gravity.CENTER);more.setContentDescription("Azioni annuncio");more.setOnClickListener(v->showListingActions(d));tools.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));card.addView(tools);return card;
+    }
+    private void appendCatalogCards(LinearLayout host,List<DealRecord> deals,int start,int end){
+        for(int i=start;i<end;i+=2){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);
+            for(int col=0;col<2;col++){int index=i+col;View card=index<end?catalogProductCard(deals.get(index)):new Space(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(col==1)lp.leftMargin=dp(12);row.addView(card,lp);}
+            LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.bottomMargin=dp(14);host.addView(row,rp);
+        }
     }
     private void loadMoreCatalog(){
         if(catalogResultsHost==null||catalogLoadingMore||catalogResultSnapshot==null||catalogVisible>=catalogResultSnapshot.size())return;catalogLoadingMore=true;int old=catalogVisible,next=Math.min(catalogResultSnapshot.size(),old+24);View loader=loadingMoreView("Carico altri "+(next-old)+" annunci…");loader.setTag("load-more-footer");removeLoadMoreHint(catalogResultsHost);catalogResultsHost.addView(loader);
-        uiUpdates.postDelayed(()->{try{if(catalogResultsHost==null||loader.getParent()!=catalogResultsHost)return;catalogResultsHost.removeView(loader);for(int i=old;i<next;i++)catalogResultsHost.addView(catalogRowV51(catalogResultSnapshot.get(i)));catalogVisible=next;if(next<catalogResultSnapshot.size())addLoadMoreHint(catalogResultsHost,"Scorri per caricare altri "+(catalogResultSnapshot.size()-next)+" annunci…");}finally{catalogLoadingMore=false;}},80);
+        uiUpdates.postDelayed(()->{try{if(catalogResultsHost==null||loader.getParent()!=catalogResultsHost)return;catalogResultsHost.removeView(loader);appendCatalogCards(catalogResultsHost,catalogResultSnapshot,old,next);catalogVisible=next;if(next<catalogResultSnapshot.size())addLoadMoreHint(catalogResultsHost,"Scorri per caricare altri "+(catalogResultSnapshot.size()-next)+" annunci…");}finally{catalogLoadingMore=false;}},80);
     }
 
     private void addCatalogToggleChip(LinearLayout row,String label,boolean on,Runnable toggle){TextView chip=materialChip((on?"✓ ":"")+label,on?Color.rgb(46,66,86):SURFACE2,on?TEXT:MUTED,on);chip.setBackground(round(on?Color.rgb(46,66,86):SURFACE2,999,1,on?CYAN:OUTLINE));chip.setOnClickListener(v->{toggle.run();catalogVisible=24;render();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,dp(36));if(row.getChildCount()>0)lp.leftMargin=dp(8);row.addView(chip,lp);}
@@ -1060,7 +1085,7 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     }
     private View librarySearchJobCard(LibrarySearchJob job){
         LinearLayout c=new LinearLayout(this);c.setGravity(Gravity.CENTER_VERTICAL);c.setPadding(dp(14),dp(14),dp(14),dp(14));c.setBackground(round(SURFACE,20,1,job.running?CYAN:(TextUtils.isEmpty(job.error)?TEAL:RED)));
-        ImageView im=new ImageView(this);im.setScaleType(ImageView.ScaleType.CENTER_CROP);im.setBackground(round(SURFACE2,14,0,0));try{if(job.uri!=null)im.setImageURI(job.uri);else{im.setImageDrawable(iconDrawable(LudoIcons.SEARCH,CYAN,24));im.setPadding(dp(20),dp(20),dp(20),dp(20));}}catch(Exception ignored){}c.addView(im,new LinearLayout.LayoutParams(dp(76),dp(76)));
+        ImageView im=new ImageView(this);im.setScaleType(ImageView.ScaleType.CENTER_CROP);im.setBackground(round(SURFACE2,14,0,0));try{if(job.uri!=null)im.setImageURI(job.uri);else{im.setImageDrawable(iconDrawable(LudoIcons.SEARCH,CYAN,24));im.setPadding(dp(20),dp(20),dp(20),dp(20));}}catch(Exception ignored){}c.addView(im,new LinearLayout.LayoutParams(dp(90),dp(94)));
         LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(12),0,dp(8),0);copy.addView(text(job.running?"Sto riconoscendo il gioco":(!TextUtils.isEmpty(job.error)?"Serve il tuo aiuto":"Gioco da confermare"),17,TEXT,Typeface.BOLD));copy.addView(text(job.label,13,MUTED,Typeface.NORMAL));
         if(job.running){ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setIndeterminate(true);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(4));bp.topMargin=dp(9);copy.addView(bar,bp);}else if(!TextUtils.isEmpty(job.error))copy.addView(text(job.error,12,ORANGE,Typeface.NORMAL));else copy.addView(text(job.results.size()+" possibili risultati",12,TEAL,Typeface.BOLD));c.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         if(!job.running&&TextUtils.isEmpty(job.error)){TextView go=appIcon(LudoIcons.CHEVRON_RIGHT,17,CYAN);go.setGravity(Gravity.CENTER);go.setOnClickListener(v->{activeLibrarySearchJobId=job.id;chooseLibraryGame(new ArrayList<>(job.results));});c.addView(go,new LinearLayout.LayoutParams(dp(42),dp(54)));c.setOnClickListener(v->{activeLibrarySearchJobId=job.id;chooseLibraryGame(new ArrayList<>(job.results));});}
@@ -2478,4 +2503,5 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
 }
+
 
