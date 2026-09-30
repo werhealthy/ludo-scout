@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 app = ROOT / "app/src/main"
 ui = (app / "java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
+icons = (app / "java/it/vintedaffari/app/LudoIcons.java").read_text(encoding="utf-8")
 build = (ROOT / "app/build.gradle").read_text(encoding="utf-8")
 
 def between(source, start, end):
@@ -24,18 +25,18 @@ nav = between(ui, "private void renderNav()", "private void addMarketHeader")
 checks = [
     ("build identity advances beyond v5.12.76",
      "versionName '5.12.76-discover-visual-polish'" not in build),
-    ("home uses the new multi-stop pastel background",
-     "GradientDrawable.Orientation.TOP_BOTTOM" in chrome and
-     "Color.rgb(228,249,246)" in chrome and "Color.rgb(255,239,247)" in chrome),
-    ("home greeting matches the new reference hierarchy",
+    ("home uses the Figma-exported shader background",
+     "R.drawable.discover_home_shader" in chrome and
+     "BitmapDrawable" in chrome and "setGravity(Gravity.FILL)" in chrome),
+    ("home greeting matches the Figma hierarchy",
      '"Bentornato,"' in header and "discoverGreetingName()" in header and
-     "37,Color.BLACK,Typeface.BOLD" in header),
-    ("hero uses the blue wave pattern, real game artwork, BGG rating, price and discount",
+     "37,Color.rgb(11,11,13),Typeface.BOLD" in header),
+    ("hero keeps real artwork and Figma-inspired texture signals",
      "discoverHeroPattern()" in hero and "discoverFlatArtwork(d" in hero and
-     "name(d)" in hero and "total(d)" in hero and "★" in hero and "saved" in hero),
-    ("category tiles use pastel shapes, symbols and no counts",
+     "name(d)" in hero and "total(d)" in hero and "LudoIcons.STAR" in hero and "saved" in hero),
+    ("category tiles use glass-style shapes and no counts",
      "discoverCategoryShape" in category_tile and "discoverCategorySymbol" in category_tile and
-     '" giochi"' not in category_tile and '"Vedi tutto"' in categories),
+     '" giochi"' not in category_tile and '"Vedi tutte"' in categories),
     ("best offers are a compact horizontal card rail",
      '"Le migliori offerte"' in offers and "HorizontalScrollView" in offers and
      "discoverListingArtwork" in offers and "saving(d)" in offers),
@@ -49,9 +50,17 @@ checks = [
      home.index("heroOpportunityCard") < home.index("addDiscoverCategories") <
      home.index("addDiscoverValueRail") < home.index("addDiscoverTopRatedRail") <
      home.index("addDiscoverFreshRail")),
-    ("reference bottom navigation labels are present without a selected pill",
-     all(x in nav for x in ['"Home","discover"','"Catalogo","catalog"','"Libreria","library"','"Profilo","companion"']) and
-     "round(Color.rgb(239,230,244)" not in nav),
+    ("bottom navigation uses the shared Font Awesome icon language",
+     all(x in nav for x in [
+         'LudoIcons.HOUSE,"Home","discover"',
+         'LudoIcons.SEARCH,"Catalogo","catalog"',
+         'LudoIcons.BOOK_OPEN,"Libreria","library"',
+         'LudoIcons.USER,"Profilo","companion"'
+     ]) and "round(Color.rgb(239,230,244)" not in nav),
+    ("Font Awesome semantic map includes core app actions",
+     all(x in icons for x in ["HOUSE=", "SEARCH=", "HEART=", "TRASH=", "CAMERA=", "GEAR=", "CHECK="])),
+    ("category rendering includes glass highlight and texture",
+     "LinearGradient" in ui and "Random r=new Random(7200L+index*97L)" in ui),
 ]
 
 for name, ok in checks:
