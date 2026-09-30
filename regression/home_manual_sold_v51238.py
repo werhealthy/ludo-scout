@@ -16,15 +16,15 @@ checks=[
      "versionName '5.12." in build and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
-    ("Home independently populates the fresh, BGG-rated and value rails",
+    ("Home independently populates offer, BGG and fresh rails",
      "addDiscoverFreshRail(limitDeals(newest,12))" in home and
-     "addDiscoverTopRatedRail(uniqueDiscoverGames(topRated,12))" in home and
+     "addDiscoverTopRatedRail(limitDeals(topRated,3))" in home and
      "addDiscoverValueRail(limitDeals(value,12))" in home and
-     "publicationAgeMinutes(a)" in home and "b.rating" in home),
-    ("real bundles can return to Home",
-     "uniqueBundleSources(deals)" in home and
-     "bundleSources.removeIf(d->bundleDealsForSource(d).size()<2)" in home and
-     "addDiscoverBundleSpotlight(bundleSources.get(0))" in home),
+     "publicationAgeMinutes(a)" in home and "a.rank" in home),
+    ("Home follows the approved reference order",
+     home.index("heroOpportunityCard") < home.index("addDiscoverCategories") <
+     home.index("addDiscoverValueRail") < home.index("addDiscoverTopRatedRail") <
+     home.index("addDiscoverFreshRail")),
     ("section subtitles are actually rendered",
      "if(!TextUtils.isEmpty(sub))" in section and "text(sub,12,MUTED" in section),
     ("Home rail cards are visual first",
