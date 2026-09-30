@@ -26,12 +26,13 @@ final class DiscoverCategories {
     }
     static String[] labels(){return LABELS.clone();}
     static String query(int index){return PREFIX+LABELS[Math.max(0,Math.min(index,LABELS.length-1))];}
-    private static int index(String query){
+    static int index(String query){
         if(query==null||!query.startsWith(PREFIX))return -1;
         for(int i=0;i<LABELS.length;i++)if(query.substring(PREFIX.length()).equals(LABELS[i]))return i;
         return -1;
     }
     static String searchText(String query){return index(query)>=0?"":query;}
+    static String appendFilter(int index,List<String> args){return index>=0&&index<LABELS.length?appendFilter(query(index),args):"";}
     static String appendFilter(String query,List<String> args){
         int index=index(query);if(index<0)return "";
         StringBuilder sql=new StringBuilder(" AND (");

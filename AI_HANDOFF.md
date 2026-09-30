@@ -1,3 +1,12 @@
+# Ludo Scout — AI handoff
+
+## 5.12.89 — Personalized Home (2026-10-01)
+- User approved implementation and automatic merge/distribution. Home interest preferences persist per BGG identity; dismiss swaps the hero and has Undo. Owned (unsold) Library games and confirmed non-IT/EN language-dependent editions are excluded from Home; unknown language facts remain unknown.
+- Hero has square/tall/wide cover compositions, a 52dp CTA, compact flags and dependence icons, and actual discount bands 0–9/10–29/30–79/80+.
+- Home product rails expose two full cards and half a third, with clearer dates and greeting spacing. Category navigation uses a separate persisted filter, numeric badge, and empty free-text search; combined search/filter SQL has count/paging parity tests.
+- Normal cold launcher entry defaults to Home; explicit intents and activity recreation retain destinations.
+- Motore illustrated loading, phase cards, queue stalls, SQLite crashes/ANR and remaining product pages are separate pending steps. No claim of stability resolution or pixel/device validation.
+
 ## 5.12.88 — Home refinement, step1 (2026-09-30)
 Home: one gear→Motore, engine ellipsis→settings/diagnostics;52dp visible ripple CTA; readable flag/edition and dependence labels; crop Home/BGG/hero covers; FontAwesome section icons; category Vedi tutte removed per interpreted transcription; real same-seller cover-led bundle spotlight discovered off main thread, bounded40candidates/cache60s, no invented bundle price. Language fact unknown/conflicts remain unknown; separate detail row avoids clipping provider rating.
 
