@@ -1522,6 +1522,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String bggReviewWriteSummary=bggReviewWrite.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-bggReviewWrite.updatedAt)+", "+bggReviewWrite.detail);
         MarketStore.RuntimeStatus engineSla=marketDiag.diagnosticState("engine_sla");
         String engineSlaSummary=engineSla.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-engineSla.updatedAt)+", "+engineSla.detail);
+        MarketStore.RuntimeStatus enginePerformance=marketDiag.diagnosticState("engine_performance");
+        String enginePerformanceSummary=enginePerformance.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-enginePerformance.updatedAt)+", "+EnginePerformanceMetrics.restore(enginePerformance.detail).summary(System.currentTimeMillis()));
         MarketStore.RuntimeStatus engineFairness=marketDiag.diagnosticState("engine_fairness");
         String engineFairnessSummary=engineFairness.updatedAt<=0?"state=NOT_RUN":("ageMs="+Math.max(0L,System.currentTimeMillis()-engineFairness.updatedAt)+", "+engineFairness.detail);
         MarketStore.RuntimeStatus bggExactCutover=marketDiag.diagnosticState("bgg_exact_index_cutover");
@@ -1689,6 +1691,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
+                "enginePerformance={"+enginePerformanceSummary+"}\n"+
                 "engineFairness={"+engineFairnessSummary+"}\n"+
                 "bggExactIndexCutover={"+bggExactCutoverSummary+"}\n"+
                 "historicalReviewCutover={"+historicalReviewCutoverSummary+"}\n"+

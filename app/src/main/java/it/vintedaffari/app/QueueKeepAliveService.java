@@ -48,6 +48,8 @@ public final class QueueKeepAliveService extends Service {
     private AutoLinkResolver resolver;
     private BggEnricher bgg;
     private BggSearchClient bggMatcher;
+    private EnginePerformanceMetrics enginePerformance=new EnginePerformanceMetrics();
+    private long lastEnginePerformancePersistAt=0L;
 
     private final Runnable notificationPulse=new Runnable(){@Override public void run(){
         if(!alive)return;
@@ -63,6 +65,7 @@ public final class QueueKeepAliveService extends Service {
             if(market!=null&&now-lastLocalMaintenanceAt>=20_000L){try{market.inferDeferredLanguages(80);}catch(Throwable ignored){}lastLocalMaintenanceAt=now;}
             superviseLanes(false);
             DealDatabase.ObservationSession activeRun=db==null?null:db.activeObservationSession();
+            recordEnginePerformance(activeRun,now);
             maybeNotifyNextRunComplete(now);
             int active=market==null?1:market.jobSummary().active()+market.bggMatchRequiredCount()+market.deferredVintedReadyCount(now)+market.historicalBggRevalidationPendingCount();
             if(activeRun!=null)active++;
@@ -71,6 +74,22 @@ public final class QueueKeepAliveService extends Service {
         }catch(Throwable t){Log.w(TAG,"notification/supervisor pulse failed",t);ProcessCrashJournal.recordHandled(QueueKeepAliveService.this,"queue:pulse",t);}
         if(alive&&!controlExecutor.isShutdown())try{controlExecutor.schedule(this,8_000L,TimeUnit.MILLISECONDS);}catch(Throwable ignored){}
     }};
+
+    private void recordEnginePerformance(DealDatabase.ObservationSession run,long now){
+        if(market==null||enginePerformance==null)return;
+        try{
+            MarketStore.RuntimeStatus lane=market.laneStatus("vinted");
+            int due=market.runnableVintedDueCount(now),processing=market.processingVintedCount();
+            boolean hasResult=run!=null&&(run.completeListings+run.reviewListings+run.heldListings)>0;
+            boolean complete=run!=null&&DealDatabase.engineContentSettled(run);
+            long progress=run==null?0L:(long)(run.completeListings+run.reviewListings+run.heldListings)*1_000_000L+Math.max(0,run.coreWorkListings-run.corePendingListings);
+            boolean event=enginePerformance.sample(run==null?0L:run.startAt,run==null?0L:run.endAt,now,progress,hasResult,complete,due,processing,lane.state,lane.detail);
+            if(event||lastEnginePerformancePersistAt<=0L||now-lastEnginePerformancePersistAt>=60_000L){
+                market.setDiagnosticState("engine_performance",enginePerformance.sampleCount(),enginePerformance.serialize());
+                lastEnginePerformancePersistAt=now;
+            }
+        }catch(Throwable t){Log.d(TAG,"engine performance diagnostics skipped",t);}
+    }
 
     public static boolean isRunning(){return RUNNING;}
     public static boolean isStarting(){return STARTING;}
@@ -99,7 +118,9 @@ public final class QueueKeepAliveService extends Service {
 
     private void initializeBackground(){
         try{
-            db=new DealDatabase(this);market=new MarketStore(this,db);EngineStartupMaintenance.run(this,market);market.touchProcessorHeartbeat();
+            db=new DealDatabase(this);market=new MarketStore(this,db);EngineStartupMaintenance.run(this,market);
+            MarketStore.RuntimeStatus perf=market.diagnosticState("engine_performance");enginePerformance=EnginePerformanceMetrics.restore(perf.detail);lastEnginePerformancePersistAt=perf.updatedAt;
+            market.touchProcessorHeartbeat();
         }catch(Throwable t){
             STARTING=false;Log.e(TAG,"database startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:database",t);stopSelf();return;
         }

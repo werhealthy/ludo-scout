@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.79 — Tempi reali del Motore (2026-09-30)
+
+- La diagnostica misura il tempo Vinted in attesa di pacing/limiti, il tempo con lavoro rivendicabile, il tempo con lease attive e gli altri intervalli osservati.
+- Registra il tempo dal termine osservato dello scroll al primo esito e al completamento; mostra mediana, peggiore e numero di run, sugli ultimi 20 completati.
+- I dati contengono solo tempi e contatori aggregati; nessun titolo o annuncio. Nessuna modifica al motore di pubblicazione, alle soglie o ai limiti di richiesta.
+- Regressioni: `regression/engine_performance_metrics_v51279.py` e `regression/EnginePerformanceMetricsRegression.java`.
+
 ## 5.12.78 — Coda dei collegamenti differiti (2026-09-30)
 
 - Conteggio e promozione dei collegamenti differiti limitati agli annunci BGG confermati e senza revisione manuale, variante o verifica incerta già aperta.

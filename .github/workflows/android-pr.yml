@@ -21,6 +21,8 @@ jobs:
         run: python3 regression/discover_visual_polish_v51276.py
       - name: Run queue liveness diagnostics regression
         run: python3 regression/queue_liveness_diagnostics_v51277.py
+      - name: Run queue performance metrics regression
+        run: python3 regression/engine_performance_metrics_v51279.py
 
 
       - name: Set up Java 17
@@ -29,6 +31,12 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
+      - name: Run engine performance metrics behavior regression
+        run: |
+          mkdir -p .regression-build
+          javac -d .regression-build app/src/main/java/it/vintedaffari/app/EnginePerformanceMetrics.java regression/EnginePerformanceMetricsRegression.java
+          java -cp .regression-build EnginePerformanceMetricsRegression
 
       - name: Validate Android SDK
         run: |
