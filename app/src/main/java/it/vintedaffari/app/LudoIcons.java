@@ -1,7 +1,12 @@
 package it.vintedaffari.app;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.widget.TextView;
 
@@ -80,5 +85,33 @@ final class LudoIcons {
         view.setTypeface(useRegular?regular(view.getContext()):solid(view.getContext()));
         view.setGravity(Gravity.CENTER);
         view.setIncludeFontPadding(false);
+    }
+
+    static Drawable drawable(Context context,String glyph,int color,int sizePx){
+        return new FontDrawable(context,glyph,color,sizePx,false);
+    }
+
+    static Drawable regularDrawable(Context context,String glyph,int color,int sizePx){
+        return new FontDrawable(context,glyph,color,sizePx,true);
+    }
+
+    private static final class FontDrawable extends Drawable{
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.SUBPIXEL_TEXT_FLAG);
+        private final String glyph;
+        private final int size;
+        FontDrawable(Context context,String g,int color,int px,boolean useRegular){
+            glyph=g;size=Math.max(1,px);paint.setColor(color);paint.setTextSize(size*.78f);
+            paint.setTypeface(useRegular?regular(context):solid(context));paint.setTextAlign(Paint.Align.CENTER);
+        }
+        @Override public void draw(Canvas canvas){
+            android.graphics.Rect b=getBounds();Paint.FontMetrics fm=paint.getFontMetrics();
+            float y=b.exactCenterY()-(fm.ascent+fm.descent)/2f;
+            canvas.drawText(glyph,b.exactCenterX(),y,paint);
+        }
+        @Override public int getIntrinsicWidth(){return size;}
+        @Override public int getIntrinsicHeight(){return size;}
+        @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
+        @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
+        @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
     }
 }
