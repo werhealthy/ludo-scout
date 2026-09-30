@@ -18,7 +18,7 @@ checks=[
  ("Activity overview consumes an async snapshot","EngineOverviewSnapshot snapshot=engineOverviewSnapshot" in overview and "requestEngineOverviewSnapshot()" in overview),
  ("Activity overview performs no SQLite reads on main thread","db." not in overview and "marketStore." not in overview),
  ("Activity hero performs no SQLite reads on main thread","db." not in hero and "marketStore." not in hero),
- ("snapshot is loaded on UI data executor","uiDataIo.execute(()->" in ui and "loadEngineOverviewSnapshot" in ui),
+ ("snapshot is loaded on a dedicated engine executor","engineUiIo.execute(()->" in ui and "loadEngineOverviewSnapshot" in ui),
  ("snapshot freshness starts after the database reads",completion_clock>last_read),
  ("stale snapshots remain visible while refreshing",null_guard>=0 and null_return>null_guard and background_refresh>null_return),
  ("Activity render skips SQLite-backed indicator while its button is hidden",'if(!"activity".equals(tab))updateActivityIndicator();' in render),

@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Run Home layout and loading regression
+        run: python3 regression/home_render_v51290.py
       - name: Run Discover visual polish regression
         run: python3 regression/discover_visual_polish_v51276.py
       - name: Run queue liveness diagnostics regression

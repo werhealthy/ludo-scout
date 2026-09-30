@@ -1754,7 +1754,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "bggBatch={lastSize="+p.getInt("bggBatchLastSize",0)+", requests="+p.getLong("bggBatchRequests",0)+", items="+p.getLong("bggBatchItems",0)+"}\n"+
                 "queueLanes={vinted="+vintedLane.state+", detail="+firstLine(vintedLane.detail)+", heartbeatAgeMs="+(vintedLaneHeartbeat<=0?-1:Math.max(0,queueNow-vintedLaneHeartbeat))+", bgg="+bggLane.state+", detail="+firstLine(bggLane.detail)+", heartbeatAgeMs="+(bggLaneHeartbeat<=0?-1:Math.max(0,queueNow-bggLaneHeartbeat))+"}\n"+
                 "uiLastRenderMs="+p.getLong("uiLastRenderMs",0)+"; tab="+p.getString("uiLastRenderTab","")+"\n"+
-                "activitySnapshot={state="+p.getString("activitySnapshotState","NOT_RUN")+", error="+firstLine(p.getString("activitySnapshotError",""))+"}\n"+
+                "activitySnapshot={state="+p.getString("activitySnapshotState","NOT_RUN")+", timing="+p.getString("activitySnapshotTiming","NOT_RUN")+", error="+firstLine(p.getString("activitySnapshotError",""))+"}\n"+
                 "activityIndicator={"+p.getString("activityIndicatorState","NOT_RUN")+"}\n"+
                 "uiLastAction="+p.getString("uiLastAction","")+"; at="+p.getLong("uiLastActionAt",0)+"\n"+
                 "lastCrashAt="+p.getLong("lastCrashAt",0)+"; tab="+p.getString("lastCrashTab","")+"; wizard="+p.getString("lastCrashWizard","")+"\n"+
@@ -1783,3 +1783,4 @@ public final class VintedAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+
