@@ -23,30 +23,20 @@ nav = between(ui, "private void renderNav()", "private void addMarketHeader")
 checks = [
     ("build identity is current beta line",
      "versionName '5.12." in build),
-    ("Home preserves the exported Figma background aspect ratio",
-     "R.drawable.discover_home_shader" in chrome and
-     "scale=b.width()/(float)bitmap.getWidth()" in chrome and
-     "BitmapDrawable" not in chrome),
+    ("Home gradient scales with its content bounds",
+     "RadialGradient" in chrome and "b.height()/(float)b.width()" in chrome),
     ("Home uses a Helvetica-compatible bundled typeface",
      '"fonts/remus-variable.ttf"' in ui and
      "Typeface.create(discoverTypefaceBase,w,false)" in ui),
     ("Home greeting matches the Figma hierarchy",
      '"Bentornato,"' in header and "discoverGreetingName()" in header and
      "discoverTextWeight(discoverGreetingName(),37" in header),
-    ("Hero is the Figma composition rather than procedural waves",
-     "R.drawable.discover_hero_background" in hero and
-     "discoverGameDescription(d)" in hero and
-     "discoverBggCover(d" in hero and
-     "rfp.leftMargin=dp(-29)" in hero and
-     "LudoIcons.STAR" in hero),
-    ("Home exposes exactly five semantic category clusters",
-     'new String[]{"Strategia","Cooperativi","Fantasy","Filler","Eurogame"}' in ui and
-     "for(int i=0;i<labels.length;i++)tiles.addView" in categories and
-     "preferredDiscoverCategories" not in ui),
-    ("category tiles keep translucent glass surfaces",
-     "Color.argb(51" in categories and
-     "discoverCategoryShape(index)" in categories and
-     "LinearGradient" in ui),
+    ("Hero keeps real game identity and offer information",
+     all(x in hero for x in ["discoverGameDescription(d)", "discoverBggCover(d", "name(d)", "total(d)", "discoverDiscountBadge(d", "LudoIcons.STAR", "openDetail(d)"])),
+    ("category navigation uses the shared BGG clusters",
+     "DiscoverCategories.labels()" in ui and "DiscoverCategories.query(index)" in categories and "openDiscoverCategory" in categories),
+    ("category bitmaps are sampled and cached",
+     "opts.inSampleSize=8" in ui and "discoverCategoryIcons.put(index,bitmap)" in ui),
     ("offers and latest reuse one canonical product card",
      "discoverProductCard(d,false)" in ui and
      "discoverProductCard(d,true)" in ui),
@@ -54,17 +44,16 @@ checks = [
      "discoverBggCover(d" in product and
      "firstListingPhoto" not in product and
      "setDealArtwork" not in product),
-    ("discount overlays the image in the shared product card",
-     "imageWrap.addView(badge,bp)" in product and
-     "Gravity.TOP|Gravity.RIGHT" in product),
+    ("product discount follows the real price row",
+     "discoverDiscountBadge(d,10)" in product and "bottom.addView(badge)" in product),
     ("fresh variant promotes publication time",
      "publicationDisplay(d)" in product and "if(fresh)" in product),
     ("offer variant promotes BGG rating with Font Awesome star",
      "LudoIcons.STAR" in product and "d.rating" in product),
-    ("BGG list uses category-aware rank metadata",
-     "discoverRankCategory(d)" in top_card and '" BGG"' not in top_card),
-    ("BGG heart has dedicated unclipped space",
-     "setClipChildren(false)" in top_card and "LudoIcons.HEART" in top_card),
+    ("BGG list labels its overall BGG rank",
+     '" BGG"' in top_card and "d.rank" in top_card and "d.voters" in top_card),
+    ("BGG rating remains visible beside price",
+     "LudoIcons.STAR" in top_card and "d.rating" in top_card),
     ("reference section order is hero, categories, offers, BGG, latest",
      home.index("heroOpportunityCard") < home.index("addDiscoverCategories") <
      home.index("addDiscoverValueRail") < home.index("addDiscoverTopRatedRail") <
@@ -74,7 +63,7 @@ checks = [
          'LudoIcons.HOUSE,"Home","discover"',
          'LudoIcons.SEARCH,"Catalogo","catalog"',
          'LudoIcons.BOOK_OPEN,"Libreria","library"',
-         'LudoIcons.USER,"Profilo","companion"'
+         'LudoIcons.STAR,"Ludo","companion"'
      ])),
     ("Font Awesome semantic map includes core app actions",
      all(x in icons for x in ["HOUSE=", "SEARCH=", "HEART=", "TRASH=", "CAMERA=", "GEAR=", "CHECK=", "STAR="])),
@@ -88,3 +77,4 @@ failed = [name for name, ok in checks if not ok]
 if failed:
     raise SystemExit("Discover visual polish regression failed: " + ", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} Discover visual polish guards")
+

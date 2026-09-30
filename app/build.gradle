@@ -17,7 +17,7 @@ android {
         // via LUDO_VERSION_CODE so every distributed beta can update the previous one.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
         versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 172
-        versionName '5.12.83-engine-sampling-health'
+        versionName '5.12.84-official-dark-home'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')
@@ -60,3 +60,4 @@ android {
 dependencies { implementation 'com.google.mlkit:text-recognition:16.0.1'; implementation 'androidx.core:core:1.13.1'; implementation 'androidx.work:work-runtime:2.9.1'; testImplementation 'junit:junit:4.13.2' }
 // Align transitive Kotlin runtimes from AndroidX/ML Kit, including legacy jdk7/jdk8 artifacts.
 dependencies { implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22') }
+

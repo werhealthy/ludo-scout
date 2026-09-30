@@ -29,8 +29,8 @@ checks=[
     ("Discover uses distinct, data-backed editorial rails",
      all(x in home for x in ["addDiscoverCategories","addDiscoverFreshRail","addDiscoverTopRatedRail","addDiscoverValueRail"]) and
      "heroOpportunityCard" in home),
-    ("Home categories are five stable product clusters",
-     all(x in ui for x in ["Strategia","Cooperativi","Fantasy","Filler","Eurogame"]) and
+    ("Home categories use the shared product clusters",
+     "DiscoverCategories.labels()" in ui and
      "openDiscoverCluster" in categories),
     ("fresh rail leads with listing publication time",
      "publicationDisplay(d)" in product),
@@ -39,11 +39,11 @@ checks=[
      "publicationAgeMinutes(b)" in home),
     ("BGG rail exposes rank, votes and rating",
      "d.rating" in top and "d.voters" in top and "d.rank" in top and
-     "discoverRankCategory(d)" in top),
+     '" BGG"' in top),
     ("featured opportunity uses canonical BGG content",
      "discoverBggCover(d" in opportunity and
      "discoverGameDescription(d)" in opportunity and
-     "name(d)" in opportunity and "total(d)" in opportunity and "saving(d)" in opportunity),
+     "name(d)" in opportunity and "total(d)" in opportunity and "discoverDiscountBadge(d" in opportunity),
     ("Discover greeting matches the approved Home reference",
      '"Bentornato,"' in header and
      "discoverGreetingName()" in header),
@@ -78,3 +78,4 @@ failed=[name for name,ok in checks if not ok]
 if failed:
     raise SystemExit("5.12.39 UX system regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} UX system guards")
+

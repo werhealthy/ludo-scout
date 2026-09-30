@@ -38,6 +38,9 @@ jobs:
           javac -d .regression-build app/src/main/java/it/vintedaffari/app/EnginePerformanceMetrics.java regression/EnginePerformanceMetricsRegression.java
           java -cp .regression-build EnginePerformanceMetricsRegression
 
+      - name: Run Home category SQLite fixtures
+        run: python3 regression/discover_category_sql_v51284.py
+
       - name: Validate Android SDK
         run: |
           test -n "$ANDROID_HOME" || (echo "ANDROID_HOME is not set" && exit 1)
@@ -177,3 +180,4 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+
