@@ -13,54 +13,73 @@ def between(source, start, end):
 chrome = between(ui, "private void applyDiscoverChrome()", "private void renderDiscover()")
 home = between(ui, "private void renderDiscover()", "private List<DealRecord> limitDeals")
 header = between(ui, "private View discoverHeader()", "private String discoverGreetingName")
-categories = between(ui, "private void addDiscoverCategories", "private void showDiscoverCategoryDirectory")
-category_tile = between(ui, "private View discoverCategoryTile", "private void addDiscoverFreshRail")
-fresh = between(ui, "private View discoverListingArtwork", "private void addDiscoverTopRatedRail")
+categories = between(ui, "private void addDiscoverCategories()", "private GameRecord discoverGame")
+product = between(ui, "private View discoverProductCard", "private void addDiscoverTopRatedRail")
 top_rail = between(ui, "private void addDiscoverTopRatedRail", "private View discoverTopRatedCard")
-top_card = between(ui, "private View discoverTopRatedCard", "private void addDiscoverValueRail")
-offers = between(ui, "private void addDiscoverValueRail", "private View heroOpportunityCard")
-hero = between(ui, "private View heroOpportunityCard", "private View discoverBoxArtwork")
+top_card = between(ui, "private View discoverTopRatedCard", "private View heroOpportunityCard")
+hero = between(ui, "private View heroOpportunityCard", "private View discoverFlatArtwork")
 nav = between(ui, "private void renderNav()", "private void addMarketHeader")
 
 checks = [
-    ("build identity advances beyond v5.12.76",
-     "versionName '5.12.76-discover-visual-polish'" not in build),
-    ("home uses the Figma-exported shader background",
+    ("build identity is current beta line",
+     "versionName '5.12." in build),
+    ("Home preserves the exported Figma background aspect ratio",
      "R.drawable.discover_home_shader" in chrome and
-     "BitmapDrawable" in chrome and "setGravity(Gravity.FILL)" in chrome),
-    ("home greeting matches the Figma hierarchy",
+     "scale=b.width()/(float)bitmap.getWidth()" in chrome and
+     "BitmapDrawable" not in chrome),
+    ("Home uses a Helvetica-compatible bundled typeface",
+     '"fonts/remus-variable.ttf"' in ui and
+     "Typeface.create(discoverTypefaceBase,w,false)" in ui),
+    ("Home greeting matches the Figma hierarchy",
      '"Bentornato,"' in header and "discoverGreetingName()" in header and
-     "37,Color.rgb(11,11,13),Typeface.BOLD" in header),
-    ("hero keeps real artwork and Figma-inspired texture signals",
-     "discoverHeroPattern()" in hero and "discoverFlatArtwork(d" in hero and
-     "name(d)" in hero and "total(d)" in hero and "LudoIcons.STAR" in hero and "saved" in hero),
-    ("category tiles use glass-style shapes and no counts",
-     "discoverCategoryShape" in category_tile and "discoverCategorySymbol" in category_tile and
-     '" giochi"' not in category_tile and '"Vedi tutte"' in categories),
-    ("best offers are a compact horizontal card rail",
-     '"Le migliori offerte"' in offers and "HorizontalScrollView" in offers and
-     "discoverListingArtwork" in offers and "saving(d)" in offers),
-    ("BGG section is a three-row ranked list",
-     '"I migliori su BGG"' in top_rail and "Math.min(3,deals.size())" in top_rail and
-     "HorizontalScrollView" not in top_rail and "d.rank" in top_card and "d.rating" in top_card),
-    ("latest listings use listing photos, publication time, discount and score",
-     '"Appena pubblicati"' in ui and "ImageView.ScaleType.CENTER_CROP" in fresh and
-     "publicationDisplay(d)" in fresh and "saving(d)" in fresh and "d.rating" in fresh),
+     "discoverTextWeight(discoverGreetingName(),37" in header),
+    ("Hero is the Figma composition rather than procedural waves",
+     "R.drawable.discover_hero_background" in hero and
+     "discoverGameDescription(d)" in hero and
+     "discoverBggCover(d" in hero and
+     "rfp.leftMargin=dp(-29)" in hero and
+     "LudoIcons.STAR" in hero),
+    ("Home exposes exactly five semantic category clusters",
+     'new String[]{"Strategia","Cooperativi","Fantasy","Filler","Eurogame"}' in ui and
+     "for(int i=0;i<labels.length;i++)tiles.addView" in categories and
+     "preferredDiscoverCategories" not in ui),
+    ("category tiles keep translucent glass surfaces",
+     "Color.argb(51" in categories and
+     "discoverCategoryShape(index)" in categories and
+     "LinearGradient" in ui),
+    ("offers and latest reuse one canonical product card",
+     "discoverProductCard(d,false)" in ui and
+     "discoverProductCard(d,true)" in ui),
+    ("Home product cards use BGG-only artwork",
+     "discoverBggCover(d" in product and
+     "firstListingPhoto" not in product and
+     "setDealArtwork" not in product),
+    ("discount overlays the image in the shared product card",
+     "imageWrap.addView(badge,bp)" in product and
+     "Gravity.TOP|Gravity.RIGHT" in product),
+    ("fresh variant promotes publication time",
+     "publicationDisplay(d)" in product and "if(fresh)" in product),
+    ("offer variant promotes BGG rating with Font Awesome star",
+     "LudoIcons.STAR" in product and "d.rating" in product),
+    ("BGG list uses category-aware rank metadata",
+     "discoverRankCategory(d)" in top_card and '" BGG"' not in top_card),
+    ("BGG heart has dedicated unclipped space",
+     "setClipChildren(false)" in top_card and "LudoIcons.HEART" in top_card),
     ("reference section order is hero, categories, offers, BGG, latest",
      home.index("heroOpportunityCard") < home.index("addDiscoverCategories") <
      home.index("addDiscoverValueRail") < home.index("addDiscoverTopRatedRail") <
      home.index("addDiscoverFreshRail")),
-    ("bottom navigation uses the shared Font Awesome icon language",
+    ("bottom navigation uses shared Font Awesome icons",
      all(x in nav for x in [
          'LudoIcons.HOUSE,"Home","discover"',
          'LudoIcons.SEARCH,"Catalogo","catalog"',
          'LudoIcons.BOOK_OPEN,"Libreria","library"',
          'LudoIcons.USER,"Profilo","companion"'
-     ]) and "round(Color.rgb(239,230,244)" not in nav),
+     ])),
     ("Font Awesome semantic map includes core app actions",
-     all(x in icons for x in ["HOUSE=", "SEARCH=", "HEART=", "TRASH=", "CAMERA=", "GEAR=", "CHECK="])),
-    ("category rendering includes glass highlight and texture",
-     "LinearGradient" in ui and "Random r=new Random(7200L+index*97L)" in ui),
+     all(x in icons for x in ["HOUSE=", "SEARCH=", "HEART=", "TRASH=", "CAMERA=", "GEAR=", "CHECK=", "STAR="])),
+    ("product-detail listing photos crop to fill while BGG stays fit",
+     "isBggPhoto(d,item)?ImageView.ScaleType.FIT_CENTER:ImageView.ScaleType.CENTER_CROP" in ui),
 ]
 
 for name, ok in checks:
