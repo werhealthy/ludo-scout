@@ -32,7 +32,9 @@ checks = [
      '"Bentornato,"' in header and "discoverGreetingName()" in header and
      "discoverTextWeight(discoverGreetingName(),37" in header),
     ("Hero keeps real game identity and offer information",
-     all(x in hero for x in ["discoverGameDescription(d)", "setDiscoverBggArtwork(image,placeholder,d,arrange)", "name(d)", "total(d)", "discoverDiscountBadge(d", "LudoIcons.STAR", "openDetail(d)"])),
+     all(x in hero for x in ["discoverGameDescription(d)", "FeaturedBoxArtwork featured=featuredBoxArtwork(d)", "setDiscoverBggArtwork(featured.source,featured.placeholder,d", "name(d)", "total(d)", "discoverDiscountBadge(d", "LudoIcons.STAR", "openDetail(d)"])),
+    ("Hero featured artwork uses adaptive 2.5D geometry",
+     all(x in ui for x in ["setPolyToPoly", "topFace=quad(topPts)", "sideFace=quad(sidePts)", "sampleEdge(bitmap)"])),
     ("category navigation uses the shared BGG clusters",
      "DiscoverCategories.labels()" in ui and "DiscoverCategories.query(index)" in categories and "openDiscoverCategory" in categories),
     ("category bitmaps are sampled and cached",
