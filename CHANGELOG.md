@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.81 — Primo risultato senza attesa di completamento (2026-09-30)
+
+- La mediana e il tempo peggiore del primo risultato includono anche i run ancora aperti; il numero `firstResultN` mostra quanti casi hanno già prodotto un risultato.
+- Il completamento resta separato e conta solo i run terminati. Il contatore `unobservedMs` continua a mostrare gli intervalli tra campioni oltre la finestra misurabile.
+- Solo diagnostica: non cambia priorità, pubblicazione, soglie o richieste di rete.
+- Regressione: `regression/engine_performance_metrics_v51279.py` e `regression/EnginePerformanceMetricsRegression.java`.
+
+
 ## 5.12.80 — Copertura dei campioni (2026-09-30)
 
 - La diagnostica mostra in `unobservedMs` il tempo tra campioni che supera i 12 secondi misurabili, invece di nasconderlo nei tempi attribuiti alla coda.

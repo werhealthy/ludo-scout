@@ -116,10 +116,13 @@ public final class EnginePerformanceMetrics {
             if (run.completionMs >= 0L) completion.add(run.completionMs);
             noProgressWorst=Math.max(noProgressWorst,run.noProgressMs);
         }
-        for(Run run:activeRuns.values())noProgressWorst=Math.max(noProgressWorst,run.noProgressMs);
+        for(Run run:activeRuns.values()) {
+            noProgressWorst=Math.max(noProgressWorst,run.noProgressMs);
+            if(run.firstResultAt>0L && run.scrollEndAt>0L) first.add(Math.max(0L,run.firstResultAt-run.scrollEndAt));
+        }
         Collections.sort(first);
         Collections.sort(completion);
-        return "build=engine-performance-v2;sampleCount=" + history.size() +
+        return "build=engine-performance-v3;sampleCount=" + history.size() +
                 ";firstResultN=" + first.size() + ";firstResultMedianMs=" + median(first) + ";firstResultWorstMs=" + worst(first) +
                 ";completionN=" + completion.size() + ";completionMedianMs=" + median(completion) + ";completionWorstMs=" + worst(completion) +
                 ";noProgressWorstMs="+noProgressWorst+

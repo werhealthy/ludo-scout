@@ -39,6 +39,14 @@ public final class EnginePerformanceMetricsRegression {
                 "time outside the capped measurement interval must remain visible as unobserved");
         check(EnginePerformanceMetrics.restore(capped.serialize()).summary(61_000L).equals(capped.summary(61_000L)),
                 "unobserved duration must survive persistence");
+
+        EnginePerformanceMetrics activeFirst = new EnginePerformanceMetrics();
+        activeFirst.sample(100L, 500L, 1_000L, 0L, false, false, 1, 0, "WAITING", "PACING");
+        activeFirst.sample(100L, 500L, 9_000L, 1L, true, false, 1, 0, "CLAIMING", "result ready");
+        check(activeFirst.summary(9_000L).contains("firstResultN=1;firstResultMedianMs=8500;firstResultWorstMs=8500"),
+                "first-result latency must be visible before the run completes");
+        check(activeFirst.summary(9_000L).contains("completionN=0;completionMedianMs=-1;completionWorstMs=-1"),
+                "an active run must not be counted as completed");
         System.out.println("PASS engine timing separates pacing, processing, first result, and completion");
         System.out.println("PASS persisted timing survives restart and caps missed-pulse gaps");
     }

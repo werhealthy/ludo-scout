@@ -28,7 +28,7 @@ checks=[
      "oldestRunnableVintedAgeMs(long now)" in market and
      "j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'" in market),
     ("beta build identity advances for App Tester validation",
-     "versionName '5.12.80-engine-gap-accounting'" in build),
+     "versionName '5.12.81-engine-metric-coverage'" in build),
 ]
 for name,ok in checks:
     print(("PASS " if ok else "FAIL ")+name)
