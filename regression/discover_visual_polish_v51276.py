@@ -10,41 +10,48 @@ def between(source, start, end):
     return source[source.index(start):source.index(end, source.index(start))]
 
 chrome = between(ui, "private void applyDiscoverChrome()", "private void renderDiscover()")
-categories = between(ui, "private void addDiscoverCategories", "private void addDiscoverFreshRail")
+home = between(ui, "private void renderDiscover()", "private List<DealRecord> limitDeals")
+header = between(ui, "private View discoverHeader()", "private String discoverGreetingName")
+categories = between(ui, "private void addDiscoverCategories", "private void showDiscoverCategoryDirectory")
 category_tile = between(ui, "private View discoverCategoryTile", "private void addDiscoverFreshRail")
 fresh = between(ui, "private View discoverFreshCard", "private void addDiscoverTopRatedRail")
 top_rail = between(ui, "private void addDiscoverTopRatedRail", "private View discoverTopRatedCard")
 top_card = between(ui, "private View discoverTopRatedCard", "private void addDiscoverValueRail")
+offers = between(ui, "private void addDiscoverValueRail", "private View heroOpportunityCard")
 hero = between(ui, "private View heroOpportunityCard", "private View discoverBoxArtwork")
-box = between(ui, "private View discoverBoxArtwork", "private View discoverFlatArtwork")
-nav_item = between(ui, "private View navItem", "private void addMarketHeader")
+nav = between(ui, "private void renderNav()", "private void addMarketHeader")
 
 checks = [
     ("build identity advances beyond v5.12.76",
      "versionName '5.12.76-discover-visual-polish'" not in build),
-    ("lavender-to-cream background gradient",
-     "GradientDrawable.Orientation.TOP_BOTTOM" in chrome and "DISCOVER_LAVENDER" in chrome and "DISCOVER_BG" in chrome),
-    ("generated hero and category PNG assets are packaged",
-     (app / "res/drawable-nodpi/discover_hero_background.png").exists() and
-     (app / "res/drawable-nodpi/discover_category_icons_sheet.png").exists() and
-     "R.drawable.discover_hero_background" in hero and "R.drawable.discover_category_icons_sheet" in categories),
-    ("featured offer hierarchy shows title, BGG stars, price, and discount",
-     "name(d)" in hero and "total(d)" in hero and "★" in hero and "saved" in hero and "OCCASIONE" in hero),
-    ("only the featured offer uses a perspective game box made from its real cover",
-     "discoverBoxArtwork(d" in hero and "discoverBoxArtwork" not in fresh + top_card and
-     "setDealArtwork(cover,placeholder,d)" in box and "setRotationY(" in box),
-    ("category tiles use illustrated symbols without counts and have a directory",
-     "discoverCategoryIcon" in category_tile and '" giochi"' not in category_tile and
-     '"Vedi tutte"' in categories and "showDiscoverCategoryDirectory" in categories),
-    ("latest listings use full-bleed listing photos with age and price",
-     "ImageView.ScaleType.CENTER_CROP" in fresh and "firstListingPhoto(d)" in fresh and
-     "publicationDisplay(d)" in fresh and "total(d)" in fresh),
-    ("BGG favorites use a vertical ranked list with scores",
-     "HorizontalScrollView" not in top_rail and "LinearLayout.VERTICAL" in top_rail and
-     "discoverTopRatedCard(deals.get(i),i+1)" in top_rail and "rank" in top_card.lower() and "d.rating" in top_card),
-    ("Discover navigation uses rounded bold labels and a selected pill",
-     "discoverText(label,12" in nav_item and "Typeface.BOLD" in nav_item and
-     "round(Color.rgb(239,230,244),18" in nav_item),
+    ("home uses the new multi-stop pastel background",
+     "GradientDrawable.Orientation.TOP_BOTTOM" in chrome and
+     "Color.rgb(228,249,246)" in chrome and "Color.rgb(255,239,247)" in chrome),
+    ("home greeting matches the new reference hierarchy",
+     '"Bentornato,"' in header and "discoverGreetingName()" in header and
+     "37,Color.BLACK,Typeface.BOLD" in header),
+    ("hero uses the blue wave pattern, real game artwork, BGG rating, price and discount",
+     "discoverHeroPattern()" in hero and "discoverFlatArtwork(d" in hero and
+     "name(d)" in hero and "total(d)" in hero and "★" in hero and "saved" in hero),
+    ("category tiles use pastel shapes, symbols and no counts",
+     "discoverCategoryShape" in category_tile and "discoverCategorySymbol" in category_tile and
+     '" giochi"' not in category_tile and '"Vedi tutto"' in categories),
+    ("best offers are a compact horizontal card rail",
+     '"Le migliori offerte"' in offers and "HorizontalScrollView" in offers and
+     "discoverListingArtwork" in offers and "saving(d)" in offers),
+    ("BGG section is a three-row ranked list",
+     '"I migliori su BGG"' in top_rail and "Math.min(3,deals.size())" in top_rail and
+     "HorizontalScrollView" not in top_rail and "d.rank" in top_card and "d.rating" in top_card),
+    ("latest listings use listing photos, publication time, discount and score",
+     '"Appena pubblicati"' in ui and "ImageView.ScaleType.CENTER_CROP" in fresh and
+     "publicationDisplay(d)" in fresh and "saving(d)" in fresh and "d.rating" in fresh),
+    ("reference section order is hero, categories, offers, BGG, latest",
+     home.index("heroOpportunityCard") < home.index("addDiscoverCategories") <
+     home.index("addDiscoverValueRail") < home.index("addDiscoverTopRatedRail") <
+     home.index("addDiscoverFreshRail")),
+    ("reference bottom navigation labels are present without a selected pill",
+     all(x in nav for x in ['"Home","discover"','"Catalogo","catalog"','"Libreria","library"','"Profilo","companion"']) and
+     "round(Color.rgb(239,230,244)" not in nav),
 ]
 
 for name, ok in checks:
