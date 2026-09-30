@@ -1644,8 +1644,9 @@ public final class MarketStore {
         try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{prefix,contains,contains})){return c.moveToFirst()?c.getInt(0):0;}
     }
     public int countReviewGames(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM games WHERE database_visible=1 AND (bgg_id IS NULL OR bgg_id='' OR match_state<>'MATCHED')",null)){return c.moveToFirst()?c.getInt(0):0;}}
-    public List<GameRecord> searchGamesAdvanced(String rawQuery,int limit,String scope,boolean activeOnly,Double minRating,Integer maxPrice,String sort){
-        String q=normalize(DiscoverCategories.searchText(rawQuery));String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();where.append(DiscoverCategories.appendFilter(rawQuery,args));
+    public List<GameRecord> searchGamesAdvanced(String rawQuery,int limit,String scope,boolean activeOnly,Double minRating,Integer maxPrice,String sort){return searchGamesAdvanced(rawQuery,limit,scope,activeOnly,minRating,maxPrice,sort,-1);}
+    public List<GameRecord> searchGamesAdvanced(String rawQuery,int limit,String scope,boolean activeOnly,Double minRating,Integer maxPrice,String sort,int category){
+        String q=normalize(DiscoverCategories.searchText(rawQuery));String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();where.append(DiscoverCategories.appendFilter(rawQuery,args));where.append(DiscoverCategories.appendFilter(category,args));
         if("review".equals(scope))where.append(" AND (g.bgg_id IS NULL OR g.bgg_id='' OR g.match_state<>'MATCHED')");else if(!"all".equals(scope))where.append(" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'");
         if(activeOnly)where.append(" AND EXISTS(SELECT 1 FROM market_listings lx WHERE lx.game_id=g.id AND lx.lifecycle='ACTIVE')");
         if(minRating!=null){where.append(" AND g.rating>=?");args.add(String.valueOf(minRating));}
@@ -1664,8 +1665,9 @@ public final class MarketStore {
         List<String> all=new ArrayList<>();all.add(String.valueOf(System.currentTimeMillis()-30L*24*60*60_000L));all.addAll(args);all.add(prefix);all.add(contains);all.add(contains);for(int i=0;i<5;i++)all.add(contains);all.add(String.valueOf(Math.max(1,limit)));List<GameRecord> out=new ArrayList<>();try(Cursor c=helper.getReadableDatabase().rawQuery(sql,all.toArray(new String[0]))){while(c.moveToNext())out.add(readGameWithSummary(c));}return out;
     }
 
-    public int countVisibleGamesAdvanced(String rawQuery,String scope,boolean activeOnly,Double minRating,Integer maxPrice){
-        String q=normalize(DiscoverCategories.searchText(rawQuery));String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();where.append(DiscoverCategories.appendFilter(rawQuery,args));
+    public int countVisibleGamesAdvanced(String rawQuery,String scope,boolean activeOnly,Double minRating,Integer maxPrice){return countVisibleGamesAdvanced(rawQuery,scope,activeOnly,minRating,maxPrice,-1);}
+    public int countVisibleGamesAdvanced(String rawQuery,String scope,boolean activeOnly,Double minRating,Integer maxPrice,int category){
+        String q=normalize(DiscoverCategories.searchText(rawQuery));String prefix=q.isEmpty()?"%":q+"%",contains=q.isEmpty()?"%":"%"+q+"%";StringBuilder where=new StringBuilder("g.database_visible=1");List<String> args=new ArrayList<>();where.append(DiscoverCategories.appendFilter(rawQuery,args));where.append(DiscoverCategories.appendFilter(category,args));
         if("review".equals(scope))where.append(" AND (g.bgg_id IS NULL OR g.bgg_id='' OR g.match_state<>'MATCHED')");else if(!"all".equals(scope))where.append(" AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'");
         if(activeOnly)where.append(" AND EXISTS(SELECT 1 FROM market_listings lx WHERE lx.game_id=g.id AND lx.lifecycle='ACTIVE')");
         if(minRating!=null){where.append(" AND g.rating>=?");args.add(String.valueOf(minRating));}

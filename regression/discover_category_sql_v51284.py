@@ -43,6 +43,12 @@ for line in output.splitlines():
     assert count==len(rows),(label,count,rows)
     page=[r[0] for r in db.execute("SELECT g.id"+base+" ORDER BY g.id LIMIT 1 OFFSET 1",bindings)]
     assert page==expected[label][1:2],(label,page)
+    for term in ["title","Train","absent"]:
+        filtered=base+" AND g.canonical_name LIKE ?"
+        params=bindings+["%"+term+"%"]
+        matches=[r[0] for r in db.execute("SELECT g.id"+filtered+" ORDER BY g.id",params)]
+        assert matches==[i for i in rows if term.lower() in db.execute("SELECT canonical_name FROM games WHERE id=?",(i,)).fetchone()[0].lower()]
+        assert db.execute("SELECT COUNT(*)"+filtered,params).fetchone()[0]==len(matches)
     seen.add(label)
     print("PASS",label,"category identity, eligibility, count and pagination")
 assert seen==set(expected)
