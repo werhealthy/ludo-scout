@@ -2,7 +2,16 @@
 
 ## Verified release
 
-5.12.91-featured-box-layout-fix (1000108), distributed 2026-10-01 00:51 Europe/Rome (2026-09-30 22:51 UTC). PR100 merged to beta at b195e6c5f2ecb3065f44c05e5d663a5fb27ffe09. Head 6019d1f78f4a8dcc47385ffd8987b7d0786f5bd8 passed Android PR run263 (36787381685). Signed beta run108 (36787603862) passed; Firebase confirmed successful upload and tester/group distribution.
+5.12.92-home-render-loading (1000109), distributed 2026-10-01 00:59 Europe/Rome (2026-09-30 22:59 UTC). PR101 merged at 7d531a085ab4750809f55b08554740460b49681a. Head476c70768e6fa3d4a63236e06f9c4379a094c114 passed PR run266 (36788147312). Signed beta run109 (36788339039) passed; Firebase explicitly confirmed new release upload and tester/group distribution.
+
+## Current correction
+
+- Hero hierarchy rebuild deferred after Android layout traversal. Preserves PR100 isolated 2.5D artwork renderer; price/CTA share footer, metadata beside square/tall cover. Phone visual validation remains necessary.
+- Default dismissal targets only announcement signature. Long press opens compact native menu for whole BGG-game exclusion; Undo restores previous preference. v2 preference namespace avoids preserving incorrect v89 broad dismissals. Positive-interest scoring remains per game.
+- Wider previews expose next-card edge without forcing half-third; square covers, rating/language same row. Section icons enlarged and BGG ranking minimal inline discounts restored.
+- Games category filter remains adjacent to search and stable in appearance, with badge/chips showing selection.
+- Motore dedicated executor avoids bundle queue; unused day/history reads removed. Animated native loading replaces plain text. Diagnostic activitySnapshot now includes owner/review/pipeline durations. Lightweight waiting-run count retained; acquisition, queue ownership, trust, phase SQL and publication gates unchanged.
+- Validation: 63 local source/SQL guards, full PR/beta production SQL and Android unit/compile checks passed. Review assessed posted layout reconstruction and 2.5D loading. No emulator/device screenshot verification.
 
 ## Delivery preference
 
