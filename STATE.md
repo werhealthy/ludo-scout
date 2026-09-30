@@ -1,8 +1,14 @@
+## Delivery preference — 2026-09-30
+
+User explicitly authorizes publishing each Ludo Scout update immediately to Firebase App Tester after automated checks pass, including the necessary beta PR merge. Do not wait for another merge/distribution request. Confirm actual Firebase distribution success before claiming availability. Manual visual feedback follows installation.
+
+PR93 merged to beta at 3f8370154fe82be50df80dfb6536cbf06b70aec7; source and final PR-head Android CI passed. Signed beta build and Firebase delivery are underway.
+
 ## UI milestone 5.12.85 — 2026-09-30
 
 Home cards/categories enlarged; tonal category outlines; hero adapts to loaded BGG cover aspect ratio, discount over artwork, compact CTA. Explicit edition/text-dependence labels preserve unknown data. Catalog uses two-column shared product cards and pagination. No database migration.
 
-Base: PR92 merged to beta at 9f9e38739b65c2a5fe1e6344977ec04db717263f. Android/Java checks pending PR CI; manual Android layout checks required (square/wide/tall covers, large font, narrow phone, pagination). Engine and remaining pages are outstanding: current engine counters overlap and count listings; do not sum them or label them unique games. Define exclusive phase membership before implementing reference.
+Base: PR92 merged to beta at 9f9e38739b65c2a5fe1e6344977ec04db717263f. Android/Java checks passed in PR CI; manual Android layout checks required (square/wide/tall covers, large font, narrow phone, pagination). Engine and remaining pages are outstanding: current engine counters overlap and count listings; do not sum them or label them unique games. Define exclusive phase membership before implementing reference.
 
 # Ludo Scout — Current UI work
 
