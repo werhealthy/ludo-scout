@@ -7,17 +7,20 @@ Apply the user-approved official dark Home reference, CSS and eight supplied cat
 
 ## Work prepared
 - Baseline: `beta` commit `329e66635033aef3bac71a947a16df188f04a502` (5.12.83).
+- PR: https://github.com/werhealthy/ludo-scout/pull/92 (open, not merged).
+- Verified code commit: `d603bb1476f4a184e02ab46595b668f2896ac999`.
 - Proposed source build: 5.12.84-official-dark-home, on `ui/official-dark-home-20260930`.
 - Navy radial Home; purple live-data hero with CTA/settings; eight mapped categories; offers/latest rails; vertical BGG ranking; Home/Catalogo/Ludo/Libreria navigation.
 - Category SQL is read-only and retains existing verified/visible gates. No migration or matcher/queue/pricing/publication change.
 - `UX_SYSTEM_V1.md` and `AI_HANDOFF.md` record the updated UI contract.
 
 ## Verification
-- Six current local UX regression scripts passed (76 guards total).
-- Added JUnit category tests and executable SQLite fixtures using production-generated predicates; Android PR CI will run these and the complete existing regression/unit/Java compile suite.
-- Local Android compilation/JUnit execution unavailable: this workspace has no working JDK/Android SDK. GitHub CI is authoritative for compilation.
+- GitHub Android PR validation run 248 / 36734569866 passed on code commit `d603bb1476f4a184e02ab46595b668f2896ac999`: complete current regressions, 8 production SQLite category fixtures, `:app:testDebugUnitTest` (including new category tests), and `:app:compileDebugJavaWithJavac`. Logs show both Gradle tasks BUILD SUCCESSFUL.
+- 61 current Python regressions also passed locally. Two JVM-dependent fixtures were verified in CI because the local JDK is incomplete. Local Android build unavailable; CI compiled the complete repository.
+- The first CI attempt stopped on a hard-coded old version name in the liveness guard. Updated that test to permit subsequent 5.12 beta releases while retaining the CI versionCode strategy check. No queue code changed.
+- Read-only code review completed; fixed candidate truncation before BGG ordering and enlarged settings/hero CTA touch targets.
 - No emulator/Pixel visual validation performed. Check narrow width and large fonts, missing covers, long game names, all category filters, section links and settings.
-- Historical `ux_phase1_v5120.py` was also attempted but fails obsolete version/navigation expectations on the current baseline; it is not in current CI. `ux_phase2_v5121.py` could not run in the partial local checkout and is not in current CI.
+- Historical `ux_phase1_v5120.py` was attempted but fails obsolete version/navigation expectations on the current baseline; it is not in current CI. `ux_phase2_v5121.py` could not run in the initial partial checkout and is not in current CI.
 
 ## One next step
 Once PR checks pass, integrate this UI change into beta and verify the resulting APK on Pixel against the approved reference.
