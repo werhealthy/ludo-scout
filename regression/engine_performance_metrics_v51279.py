@@ -21,9 +21,13 @@ assert '"enginePerformance={' in diagnostics, "copied diagnostics must expose qu
 assert "MedianMs" in tracker_source and "WorstMs" in tracker_source and "sampleCount" in tracker_source
 assert "noProgressWorstMs" in tracker_source, "diagnostics must expose observed time without run progress"
 assert "unobservedMs" in tracker_source, "sample gaps outside the measured interval must be reported, not discarded"
-assert "build=engine-performance-v4" in tracker_source, "fresh-session filtering must be visible as the updated metric contract"
+assert "build=engine-performance-v5" in tracker_source, "sample-health diagnostics must be visible as the updated metric contract"
 summary_source = tracker_source[tracker_source.index("String summary("):tracker_source.index("private static long median(")]
 assert "run.firstResultAt>0L" in summary_source, "first-result timing must include active runs before completion"
 assert "boolean freshAnchor" in tracker_source and "trackingStartedAt - MAX_SAMPLE_GAP_MS" in tracker_source, \
     "sessions anchored before measurement startup must not pollute fresh latency samples"
+assert "recordAttempt(" in tracker_source and "recordFailure(" in tracker_source, \
+    "diagnostics must distinguish missing supervisor samples from sampled database errors"
+assert "sampleFailures=" in tracker_source and "lastFailureClass=" in tracker_source, \
+    "copyable diagnostics must expose sampling failures without listing data"
 print("PASS engine timing exposes bounded per-run medians/worst and queue-state durations")

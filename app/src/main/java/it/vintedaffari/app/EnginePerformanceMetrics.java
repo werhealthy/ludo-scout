@@ -9,7 +9,7 @@ import java.util.Map;
 
 /** Small diagnostic-only accumulator. It stores timings and run timestamps, never listing data. */
 public final class EnginePerformanceMetrics {
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
     private static final int MAX_HISTORY = 20;
     private static final int MAX_ACTIVE_RUNS = 80;
     private static final long MAX_SAMPLE_GAP_MS = 12_000L;
@@ -37,6 +37,12 @@ public final class EnginePerformanceMetrics {
     private final ArrayDeque<FinishedRun> history = new ArrayDeque<>();
     private long trackingStartedAt;
     private long lastSampleAt;
+    private long lastAttemptAt;
+    private long lastFailureAt;
+    private long attemptCount;
+    private long successfulSampleCount;
+    private long sampleFailureCount;
+    private String lastFailureClass="";
     private long pacingMs;
     private long gateMs;
     private long sqliteBusyMs;
@@ -45,10 +51,23 @@ public final class EnginePerformanceMetrics {
     private long otherMs;
     private long unobservedMs;
 
+    public synchronized void recordAttempt(long now) {
+        attemptCount++;
+        lastAttemptAt=Math.max(0L,now);
+    }
+
+    /** Stores only the exception class, never its message or any listing data. */
+    public synchronized void recordFailure(long now, Throwable failure) {
+        sampleFailureCount++;
+        lastFailureAt=Math.max(0L,now);
+        lastFailureClass=failure==null?"Unknown":failure.getClass().getSimpleName();
+    }
+
     /** Returns true when a first-result or completion event needs an immediate persistence flush. */
     public synchronized boolean sample(long runStartAt, long scrollEndAt, long now, long progressMarker,
             boolean hasResult, boolean complete, int due, int processing,
             String laneState, String laneDetail) {
+        successfulSampleCount++;
         if (trackingStartedAt <= 0L) trackingStartedAt = Math.max(1L, now);
         long elapsed = lastSampleAt <= 0L ? 0L : Math.max(0L, now - lastSampleAt);
         long delta = Math.min(MAX_SAMPLE_GAP_MS, elapsed);
@@ -128,7 +147,10 @@ public final class EnginePerformanceMetrics {
         }
         Collections.sort(first);
         Collections.sort(completion);
-        return "build=engine-performance-v4;sampleCount=" + history.size() +
+        return "build=engine-performance-v5;sampleCount=" + history.size() +
+                ";samplingAttempts="+attemptCount+";successfulSamples="+successfulSampleCount+";sampleFailures="+sampleFailureCount+
+                ";lastAttemptAgeMs="+(lastAttemptAt<=0L?-1L:Math.max(0L,now-lastAttemptAt))+";lastFailureClass="+lastFailureClass+
+                ";lastFailureAgeMs="+(lastFailureAt<=0L?-1L:Math.max(0L,now-lastFailureAt))+
                 ";firstResultN=" + first.size() + ";firstResultMedianMs=" + median(first) + ";firstResultWorstMs=" + worst(first) +
                 ";completionN=" + completion.size() + ";completionMedianMs=" + median(completion) + ";completionWorstMs=" + worst(completion) +
                 ";noProgressWorstMs="+noProgressWorst+
@@ -147,6 +169,9 @@ public final class EnginePerformanceMetrics {
     /** Compact key/value persistence in the existing cross-process diagnostics row; no schema change. */
     public synchronized String serialize() {
         StringBuilder out = new StringBuilder("v=").append(VERSION).append(";epoch=").append(trackingStartedAt).append(";last=").append(lastSampleAt)
+                .append(";attemptAt=").append(lastAttemptAt).append(";failureAt=").append(lastFailureAt)
+                .append(";attempts=").append(attemptCount).append(";successfulSamples=").append(successfulSampleCount)
+                .append(";sampleFailures=").append(sampleFailureCount).append(";failureClass=").append(lastFailureClass)
                 .append(";pacing=").append(pacingMs).append(";gate=").append(gateMs).append(";sqliteBusy=").append(sqliteBusyMs).append(";runnable=").append(runnableMs)
                 .append(";processing=").append(processingMs).append(";other=").append(otherMs).append(";unobserved=").append(unobservedMs).append(";active=");
         boolean comma = false;
@@ -177,6 +202,12 @@ public final class EnginePerformanceMetrics {
         if (parse(fields.get("v"), 0L) != VERSION) return out;
         out.trackingStartedAt = parse(fields.get("epoch"), 0L);
         out.lastSampleAt = parse(fields.get("last"), 0L);
+        out.lastAttemptAt=parse(fields.get("attemptAt"),0L);
+        out.lastFailureAt=parse(fields.get("failureAt"),0L);
+        out.attemptCount=parse(fields.get("attempts"),0L);
+        out.successfulSampleCount=parse(fields.get("successfulSamples"),0L);
+        out.sampleFailureCount=parse(fields.get("sampleFailures"),0L);
+        out.lastFailureClass=fields.getOrDefault("failureClass","");
         out.pacingMs = parse(fields.get("pacing"), 0L);
         out.gateMs = parse(fields.get("gate"), 0L);
         out.sqliteBusyMs = parse(fields.get("sqliteBusy"), 0L);

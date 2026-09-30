@@ -55,6 +55,17 @@ public final class EnginePerformanceMetricsRegression {
                 "a persisted observation session predating measurement must not create multi-day first-result latency");
         check(oldObservation.summary(108_000_000L).contains("activeRuns=0"),
                 "stale observation sessions must not be treated as active measured runs");
+
+        EnginePerformanceMetrics samplingHealth = new EnginePerformanceMetrics();
+        samplingHealth.recordAttempt(200_000L);
+        samplingHealth.recordFailure(200_000L, new IllegalStateException("do not expose this message"));
+        String healthSummary=samplingHealth.summary(210_000L);
+        check(healthSummary.contains("samplingAttempts=1;successfulSamples=0;sampleFailures=1"),
+                "failed metric reads must be distinguished from successful samples");
+        check(healthSummary.contains("lastFailureClass=IllegalStateException") && !healthSummary.contains("do not expose this message"),
+                "sampling diagnostics must store the exception class without its message");
+        check(EnginePerformanceMetrics.restore(samplingHealth.serialize()).summary(210_000L).equals(healthSummary),
+                "sampling-health counters must survive persistence");
         System.out.println("PASS engine timing separates pacing, processing, first result, and completion");
         System.out.println("PASS persisted timing survives restart and caps missed-pulse gaps");
     }

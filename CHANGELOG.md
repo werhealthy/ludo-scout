@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.83 — Salute della misura Motore (2026-09-30)
+
+- La diagnostica distingue i tentativi di campionamento riusciti da quelli falliti e mostra solo la classe dell’errore, senza messaggi o dati degli annunci.
+- Serve a capire perché il supervisore risulta attivo mentre i tempi misurati restano vecchi.
+- Solo diagnostica: nessuna modifica alla coda, alle richieste, alle soglie o alla pubblicazione.
+- Regressione: `regression/engine_performance_metrics_v51279.py` e `regression/EnginePerformanceMetricsRegression.java`.
+
+
 ## 5.12.82 — Esclusione delle sessioni storiche dai tempi (2026-09-30)
 
 - Il misuratore non usa più sessioni di osservazione già presenti nel database all’avvio come nuovi campioni; evita così tempi del primo risultato di giorni, calcolati da un’ultima osservazione storica.

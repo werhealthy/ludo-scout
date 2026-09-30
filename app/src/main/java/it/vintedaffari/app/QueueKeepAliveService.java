@@ -77,6 +77,7 @@ public final class QueueKeepAliveService extends Service {
 
     private void recordEnginePerformance(DealDatabase.ObservationSession run,long now){
         if(market==null||enginePerformance==null)return;
+        enginePerformance.recordAttempt(now);
         try{
             MarketStore.RuntimeStatus lane=market.laneStatus("vinted");
             int due=market.runnableVintedDueCount(now),processing=market.processingVintedCount();
@@ -88,7 +89,7 @@ public final class QueueKeepAliveService extends Service {
                 market.setDiagnosticState("engine_performance",enginePerformance.sampleCount(),enginePerformance.serialize());
                 lastEnginePerformancePersistAt=now;
             }
-        }catch(Throwable t){Log.d(TAG,"engine performance diagnostics skipped",t);}
+        }catch(Throwable t){enginePerformance.recordFailure(now,t);Log.d(TAG,"engine performance diagnostics skipped",t);}
     }
 
     public static boolean isRunning(){return RUNNING;}
