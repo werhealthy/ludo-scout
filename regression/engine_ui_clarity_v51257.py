@@ -21,8 +21,8 @@ run = main[run_start:thumb_start]
 checks = [
     ("overview is organized around work, results, human attention and other scrolls",
      all(token in overview for token in (
-         "engineCurrentRunHero", "engineCurrentResultsCard",
-         "engineAttentionCard", "engineWorkQueueCard", "Attività recente"))),
+         "engineCurrentRunHero", "enginePipelineCard",
+         "engineAttentionCard", "engineWorkQueueCard", "Scroll recenti"))),
     ("overview no longer renders the technical five-stage funnel",
      "engineFunnelRow(" not in overview and "Percorso di questo scroll" not in overview),
     ("hero has concrete states and no percentage progress bar",
@@ -36,7 +36,7 @@ checks = [
      "da questo scroll" in components and
      "nel Catalogo" not in components),
     ("human attention is a separate conditional inbox",
-     "Serve il tuo aiuto" in components and
+     "Richiedono attenzione" in components and
      "elementi richiedono" in components and
      'engineSection="review"' in components),
     ("unfinished scrolls use user-facing waiting states",
@@ -56,3 +56,4 @@ failed = [name for name, ok in checks if not ok]
 if failed:
     raise SystemExit("Motore UI clarity regression failed: " + ", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} Motore UI clarity guards")
+

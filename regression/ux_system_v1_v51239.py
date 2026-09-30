@@ -49,9 +49,9 @@ checks=[
      "discoverGreetingName()" in header),
     ("section headers rely on typography instead of icon tiles",
      "TextView ic=text(icon" not in section and "text(title,21,TEXT" in section),
-    ("Market has one search and two explicit utility controls",
-     'marketToolbarButton(activeFilterCount()>0?"Filtri' in market and
-     "marketToolbarButton(sortLabel()" in market and
+    ("Catalog has search with adjacent filters and result-count sorting",
+     'filters.setOnClickListener(v->showFilterSheet())' in market and
+     "sortControl.setOnClickListener(v->showSortMenu(sortControl))" in market and
      "addCatalogToggleChip(quick" not in market),
     ("Catalog uses the shared product grammar in a two-column grid",
      "appendCatalogCards(results,list" in market and "col<2" in market and "catalogProductCard(deals.get(index))" in market),
