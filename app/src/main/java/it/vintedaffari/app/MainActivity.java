@@ -1673,12 +1673,12 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private EngineOverviewSnapshot loadEngineOverviewSnapshot(){
         long started=System.currentTimeMillis();
         DealDatabase.ObservationSession run=db.activeObservationSession();long ownerAt=System.currentTimeMillis();
-        int recoveryCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();long reviewAt=System.currentTimeMillis();
+        int waitingRuns=db.waitingObservationSessionCount();int recoveryCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();long reviewAt=System.currentTimeMillis();
         DealDatabase.ObservationSession pipelineRun=run!=null?run:db.latestObservationSession();
         int[] phases=pipelineRun==null?new int[5]:db.enginePipelineCounts(pipelineRun.startAt,pipelineRun.endAt);
         int activeMask=pipelineRun==null?0:db.enginePipelineActiveMask(pipelineRun.startAt,pipelineRun.endAt);
         getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activitySnapshotTiming","ownerMs="+(ownerAt-started)+";reviewMs="+(reviewAt-ownerAt)+";pipelineMs="+(System.currentTimeMillis()-reviewAt)).apply();
-        EngineOverviewSnapshot snapshot=new EngineOverviewSnapshot(System.currentTimeMillis(),run,0,recoveryCount,Collections.emptyList(),Collections.emptyList());snapshot.pipelineRun=pipelineRun;snapshot.phases=phases;snapshot.activeMask=activeMask;return snapshot;
+        EngineOverviewSnapshot snapshot=new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,Collections.emptyList(),Collections.emptyList());snapshot.pipelineRun=pipelineRun;snapshot.phases=phases;snapshot.activeMask=activeMask;return snapshot;
     }
 
     private void requestEngineOverviewSnapshot(){
