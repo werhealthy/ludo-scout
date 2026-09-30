@@ -750,13 +750,6 @@ private void applyDiscoverChrome(){
         box.setContentDescription(name(d)+" · copertina BGG");return box;
     }
 
-    private View discoverFlatArtwork(DealRecord d,int width,int height){
-        FrameLayout artwork=new FrameLayout(this);artwork.setBackground(round(DISCOVER_SURFACE,14,0,0));artwork.setClipToOutline(true);
-        TextView placeholder=text(coverPlaceholder(d),10,DISCOVER_MUTED,Typeface.BOLD);placeholder.setGravity(Gravity.CENTER);placeholder.setPadding(dp(6),dp(6),dp(6),dp(6));artwork.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
-        ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);image.setPadding(dp(3),dp(3),dp(3),dp(3));artwork.addView(image,new FrameLayout.LayoutParams(-1,-1));setDealArtwork(image,placeholder,d);
-        artwork.setLayoutParams(new LinearLayout.LayoutParams(width,height));return artwork;
-    }
-
     private void addDiscoverBundleSpotlight(DealRecord d){
         List<DealRecord> games=bundleDealsForSource(d);if(games.size()<2)return;
         addDiscoverSectionHeading("Dallo stesso venditore","Apri",()->openBundleDetail(d));
