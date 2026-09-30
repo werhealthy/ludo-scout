@@ -10,13 +10,15 @@ if '--source-eval' in sys.argv:
         if isinstance(node,ast.Constant) and isinstance(node.value,str):return node.value
         if isinstance(node,ast.Name):return values[node.id]
         if isinstance(node,ast.BinOp) and isinstance(node.op,ast.Add):return literal(node.left)+literal(node.right)
+        if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id=='grouped' and not node.args:return grouped
         raise ValueError('Unexpected Java query expression')
     for name,expression in re.findall(r'String (\w+)=(.*?);\n',source.read_text(),re.S):values[name]=literal(ast.parse('('+expression+')',mode='eval').body)
     expression=source.read_text().split('        return ',1)[1].split(';\n',1)[0]
     grouped=literal(ast.parse('('+expression+')',mode='eval').body)
-    sql='SELECT phase,COUNT(*) FROM ('+grouped+') GROUP BY phase'
-    items='SELECT identity,signature,game_id,phase,busy,title FROM ('+grouped+') WHERE (?<0 AND phase<4) OR phase=? ORDER BY title COLLATE NOCASE,identity'
-    active='SELECT DISTINCT phase FROM ('+grouped+') WHERE busy=1'
+    def method(name):
+        expression=re.search(r'static String '+name+r'\(\)\{return (.*?);\}',source.read_text()).group(1)
+        return literal(ast.parse('('+expression+')',mode='eval').body)
+    sql,items,active=method('query'),method('items'),method('active')
 else:
     with tempfile.TemporaryDirectory() as temp:
         runner=pathlib.Path(temp)/'PrintPipeline.java'
@@ -42,11 +44,11 @@ def counts():
     result=dict(db.execute(sql,(0,200)))
     seen=set()
     for phase in range(5):
-        rows=list(db.execute(items,(0,200,phase,phase)))
+        rows=list(db.execute(items,("0","200",str(phase),str(phase))))
         assert len(rows)==result.get(phase,0),(phase,rows,result)
         assert not seen.intersection(row[0] for row in rows)
         seen.update(row[0] for row in rows)
-    assert len(list(db.execute(items,(0,200,-1,-1))))==sum(result.get(p,0) for p in range(4))
+    assert len(list(db.execute(items,("0","200","-1","-1"))))==sum(result.get(p,0) for p in range(4))
     return result
 db.execute("INSERT INTO observations(signature,observed_at) VALUES('raw',100)")
 add('pending',1)
