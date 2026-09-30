@@ -443,7 +443,7 @@ private void applyDiscoverChrome(){
             if(discoverTypefaceBase==null)discoverTypefaceBase=Typeface.createFromAsset(getAssets(),"fonts/remus-variable.ttf");
             Typeface face=Typeface.create(discoverTypefaceBase,w,false);discoverTypefaceWeights.put(w,face);return face;
         }catch(Throwable ignored){
-            Typeface face=Typeface.create("sans-serif",w,false);discoverTypefaceWeights.put(w,face);return face;
+            Typeface face=Typeface.create(Typeface.create("sans-serif",Typeface.NORMAL),w,false);discoverTypefaceWeights.put(w,face);return face;
         }
     }
 
