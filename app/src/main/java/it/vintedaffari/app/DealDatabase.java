@@ -467,6 +467,15 @@ public final class DealDatabase extends SQLiteOpenHelper {
         return counts;
     }
 
+    public static final class PipelineItem {public String identity,signature,title;public long gameId;public int phase;}
+    public synchronized List<PipelineItem> enginePipelineItems(long start,long end,int phase){
+        List<PipelineItem> out=new ArrayList<>();start=clampEngineStart(start);if(end<start)return out;
+        try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.items(),new String[]{String.valueOf(start),String.valueOf(end),String.valueOf(phase),String.valueOf(phase)})){while(c.moveToNext()){PipelineItem item=new PipelineItem();item.identity=c.getString(0);item.signature=c.getString(1);item.gameId=c.getLong(2);item.phase=c.getInt(3);item.title=c.getString(5);out.add(item);}}return out;
+    }
+    public synchronized int enginePipelineActiveMask(long start,long end){
+        start=clampEngineStart(start);if(end<start)return 0;int mask=0;try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.active(),new String[]{String.valueOf(start),String.valueOf(end)})){while(c.moveToNext())mask|=1<<c.getInt(0);}return mask;
+    }
+
     public synchronized List<EngineRunItem> engineRunItems(long startAt,long endAt,String filter,int limit){
         List<EngineRunItem> out=new ArrayList<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;String mode=filter==null?"all":filter;
         String sql="SELECT l.id,COALESCE(l.game_id,0),COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),"+

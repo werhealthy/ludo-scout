@@ -48,9 +48,9 @@ checks=[
      'renderEngineHeader("Serve il tuo aiuto"' in ui and
      '"Collegamento Vinted"' in ui and
      '"Gioco BGG"' in ui),
-    ("catalog shows publishable cards and links recovery back to Motore",
+    ("catalog shows publishable cards; recovery remains in Motore",
      'db.getDeals("trusted_any_price",800)' in ui and
-     '" annunci da completare · Apri Motore"' in ui and
+     'engineAttentionCard(snapshot.recoveryCount)' in ui and
      'navigate("activity")' in ui),
     ("strong red incomplete badge is removed",
      '"Vinted da completare · "' not in ui and
@@ -80,3 +80,4 @@ failed=[name for name,ok in checks if not ok]
 if failed:
     raise SystemExit("5.12.30 engine recovery truth regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} 5.12.30 recovery/truth guards")
+

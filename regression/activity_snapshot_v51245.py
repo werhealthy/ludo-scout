@@ -3,7 +3,7 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[1]
 ui=(root/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
 diagnostics=(root/"app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
-overview=ui[ui.index("private void renderEngineOverview()"):ui.index("private View engineCurrentRunHero",ui.index("private void renderEngineOverview()"))]
+overview=ui[ui.index("private void renderEngineOverview()"):ui.index("private View enginePipelineCard",ui.index("private void renderEngineOverview()"))]
 hero=ui[ui.index("private View engineCurrentRunHero"):ui.index("\n    private ",ui.index("private View engineCurrentRunHero")+30)]
 render=ui[ui.index("private void render()"):ui.index("private void cancelImageRequests",ui.index("private void render()"))]
 receiver=ui[ui.index("private final BroadcastReceiver receiver"):ui.index("@Override protected void onCreate",ui.index("private final BroadcastReceiver receiver"))]
@@ -29,3 +29,4 @@ checks=[
 failed=[n for n,ok in checks if not ok]
 for n,ok in checks: print(("PASS " if ok else "FAIL ")+n)
 if failed: raise SystemExit("activity snapshot regression failed: "+", ".join(failed))
+

@@ -7,22 +7,25 @@ main = (root / "app/src/main/java/it/vintedaffari/app/MainActivity.java").read_t
 db = (root / "app/src/main/java/it/vintedaffari/app/DealDatabase.java").read_text(encoding="utf-8")
 
 overview_start = main.index("private void renderEngineOverview()")
+overview_end = main.index("private View enginePipelineCard", overview_start)
 hero_start = main.index("private View engineCurrentRunHero", overview_start)
 results_start = main.index("private View engineCurrentResultsCard", hero_start)
 funnel_start = main.index("private View engineFunnelRow", results_start)
 run_start = main.index("private void renderEngineRun()")
 thumb_start = main.index("private View engineRunThumbnailView", run_start)
 
-overview = main[overview_start:hero_start]
+overview = main[overview_start:overview_end]
 hero = main[hero_start:results_start]
 components = main[results_start:funnel_start]
 run = main[run_start:thumb_start]
 
 checks = [
-    ("overview is organized around work, results, human attention and other scrolls",
-     all(token in overview for token in (
-         "engineCurrentRunHero", "enginePipelineCard",
-         "engineAttentionCard", "engineWorkQueueCard", "Scroll recenti"))),
+    ("overview has only pipeline and actionable attention",
+     "enginePipelineCard" in overview and "engineAttentionCard" in overview and
+     all(token not in overview for token in ("engineCurrentRunHero", "engineWorkQueueCard", "Scroll recenti"))),
+    ("phase and central clicks open direct exact data",
+     "openEnginePhase(-1,snapshot)" in main and "EnginePipelineSql.items()" in db and
+     "private void showEnginePhase" not in main),
     ("overview no longer renders the technical five-stage funnel",
      "engineFunnelRow(" not in overview and "Percorso di questo scroll" not in overview),
     ("hero has concrete states and no percentage progress bar",
