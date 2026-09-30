@@ -30,7 +30,7 @@ checks=[
      all(x in home for x in ["addDiscoverCategories","addDiscoverFreshRail","addDiscoverTopRatedRail","addDiscoverValueRail"]) and
      "heroOpportunityCard" in home),
     ("Home categories are five stable product clusters",
-     all(x in categories for x in ["Strategia","Cooperativi","Fantasy","Filler","Eurogame"]) and
+     all(x in ui for x in ["Strategia","Cooperativi","Fantasy","Filler","Eurogame"]) and
      "openDiscoverCluster" in categories),
     ("fresh rail leads with listing publication time",
      "publicationDisplay(d)" in product),
