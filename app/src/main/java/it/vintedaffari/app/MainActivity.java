@@ -234,8 +234,8 @@ private View makeCompanionFab(){
     private void applyActivityIndicatorSnapshot(View target,ActivityIndicatorSnapshot snapshot){
         if(target==null)return;
         boolean active=snapshot!=null&&snapshot.active,onlyPaused=snapshot!=null&&snapshot.onlyPaused;int factChecks=snapshot==null?0:snapshot.factChecks;
-        ImageView icon=target.findViewById(SHEET_ID+2);TextView dot=target.findViewById(SHEET_ID+3);TextView badge=target.findViewById(SHEET_ID+1);
-        if(icon!=null)icon.setColorFilter(onlyPaused?ORANGE:active?CYAN:MUTED);
+        TextView icon=target.findViewById(SHEET_ID+2);TextView dot=target.findViewById(SHEET_ID+3);TextView badge=target.findViewById(SHEET_ID+1);
+        if(icon!=null)icon.setTextColor(onlyPaused?ORANGE:active?CYAN:MUTED);
         if(dot!=null){dot.setVisibility(active?View.VISIBLE:View.GONE);dot.setBackground(round(onlyPaused?YELLOW:CYAN,999,0,0));}
         if(badge!=null){String shown=compactCount(factChecks);badge.setText(shown);badge.setVisibility(factChecks>0?View.VISIBLE:View.GONE);FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)badge.getLayoutParams();int w=shown.length()<=2?dp(20):shown.length()<=4?dp(29):dp(36);lp.width=w;badge.setLayoutParams(lp);}
         target.setContentDescription(factChecks>0?"Attività: "+factChecks+" fact-check da risolvere":active?(onlyPaused?"Completamento Database in pausa":"Elaborazioni in corso in background"):"Attività");
@@ -431,26 +431,44 @@ private void applyDiscoverChrome(){
 
     private Drawable discoverHeroPattern(){
         return new Drawable(){
-            private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
-            private Bitmap pattern;
+            private final Paint fill=new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint blue=new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint soft=new Paint(Paint.ANTI_ALIAS_FLAG);
             @Override public void draw(Canvas canvas){
-                Rect b=getBounds();float radius=dp(20);
-                paint.setColor(Color.argb(71,255,252,238));
-                canvas.drawRoundRect(new RectF(b),radius,radius,paint);
+                Rect b=getBounds();float w=b.width(),h=b.height(),radius=dp(20);
+                fill.setColor(Color.argb(71,255,252,238));
+                canvas.drawRoundRect(new RectF(b),radius,radius,fill);
+
                 int save=canvas.save();
                 Path clip=new Path();clip.addRoundRect(new RectF(b),radius,radius,Path.Direction.CW);canvas.clipPath(clip);
-                if(pattern==null)pattern=BitmapFactory.decodeResource(getResources(),R.drawable.discover_home_hero_pattern);
-                if(pattern!=null){
-                    paint.setAlpha(255);
-                    Rect src=new Rect(0,0,pattern.getWidth(),pattern.getHeight());
-                    // Figma's oversized blue texture is cropped by the hero card.
-                    RectF dst=new RectF(b.left-dp(78),b.top-dp(2),b.right+dp(286),b.bottom+dp(2));
-                    canvas.drawBitmap(pattern,src,dst,paint);
+                // Figma Star 2 is a low-opacity ultramarine texture, not a blue card.
+                blue.setColor(Color.argb(99,0,57,170));blue.setStyle(Paint.Style.FILL);
+                Path field=new Path();field.moveTo(b.left,b.top);field.lineTo(b.left+w*.33f,b.top);
+                for(int i=0;i<=18;i++){
+                    float y=b.top+h*(i/18f);
+                    float x=b.left+w*(.34f+.018f*(float)Math.sin(i*.87f));
+                    field.lineTo(x,y);
                 }
+                field.lineTo(b.left,b.bottom);field.close();canvas.drawPath(field,blue);
+
+                blue.setStyle(Paint.Style.STROKE);blue.setStrokeCap(Paint.Cap.ROUND);
+                for(int i=-2;i<18;i++){
+                    float y=b.top+h*(.10f+i*.055f);
+                    float thickness=dp(5.5f+(i%4)*1.2f);
+                    blue.setStrokeWidth(thickness);
+                    Path p=new Path();p.moveTo(b.left+w*.27f,y);
+                    p.cubicTo(b.left+w*.42f,y-dp(15),b.left+w*.48f,y+dp(14),b.left+w*.60f,y-dp(4));
+                    p.cubicTo(b.left+w*.72f,y-dp(18),b.left+w*.80f,y+dp(13),b.right+dp(28),y-dp(8));
+                    canvas.drawPath(p,blue);
+                }
+
+                // Subtle grain approximates Figma's Texture effect (radius 12.3 / noise 42.4).
+                soft.setColor(Color.argb(11,255,255,255));Random r=new Random(1156L);
+                for(int i=0;i<48;i++)canvas.drawCircle(b.left+r.nextFloat()*w,b.top+r.nextFloat()*h,dp(.55f+r.nextFloat()*.7f),soft);
                 canvas.restoreToCount(save);
             }
-            @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
-            @Override public void setColorFilter(android.graphics.ColorFilter filter){paint.setColorFilter(filter);}
+            @Override public void setAlpha(int alpha){fill.setAlpha(alpha);blue.setAlpha(alpha);}
+            @Override public void setColorFilter(android.graphics.ColorFilter filter){fill.setColorFilter(filter);blue.setColorFilter(filter);}
             @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
         };
     }
