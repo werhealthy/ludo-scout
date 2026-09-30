@@ -56,7 +56,7 @@ checks=[
      'fullScreenPanel("Filtri","Azzera"' in filters and
      'fullScreenPanel("Filtri giochi","Azzera"' in ui),
     ("game database shell has no quick-filter wall",
-     "marketToolbarButton(databaseAdvancedFilterCount()" in db and
+     "appIcon(LudoIcons.SLIDERS" in db and
      'materialChip(("review".equals(databaseScope)' not in db),
 ]
 
@@ -66,3 +66,4 @@ failed=[name for name,ok in checks if not ok]
 if failed:
     raise SystemExit("5.12.40 connected product graph regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} connected product graph guards")
+

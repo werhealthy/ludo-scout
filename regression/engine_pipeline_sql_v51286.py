@@ -13,38 +13,50 @@ if '--source-eval' in sys.argv:
         raise ValueError('Unexpected Java query expression')
     for name,expression in re.findall(r'String (\w+)=(.*?);\n',source.read_text(),re.S):values[name]=literal(ast.parse('('+expression+')',mode='eval').body)
     expression=source.read_text().split('        return ',1)[1].split(';\n',1)[0]
-    sql=literal(ast.parse('('+expression+')',mode='eval').body)
+    grouped=literal(ast.parse('('+expression+')',mode='eval').body)
+    sql='SELECT phase,COUNT(*) FROM ('+grouped+') GROUP BY phase'
+    items='SELECT identity,signature,game_id,phase,busy,title FROM ('+grouped+') WHERE (?<0 AND phase<4) OR phase=? ORDER BY title COLLATE NOCASE,identity'
+    active='SELECT DISTINCT phase FROM ('+grouped+') WHERE busy=1'
 else:
     with tempfile.TemporaryDirectory() as temp:
         runner=pathlib.Path(temp)/'PrintPipeline.java'
-        runner.write_text('package it.vintedaffari.app; public class PrintPipeline {public static void main(String[] args){System.out.print(EnginePipelineSql.query());}}')
+        runner.write_text('package it.vintedaffari.app; public class PrintPipeline {public static void main(String[] args){System.out.print(EnginePipelineSql.query()+"\\n---QUERY---\\n"+EnginePipelineSql.items()+"\\n---QUERY---\\n"+EnginePipelineSql.active());}}')
         subprocess.run(['javac','-d',temp,str(source),str(runner)],check=True)
-        sql=subprocess.check_output(['java','-cp',temp,'it.vintedaffari.app.PrintPipeline'],text=True)
+        sql,items,active=subprocess.check_output(['java','-cp',temp,'it.vintedaffari.app.PrintPipeline'],text=True).split('\n---QUERY---\n')
 db=sqlite3.connect(':memory:')
 db.executescript('''
-CREATE TABLE observations(signature TEXT,observed_at INTEGER);
+CREATE TABLE observations(signature TEXT,observed_at INTEGER,display_name TEXT,game_name TEXT,vinted_title TEXT);
 CREATE TABLE games(id INTEGER PRIMARY KEY,bgg_id TEXT,match_state TEXT,rating REAL,database_visible INTEGER);
 CREATE TABLE market_listings(id INTEGER PRIMARY KEY,game_id INTEGER,legacy_signature TEXT,temp_fingerprint TEXT,lifecycle TEXT,enrichment_state TEXT,manual_review_required INTEGER,match_state TEXT,vinted_item_id TEXT,vinted_url TEXT);
 CREATE TABLE deals(signature TEXT,verification_state TEXT,lifecycle TEXT,listing_type TEXT,tier TEXT,rating REAL,bgg_id TEXT,vinted_item_id TEXT,vinted_url TEXT);
-CREATE TABLE processing_jobs(listing_id INTEGER,job_type TEXT,source TEXT,state TEXT);
+CREATE TABLE processing_jobs(listing_id INTEGER,job_type TEXT,source TEXT,state TEXT,game_id INTEGER);
 ''')
 def add(sig,game=None,bgg=None,rating=None,gs='PENDING',state='PENDING_ANALYSIS',linked=False,review=0,visible=1):
     lid=db.execute('SELECT COALESCE(MAX(id),0)+1 FROM market_listings').fetchone()[0]
     if game is not None:db.execute('INSERT OR IGNORE INTO games VALUES(?,?,?,?,?)',(game,bgg,gs,rating,visible))
-    db.execute('INSERT INTO observations VALUES(?,100)',(sig,))
+    db.execute('INSERT INTO observations(signature,observed_at) VALUES(?,100)',(sig,))
     db.execute('INSERT INTO market_listings VALUES(?,?,?,?,?,?,?,?,?,?)',(lid,game,sig,sig,'ACTIVE',state,review,'MATCHED' if gs=='MATCHED' else gs,str(lid) if linked else '', 'url' if linked else ''))
     db.execute("INSERT INTO deals VALUES(?,'OK','ACTIVE','GAME','good',?,?,?,?)",(sig,rating,bgg,str(lid) if linked else '','url' if linked else ''))
     return lid
-def counts():return dict(db.execute(sql,(0,200)))
-db.execute("INSERT INTO observations VALUES('raw',100)")
+def counts():
+    result=dict(db.execute(sql,(0,200)))
+    seen=set()
+    for phase in range(5):
+        rows=list(db.execute(items,(0,200,phase,phase)))
+        assert len(rows)==result.get(phase,0),(phase,rows,result)
+        assert not seen.intersection(row[0] for row in rows)
+        seen.update(row[0] for row in rows)
+    assert len(list(db.execute(items,(0,200,-1,-1))))==sum(result.get(p,0) for p in range(4))
+    return result
+db.execute("INSERT INTO observations(signature,observed_at) VALUES('raw',100)")
 add('pending',1)
 add('analyzing',2,state='ANALYZED')
 add('eligible',3,'3',7,'MATCHED','ANALYZED')
-vinted=add('vinted',4,'4',7,'MATCHED','PENDING_ENRICHMENT');db.execute("INSERT INTO processing_jobs VALUES(?,'VINTED_ENRICHMENT','AUTO','PENDING')",(vinted,))
+vinted=add('vinted',4,'4',7,'MATCHED','PENDING_ENRICHMENT');db.execute("INSERT INTO processing_jobs(listing_id,job_type,source,state) VALUES(?,'VINTED_ENRICHMENT','AUTO','PENDING')",(vinted,))
 ready=add('ready',5,'5',7,'MATCHED','CORE_COMPLETE',True)
 assert counts()=={0:2,1:1,2:1,3:1,4:1},counts()
 # Repeated observations and duplicate canonical/BGG identities don't inflate any phase.
-db.execute("INSERT INTO observations VALUES('ready',100)")
+db.execute("INSERT INTO observations(signature,observed_at) VALUES('ready',100)")
 add('ready-copy',6,'5',7,'MATCHED','COMPLETE',True)
 assert counts()=={0:2,1:1,2:1,3:1,4:1},counts()
 # A game's most advanced usable listing determines its one phase.
@@ -58,7 +70,7 @@ add('low',52,'52',5,'MATCHED','COMPLETE',True)
 add('hold',53,'53',8,'MATCHED','LOCAL_ONLY',True)
 assert counts()=={0:2,1:1,3:1,4:2},counts()
 # Automatic deep enrichment doesn't unpublish core readiness; manual deep recovery does.
-db.execute("INSERT INTO processing_jobs VALUES(?,'VINTED_DEEP_ENRICHMENT','AUTO','PENDING')",(ready,))
+db.execute("INSERT INTO processing_jobs(listing_id,job_type,source,state) VALUES(?,'VINTED_DEEP_ENRICHMENT','AUTO','PENDING')",(ready,))
 assert counts().get(4)==2
 # Remove other ready listing so the single pending manual recovery can demote this identity.
 db.execute("UPDATE market_listings SET lifecycle='SOLD' WHERE legacy_signature='ready-copy'")
@@ -76,4 +88,10 @@ db.execute("UPDATE deals SET listing_type='ACCESSORY' WHERE signature='unsupport
 db.execute("UPDATE deals SET vinted_item_id='' WHERE signature='missing-id'")
 assert counts().get(4)==1
 assert not dict(db.execute(sql,(201,300)))
+db.execute("UPDATE processing_jobs SET state='PROCESSING' WHERE listing_id=?",(vinted,))
+assert 3 in [row[0] for row in db.execute(active,(0,200))]
+db.execute("UPDATE processing_jobs SET state='PENDING'")
+assert not list(db.execute(active,(0,200)))
+db.execute("INSERT INTO processing_jobs(game_id,job_type,source,state) VALUES(2,'BGG_ENRICHMENT','AUTO','PROCESSING')")
+assert 1 in [row[0] for row in db.execute(active,(0,200))]
 print('PASS production SQLite phase occupancy, identities, review/price holds, pending/manual/deep jobs and time scope')

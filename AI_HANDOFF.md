@@ -1,3 +1,13 @@
+## 5.12.87 — Catalog Giochi and Motore motion (2026-09-30)
+- Giochi uses two cover-first columns, equal two-line ellipsized titles, BGG rating/players/current availability. All four advanced filters and sorting preserved; history remains in game detail.
+- Ludo removes redundant metric summary and Motore shortcut, adds module spacing, calm cover-first recommendations and truthful raw BGG rating.
+- Motore entry is Home only. Overview contains the five-phase wheel and conditional attention. Central count opens current work/phase<4; each phase opens direct exact grouped membership, without explanatory modal. Lists load off main thread and show observation titles while unidentified.
+- Shared read-only SQL predicates preserve readiness/trust gates, deduplicate identities and drive both counts/lists. Active pulse follows actual PROCESSING listing or game jobs, excluding optional automatic deep enrichment.
+- Same-scroll counts persist as visual baseline; fresh counts interpolate once with small zoom and green/red delta. Stale entry snapshots do not consume changes. Motion respects disabled system animators and foreground lifecycle.
+- Edition language and text dependence use distinct FontAwesome icons and exact existing facts; no inferred game-wide edition language.
+- 62 current workflow regressions pass locally, including exclusive SQL count/list parity and active-job fixtures. Android/JUnit/production-Java SQL validation runs in PR CI; device visual verification unavailable locally.
+- User authorizes verified merge and immediate Firebase App Tester distribution. Update STATE after confirmed distribution.
+
 
 ## 5.12.86 — Unified UI and five-phase Motore (2026-09-30)
 - Home/Catalog cards reserve exactly two title lines with ellipsis, taller covers and a consistent price slot; catalog status reserves two lines too.
