@@ -19,9 +19,10 @@ checks=[
      "1000000 + ciVersionCode.toInteger()" in build),
     ("Home uses the updated Discover editorial composition",
      "private void renderDiscover()" in ui and
-     '"Scopri"' in discover and
+     '"Bentornato,"' in discover and
      "addDiscoverFreshRail" in ui and
-     "addDiscoverTopRatedRail" in ui),
+     "addDiscoverTopRatedRail" in ui and
+     "addDiscoverValueRail" in ui),
     ("Catalog preview is a true horizontal listing row",
      "new LinearLayout(this)" in catalog and
      "setOrientation(LinearLayout.HORIZONTAL)" in catalog and
