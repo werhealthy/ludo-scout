@@ -2,16 +2,7 @@
 
 ## Verified release
 
-5.12.89-home-personalized (1000106), distributed 2026-10-01 00:36 Europe/Rome (2026-09-30 22:36 UTC). PR98 merged to beta at 120efc03bd30a2c938e83b7d071a2aa75eb37356. Head 6ef8d2d93a59e3c1b8d323a0fc33edca9d279189 passed Android PR run261 (36785959533). Signed beta run106 (36786129627) passed; Firebase logs explicitly confirmed successful release upload and tester/group distribution.
-
-## Current completed refinement — Home
-
-- Per-game interest/dismiss preferences persist on device. Non mi interessa swaps the hero and has Undo. Owned unsold Library games and confirmed non-IT/EN dependent editions are excluded from Home, including bundle partners.
-- Featured cover uses square/portrait/landscape compositions, with 52dp CTA and 48dp preference targets. Compact flags/lock icons share readable help; unknown metadata is preserved.
-- Actual discount percentages use bands 0–9, 10–29, 30–79, 80+ across featured/product/top-rated cards. Product rails expose two full cards and half a third; publication dates and greeting spacing improved.
-- Categories use independent persisted filters, visible numbered filter badges, and free-text search stays separate. Production SQL fixtures cover typed category, free text, eligibility, count and paging parity.
-- Normal cold launcher entry defaults Home; explicit intents and saved activity recreation preserve destinations.
-- Validation: PR and signed beta succeeded, including Android unit tests and compile, category/pipeline/canonical SQLite fixtures.62 local source/SQL checks passed. Static review caught badge/color gaps; CI caught a local-name collision, fixed before merge. No local device/emulator pixel validation.
+5.12.90-featured-box-poc (1000107), distributed 2026-10-01 00:40 Europe/Rome (2026-09-30 22:40 UTC). PR99 merged to beta at 8039f8ed81e69c350413552f809fb8cb9177ff30. Head 53502a2b3eeae414f9a9ff6906a58545887150f1 passed Android PR run262 (36786299279). Signed beta run107 (36786535211) passed; Firebase confirmed successful new release upload and tester/group distribution.
 
 ## Delivery preference
 
@@ -20,6 +11,7 @@ Automatically merge verified Ludo Scout updates to beta and publish to Firebase 
 ## Previous completed step — Home 5.12.88
 
 - One Home gear opens Motore. Engine ellipsis opens existing settings/diagnostics.
+- Featured hero proof of concept uses the real BGG cover in an adaptive 2.5D box renderer: perspective-mapped front, separate top/side planes, cover-derived side tone, restrained front light, and layered contact/ambient shadows. Personalized Mi interessa / Non mi interessa behavior from v89 is preserved; no new dependency was added.
 - Featured Scopri di più is visibly52dp tall with ripple and larger text.
 - Edition flags/names and distinct dependence labels use ordinary Italian, with explicit unknown states and no invented language evidence. Detail language has its own row to preserve BGG visibility.
 - Home covers, hero and BGG ranking crop to their frames. Shared section titles use FontAwesome.
@@ -30,7 +22,7 @@ Automatically merge verified Ludo Scout updates to beta and publish to Firebase 
 
 ## Validation
 
-All PR/beta workflows passed, including production Java-generated SQLite fixtures, Android JUnit, Java compilation and signed APK.62 current workflow source/SQL regressions also passed locally; code review caught and verified fixes for bundle UI cost and detail language clipping. No local Android emulator/device visual validation. User reviews this step through App Tester.
+PR99 Android validation passed all regressions and Java compilation. Signed beta run107 passed, uploaded 5.12.90-featured-box-poc (1000107) to Firebase, and Firebase reported distribution to testers/groups successful. No emulator/device visual validation was performed: the renderer's realism, shadow quality, and behavior across real wide/tall/square BGG covers must be judged on the user's phone before treating this visual direction as approved.
 
 ## Remaining work — do not claim fixed
 
@@ -43,4 +35,4 @@ User requested ordered, reviewable steps rather than one broad rewrite. See docs
 4. Ludo — minimal purple pet inspired by attached reference; large opening presence, collapses on scroll.
 5. Collection/shared interactions — bookshelf exploration, liking0–5 with preserved existing ratings, sale-price entry/backfill, bottom-slide modals and purposeful motion.
 
-Recommended next action: inspect Home on1000106, then address Motore crashes/stalled queue before deeper animations. Application identity, signing, acquisition, queue ownership and publish/readiness/review/price gates unchanged.
+Recommended next action: inspect the featured card on 5.12.90-featured-box-poc with several real BGG covers; decide whether the 2.5D renderer is visually credible before refining it or extending it elsewhere.
