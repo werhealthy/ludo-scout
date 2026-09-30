@@ -1,5 +1,15 @@
 # Ludo Scout — AI handoff
 
+## 5.12.85 — Home/Catalog refinement (PR93)
+- Larger 166dp Home product cards and 90×94dp categories with individual tonal borders.
+- Hero reflows from actual loaded BGG artwork ratio: landscape above copy; square and portrait beside it. Natural title height, start alignment, discount inside artwork, compact CTA with 48dp touch area.
+- Edition language and text dependence use exact existing tokens; missing/conflicting evidence stays unknown. No inference from category or description.
+- Catalog reuses cover-first cards in a two-column grid; category chips filter exact BGG labels and toggle off on second tap. Existing listing overflow/recovery/bundle signals retained, 24-card pagination retained. Category selection is session-local.
+- Files: MainActivity, HomePresentation and JUnit tests, DiscoverCategories, visual guards, release identity and design/state docs. No DB migration or new dependency.
+- 61 Python source regressions passed locally. Java/Android validation is PR CI; local JDK unavailable. Manual pass: square/wide/tall/missing cover, long name, large font, 320–393dp widths, Home links, Catalog filter/sort/reset/actions and scroll past 24 cards.
+- Outstanding: Motore five-stage design and remaining pages. Current stage counters overlap and measure listings; define mutually exclusive membership and game identity before using a total. Do not invent per-game movement or price alerts absent event evidence.
+
+
 ## 5.12.84 — Official dark Home (2026-09-30)
 - Implements the approved screenshot/CSS: navy radial background, white hierarchy, purple hero with real rating/name/description/cover/price/discount and white CTA; settings opens the existing sheet.
 - Uses all eight supplied category icons, sampled once and cached. DiscoverCategories maps every supplied BGG category; SQL filters whole category labels with OR semantics, retaining verified/visible eligibility. Famiglia does not override the existing Children's Game exclusion.
