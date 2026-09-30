@@ -143,3 +143,7 @@ Before merging UI changes:
 - Can any metadata move behind progressive disclosure?
 - Is a corrective/manual action cluttering the main hierarchy?
 
+
+
+### Home/Catalog refinement 5.12.85
+Vertical cards share larger cover-first layout, explicit edition and text-dependence information. Category borders follow their individual tonal color. Featured card uses actual loaded cover ratio: wide cover above copy, square or portrait beside start-aligned copy, discount inside artwork and compact button within 48dp touch area. Catalog uses two columns; pipeline eligibility/filter/sort/pagination remain unchanged. Engine and other pages await subsequent milestones.

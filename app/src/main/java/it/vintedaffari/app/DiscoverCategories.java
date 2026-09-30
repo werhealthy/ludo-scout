@@ -18,6 +18,12 @@ final class DiscoverCategories {
         {"Murder / Mystery","Horror","Spies / Secret Agents","Zombies"},
         {"Wargame","World War I","World War II","Napoleonic","American Civil War","Vietnam War","Modern Warfare"}
     };
+    static boolean matches(int index,String categories){
+        if(index<0||index>=BGG.length||categories==null)return false;
+        String normalized=" · "+categories.trim().toLowerCase(Locale.ROOT)+" · ";
+        for(String category:BGG[index])if(normalized.contains(" · "+category.toLowerCase(Locale.ROOT)+" · "))return true;
+        return false;
+    }
     static String[] labels(){return LABELS.clone();}
     static String query(int index){return PREFIX+LABELS[Math.max(0,Math.min(index,LABELS.length-1))];}
     private static int index(String query){

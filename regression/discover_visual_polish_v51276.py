@@ -32,7 +32,7 @@ checks = [
      '"Bentornato,"' in header and "discoverGreetingName()" in header and
      "discoverTextWeight(discoverGreetingName(),37" in header),
     ("Hero keeps real game identity and offer information",
-     all(x in hero for x in ["discoverGameDescription(d)", "discoverBggCover(d", "name(d)", "total(d)", "discoverDiscountBadge(d", "LudoIcons.STAR", "openDetail(d)"])),
+     all(x in hero for x in ["discoverGameDescription(d)", "setDiscoverBggArtwork(image,placeholder,d,arrange)", "name(d)", "total(d)", "discoverDiscountBadge(d", "LudoIcons.STAR", "openDetail(d)"])),
     ("category navigation uses the shared BGG clusters",
      "DiscoverCategories.labels()" in ui and "DiscoverCategories.query(index)" in categories and "openDiscoverCategory" in categories),
     ("category bitmaps are sampled and cached",
@@ -45,7 +45,7 @@ checks = [
      "firstListingPhoto" not in product and
      "setDealArtwork" not in product),
     ("product discount follows the real price row",
-     "discoverDiscountBadge(d,10)" in product and "bottom.addView(badge)" in product),
+     "discoverDiscountBadge(d,11)" in product and "bottom.addView(badge)" in product),
     ("fresh variant promotes publication time",
      "publicationDisplay(d)" in product and "if(fresh)" in product),
     ("offer variant promotes BGG rating with Font Awesome star",
