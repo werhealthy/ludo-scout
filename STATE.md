@@ -2,13 +2,22 @@
 
 ## Verified release
 
-5.12.88-home-material (1000105), distributed 2026-10-01 00:01 Europe/Rome (2026-09-30 22:01 UTC). PR96 merged to beta at 8021556cf81f8a3a24282f7d759cc7809d4ae33c. Head c64412f46eb7f45299334ab29be2d2faf3090aab passed Android PR run256 (36782398800). Signed beta run36782726617 passed and Firebase confirmed successful new release upload and tester/group distribution.
+5.12.89-home-personalized (1000106), distributed 2026-10-01 00:36 Europe/Rome (2026-09-30 22:36 UTC). PR98 merged to beta at 120efc03bd30a2c938e83b7d071a2aa75eb37356. Head 6ef8d2d93a59e3c1b8d323a0fc33edca9d279189 passed Android PR run261 (36785959533). Signed beta run106 (36786129627) passed; Firebase logs explicitly confirmed successful release upload and tester/group distribution.
+
+## Current completed refinement — Home
+
+- Per-game interest/dismiss preferences persist on device. Non mi interessa swaps the hero and has Undo. Owned unsold Library games and confirmed non-IT/EN dependent editions are excluded from Home, including bundle partners.
+- Featured cover uses square/portrait/landscape compositions, with 52dp CTA and 48dp preference targets. Compact flags/lock icons share readable help; unknown metadata is preserved.
+- Actual discount percentages use bands 0–9, 10–29, 30–79, 80+ across featured/product/top-rated cards. Product rails expose two full cards and half a third; publication dates and greeting spacing improved.
+- Categories use independent persisted filters, visible numbered filter badges, and free-text search stays separate. Production SQL fixtures cover typed category, free text, eligibility, count and paging parity.
+- Normal cold launcher entry defaults Home; explicit intents and saved activity recreation preserve destinations.
+- Validation: PR and signed beta succeeded, including Android unit tests and compile, category/pipeline/canonical SQLite fixtures.62 local source/SQL checks passed. Static review caught badge/color gaps; CI caught a local-name collision, fixed before merge. No local device/emulator pixel validation.
 
 ## Delivery preference
 
 Automatically merge verified Ludo Scout updates to beta and publish to Firebase App Tester. Do not ask again for merge or distribution approval. Confirm successful tester distribution before claiming availability. Documentation-only status commits may skip CI to avoid duplicate APKs.
 
-## Current completed step — Home
+## Previous completed step — Home 5.12.88
 
 - One Home gear opens Motore. Engine ellipsis opens existing settings/diagnostics.
 - Featured Scopri di più is visibly52dp tall with ripple and larger text.
@@ -34,4 +43,4 @@ User requested ordered, reviewable steps rather than one broad rewrite. See docs
 4. Ludo — minimal purple pet inspired by attached reference; large opening presence, collapses on scroll.
 5. Collection/shared interactions — bookshelf exploration, liking0–5 with preserved existing ratings, sale-price entry/backfill, bottom-slide modals and purposeful motion.
 
-Recommended next action: inspect Home on1000105, then address Motore crashes/stalled queue before deeper animations. Application identity, signing, acquisition, queue ownership and publish/readiness/review/price gates unchanged.
+Recommended next action: inspect Home on1000106, then address Motore crashes/stalled queue before deeper animations. Application identity, signing, acquisition, queue ownership and publish/readiness/review/price gates unchanged.
