@@ -52,6 +52,7 @@ final class LudoIcons {
     static final String BOOKMARK="\uf02e";
     static final String EYE_SLASH="\uf070";
     static final String GAMEPAD="\uf11b";
+    static final String STORE="\uf54e";
 
     private static Typeface solid;
     private static Typeface regular;
