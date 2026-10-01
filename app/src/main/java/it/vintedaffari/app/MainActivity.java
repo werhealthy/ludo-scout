@@ -626,15 +626,35 @@ private void applyDiscoverChrome(){
     }
     private View discoverLanguageIndicator(DealRecord d){View row=languageIndicators(d.languageCode);row.setOnClickListener(v->showLanguageHelp());return row;}
 
+
+    /** Seamless violet studio surface; lighting scales with the card, no raster floor. */
+    private Drawable premiumSurface(boolean hero){return new Drawable(){
+        private final Paint paint=new Paint(3),rim=new Paint(3);private final RectF rect=new RectF();private final Path clip=new Path();
+        private Shader base,bloom,sheen,floor;private final float radius=dp(hero?18:12);
+        @Override protected void onBoundsChange(Rect bounds){
+            float width=Math.max(1,bounds.width()),height=Math.max(1,bounds.height()),inset=dp(1)*.5f;rect.set(bounds.left+inset,bounds.top+inset,bounds.right-inset,bounds.bottom-inset);clip.reset();clip.addRoundRect(rect,radius,radius,Path.Direction.CW);
+            base=new LinearGradient(bounds.left,bounds.top,bounds.right,bounds.bottom,new int[]{Color.rgb(27,15,46),Color.rgb(18,10,33),Color.rgb(29,17,43)},new float[]{0,.57f,1},Shader.TileMode.CLAMP);
+            bloom=new RadialGradient(bounds.left+width*.24f,bounds.top+height*.20f,Math.max(1,width*.65f),new int[]{Color.argb(hero?115:58,123,55,181),Color.argb(hero?45:18,94,32,133),Color.TRANSPARENT},new float[]{0,.43f,1},Shader.TileMode.CLAMP);
+            sheen=new LinearGradient(bounds.left,bounds.top,bounds.right,bounds.bottom,new int[]{Color.TRANSPARENT,Color.argb(hero?28:15,204,176,236),Color.TRANSPARENT},new float[]{0,.44f,1},Shader.TileMode.CLAMP);
+            floor=new LinearGradient(0,bounds.top+height*.64f,0,bounds.bottom,new int[]{Color.TRANSPARENT,Color.argb(hero?34:22,114,63,153),Color.argb(70,5,4,12)},new float[]{0,.70f,1},Shader.TileMode.CLAMP);
+            rim.setStyle(Paint.Style.STROKE);rim.setStrokeWidth(dp(1));rim.setShader(new LinearGradient(bounds.left,bounds.top,bounds.right,bounds.bottom,new int[]{Color.argb(hero?220:90,157,76,192),Color.argb(95,91,57,128),Color.argb(hero?155:60,142,76,167)},null,Shader.TileMode.CLAMP));
+        }
+        @Override public void draw(Canvas canvas){int save=canvas.save();canvas.clipPath(clip);paint.setShader(base);canvas.drawRect(rect,paint);paint.setShader(bloom);canvas.drawRect(rect,paint);paint.setShader(sheen);canvas.drawRect(rect,paint);paint.setShader(floor);canvas.drawRect(rect,paint);canvas.restoreToCount(save);canvas.drawRoundRect(rect,radius,radius,rim);}
+        @Override public void getOutline(Outline outline){outline.setRoundRect(getBounds(),radius);}
+        @Override public void setAlpha(int alpha){paint.setAlpha(alpha);rim.setAlpha(alpha);}
+        @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);rim.setColorFilter(filter);}
+        @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+    };}
+
     private View homePreviewBox(DealRecord d){
-        FrameLayout stage=new FrameLayout(this);stage.setBackground(round(Color.rgb(23,21,30),12,0,0));stage.setClipToOutline(true);sceneBackdrop(stage,R.drawable.game_scene_floor);FeaturedBoxView box=new FeaturedBoxView(true,true);stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
+        FrameLayout stage=new FrameLayout(this);stage.setBackground(premiumSurface(false));stage.setClipToOutline(true);FeaturedBoxView box=new FeaturedBoxView(true,true);stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
         TextView placeholder=discoverTextWeight(coverPlaceholder(d),10,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);stage.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
         ImageView source=new ImageView(this);source.setVisibility(View.INVISIBLE);stage.addView(source,new FrameLayout.LayoutParams(dp(1),dp(1)));
         setProductArtwork(source,placeholder,d.bggId,d.bggImageUrl,"home-preview:"+d.signature+":"+d.bggId,()->{Drawable art=source.getDrawable();if(art instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)art).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,null);placeholder.setVisibility(View.GONE);}}});return stage;
     }
     private View discoverProductCard(DealRecord d,boolean fresh){
         LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(12),dp(12),dp(12),dp(12));
-        card.setBackground(round(DISCOVER_SURFACE,18,1,DISCOVER_OUTLINE));
+        card.setBackground(premiumSurface(false));
         View cover=homePreviewBox(d);addGameFavorite((FrameLayout)cover,d.bggId,name(d),Gravity.TOP|Gravity.END);card.addView(cover,new LinearLayout.LayoutParams(-1,dp(180)));
         card.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{int size=r-l-card.getPaddingLeft()-card.getPaddingRight();if(size>0&&cover.getLayoutParams().height!=size)cover.post(()->{cover.getLayoutParams().height=size;cover.requestLayout();});});
         TextView title=discoverTextWeight(name(d),16,DISCOVER_TEXT,700);title.setLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setPadding(0,dp(9),0,dp(4));card.addView(title);
@@ -679,25 +699,25 @@ private void applyDiscoverChrome(){
     }
 
     private View heroOpportunityCard(DealRecord d){
-        FrameLayout card=new FrameLayout(this);card.setClipToOutline(true);GradientDrawable background=new GradientDrawable();background.setColors(new int[]{Color.rgb(46,43,52),Color.rgb(8,8,12)});background.setGradientType(GradientDrawable.RADIAL_GRADIENT);background.setGradientCenter(.50f,.46f);background.setGradientRadius(dp(310));background.setCornerRadius(dp(16));background.setStroke(dp(1),DISCOVER_OUTLINE);GradientDrawable glow=new GradientDrawable();glow.setColors(new int[]{Color.argb(36,102,78,140),Color.TRANSPARENT});glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);glow.setGradientCenter(.50f,.56f);glow.setGradientRadius(dp(190));glow.setCornerRadius(dp(16));card.setBackground(new android.graphics.drawable.LayerDrawable(new Drawable[]{background,glow}));
+        FrameLayout card=new FrameLayout(this);card.setClipToOutline(true);card.setBackground(premiumSurface(true));
         LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(16),dp(16),dp(16),dp(16));card.addView(content,new FrameLayout.LayoutParams(-1,-2));
-        FrameLayout art=new FrameLayout(this);art.setBackground(round(Color.rgb(23,21,30),12,0,0));art.setClipToOutline(true);sceneBackdrop(art,R.drawable.game_scene_floor);FeaturedBoxView box=new FeaturedBoxView(true,false);art.addView(box,new FrameLayout.LayoutParams(-1,-1));TextView placeholder=discoverTextWeight(coverPlaceholder(d),11,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(this);image.setVisibility(View.INVISIBLE);art.addView(image,new FrameLayout.LayoutParams(dp(1),dp(1),Gravity.TOP|Gravity.START));TextView badge=discoverDiscountBadge(d,14);if(badge!=null){FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);bp.setMargins(dp(8),dp(8),dp(8),0);art.addView(badge,bp);}
-        addGameFavorite(art,d.bggId,name(d),Gravity.BOTTOM|Gravity.END);String summary=discoverGameDescription(d);final int[] previous={-1,-1};Runnable arrange=()->{
+        FrameLayout art=new FrameLayout(this);art.setBackgroundColor(Color.TRANSPARENT);FeaturedBoxView box=new FeaturedBoxView(true,false);art.addView(box,new FrameLayout.LayoutParams(-1,-1));TextView placeholder=discoverTextWeight(coverPlaceholder(d),11,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(this);image.setVisibility(View.INVISIBLE);art.addView(image,new FrameLayout.LayoutParams(dp(1),dp(1),Gravity.TOP|Gravity.START));TextView badge=discoverDiscountBadge(d,14);if(badge!=null){FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);bp.setMargins(dp(4),dp(8),dp(4),0);art.addView(badge,bp);}
+        String summary=discoverGameDescription(d);final int[] previous={-1,-1};Runnable arrange=()->{
             Drawable cover=image.getDrawable();int width=cover==null?1:cover.getIntrinsicWidth(),height=cover==null?1:cover.getIntrinsicHeight();int mode=HomePresentation.coverMode(width,height);int available=content.getWidth()-content.getPaddingLeft()-content.getPaddingRight();if(available<=0)available=getResources().getDisplayMetrics().widthPixels-dp(72);if(previous[0]==mode&&previous[1]==available)return;previous[0]=mode;previous[1]=available;
             if(art.getParent()!=null)((ViewGroup)art.getParent()).removeView(art);content.removeAllViews();
-            LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);TextView title=discoverTextWeight(name(d),mode==HomePresentation.SQUARE?27:28,DISCOVER_TEXT,700);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);LinearLayout facts=new LinearLayout(this);facts.setGravity(Gravity.CENTER_VERTICAL);facts.addView(appIcon(LudoIcons.STAR,15,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(23),dp(26)));facts.addView(discoverTextWeight(d.rating==null?"—":String.format(Locale.ITALY,"%.1f",d.rating),17,TEXT,700));copy.addView(facts);copy.addView(discoverLanguageIndicator(d));TextView price=discoverTextWeight(total(d),27,DISCOVER_TEXT,700);price.setPadding(0,dp(3),0,0);price.setGravity(Gravity.CENTER_VERTICAL);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(16,27,1,android.util.TypedValue.COMPLEX_UNIT_SP);
-            TextView eyebrow=discoverTextWeight("★ Gioco in evidenza",12,Color.rgb(242,231,255),600);eyebrow.setPadding(dp(8),dp(5),dp(8),dp(5));eyebrow.setBackground(round(Color.rgb(73,38,99),8,1,Color.rgb(156,94,190)));LinearLayout.LayoutParams labelParams=new LinearLayout.LayoutParams(-2,-2);labelParams.bottomMargin=dp(8);copy.addView(eyebrow,0,labelParams);
+            LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);boolean inline=HomePresentation.heroInline(available/getResources().getDisplayMetrics().density,getResources().getConfiguration().fontScale);TextView title=discoverTextWeight(name(d),inline?24:27,DISCOVER_TEXT,700);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);LinearLayout facts=new LinearLayout(this);facts.setGravity(Gravity.CENTER_VERTICAL);facts.addView(appIcon(LudoIcons.STAR,15,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(23),dp(26)));facts.addView(discoverTextWeight(d.rating==null?"—":String.format(Locale.ITALY,"%.1f",d.rating),17,TEXT,700));copy.addView(facts);copy.addView(discoverLanguageIndicator(d));TextView price=discoverTextWeight(total(d),27,DISCOVER_TEXT,700);price.setPadding(0,dp(3),0,0);price.setGravity(Gravity.CENTER_VERTICAL);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(16,27,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+            TextView eyebrow=discoverTextWeight("★ Gioco in evidenza",11,Color.rgb(242,231,255),600);eyebrow.setMaxLines(1);eyebrow.setEllipsize(TextUtils.TruncateAt.END);eyebrow.setPadding(dp(8),dp(5),dp(8),dp(5));eyebrow.setBackground(round(Color.rgb(73,38,99),8,1,Color.rgb(156,94,190)));LinearLayout.LayoutParams labelParams=new LinearLayout.LayoutParams(-2,-2);labelParams.bottomMargin=dp(8);copy.addView(eyebrow,0,labelParams);
             if(!TextUtils.isEmpty(summary)&&!summary.equals("Descrizione BGG non disponibile.")){TextView description=discoverTextWeight(summary,12,DISCOVER_MUTED,400);description.setMaxLines(2);description.setEllipsize(TextUtils.TruncateAt.END);description.setPadding(0,dp(8),0,dp(8));copy.addView(description);}
-            LinearLayout prices=new LinearLayout(this);prices.setGravity(Gravity.CENTER_VERTICAL);prices.addView(price,new LinearLayout.LayoutParams(0,dp(44),1));copy.addView(prices);
+            LinearLayout prices=new LinearLayout(this);prices.setGravity(Gravity.CENTER_VERTICAL);prices.addView(price,new LinearLayout.LayoutParams(0,dp(48),1));prices.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));copy.addView(prices);
             Button action=button("Scopri di più",Color.WHITE);action.setCompoundDrawablesRelative(null,null,iconDrawable(LudoIcons.ARROW_RIGHT,Color.BLACK,16),null);action.setCompoundDrawablePadding(dp(10));action.setTextColor(Color.BLACK);action.setTextSize(14);action.setPadding(dp(12),0,dp(12),0);action.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(40,0,0,0)),round(Color.WHITE,999,0,0),null));action.setOnClickListener(v->openDetail(d));LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,dp(52));ap.topMargin=dp(6);copy.addView(action,ap);
-            if(mode==HomePresentation.SQUARE||mode==HomePresentation.WIDE||available<dp(290)||getResources().getConfiguration().fontScale>1.15f){int h=mode==HomePresentation.SQUARE?Math.min(dp(240),Math.round(available*.82f)):Math.max(dp(120),Math.min(dp(260),Math.round(available*height/(float)Math.max(1,width))));content.addView(art,new LinearLayout.LayoutParams(-1,h));copy.setPadding(0,dp(12),0,0);content.addView(copy,new LinearLayout.LayoutParams(-1,-2));}
-            else{LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);float imageWeight=mode==HomePresentation.TALL?.52f:.52f;int imageWidth=Math.round(available*imageWeight);int h=mode==HomePresentation.TALL?Math.max(dp(210),Math.min(dp(300),Math.round(imageWidth*height/(float)Math.max(1,width)))):Math.max(dp(230),imageWidth);row.addView(art,new LinearLayout.LayoutParams(0,h,imageWeight));copy.setPadding(dp(14),0,0,0);row.addView(copy,new LinearLayout.LayoutParams(0,-2,1-imageWeight));content.addView(row,new LinearLayout.LayoutParams(-1,-2));}
+            if(!inline){int h=mode==HomePresentation.SQUARE?Math.min(dp(240),Math.round(available*.78f)):Math.max(dp(140),Math.min(dp(270),Math.round(available*height/(float)Math.max(1,width))));content.addView(art,new LinearLayout.LayoutParams(-1,h));copy.setPadding(0,dp(12),0,0);content.addView(copy,new LinearLayout.LayoutParams(-1,-2));}
+            else{LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.BOTTOM);float imageWeight=.49f;row.addView(art,new LinearLayout.LayoutParams(0,dp(250),imageWeight));copy.setPadding(dp(12),0,0,0);row.addView(copy,new LinearLayout.LayoutParams(0,-2,1-imageWeight));row.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{int target=Math.max(dp(235),Math.min(dp(360),copy.getHeight()));if(art.getParent()==row&&art.getLayoutParams().height!=target)art.post(()->{if(art.getParent()==row&&art.getLayoutParams().height!=target){art.getLayoutParams().height=target;art.requestLayout();}});});content.addView(row,new LinearLayout.LayoutParams(-1,-2));}
 
         };
-        content.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol)content.post(arrange);});arrange.run();setFeaturedArtwork(image,placeholder,d,()->{Drawable drawable=image.getDrawable();if(drawable instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,scenePedestal);placeholder.setVisibility(View.GONE);}}content.post(arrange);});card.setOnClickListener(v->openDetail(d));card.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return card;
+        content.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol)content.post(arrange);});arrange.run();setFeaturedArtwork(image,placeholder,d,()->{Drawable drawable=image.getDrawable();if(drawable instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,null);placeholder.setVisibility(View.GONE);}}content.post(arrange);});card.setOnClickListener(v->openDetail(d));card.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return card;
     }
 
-    private Bitmap featuredPedestal,scenePedestal;
+    private Bitmap featuredPedestal;
     private boolean featuredPedestalChecked;private final Object featuredPedestalLock=new Object();
     /** Home and detail stages share cache, off-thread decoding and the same PNG. */
     private void setFeaturedArtwork(ImageView image,TextView placeholder,DealRecord d,Runnable loaded){
@@ -706,7 +726,6 @@ private void applyDiscoverChrome(){
     private void setProductArtwork(ImageView image,TextView placeholder,String bggId,String sourceUrl,String identity,Runnable loaded){
         placeholder.setVisibility(View.VISIBLE);image.setImageDrawable(null);image.setTag(identity);
         galleryNet.execute(()->{
-            scenePedestal=sceneAsset(R.drawable.game_scene_plinth);
             synchronized(featuredPedestalLock){if(!featuredPedestalChecked){featuredPedestalChecked=true;try{int id=getResources().getIdentifier("featured_game_pedestal","drawable",getPackageName());if(id!=0){BitmapFactory.Options options=new BitmapFactory.Options();options.inScaled=false;options.inPreferredConfig=Bitmap.Config.ARGB_8888;BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeResource(getResources(),id,bounds);options.inSampleSize=1;while(bounds.outWidth/options.inSampleSize>1200)options.inSampleSize*=2;Bitmap candidate=BitmapFactory.decodeResource(getResources(),id,options);if(candidate!=null&&candidate.hasAlpha()&&Color.alpha(candidate.getPixel(0,0))==0)featuredPedestal=candidate;}}catch(RuntimeException|OutOfMemoryError ignored){featuredPedestal=null;}}}
             File file=TextUtils.isEmpty(bggId)?null:ArtworkStore.bggFile(this,bggId);Bitmap bitmap=file!=null&&file.exists()?decodeLocalBitmap(file,600,700):null;
             String remote=sourceUrl;if(TextUtils.isEmpty(remote)&&!TextUtils.isEmpty(bggId)){try{GameRecord game=marketStore.gameStatsByBggId(bggId);if(game!=null)remote=TextUtils.isEmpty(game.imageUrl)?game.thumbnailUrl:game.imageUrl;}catch(RuntimeException ignored){}}
@@ -721,7 +740,7 @@ private void applyDiscoverChrome(){
     private FrameLayout productBoxArtwork(String bggId,String url,String name,boolean physicalScene){
         FrameLayout stage=new FrameLayout(this);stage.setBackgroundColor(Color.TRANSPARENT);FeaturedBoxView box=new FeaturedBoxView(physicalScene,false);box.setContentDescription("Scatola di "+(TextUtils.isEmpty(name)?"questo gioco":name));stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
         TextView placeholder=text("Copertina non disponibile",12,MUTED,Typeface.NORMAL);placeholder.setGravity(Gravity.CENTER);stage.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(this);image.setVisibility(View.INVISIBLE);stage.addView(image,new FrameLayout.LayoutParams(dp(1),dp(1)));
-        setProductArtwork(image,placeholder,bggId,url,"product:"+bggId+":"+url,()->{Drawable drawable=image.getDrawable();if(drawable instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,physicalScene?scenePedestal:featuredPedestal);placeholder.setVisibility(View.GONE);}}});return stage;
+        setProductArtwork(image,placeholder,bggId,url,"product:"+bggId+":"+url,()->{Drawable drawable=image.getDrawable();if(drawable instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,physicalScene?null:featuredPedestal);placeholder.setVisibility(View.GONE);}}});return stage;
     }
     private int productArtworkHeight(){int width=getResources().getDisplayMetrics().widthPixels-dp(40);return Math.max(dp(220),Math.min(dp(300),Math.round(width*.90f)));}
     private Drawable productPageBackground(){return new Drawable(){
@@ -740,11 +759,12 @@ private void applyDiscoverChrome(){
 
     
 
+
     private final class FeaturedBoxView extends View{
-        private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG),fillPaint=new Paint(Paint.ANTI_ALIAS_FLAG),edgePaint=new Paint(Paint.ANTI_ALIAS_FLAG),shadowPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG),fillPaint=new Paint(Paint.ANTI_ALIAS_FLAG),edgePaint=new Paint(Paint.ANTI_ALIAS_FLAG),shadowPaint=new Paint(Paint.ANTI_ALIAS_FLAG),reflectionPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
         private final boolean homeScene,preview;
-        private final Matrix coverMatrix=new Matrix();private final Path frontPath=new Path(),topPath=new Path(),sidePath=new Path();private final FeaturedBoxGeometry geometry=new FeaturedBoxGeometry();private final RectF flatBounds=new RectF(),ambient=new RectF(),contact=new RectF(),pedestalBounds=new RectF();private final float[] source=new float[8];
-        private Bitmap cover,pedestal;private int edgeColor;private boolean prepared,failed;private LinearGradient sideLight,topLight,frontLight;private android.graphics.RadialGradient contactLight,ambientLight;
+        private final Matrix coverMatrix=new Matrix(),reflectionMatrix=new Matrix();private final Path frontPath=new Path(),topPath=new Path(),sidePath=new Path(),metalBodyPath=new Path(),reflectionPath=new Path();private final FeaturedBoxGeometry geometry=new FeaturedBoxGeometry();private final RectF flatBounds=new RectF(),ambient=new RectF(),contact=new RectF(),pedestalBounds=new RectF(),metalTopBounds=new RectF();private final float[] source=new float[8],reflectionPoints=new float[8];
+        private Bitmap cover,pedestal;private int edgeColor;private boolean prepared,failed;private LinearGradient sideLight,topLight,frontLight,metalBodyLight,metalTopLight;private android.graphics.RadialGradient contactLight,ambientLight;
         FeaturedBoxView(){this(false,false);}
         FeaturedBoxView(boolean homeScene,boolean preview){super(MainActivity.this);this.homeScene=homeScene;this.preview=preview;setContentDescription("Scatola del gioco in prospettiva");}
         void setCover(Bitmap bitmap,Bitmap base){cover=bitmap;pedestal=base;failed=false;try{edgeColor=sampleEdge(bitmap);}catch(RuntimeException e){failed=true;}prepare();invalidate();}
@@ -753,34 +773,50 @@ private void applyDiscoverChrome(){
         private void prepare(){
             prepared=false;if(cover==null||cover.isRecycled()||getWidth()<=0||getHeight()<=0)return;
             float ratio=cover.getWidth()/(float)cover.getHeight(),w=Math.min(getWidth(),getHeight()*ratio),h=w/ratio;flatBounds.set((getWidth()-w)/2,(getHeight()-h)/2,(getWidth()+w)/2,(getHeight()+h)/2);
-            if(failed||!preview&&(pedestal==null||pedestal.isRecycled()))return;
+            if(failed||!homeScene&&!preview&&(pedestal==null||pedestal.isRecycled()))return;
             try{
-                if(!(preview?geometry.update(getWidth(),getHeight(),cover.getWidth(),cover.getHeight(),getResources().getDisplayMetrics().density):geometry.update(getWidth(),getHeight(),cover.getWidth(),cover.getHeight(),getResources().getDisplayMetrics().density,pedestal.getWidth()/(float)pedestal.getHeight())))return;
+                boolean valid=homeScene?geometry.updateMetal(getWidth(),getHeight(),cover.getWidth(),cover.getHeight(),getResources().getDisplayMetrics().density,!preview):preview?geometry.update(getWidth(),getHeight(),cover.getWidth(),cover.getHeight(),getResources().getDisplayMetrics().density):geometry.update(getWidth(),getHeight(),cover.getWidth(),cover.getHeight(),getResources().getDisplayMetrics().density,pedestal.getWidth()/(float)pedestal.getHeight());if(!valid)return;
                 source[0]=0;source[1]=0;source[2]=cover.getWidth();source[3]=0;source[4]=cover.getWidth();source[5]=cover.getHeight();source[6]=0;source[7]=cover.getHeight();coverMatrix.reset();if(!coverMatrix.setPolyToPoly(source,0,geometry.front,0,4))return;
                 path(frontPath,geometry.front);path(topPath,geometry.top);path(sidePath,geometry.side);
                 float l=geometry.left,r=l+geometry.width,b=geometry.bottom,d=geometry.depth;pedestalBounds.set(geometry.pedestalLeft,geometry.pedestalTop,geometry.pedestalLeft+geometry.pedestalWidth,geometry.pedestalTop+geometry.pedestalHeight);
-                topLight=new LinearGradient(l,geometry.top[3],r,b,shade(edgeColor,homeScene?.55f:.80f),shade(edgeColor,homeScene?.36f:.58f),Shader.TileMode.CLAMP);
-                sideLight=new LinearGradient(r,0,r+d,0,shade(edgeColor,homeScene?.44f:.64f),shade(edgeColor,homeScene?.25f:.42f),Shader.TileMode.CLAMP);
-                frontLight=new LinearGradient(l,0,r,b,new int[]{Color.argb(12,255,255,255),Color.TRANSPARENT,Color.argb(16,0,0,0)},new float[]{0,.6f,1},Shader.TileMode.CLAMP);
-                ambient.set(l-geometry.width*.12f,b-geometry.height*.04f,r+d+geometry.width*.12f,b+geometry.height*.12f);contact.set(l-geometry.width*.02f,b-geometry.height*.012f,r+d+geometry.width*.02f,b+geometry.height*.05f);contactLight=new android.graphics.RadialGradient(0,0,1,new int[]{Color.argb(245,0,0,0),Color.argb(165,0,0,0),Color.TRANSPARENT},new float[]{0,.55f,1},Shader.TileMode.CLAMP);ambientLight=new android.graphics.RadialGradient(0,0,1,new int[]{Color.argb(100,0,0,0),Color.TRANSPARENT},null,Shader.TileMode.CLAMP);prepared=true;
+                topLight=new LinearGradient(l-(homeScene?d:0),geometry.top[3],r,b,shade(edgeColor,homeScene?.55f:.80f),shade(edgeColor,homeScene?.36f:.58f),Shader.TileMode.CLAMP);
+                sideLight=homeScene?new LinearGradient(l-d,0,l,0,shade(edgeColor,.24f),shade(edgeColor,.46f),Shader.TileMode.CLAMP):new LinearGradient(r,0,r+d,0,shade(edgeColor,.64f),shade(edgeColor,.42f),Shader.TileMode.CLAMP);
+                frontLight=new LinearGradient(l,0,r,b,new int[]{Color.argb(homeScene?10:12,255,255,255),Color.TRANSPARENT,Color.argb(homeScene?15:16,0,0,0)},new float[]{0,.6f,1},Shader.TileMode.CLAMP);
+                float boxLeft=homeScene?l-d:l,boxRight=homeScene?r:r+d;
+                if(homeScene){ambient.set(boxLeft-geometry.width*.10f,b-geometry.height*.025f,boxRight+geometry.width*.10f,b+geometry.width*.065f);contact.set(boxLeft,b-geometry.width*.012f,boxRight,b+geometry.width*.026f);}else{ambient.set(l-geometry.width*.12f,b-geometry.height*.04f,r+d+geometry.width*.12f,b+geometry.height*.12f);contact.set(l-geometry.width*.02f,b-geometry.height*.012f,r+d+geometry.width*.02f,b+geometry.height*.05f);}contactLight=new RadialGradient(0,0,1,new int[]{Color.argb(homeScene?225:245,0,0,0),Color.argb(homeScene?140:165,0,0,0),Color.TRANSPARENT},new float[]{0,.55f,1},Shader.TileMode.CLAMP);ambientLight=new RadialGradient(0,0,1,new int[]{Color.argb(homeScene?145:100,0,0,0),Color.TRANSPARENT},null,Shader.TileMode.CLAMP);
+                if(homeScene&&!preview){
+                    float pl=pedestalBounds.left,pr=pedestalBounds.right,pw=pedestalBounds.width(),sy=geometry.pedestalSurfaceY,half=pw*.055f,lower=sy+pw*.10f;
+                    metalTopBounds.set(pl,sy-half,pr,sy+half);metalBodyPath.reset();metalBodyPath.moveTo(pl,sy);metalBodyPath.lineTo(pl,lower);metalBodyPath.cubicTo(pl,lower+half*1.333f,pr,lower+half*1.333f,pr,lower);metalBodyPath.lineTo(pr,sy);metalBodyPath.cubicTo(pr,sy+half*1.333f,pl,sy+half*1.333f,pl,sy);metalBodyPath.close();
+                    metalBodyLight=new LinearGradient(pl,0,pr,0,new int[]{Color.rgb(16,9,29),Color.rgb(54,28,79),Color.rgb(25,13,42),Color.rgb(65,34,94),Color.rgb(19,10,33)},new float[]{0,.26f,.52f,.80f,1},Shader.TileMode.CLAMP);
+                    metalTopLight=new LinearGradient(pl,sy-half,pr,sy+half,new int[]{Color.rgb(30,19,47),Color.rgb(83,51,117),Color.rgb(35,21,55)},new float[]{0,.58f,1},Shader.TileMode.CLAMP);
+                    reflectionMatrix.set(coverMatrix);reflectionMatrix.postScale(1,-.18f,0,sy);reflectionMatrix.mapPoints(reflectionPoints,source);path(reflectionPath,reflectionPoints);
+                    BitmapShader reflected=new BitmapShader(cover,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP);reflected.setLocalMatrix(reflectionMatrix);LinearGradient fade=new LinearGradient(0,sy,0,sy+Math.max(1,Math.min(geometry.height*.18f,half)),Color.argb(40,255,255,255),Color.TRANSPARENT,Shader.TileMode.CLAMP);reflectionPaint.setShader(new ComposeShader(reflected,fade,PorterDuff.Mode.DST_IN));
+                }
+                prepared=true;
             }catch(RuntimeException e){failed=true;}
         }
         @Override protected void onDraw(Canvas canvas){
             super.onDraw(canvas);if(cover==null||cover.isRecycled())return;
             if(!prepared){canvas.drawBitmap(cover,null,flatBounds,bitmapPaint);return;}
             int save=canvas.save();try{
-                if(!preview){if(homeScene){int ground=canvas.save();canvas.translate(pedestalBounds.centerX(),pedestalBounds.bottom-geometry.pedestalHeight*.10f);canvas.scale(geometry.pedestalWidth*.55f,geometry.pedestalHeight*.22f);shadowPaint.setShader(ambientLight);canvas.drawCircle(0,0,1,shadowPaint);canvas.restoreToCount(ground);}canvas.drawBitmap(pedestal,null,pedestalBounds,bitmapPaint);}
-                // Cached radial shaders produce soft elliptical shadows without bitmap blur.
+                if(!preview){
+                    if(homeScene){
+                        int ground=canvas.save();canvas.translate(pedestalBounds.centerX(),pedestalBounds.bottom);canvas.scale(pedestalBounds.width()*.54f,Math.max(1,pedestalBounds.width()*.028f));shadowPaint.setShader(ambientLight);canvas.drawCircle(0,0,1,shadowPaint);canvas.restoreToCount(ground);
+                        fillPaint.setShader(metalBodyLight);canvas.drawPath(metalBodyPath,fillPaint);fillPaint.setShader(metalTopLight);canvas.drawOval(metalTopBounds,fillPaint);
+                        int reflection=canvas.save();canvas.clipPath(reflectionPath);canvas.drawOval(metalTopBounds,reflectionPaint);canvas.restoreToCount(reflection);
+                        edgePaint.setShader(null);edgePaint.setStyle(Paint.Style.STROKE);edgePaint.setStrokeWidth(Math.max(1,getResources().getDisplayMetrics().density*.55f));edgePaint.setColor(Color.argb(135,145,94,179));canvas.drawOval(metalTopBounds,edgePaint);
+                    }else canvas.drawBitmap(pedestal,null,pedestalBounds,bitmapPaint);
+                }
                 int ambientSave=canvas.save();canvas.translate(ambient.centerX(),ambient.centerY());canvas.scale(ambient.width()/2,ambient.height()/2);shadowPaint.setShader(ambientLight);canvas.drawCircle(0,0,1,shadowPaint);canvas.restoreToCount(ambientSave);
                 int contactSave=canvas.save();canvas.translate(contact.centerX(),contact.centerY());canvas.scale(contact.width()/2,contact.height()/2);shadowPaint.setShader(contactLight);canvas.drawCircle(0,0,1,shadowPaint);canvas.restoreToCount(contactSave);shadowPaint.setShader(null);
                 fillPaint.setShader(topLight);canvas.drawPath(topPath,fillPaint);fillPaint.setShader(sideLight);canvas.drawPath(sidePath,fillPaint);canvas.drawBitmap(cover,coverMatrix,bitmapPaint);
                 int frontSave=canvas.save();canvas.clipPath(frontPath);fillPaint.setShader(frontLight);canvas.drawPaint(fillPaint);canvas.restoreToCount(frontSave);
-                edgePaint.setStyle(Paint.Style.STROKE);edgePaint.setStrokeWidth(Math.max(1,getResources().getDisplayMetrics().density*.5f));edgePaint.setColor(Color.argb(45,255,255,255));canvas.drawPath(topPath,edgePaint);edgePaint.setColor(Color.argb(50,0,0,0));canvas.drawLine(geometry.front[2],geometry.front[3],geometry.front[4],geometry.front[5],edgePaint);
+                edgePaint.setStyle(Paint.Style.STROKE);edgePaint.setStrokeWidth(Math.max(1,getResources().getDisplayMetrics().density*.5f));edgePaint.setColor(Color.argb(homeScene?35:45,255,255,255));canvas.drawPath(topPath,edgePaint);edgePaint.setColor(Color.argb(55,0,0,0));if(homeScene)canvas.drawLine(geometry.front[0],geometry.front[1],geometry.front[6],geometry.front[7],edgePaint);else canvas.drawLine(geometry.front[2],geometry.front[3],geometry.front[4],geometry.front[5],edgePaint);
             }catch(RuntimeException e){failed=true;prepared=false;canvas.restoreToCount(save);save=canvas.save();canvas.drawBitmap(cover,null,flatBounds,bitmapPaint);}finally{canvas.restoreToCount(save);}
         }
         private int sampleEdge(Bitmap bitmap){
             if(bitmap==null||bitmap.getWidth()<2||bitmap.getHeight()<2)return Color.rgb(58,50,76);
-            long rr=0,gg=0,bb=0;int count=0,x=Math.max(0,Math.min(bitmap.getWidth()-1,(int)(bitmap.getWidth()*.90f)));
+            long rr=0,gg=0,bb=0;int count=0,x=Math.max(0,Math.min(bitmap.getWidth()-1,(int)(bitmap.getWidth()*(homeScene?.10f:.90f))));
             for(int i=1;i<=7;i++){int y=Math.min(bitmap.getHeight()-1,(int)(bitmap.getHeight()*(i/8f)));int c=bitmap.getPixel(x,y);rr+=Color.red(c);gg+=Color.green(c);bb+=Color.blue(c);count++;}
             int base=Color.rgb((int)(rr/count),(int)(gg/count),(int)(bb/count));float[] hsv=new float[3];Color.colorToHSV(base,hsv);hsv[1]=Math.min(.72f,hsv[1]*.85f);hsv[2]=Math.max(.10f,Math.min(.52f,hsv[2]*.56f));return Color.HSVToColor(hsv);
         }

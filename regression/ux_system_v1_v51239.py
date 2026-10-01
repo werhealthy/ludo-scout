@@ -42,7 +42,7 @@ checks=[
      '" BGG"' in top),
     ("featured opportunity uses canonical BGG content",
      "FeaturedBoxView box=new FeaturedBoxView(true,false)" in opportunity and
-     "sceneBackdrop(art,R.drawable.game_scene_floor)" in opportunity and
+     "card.setBackground(premiumSurface(true))" in opportunity and
      "setFeaturedArtwork(image,placeholder,d" in opportunity and
      "discoverGameDescription(d)" in opportunity and
      "name(d)" in opportunity and "total(d)" in opportunity and "discoverDiscountBadge(d" in opportunity),
