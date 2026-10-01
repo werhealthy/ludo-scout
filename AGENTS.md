@@ -10,6 +10,20 @@ Prima di qualsiasi lavoro significativo, a ogni nuova chat o ripresa:
 
 Non chiedere all'utente di ricopiare la scaletta o la conversazione quando il repository è accessibile. Se questi file non sono accessibili, segnala il limite senza inventare lo stato.
 
+## Workstream paralleli: frontend / backend
+Le keyword `frontend` e `backend` selezionano il workstream della chat. Entrambi gli agenti restano sviluppatori full-stack: la keyword definisce responsabilità primaria e confini del task, non capacità diverse.
+
+- `frontend`: UI/UX, rendering, navigazione, accessibilità, interazioni e polish. Fonte operativa principale: `docs/specs/2026-09-30-ui-refinement.md`.
+- `backend`: stabilità, performance, SQLite/concorrenza, code/lease, acquisizione Vinted conforme, riconoscimento BGG, riduzione review manuale, metriche e osservabilità. Fonte operativa principale: `docs/specs/backend-reliability-recognition.md`.
+- Ogni workstream parte dall'ultimo SHA di `beta` e lavora su branch dedicato `frontend/<task>` o `backend/<task>`. Non sviluppare in parallelo direttamente su `beta`.
+- Prima del merge, riallineare il branch a `beta` e rieseguire le verifiche pertinenti. Una PR per task sostanziale; piccoli commit logici.
+- Evitare modifiche fuori workstream. File condivisi ad alto conflitto (per esempio `MainActivity.java`, `DealDatabase.java`, `MarketStore.java`, `STATE.md`) si toccano solo quando necessari al task e vanno dichiarati nella PR.
+- `STATE.md` descrive lo stato integrato del progetto: aggiornarlo al checkpoint/merge, non come diario di ogni branch. Le specifiche di workstream mantengono il backlog separato.
+- Se una chat riceve esplicitamente `frontend` o `backend`, non deve chiedere quale ruolo assumere. Se manca la keyword, usa il workstream già attivo nel contesto; chiedi solo se la scelta cambierebbe davvero il lavoro.
+- Nessun workstream può cambiare filtri, soglie, schema, dipendenze, sicurezza o comportamento di produzione senza la normale approvazione prevista sopra.
+
+Per Vinted, ottimizzare velocità e affidabilità riducendo richieste inutili, duplicati e lavoro remoto. Non tentare di aggirare CAPTCHA, blocchi anti-bot, rate limit o altri controlli della piattaforma; HTTP 403/429 e challenge sono segnali di backoff e riduzione della pressione.
+
 ## Gestione della scaletta
 - Aggiorna il file esistente con i nuovi feedback, consolidando i duplicati in gruppi sostanziosi.
 - Mantieni distinti lavori da fare, implementati, verificati automaticamente e accettati sul telefono.
