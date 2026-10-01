@@ -21,7 +21,7 @@ final class FeaturedBoxGeometry {
   if(!Float.isFinite(pedestalRatio)||pedestalRatio<=0||viewW<2||viewH<2||coverW<=0||coverH<=0||!Float.isFinite(density)||density<=0)return false;
   float ratio=coverW/(float)coverH;if(ratio<.15f||ratio>6)return false;
   float pad=Math.min(6*density,Math.min(viewW,viewH)*.06f),usableW=viewW-2*pad,usableH=viewH-2*pad;
-  float baseScale=1.075f*1.28f,baseHeightPerWidth=baseScale/pedestalRatio;
+  float baseScale=1.075f*1.12f,baseHeightPerWidth=baseScale/pedestalRatio;
   width=Math.min(usableW/baseScale,usableH/(1/ratio+baseHeightPerWidth*.60f+.075f*.38f));height=width/ratio;depth=width*.075f;
   pedestalWidth=width*baseScale;pedestalHeight=pedestalWidth/pedestalRatio;
   float rise=depth*.38f,totalHeight=height+pedestalHeight*.60f+rise,y=(viewH-totalHeight)/2+rise;
