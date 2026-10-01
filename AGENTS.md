@@ -25,6 +25,8 @@ Le keyword `frontend` e `backend` selezionano il workstream della chat. Entrambi
 Per Vinted, ottimizzare velocità e affidabilità riducendo richieste inutili, duplicati e lavoro remoto. Non tentare di aggirare CAPTCHA, blocchi anti-bot, rate limit o altri controlli della piattaforma; HTTP 403/429 e challenge sono segnali di backoff e riduzione della pressione.
 
 ## Gestione della scaletta
+- In ogni risposta indica quanti gruppi tematici aperti mancano alla fine della scaletta. Conta gruppi sostanziosi, non micro-fix; aggiorna il totale quando nuovi feedback cambiano il backlog. Specifica il conteggio frontend separatamente dal backlog backend.
+- Raggruppa ogni consegna per tematica, con più correzioni coerenti.
 - Aggiorna il file esistente con i nuovi feedback, consolidando i duplicati in gruppi sostanziosi.
 - Mantieni distinti lavori da fare, implementati, verificati automaticamente e accettati sul telefono.
 - Non riaprire come nuovi job le attività già consegnate; conserva le verifiche pendenti.
@@ -36,7 +38,6 @@ Per Vinted, ottimizzare velocità e affidabilità riducendo richieste inutili, d
 Preserva dati reali, preferiti per identità BGG, memoria Ludo, rating personali, navigazione e pricing verificato. Non cambiare filtri, soglie, schema, dipendenze o servizi senza una decisione specifica autorizzata.
 Per modifiche al codice esegui i controlli pertinenti e il workflow di regressioni/build esistente; registra prove e limiti. La distribuzione beta verificata già autorizzata richiede build firmata, certificato atteso, conferma distinta di upload Firebase e distribuzione ai tester.
 Non dichiarare approvazione visiva o prestazioni sul telefono sulla base della sola CI. Modifiche esclusivamente documentali non richiedono una nuova APK.
-
 
 ## Comunicazione del workstream backend
 A ogni consegna spiegare sinteticamente cosa è stato fatto, cosa l’utente deve verificare, come eseguire la prova e cosa deve restituire (per esempio due diagnostiche complete con tempi/versione). Se non serve una prova sul telefono, dirlo. Non richiedere test di una funzione diagnostica prima che una build che la contiene sia verificata e distribuita.
