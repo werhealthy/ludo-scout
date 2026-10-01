@@ -25,7 +25,8 @@ checks=[
      "linkedDealTagStrip(d,game)" in detail),
     ("listing detail does not duplicate game identity card",
      "entityLinkCard(game)" not in detail and
-     'roundIconButton("▦",CYAN)' in detail),
+     'text("Scheda gioco",14,TEXT,Typeface.BOLD)' in detail and
+     "openGameDetailOverlay(game.id)" in detail),
     ("listing detail removes market history",
      '"Contesto prezzo"' not in detail and
      "localVintedReferenceStats" not in detail and
