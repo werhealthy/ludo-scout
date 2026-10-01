@@ -6,7 +6,7 @@ final class FeaturedBoxGeometry {
  boolean update(int viewW,int viewH,int coverW,int coverH,float density){
   if(viewW<2||viewH<2||coverW<=0||coverH<=0||!Float.isFinite(density)||density<=0)return false;
   float ratio=coverW/(float)coverH;if(ratio<.15f||ratio>6)return false;
-  float pad=Math.min(12*density,Math.min(viewW,viewH)*.12f),usableW=viewW-2*pad,usableH=viewH-2*pad-12*density;
+  float pad=Math.min(12*density,Math.min(viewW,viewH)*.12f),usableW=viewW-2*pad,usableH=(viewH-2*pad)/1.2f;
   if(usableW<=0||usableH<=0)return false;
   width=Math.min(usableW/1.09f,usableH*ratio);height=width/ratio;depth=width*.075f;
   left=(viewW-width-depth)/2;float y=(viewH-height)/2;bottom=y+height;
