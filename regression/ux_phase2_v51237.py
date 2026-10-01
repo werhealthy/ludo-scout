@@ -28,9 +28,9 @@ checks=[
      "setOrientation(LinearLayout.HORIZONTAL)" in catalog and
      "row.addView(info,new LinearLayout.LayoutParams(0,-2,1))" in catalog and
      "LinearLayout c=verticalCard()" not in catalog),
-    ("Library is collection-first with summary search and history scope",
-     "La tua collezione, non un altro catalogo." in library and
-     "librarySummaryCard(owned)" in library and
+    ("Library keeps collection rows search and history scope",
+     "body.addView(libraryRow(g))" in library and
+     "body.addView(librarySummaryCard(owned))" not in library and
      "librarySearchBar()" in library and
      "libraryScopeTabs(owned.size(),sold.size())" in library),
     ("Ludo has explicit Per me Cacce Profilo spaces",

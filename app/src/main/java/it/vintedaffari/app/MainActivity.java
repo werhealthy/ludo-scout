@@ -1222,10 +1222,12 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
         if(!value.matches("[0-9]+([.,][0-9]{1,2})?"))throw new IllegalArgumentException("Importo non valido");
         try{return new java.math.BigDecimal(value.replace(',','.')).movePointRight(2).intValueExact();}catch(ArithmeticException|NumberFormatException error){throw new IllegalArgumentException("Importo troppo grande",error);}
     }
+    private final Set<Dialog> librarySaveInFlight=new HashSet<>();
     private void saveLibraryChange(LibraryGame game,Runnable change,Dialog sheet,Dialog parent,View save){
+        if(!sheet.isShowing()||!librarySaveInFlight.add(sheet))return;
         save.setEnabled(false);int position=0;if(parent!=null){ScrollView previous=parent.findViewById(SHEET_ID+110);if(previous!=null)position=previous.getScrollY();}final int savedY=position;
         uiDataIo.execute(()->{LibraryGame updated=null;String failure=null;try{change.run();for(LibraryGame item:libraryDb.all())if(java.util.Objects.equals(game.bggId,item.bggId)){updated=item;break;}}catch(RuntimeException error){failure="Salvataggio non riuscito. Riprova.";}final LibraryGame fresh=updated;final String error=failure;
-            runOnUiThread(()->{if(isFinishing()||isDestroyed())return;if(error!=null){save.setEnabled(true);if(sheet.isShowing())Toast.makeText(this,error,Toast.LENGTH_LONG).show();return;}boolean returnToDetail=parent!=null&&parent.isShowing()&&sheet.isShowing();sheet.dismiss();if(returnToDetail)parent.dismiss();if("library".equals(tab))scheduleRender(0);if(returnToDetail&&fresh!=null)openLibraryDetail(fresh,savedY);});
+            runOnUiThread(()->{librarySaveInFlight.remove(sheet);if(isFinishing()||isDestroyed())return;if(error!=null){save.setEnabled(true);if(sheet.isShowing())Toast.makeText(this,error,Toast.LENGTH_LONG).show();return;}boolean returnToDetail=parent!=null&&parent.isShowing()&&sheet.isShowing();sheet.dismiss();if(returnToDetail)parent.dismiss();if("library".equals(tab))scheduleRender(0);if(returnToDetail&&fresh!=null)openLibraryDetail(fresh,savedY);});
         });
     }
     private void editLibrarySale(LibraryGame g,Dialog parent,boolean markSold){
