@@ -7,7 +7,15 @@ market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 system=(ROOT/"UX_SYSTEM_V2_CONNECTED_GRAPH.md").read_text(encoding="utf-8")
 
-detail=ui[ui.index("private void openDetail(DealRecord d)"):ui.index("private TextView detailSecondaryAction",ui.index("private void openDetail(DealRecord d)"))]
+def production_method(signature):
+    start=ui.index(signature);brace=ui.index("{",start);depth=0
+    for i in range(brace,len(ui)):
+        if ui[i]=="{": depth+=1
+        elif ui[i]=="}":
+            depth-=1
+            if depth==0:return ui[start:i+1]
+    raise ValueError(signature)
+detail=production_method("private void openDetail(DealRecord d,boolean preserveParent)")
 game=ui[ui.index("private void renderDatabaseDetail()"):ui.index("private void compareOnVinted",ui.index("private void renderDatabaseDetail()"))]
 filters=ui[ui.index("private void showFilterSheet()"):ui.index("private void renderBundles()",ui.index("private void showFilterSheet()"))]
 db=ui[ui.index("private void renderDatabase()"):ui.index("private String databaseSortLabel",ui.index("private void renderDatabase()"))]
@@ -20,8 +28,8 @@ checks=[
      "listings, games and tags form a connected graph" in system and
      "Other listings of the same game" in system),
     ("listing detail separates metadata into distinct visual objects",
-     'scorePill("Ludo "+scoreLabel(d),LIME)' in detail and
-     "langChip(d.languageCode)" in detail and
+     'productRatingRow(d.rating,scoreLabel(d)' in detail and
+     "productLanguagePanel(d.languageCode" in detail and
      'publicationText(d,12,Typeface.NORMAL)' in detail and
      '" · "+languageShort(d.languageCode)+" · "+publicationDisplay(d)' not in detail),
     ("listing detail exposes canonical game navigation",
@@ -31,7 +39,7 @@ checks=[
      "openGameDetailOverlay(game.id)" in detail),
     ("listing detail keeps provider identity",
      'provider_vinted_logo,"Vinted"' in detail and
-     "bggPill(d)" in detail and
+     "productRatingRow(d.rating" in detail and "openBgg(d.bggId)" in detail and
      "provider_bgg_logo" in ui),
     ("correction affordance is immediate",
      'roundIconButton("?",CYAN)' in detail and

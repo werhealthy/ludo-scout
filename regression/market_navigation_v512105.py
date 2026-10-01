@@ -41,6 +41,7 @@ public class MarketNavigationRegression extends ScreenBase {
     boolean openingPreset=false;int databaseVisible=24;String databaseScope="verified";Dialog activeGameOverlay;ArrayList<Dialog> marketDetailDialogs=new ArrayList<>();
     Dialog activeDetailDialog,activeResolutionDialog;String activeDealSignature="";boolean suppressDetailDismissState=false;
     static class Dialog { boolean showing=true; boolean isShowing(){return showing;} Runnable onDismiss;void dismiss(){showing=false;if(onDismiss!=null)onDismiss.run();} }
+    Map<Dialog,Object> preparedGameOverlays=new HashMap<>();
     Map<String,Integer> tabScrollPositions=new HashMap<>();
     Deque<String> tabHistory=new ArrayDeque<>();
     FakeScroll scroll=new FakeScroll();
