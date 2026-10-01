@@ -1,6 +1,17 @@
 # Ludo Scout — Current state
 
-## Current milestone — Motore layout 5.12.98
+## Current milestone — Product box stage 5.12.99
+5.12.99-product-box-stage (1000116) uploaded at2026-10-01 07:37:59 UTC and distributed to testers/groups successfully at07:38:00 UTC (09:38 Europe/Rome). Signed beta run116 (36831018836) passed regression tests, Android unit tests, APK build and certificate verification. PR108 merged at1c3152ecce6e3d94728be055700cb8b89f10c584. PR validation run279 (36830670319), heade7b4338f79571e9aa473dec45d157ce3c59c7f64, passed regressions, SQLite fixtures, Android JUnit, Java compilation and review APK.
+- User explicitly paused Motore work and redirected the milestone to foreground product boxes. Existing Motore layout/counts/navigation and unresolved queue/SQLite stability issues remain unchanged.
+- Visible cover front is centered over the existing transparent pedestal. Side depth13% of front width (previously7.5%); cover-derived hue/saturation, brighter edge lighting and broader/stronger cached contact shadows. Front is kept complete with real aspect ratio. Uniform pedestal geometry retained.
+- Home square stage is capped at240dp and82% of available width, with two-line description. Tall layout preserved. Box/pedestal proportions rebalanced.
+- Catalog game route, game overlay, listing detail and Library detail share transparent product artwork on a continuous radial page background. Real listing photos remain separately accessible in the original gallery; unknown-BGG listings retain real photos. Refresh does not replace box stage with old gallery.
+- Bitmap decoding, pedestal decoding and fallback metadata lookup run off the UI thread. Existing PNG reused, no new assets/dependencies/schema/navigation changes. Explicit unavailable-cover placeholder and existing flat-cover fallback preserved.
+- New centering/depth JUnit test reproduced failure before the fix; final CI passed. A336-case numerical geometry sweep checked front/side/top/pedestal bounds for varied sizes, densities and aspect ratios.
+- No device/emulator available, no on-device data verification or visual approval claimed. Check square/tall/wide covers, front/base centering and contact shadow, Home balance, details and real listing-photo access.
+Next single step: install5.12.99 and approve the shared product stage visually on the phone before further aesthetic changes.
+
+## Previous verified milestone — Motore layout 5.12.98
 5.12.98-engine-layout (1000115) uploaded to Firebase and distributed to testers/groups successfully at 2026-10-01 07:20:19 UTC (09:20 Europe/Rome). PR107 merged at865d6f1945ee5e4134a773108d1f0355a6bb8bd7. PR validation run277 (36829115098), head86c0be6e97978c387d0eb1ae20e05285b49b194f, passed full regressions/SQLite fixtures, Android JUnit, Java compile and review APK. Signed beta run115 (36829430731) passed tests/build/signature and Firebase distribution.
 - Motore has16dp page top spacing plus8dp header spacing. One surface groups scoped scroll identity/status, separate waiting-scroll and global pending-announcement actions, and the five-phase graph. Counts, membership SQL, direct phase/central navigation and attention inbox are preserved. Larger text uses stacked controls and the existing phase list.
 - Shared system-bar/cutout safe-inset helper serves main shell and game/announcement detail windows. Detail top padding16dp, bottom24dp; waiting/run/phase cards use16dp padding. No48dp blanket content padding.
