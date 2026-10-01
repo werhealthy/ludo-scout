@@ -20,7 +20,7 @@ if "setSalePrice(" in dbsrc:
 sale_call='n.markSold("a","Non lo giocavo",1234);' if "markSold(String bggId,String reason,Integer" in dbsrc else 'n.markSold("a","Non lo giocavo");'
 update_call='n.setSalePrice("a",2468);' if "setSalePrice(" in dbsrc else 'n.markSold("a","Non lo giocavo");'
 if "private static String libraryPersonalRatingLabel(" in ui:
-    label=method(ui,"private static String libraryPersonalRatingLabel(")
+    label=method(ui,"private static String libraryPersonalRatingLabel(")+"\n"+method(ui,"private static Integer librarySalePrice(")
 else:
     expr=re.search(r'pc.addView\(text\((g.personalRating==null\?[^;]+?),17,g.personalRating==null\?',ui).group(1)
     label="private static String libraryPersonalRatingLabel(Integer value){LibraryGame g=new LibraryGame();g.personalRating=value;return "+expr+";}"
@@ -48,6 +48,7 @@ public class LibraryDataRegression {
   else if(args[0].equals("sold")){__SALE__}
   else if(args[0].equals("sale-price")){__UPDATE__}
   else if(args[0].equals("restore"))n.restoreOwned("a");
+  else if(args[0].equals("parse")){try{System.out.println(librarySalePrice(args[1]));}catch(IllegalArgumentException error){System.out.println("INVALID");}}
   else if(args[0].equals("label"))System.out.println(libraryPersonalRatingLabel(args[1].equals("null")?null:Integer.valueOf(args[1])));
  }
 }
@@ -109,4 +110,10 @@ with tempfile.TemporaryDirectory() as temp:
     test("restore clears sale fields and preserves taste",restore)
     for value,want in [(7,"3,5"),(10,"5,0"),(0,"0,0")]:
         test("display legacy "+str(value)+" as exact five-star value",lambda v=value,w=want:None if w in run("label",v)[0] and "/10" not in run("label",v)[0] else (_ for _ in ()).throw(AssertionError("incorrect five-star conversion")))
+    def owned_guard():
+        c=current();c.execute("UPDATE library_games SET collection_state='owned',sold_at=NULL,sold_reason=NULL WHERE bgg_id='a'");apply(c,"sale-price")
+        assert c.execute("SELECT collection_state,sale_price_cents,sold_at FROM library_games WHERE bgg_id='a'").fetchone()==("owned",None,None)
+    test("sale-price backfill cannot change owned game",owned_guard)
+    for raw,want in [("","null"),("  ","null"),("0","0"),("0,00","0"),("12,34","1234"),("12.34","1234"),("7,5","750"),("21474836,47","2147483647"),("-1","INVALID"),("12,345","INVALID"),("NaN","INVALID"),("21474836,48","INVALID")]:
+        test("sale input "+repr(raw),lambda v=raw,w=want:None if run("parse",v)==[w] else (_ for _ in ()).throw(AssertionError("incorrect cents/input validation")))
 if failures:raise SystemExit("Library data regressions failed: "+", ".join(failures))
