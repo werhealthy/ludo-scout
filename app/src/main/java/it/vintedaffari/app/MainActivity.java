@@ -918,6 +918,7 @@ private void renderDatabase(){
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(0,dp(8),0,dp(8));hero.addView(productBoxArtwork(g.bggId,TextUtils.isEmpty(g.imageUrl)?g.thumbnailUrl:g.imageUrl,g.name),new LinearLayout.LayoutParams(-1,productArtworkHeight()));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(0,dp(12),0,0);TextView name=text(g.name,27,TEXT,Typeface.BOLD);name.setMaxLines(3);copy.addView(name);
         Integer composite=snapshot==null?gameQualityScore(g):snapshot.quality;copy.addView(productRatingRow(g.rating,composite==null?"":String.format(Locale.ITALY,"%.1f",composite/10.0),()->{if(!TextUtils.isEmpty(g.bggId))openBgg(g.bggId);},()->{if(composite!=null)showGameScoreInfo(g,composite);}));
         String rawMeta=(g.year==null?"Anno n/d":String.valueOf(g.year))+(g.rank==null||g.rank<=0?"":" · #"+g.rank+" BGG");TextView meta=text(rawMeta,12,MUTED,Typeface.NORMAL);meta.setPadding(0,dp(7),0,0);copy.addView(meta);
+        if(!TextUtils.isEmpty(g.bggId)){DealRecord preference=new DealRecord();preference.bggId=g.bggId;preference.gameName=g.name;preference.signature="game:"+g.bggId;copy.addView(productInterestControls(preference));}
         if(!TextUtils.isEmpty(g.bggId)){View bgg=providerLinkCard(R.drawable.provider_bgg_logo,"BoardGameGeek","Apri scheda",BGG_BG,false);bgg.setOnClickListener(v->openBgg(g.bggId));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=dp(12);copy.addView(bgg,bp);}hero.addView(copy,new LinearLayout.LayoutParams(-1,-2));host.addView(hero);
 
         LinearLayout quick=gameFactChips(g);if(quick.getChildCount()>0){quick.setPadding(0,dp(12),0,0);host.addView(quick);}
@@ -1336,7 +1337,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         private float anchor,progress;private boolean touching,anchored;
         void down(float y,boolean atBottom){touching=true;anchored=atBottom;anchor=y;progress=0;}
         float move(float y,boolean atBottom,float distance){if(!touching)return 0;if(!atBottom){anchored=false;progress=0;return 0;}if(!anchored){anchor=y;anchored=true;progress=0;return 0;}progress=Math.max(0,Math.min(1,(anchor-y)/distance));return progress;}
-        boolean release(boolean ready){boolean complete=touching&&anchored&&progress>=1&&ready;cancel();return complete;}
+        boolean release(float y,float distance,boolean ready){boolean complete=touching&&anchored&&progress>=1&&anchor-y>=distance&&ready;cancel();return complete;}
         void cancel(){touching=false;anchored=false;progress=0;}
     }
     private void installPullToGame(ScrollView sc,TextView hint,long gameId,Dialog detail){
@@ -1347,7 +1348,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
             if(action==android.view.MotionEvent.ACTION_CANCEL||e.getPointerCount()!=1||!detail.isShowing()){gesture.cancel();updateGamePullHint(hint,0,ready);return false;}
             if(action==android.view.MotionEvent.ACTION_DOWN){gesture.down(e.getY(),bottom);updateGamePullHint(hint,0,ready);}
             else if(action==android.view.MotionEvent.ACTION_MOVE){float progress=gesture.move(e.getY(),bottom,dp(72f));updateGamePullHint(hint,ready?progress:0,ready);}
-            else if(action==android.view.MotionEvent.ACTION_UP){boolean go=gesture.release(ready&&bottom);updateGamePullHint(hint,0,ready);if(go)showPreparedGameTransition(detail,gameId);}
+            else if(action==android.view.MotionEvent.ACTION_UP){boolean go=gesture.release(e.getY(),dp(72f),ready&&bottom);updateGamePullHint(hint,0,ready);if(go)showPreparedGameTransition(detail,gameId);}
             return false;
         });
     }
