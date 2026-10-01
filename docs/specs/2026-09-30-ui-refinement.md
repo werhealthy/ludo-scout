@@ -96,3 +96,20 @@ Next grouped block: product detail hierarchy, language/personalization and the i
 
 
 This approval supersedes earlier statements that the two-tab proposal is pending. Historical pricing and Motore stability requirements remain open.
+
+
+## 2026-10-01 — Grouped product interaction design approved and delivered
+5.12.106-product-interaction (1000123) uploaded to Firebase at2026-10-01 15:30:50 UTC and separately distributed to testers/groups at15:30:51 UTC (17:30 Europe/Rome), explicitly confirmed in signed job110443809254 logs. PR115 merged6abe6c411812f050251cb0641425a9cf5695aacb. PR validation run300 (36883748763), head44bb6c8b76fb5d0e602947351f026510301369c8, passed9gesture scenarios, all existing regressions/SQLite fixtures, Android JUnit, Java compile and review APK. Signed beta run123 (36884375420) passed tests/build/signature/Firebase upload and tester distribution.
+
+User approved the concrete grouped design with “vai” on2026-10-01: raw BGG rating prominent, Ludo secondary; explicit edition/text dependence; existing interest preferences; intentional end-of-content pull and prepared game destination.
+- Listing and game details share24sp raw BGG rating with inspectable secondary Ludo Score. Listing price and real saving badge remain distinct; provider identity28dp. Approved dark product artwork/photos preserved.
+- Edition name and text dependence are separate readable facts using HomePresentation; correction/help have48dp minimum targets and larger-font stacking. Unknown language is not inferred.
+- Mi interessa / Non mi interessa uses the existing game-key Home preferences, toggles back to neutral, and synchronizes attached preserved views. Catalog eligibility and owned/library ratings unchanged.
+- Gesture begins counting only at actual content end, requires72dp further movement and full circular progress followed by release. Retreat, final-UP retreat, Android CANCEL, multiple fingers, source closure and unavailable preparation cancel. Explicit Scheda gioco action remains available.
+- Source-bound prepared game dialog uses factual background snapshot of rating/similar games/prices/history/active offers and captured deal scores. UI construction stays on main thread; local image decoding on image executor. Pull opens already prepared content without a full-screen loading intermediate, retaining the listing and its scroll for Back. Images may still use their existing asynchronous placeholders; no instant-image guarantee.
+- Independent read-only review identified source reprepare-after-close and final-release-coordinate defects; corrected and re-reviewed. Attached-only preference listeners address stale selection on preload/Back. No blockers remained.
+- New executable production touch-listener harness covers9scenarios; test-only run294 reproduced6old failures and run297 reproducedfinal-UPretreat before correction. Full existing regression/SQLite/JUnit/compile/APK checks verified below. A compiler API error (LinearLayout minimum height) was corrected before delivery; no failed final checks hidden.
+- No device/emulator available. Harness verifies app listener/state effects, not real Android dispatch/interception or visual/gesture smoothness. Phone checks: BGG/language with enlarged text; interest synchronization/neutral; intentional pull, cancellation/retreat and Back/category from prepared game.
+Next grouped block: Library previews/personal ratings and sale-price entry, with shared bottom sheets and accessibility. Motore remains on standby.
+
+The concrete in-chat design was presented and explicitly approved before implementation. Intentional pull requirements in section3 are implemented for prepared linked-game destinations; device gesture/visual acceptance remains pending. Earlier Home/Motore/Library historical requirements are not automatically closed.
