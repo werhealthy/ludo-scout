@@ -6,7 +6,7 @@ public final class LibraryGame {
     public long id,addedAt;
     public Long acquiredAt;
     public String bggId,name,imageUrl,source;
-    public Integer paidCents,shippingCents;
+    public Integer paidCents,shippingCents,salePriceCents;
     public Double rating,geekRating,weight;
     public Integer playtime;
     public boolean bundlePurchase;

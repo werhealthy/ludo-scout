@@ -105,7 +105,7 @@ public final class LocalScoutBrain {
 
     private static String pickReason(DealRecord d,PreferenceProfile p,List<LibraryGame> library){
         List<String> cats=categories(d.bggCategories);LibraryGame closest=closestLiked(cats,library);StringBuilder out=new StringBuilder();
-        if(closest!=null&&closest.personalRating!=null){String common=firstCommon(cats,categories(closest.categories));out.append("Condivide ").append(common==null?"alcuni tratti":common).append(" con ").append(closest.name).append(", a cui hai dato ").append(closest.personalRating).append("/10. ");}
+        if(closest!=null&&closest.personalRating!=null){String common=firstCommon(cats,categories(closest.categories));out.append("Condivide ").append(common==null?"alcuni tratti":common).append(" con ").append(closest.name).append(", a cui hai dato ").append(String.format(java.util.Locale.ITALY,"%.1f",closest.personalRating/2.0)).append("/5. ");}
         else if(affinity(d,p)<=0.2&&scoutScore(d)>=7.5)out.append("È fuori dai segnali più forti della tua Libreria, ma la qualità BGG è abbastanza alta da meritare spazio come scoperta. ");
         else if(!cats.isEmpty())out.append("Il profilo BGG lo colloca soprattutto in ").append(cats.get(0)).append(cats.size()>1?" e "+cats.get(1):"").append(". ");
         DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(d);if(!TextUtils.isEmpty(evaluation.reason))out.append(evaluation.reason).append(". ");
