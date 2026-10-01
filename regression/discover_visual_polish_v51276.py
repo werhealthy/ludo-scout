@@ -32,7 +32,7 @@ checks = [
      '"Bentornato,"' in header and "discoverGreetingName()" in header and
      "discoverTextWeight(discoverGreetingName(),37" in header),
     ("Hero keeps real game identity and offer information",
-     all(x in hero for x in ["discoverGameDescription(d)", "FeaturedBoxView box=new FeaturedBoxView()", "setFeaturedArtwork(image,placeholder,d", "name(d)", "total(d)", "discoverDiscountBadge(d", "LudoIcons.STAR", "openDetail(d)"])),
+     all(x in hero for x in ["discoverGameDescription(d)", "FeaturedBoxView box=new FeaturedBoxView(true,false)", "setFeaturedArtwork(image,placeholder,d", "name(d)", "total(d)", "discoverDiscountBadge(d", "LudoIcons.STAR", "openDetail(d)"])),
     ("Hero featured artwork uses adaptive 2.5D geometry",
      all(x in ui for x in ["setPolyToPoly", "path(topPath,geometry.top)", "path(sidePath,geometry.side)", "sampleEdge(bitmap)"])),
     ("category navigation uses the shared BGG clusters",
@@ -43,11 +43,12 @@ checks = [
      "discoverProductCard(d,false)" in ui and
      "discoverProductCard(d,true)" in ui),
     ("Home product cards use BGG-only artwork",
-     "discoverBggCover(d" in product and
+     "homePreviewBox(d)" in product and
+     "setProductArtwork(source,placeholder,d.bggId,d.bggImageUrl" in ui and
      "firstListingPhoto" not in product and
      "setDealArtwork" not in product),
-    ("product discount follows the real price row",
-     "discoverDiscountBadge(d,11)" in product and "bottom.addView(badge)" in product),
+    ("product discount uses real data and section hierarchy",
+     "discoverDiscountBadge(d,fresh?11:14)" in product and "card.addView(badge,savingLp)" in product and "total(d)" in product),
     ("fresh variant promotes publication time",
      "publicationDisplay(d)" in product and "if(fresh)" in product),
     ("offer variant promotes BGG rating with Font Awesome star",

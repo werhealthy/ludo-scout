@@ -9,7 +9,7 @@ final class FeaturedBoxGeometry {
   float pad=Math.min(12*density,Math.min(viewW,viewH)*.12f),usableW=viewW-2*pad,usableH=(viewH-2*pad)/1.2f;
   if(usableW<=0||usableH<=0)return false;
   width=Math.min(usableW/1.26f,usableH*ratio);height=width/ratio;depth=width*.085f;
-  left=(viewW-width)/2;float y=(viewH-height)/2;bottom=y+height;
+  left=(viewW-width-depth)/2;float y=(viewH-height)/2;bottom=y+height;
   float right=left+width,rise=depth*.38f,tilt=height*.012f;
   set(front,left,y+tilt,right,y,right,bottom,left,bottom-tilt);
   set(top,left,y+tilt,left+depth,y+tilt-rise,right+depth,y-rise,right,y);
