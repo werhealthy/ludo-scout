@@ -2,16 +2,17 @@
 
 ## Verified release
 
-5.12.93-featured-box-refinement (1000110), Firebase upload/distribution confirmed 2026-10-01 07:31 Europe/Rome (05:31 UTC). PR102 merged at 5db9ef233f72956703bedfd044d5ad46e8c14947. Head ca0e6060fee6c1b0245c1b26f5bf2c3b3d84f0b3 passed PR run269 (36819619132): full regressions, Android unit/compile and review APK build. Signed beta run110 (36819845258) succeeded and Firebase logs explicitly confirmed release upload and distribution to testers/groups.
+5.12.94-engine-intake (1000111), Firebase upload/tester distribution confirmed 2026-10-01 07:49 Europe/Rome (05:49 UTC). PR103 merged at 1189820b673bbe1bef854912dab483a8e40898e8. Head 8fd93850d97f424a7b6cf033f226f91e76ee898e passed PR run271 (36821073751), including full regressions, Java-generated SQLite, Android tests/compile and review APK. Signed beta run111 (36821361426) succeeded; Firebase explicitly confirmed upload and distribution.
 
-## Current step — isolated featured artwork
+## Current Motore/UI step
 
-- FeaturedBoxGeometry prepares reusable square/tall/wide front, top and side coordinates. Front uses full BGG bitmap, thin side is cover-derived color without invented artwork. Top extends above front, shadow space is reserved.
-- FeaturedBoxView caches Paths/Matrix/gradients on bitmap/bounds changes, reuses Paints and geometry, and uses translucent ambient/contact shadow ovals without blur or software layer. Invalid geometry or drawing runtime errors use FIT_CENTER flat bitmap fallback; missing image keeps existing placeholder.
-- Hero layout, preferences, selection/ranking and all other cards unchanged. Posting layout reconstruction after traversal is preserved.
-- Geometry JUnit covers shape bounds/ratios, top direction and invalid values.63 local guards and full remote PR/beta checks passed; static review checked Canvas state, fallback and shared bitmap handling. PR APK uses a temporary review-only signing key; Firebase beta uses existing signing key.
-- No device/emulator visual or frame-time verification. Do not claim realistic rendering from successful build. User must check cover/content visibility, proportions, side/top, contact/ambient shadows, distortions, square/tall/wide behavior and scrolling/flicker on phone.
-- Next UI feedback remains pending: keep only Non mi interessa in hero, announcement ellipsis top-right, remove textual Offertona badge, full-page centered Motore loading with more icon/ring spacing and specific action text.
+- Separate Da analizzare circle is GLOBAL announcement intake, not another active-scroll game phase. Shows canonical active PENDING_ANALYSIS listings plus latest raw pending sightings without any canonical listing. Raw signatures deduplicate and completion wins by (observed_at,id). Count/list use same SQL; direct phase=-2 route works even with no pipelineRun. Data remains truthful while queue is paused. Count changes animate once; throttled background arrivals request fresh snapshots. Existing 5-phase scroll logic and publish/trust gates preserved; do not sum global announcement intake with scoped game phases.
+- Query plan reproduced full SCAN market_listings for COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) joins. Equivalent indexed OR joins now use existing legacy/fingerprint indexes in DealDatabase and EnginePipelineSql. No schema migration, new index, queue ownership or data changes. Parity test covers null/empty/overridden legacy identity; phase SQL fixtures retain all trust/readiness gates.
+- Main Motore initial load is blank page with centered animation/activity text; icon38 inside52dp and spinner144dp in168dp frame leave clear spacing. Stale data remains visible while refreshing.
+- Hero large interest buttons removed. Single muted Non mi interessa action retains48dp hit target, announcement tap and game exclusion via long-press popup. Catalog announcement ellipsis now overlays top-right artwork; text offer labels removed from catalog previews.
+- Validation:65 local source/SQL tests passed; full remote PR/beta tests/compile/APK passed. Static review caught latest raw same-timestamp completion and fix is in production fixture. User/device validation pending: incoming paused intake, direct list, count drop after analysis, load time, spacing and preview actions.
+- User rejected apparent flat framed box on device and explicitly paused box work; do not claim renderer realism or revisit before other UX tasks. Shared SQLite crashes/ANR and stalled processing lease are NOT established fixed. Indexed query correction addresses demonstrated cost, not all lock/queue behavior.
+- Remaining steps: rich phase cards with available BGG/Vinted data; investigate latest device timing/queue stall; finish catalog/detail actions and controlled transition, Ludo purple pet, collection ratings/sold prices and shared bottom sheets.
 
 ## Delivery preference
 
