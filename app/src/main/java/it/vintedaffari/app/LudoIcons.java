@@ -22,6 +22,7 @@ final class LudoIcons {
     static final String INFO="\uf05a";
     static final String ELLIPSIS_VERTICAL="\uf142";
     static final String ARROW_LEFT="\uf060";
+    static final String ARROW_RIGHT="\uf061";
     static final String CHEVRON_LEFT="\uf053";
     static final String CHEVRON_RIGHT="\uf054";
     static final String FILTER="\uf0b0";

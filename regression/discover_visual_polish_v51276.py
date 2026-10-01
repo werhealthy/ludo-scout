@@ -43,11 +43,12 @@ checks = [
      "discoverProductCard(d,false)" in ui and
      "discoverProductCard(d,true)" in ui),
     ("Home product cards use BGG-only artwork",
-     "discoverBggCover(d" in product and
+     "homePreviewBox(d)" in product and
+     "setProductArtwork(source,placeholder,d.bggId,d.bggImageUrl" in ui and
      "firstListingPhoto" not in product and
      "setDealArtwork" not in product),
-    ("product discount follows the real price row",
-     "discoverDiscountBadge(d,11)" in product and "bottom.addView(badge)" in product),
+    ("product discount uses real data and section hierarchy",
+     "discoverDiscountBadge(d,fresh?11:14)" in product and "card.addView(badge,savingLp)" in product and "total(d)" in product),
     ("fresh variant promotes publication time",
      "publicationDisplay(d)" in product and "if(fresh)" in product),
     ("offer variant promotes BGG rating with Font Awesome star",
