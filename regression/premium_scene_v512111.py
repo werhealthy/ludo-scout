@@ -31,6 +31,7 @@ public class PremiumSceneRegression {
   Method inline;
   try{inline=HomePresentation.class.getDeclaredMethod("heroInline",float.class,float.class);}
   catch(NoSuchMethodException missing){throw new AssertionError("Square covers should use the compact two-column hero on a normal phone");}
+  expect((boolean)inline.invoke(null,288f,1f),"360dp phone after actual 40dp+32dp padding must have horizontal hero");
   expect((boolean)inline.invoke(null,300f,1f),"normal phone hero should be horizontal");
   expect((boolean)inline.invoke(null,340f,1.15f),"moderate type scaling must keep the layout usable");
   expect(!(boolean)inline.invoke(null,250f,1f),"narrow cards need vertical fallback");
