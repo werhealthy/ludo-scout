@@ -109,7 +109,7 @@ public final class MainActivity extends Activity {
         QueueKeepAliveService.ensureRunning(this);
     }
 
-    @Override protected void onResume(){super.onResume();petResumed=true;petLoadedAt=0;if(petView!=null)petView.setResumed(true);engineUiResumed=true;if("activity".equals(tab)){engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,f);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
+    @Override protected void onResume(){super.onResume();petResumed=true;petLoadedAt=0;if(petView!=null)petView.setResumed(activePetPanel==null);engineUiResumed=true;if("activity".equals(tab)){engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,f);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
     @Override protected void onPause(){petResumed=false;if(petView!=null)petView.setResumed(false);engineUiResumed=false;uiUpdates.removeCallbacks(activityStatusPulse);persistTransientUiSession();super.onPause();}
     @Override public void onTrimMemory(int level){
         super.onTrimMemory(level);
@@ -168,7 +168,7 @@ private View makeCompanionFab(){
     }
 
     private void render(){
-        if(body==null||renderInProgress)return;renderInProgress=true;long started=System.currentTimeMillis();
+        if(body==null||renderInProgress)return;if(activePetPanel!=null&&activePetPanel.isShowing()){refreshPetPanel();return;}renderInProgress=true;long started=System.currentTimeMillis();
         try{applyDiscoverChrome();if(!"activity".equals(tab))updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp("discover".equals(tab)?20:18),dp("discover".equals(tab)?7:"activity".equals(tab)?16:4),dp("discover".equals(tab)?20:18),"discover".equals(tab)?dp(32):dp(24));if(activityButton!=null)activityButton.setVisibility(View.GONE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
         finally{renderInProgress=false;long elapsed=System.currentTimeMillis()-started;getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putLong("uiLastRenderMs",elapsed).putString("uiLastRenderTab",tab).apply();}
     }
@@ -1140,7 +1140,7 @@ private void showFilterSheet(){
 
     // ---------- OCCHIO DI LUDO: local companion ----------
     private final LudoPetState petState=new LudoPetState();
-    private LudoPetView petView;private boolean petResumed;
+    private LudoPetView petView;private boolean petResumed;private Dialog activePetPanel;private boolean petPanelProfile;
     private LocalScoutBrain.Snapshot petSnapshot;private List<DealRecord> petHuntDeals=Collections.emptyList();private List<LibraryGame> petLibrary=Collections.emptyList();
     private final Map<String,Long> petGameIds=new HashMap<>();private boolean petLoading;private long petLoadedAt;private String petFailure;
     private void requestPetSnapshot(){
@@ -1161,11 +1161,14 @@ private void showFilterSheet(){
         String phrase=petLoading&&petSnapshot==null?"Sto cercando tra i tuoi giochi…":petFailure!=null?petFailure:chosen!=null?"Ecco la mia proposta.":petSnapshot!=null&&petGameIds.isEmpty()?"Nessun consiglio convincente adesso. Avviamo una caccia?":"Cerchiamo il prossimo gioco?";
         TextView speech=text(phrase,18,Color.rgb(40,22,61),Typeface.NORMAL);speech.setPadding(dp(16),dp(12),dp(16),dp(12));speech.setBackground(round(Color.rgb(239,228,255),20,0,0));speech.setGravity(Gravity.CENTER);scene.addView(speech,new LinearLayout.LayoutParams(-1,-2));
         FrameLayout stage=new FrameLayout(this);stage.setBackground(new Drawable(){private final Paint p=new Paint(3);public void draw(Canvas c){Rect b=getBounds();p.setColor(Color.rgb(52,33,76));c.drawOval(b.left-b.width()*.3f,b.top+b.height()*.72f,b.right+b.width()*.3f,b.bottom+b.height()*.3f,p);}public void setAlpha(int a){}public void setColorFilter(android.graphics.ColorFilter f){}public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}});
-        Button hunts=petSideButton("Cacce",LudoIcons.SEARCH,()->openPetSpace(false));FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);hp.topMargin=dp(12);stage.addView(hunts,hp);
-        Button tastes=petSideButton("Gusti",LudoIcons.HEART,()->openPetSpace(true));FrameLayout.LayoutParams tp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);tp.topMargin=dp(12);stage.addView(tastes,tp);
-        LinearLayout actors=new LinearLayout(this);actors.setGravity(Gravity.CENTER_VERTICAL);petView=new LudoPetView(this);petView.lookAtGame(chosen!=null);petView.setResumed(petResumed);actors.addView(petView,new LinearLayout.LayoutParams(0,-1,chosen==null?1f:.56f));
+        LinearLayout stageContent=new LinearLayout(this);stageContent.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout controls=new LinearLayout(this);controls.setPadding(0,dp(12),0,dp(8));controls.setGravity(Gravity.CENTER_VERTICAL);
+        Button hunts=petSideButton("Cacce",LudoIcons.SEARCH,()->openPetSpace(false));controls.addView(hunts,new LinearLayout.LayoutParams(0,-2,1));
+        controls.addView(new Space(this),new LinearLayout.LayoutParams(dp(32),1));
+        Button tastes=petSideButton("Gusti",LudoIcons.HEART,()->openPetSpace(true));controls.addView(tastes,new LinearLayout.LayoutParams(0,-2,1));stageContent.addView(controls,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout actors=new LinearLayout(this);actors.setGravity(Gravity.CENTER_VERTICAL);if(chosen==null)actors.addView(new Space(this),new LinearLayout.LayoutParams(0,1,.22f));petView=new LudoPetView(this);petView.lookAtGame(chosen!=null);petView.setResumed(petResumed);actors.addView(petView,new LinearLayout.LayoutParams(0,-1,.56f));if(chosen==null)actors.addView(new Space(this),new LinearLayout.LayoutParams(0,1,.22f));
         if(chosen!=null){View box=productBoxArtwork(chosen.bggId,chosen.bggImageUrl,name(chosen));actors.addView(box,new LinearLayout.LayoutParams(0,-1,.44f));}
-        FrameLayout.LayoutParams actorsLp=new FrameLayout.LayoutParams(-1,-1);actorsLp.topMargin=dp(84);actorsLp.bottomMargin=dp(4);stage.addView(actors,actorsLp);
+        stageContent.addView(actors,new LinearLayout.LayoutParams(-1,0,1));stage.addView(stageContent,new FrameLayout.LayoutParams(-1,-1));
         int available=getResources().getDisplayMetrics().heightPixels;int stageHeight=Math.max(dp(260),Math.min(dp(350),available/2-dp(75)));scene.addView(stage,new LinearLayout.LayoutParams(-1,stageHeight));
         if(chosen!=null){TextView title=text(name(chosen),18,TEXT,Typeface.BOLD);title.setGravity(Gravity.CENTER);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);scene.addView(title);String reason=petSnapshot.pickReasons.get(chosen.signature);if(!TextUtils.isEmpty(reason)){TextView why=text(reason,13,Color.rgb(211,194,233),Typeface.NORMAL);why.setGravity(Gravity.CENTER);why.setPadding(0,dp(6),0,dp(8));scene.addView(why);}}
         String action=petFailure!=null?"Riprova":chosen!=null?"Apri il gioco":petSnapshot!=null&&petGameIds.isEmpty()?"Avvia una caccia":"Consigliami";
@@ -1174,11 +1177,16 @@ private void showFilterSheet(){
         LinearLayout.LayoutParams sceneLp=new LinearLayout.LayoutParams(-1,-2);sceneLp.topMargin=dp(16);body.addView(scene,sceneLp);
     }
     private Button petSideButton(String label,String icon,Runnable action){Button b=button(label,Color.rgb(72,46,103));b.setTextColor(Color.WHITE);b.setTextSize(14);b.setMinHeight(dp(56));b.setMinWidth(dp(110));b.setPadding(dp(12),dp(8),dp(12),dp(8));b.setCompoundDrawablesWithIntrinsicBounds(iconDrawable(icon,Color.WHITE,18),null,null,null);b.setCompoundDrawablePadding(dp(8));b.setContentDescription("Apri "+label);b.setOnClickListener(v->action.run());return b;}
+    private void refreshPetPanel(){
+        Dialog panel=activePetPanel;if(panel==null||!panel.isShowing())return;LinearLayout host=panel.findViewById(SHEET_ID);if(host==null)return;
+        LinearLayout previous=body;try{body=host;host.removeAllViews();if(petPanelProfile){renderLibraryInsights(petSnapshot,petLibrary);body.addView(companionProfileTrustCard(petLibrary));body.addView(languageStats(petSnapshot));}else renderHunts(petHuntDeals);}finally{body=previous;}
+    }
     private void openPetSpace(boolean profile){
         if(petSnapshot==null){Toast.makeText(this,"Attendi il caricamento, poi riprova.",Toast.LENGTH_SHORT).show();return;}
-        Dialog panel=fullScreenPanel(profile?"I miei gusti":"Le mie cacce");LinearLayout host=panel.findViewById(SHEET_ID);LinearLayout previous=body;
-        try{body=host;if(profile){renderLibraryInsights(petSnapshot,petLibrary);body.addView(companionProfileTrustCard(petLibrary));body.addView(languageStats(petSnapshot));}else renderHunts(petHuntDeals);}finally{body=previous;}
-        if(petView!=null)petView.setResumed(false);panel.setOnDismissListener(d->{petLoadedAt=0;if(petView!=null&&"companion".equals(tab)){petView.setResumed(petResumed);scheduleRender(0);}});panel.show();
+        Dialog panel=fullScreenPanel(profile?"I miei gusti":"Le mie cacce");activePetPanel=panel;petPanelProfile=profile;
+        if(petView!=null)petView.setResumed(false);
+        panel.setOnDismissListener(d->{if(activePetPanel==panel)activePetPanel=null;petLoadedAt=0;if(petView!=null&&"companion".equals(tab)){petView.setResumed(petResumed);scheduleRender(0);}});
+        panel.show();refreshPetPanel();
     }
     private View companionTabs(){LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(SURFACE2,18,1,OUTLINE));addCompanionTab(tabs,"Per me","for_you");addCompanionTab(tabs,"Cacce","hunts");addCompanionTab(tabs,"Profilo","profile");return tabs;}
     private void addCompanionTab(LinearLayout tabs,String label,String value){boolean on=value.equals(companionSection);TextView t=text(label,13,on?TEXT:MUTED,Typeface.BOLD);t.setGravity(Gravity.CENTER);t.setBackground(round(on?Color.rgb(61,42,90):Color.TRANSPARENT,13,0,0));t.setOnClickListener(v->{companionSection=value;render();if(scroll!=null)scroll.scrollTo(0,0);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(4);tabs.addView(t,lp);}
