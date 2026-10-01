@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources><style name="LudoBottomSheetAnimation"><item name="android:windowEnterAnimation">@anim/ludo_sheet_enter</item><item name="android:windowExitAnimation">@anim/ludo_sheet_exit</item></style></resources>
