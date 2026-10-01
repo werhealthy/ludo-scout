@@ -27,3 +27,8 @@ Add-game and other task modals should slide upward from bottom with coherent bac
 
 ## Delivery checks
 Every implemented step: current regression workflow + Android/JUnit compilation; code review; signed beta APK; Firebase upload and tester distribution confirmation. Local environment has no working JDK or Android emulator, so device visual/gesture validation comes from App Tester and user feedback.
+
+## 2026-10-01 — First Motore layout milestone delivered
+5.12.98-engine-layout: header/page spacing, bars/cutout helper, one grouped surface for current scroll/state, independent waiting-scroll/global-intake actions and unchanged five-phase graph. Progressive phase cards use actual available BGG and legacy Vinted fields, with background enrichment/artwork decode. Raw rows remain visible; exact phase membership/publication gates and schema unchanged. Shared game/announcement detail padding is consistent. CI/regression/SQLite/JUnit/compile/APK/signing and Firebase upload/distribution confirmed; device visual approval pending.
+
+This delivery does not close the stability or motion requirements in section2. Recorded PROCESSING activity is not proof of a healthy lease. Current deltas compare successive fresh snapshots of the same scroll and fade after~3seconds; the older “Dall’ultima visita” proposal still requires a dedicated decision. User chose compact waiting-scroll actions, superseding the extra “Da analizzare” circle. No navigation selector, mascot, Library or queue rewrite was included.

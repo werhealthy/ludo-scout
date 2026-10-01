@@ -1,6 +1,17 @@
 # Ludo Scout — Current state
 
-## Verified release — 5.12.97
+## Current milestone — Motore layout 5.12.98
+5.12.98-engine-layout (1000115) uploaded to Firebase and distributed to testers/groups successfully at 2026-10-01 07:20:19 UTC (09:20 Europe/Rome). PR107 merged at865d6f1945ee5e4134a773108d1f0355a6bb8bd7. PR validation run277 (36829115098), head86c0be6e97978c387d0eb1ae20e05285b49b194f, passed full regressions/SQLite fixtures, Android JUnit, Java compile and review APK. Signed beta run115 (36829430731) passed tests/build/signature and Firebase distribution.
+- Motore has16dp page top spacing plus8dp header spacing. One surface groups scoped scroll identity/status, separate waiting-scroll and global pending-announcement actions, and the five-phase graph. Counts, membership SQL, direct phase/central navigation and attention inbox are preserved. Larger text uses stacked controls and the existing phase list.
+- Shared system-bar/cutout safe-inset helper serves main shell and game/announcement detail windows. Detail top padding16dp, bottom24dp; waiting/run/phase cards use16dp padding. No48dp blanket content padding.
+- Phase rows retain raw elements even without BGG/price. Real game cover/rating and available legacy Vinted price/detail are added from background enrichment reads; local bitmap decode runs on image executor. Raw items without detail data remain visible. No fabricated pricing/image/verification fields.
+- First CI correctly rejected snapshot timestamp before pause-state reads; all reads now precede freshness timestamp. Final validation passed. Overview status uses recorded phase activity, pause flags and Vinted pacing; it is not proof that an old processing lease is healthy.
+- Home5.12.97, existing pedestal, discovery/preferences, schema, queue ownership/recovery and publication gates unchanged. No claim to fix long-active scrolls, SQLite crashes/ANRs or leases.
+- Existing count motion remains same-scroll snapshot comparison with~3s fading delta. Return-visit baseline/persistent deltas and continuous active-phase motion are still open; older spec proposal is not an approved rule.
+- Automatic validation passed; SQL fixtures passed with unchanged membership queries. No device/emulator or real on-device data/visual approval performed.
+Next step: install5.12.98 and validate top/notch spacing, grouped controls/direct count lists, progressive cards and increased text on the phone. Then take stability/motion as a separate milestone.
+
+## Previous verified release — 5.12.97
 5.12.97-featured-foreground (1000114) uploaded and distributed to Firebase testers/groups successfully at 2026-10-01 07:05:53 UTC. PR106 merged at 5934b175d6d08845252e6d28821c4d7963c36b61. PR validation run274 (36827544924) and signed beta run114 (36827966382) passed regressions, Android JUnit, Java compilation, APK build and signing verification.
 - Square cover mode uses a full-width artwork stage above details; tall covers use52% artwork width. Uniform pedestal scale reduced to allow a larger box, preserving40% contact anchor. Cached elliptical radial contact and ambient shadows; layered violet background, brighter12sp featured pill and shared Font Awesome CTA chevron.
 - Geometry JUnit asserts square foreground occupancy and bounds;336 numerical geometry cases checked. Existing async decode, posted hierarchy rebuild, fallback, pricing and discovery remain unchanged.
@@ -69,4 +80,4 @@ User requested ordered, reviewable steps rather than one broad rewrite. See docs
 4. Ludo — minimal purple pet inspired by attached reference; large opening presence, collapses on scroll.
 5. Collection/shared interactions — bookshelf exploration, liking0–5 with preserved existing ratings, sale-price entry/backfill, bottom-slide modals and purposeful motion.
 
-Recommended next action: install 5.12.91-featured-box-layout-fix and verify that the featured card content is visible again; only then judge whether the 2.5D box itself is visually credible.
+Historical note: the v91 visual validation recommendation above is superseded by the current milestone and v97 hero baseline.
