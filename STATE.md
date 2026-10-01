@@ -2,16 +2,16 @@
 
 ## Verified release
 
-5.12.92-home-render-loading (1000109), distributed 2026-10-01 00:59 Europe/Rome (2026-09-30 22:59 UTC). PR101 merged at 7d531a085ab4750809f55b08554740460b49681a. Head476c70768e6fa3d4a63236e06f9c4379a094c114 passed PR run266 (36788147312). Signed beta run109 (36788339039) passed; Firebase explicitly confirmed new release upload and tester/group distribution.
+5.12.93-featured-box-refinement (1000110), Firebase upload/distribution confirmed 2026-10-01 07:31 Europe/Rome (05:31 UTC). PR102 merged at 5db9ef233f72956703bedfd044d5ad46e8c14947. Head ca0e6060fee6c1b0245c1b26f5bf2c3b3d84f0b3 passed PR run269 (36819619132): full regressions, Android unit/compile and review APK build. Signed beta run110 (36819845258) succeeded and Firebase logs explicitly confirmed release upload and distribution to testers/groups.
 
-## Current correction
+## Current step — isolated featured artwork
 
-- Hero hierarchy rebuild deferred after Android layout traversal. Preserves PR100 isolated 2.5D artwork renderer; price/CTA share footer, metadata beside square/tall cover. Phone visual validation remains necessary.
-- Default dismissal targets only announcement signature. Long press opens compact native menu for whole BGG-game exclusion; Undo restores previous preference. v2 preference namespace avoids preserving incorrect v89 broad dismissals. Positive-interest scoring remains per game.
-- Wider previews expose next-card edge without forcing half-third; square covers, rating/language same row. Section icons enlarged and BGG ranking minimal inline discounts restored.
-- Games category filter remains adjacent to search and stable in appearance, with badge/chips showing selection.
-- Motore dedicated executor avoids bundle queue; unused day/history reads removed. Animated native loading replaces plain text. Diagnostic activitySnapshot now includes owner/review/pipeline durations. Lightweight waiting-run count retained; acquisition, queue ownership, trust, phase SQL and publication gates unchanged.
-- Validation: 63 local source/SQL guards, full PR/beta production SQL and Android unit/compile checks passed. Review assessed posted layout reconstruction and 2.5D loading. No emulator/device screenshot verification.
+- FeaturedBoxGeometry prepares reusable square/tall/wide front, top and side coordinates. Front uses full BGG bitmap, thin side is cover-derived color without invented artwork. Top extends above front, shadow space is reserved.
+- FeaturedBoxView caches Paths/Matrix/gradients on bitmap/bounds changes, reuses Paints and geometry, and uses translucent ambient/contact shadow ovals without blur or software layer. Invalid geometry or drawing runtime errors use FIT_CENTER flat bitmap fallback; missing image keeps existing placeholder.
+- Hero layout, preferences, selection/ranking and all other cards unchanged. Posting layout reconstruction after traversal is preserved.
+- Geometry JUnit covers shape bounds/ratios, top direction and invalid values.63 local guards and full remote PR/beta checks passed; static review checked Canvas state, fallback and shared bitmap handling. PR APK uses a temporary review-only signing key; Firebase beta uses existing signing key.
+- No device/emulator visual or frame-time verification. Do not claim realistic rendering from successful build. User must check cover/content visibility, proportions, side/top, contact/ambient shadows, distortions, square/tall/wide behavior and scrolling/flicker on phone.
+- Next UI feedback remains pending: keep only Non mi interessa in hero, announcement ellipsis top-right, remove textual Offertona badge, full-page centered Motore loading with more icon/ring spacing and specific action text.
 
 ## Delivery preference
 
