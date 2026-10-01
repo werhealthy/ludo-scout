@@ -40,6 +40,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run product gesture behavior regression
+        run: python3 regression/product_gesture_v512106.py
+
       - name: Run Catalog navigation behavior regression
         run: python3 regression/market_navigation_v512105.py
 

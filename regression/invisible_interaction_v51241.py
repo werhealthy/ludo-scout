@@ -6,7 +6,15 @@ ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(en
 build=(ROOT/"app/build.gradle").read_text(encoding="utf-8")
 system=(ROOT/"UX_SYSTEM_V3_INVISIBLE_INTERACTION.md").read_text(encoding="utf-8")
 
-detail=ui[ui.index("private void openDetail(DealRecord d)"):ui.index("private TextView detailSecondaryAction",ui.index("private void openDetail(DealRecord d)"))]
+def production_method(signature):
+    start=ui.index(signature);brace=ui.index("{",start);depth=0
+    for i in range(brace,len(ui)):
+        if ui[i]=="{": depth+=1
+        elif ui[i]=="}":
+            depth-=1
+            if depth==0:return ui[start:i+1]
+    raise ValueError(signature)
+detail=production_method("private void openDetail(DealRecord d,boolean preserveParent)")
 filters=ui[ui.index("private void showFilterSheet()"):ui.index("private void renderBundles()",ui.index("private void showFilterSheet()"))]
 catalog=ui[ui.index("private View catalogRowV51"):ui.index("private int photoCount",ui.index("private View catalogRowV51"))]
 overlay=ui[ui.index("private void openGameDetailOverlay"):ui.index("private View marketListingCard",ui.index("private void openGameDetailOverlay"))]
@@ -32,9 +40,9 @@ checks=[
      "localVintedReferenceStats" not in detail and
      '"Annunci di questo gioco"' not in detail),
     ("listing detail keeps distinct signals",
-     'scorePill("Ludo "+scoreLabel(d),LIME)' in detail and
-     "langChip(d.languageCode)" in detail and
-     "bggPill(d)" in detail and
+     'productRatingRow(d.rating,scoreLabel(d)' in detail and
+     "productLanguagePanel(d.languageCode" in detail and
+     "productRatingRow(d.rating" in detail and "openBgg(d.bggId)" in detail and
      "publicationText(d,12,Typeface.NORMAL)" in detail),
     ("listing can transition to game by overscroll",
      "installPullToGame(sc,pullHint,game.id,dialog)" in detail and
