@@ -49,7 +49,7 @@ public final class DbContentionTrace {
         final String operation;final Thread thread=Thread.currentThread();
         final long started=System.nanoTime();
         private String phase="SETUP",error="";
-        private long phaseAt=started,openNs,waitNs,bodyNs,commitNs,helperNs;
+        private long phaseAt=started,openNs,waitNs,bodyNs,commitNs,helperNs,implicitNs;
         private boolean closed,tracked;
         private Scope(String operation){this.operation=operation;}
         public synchronized void phase(String next){
@@ -63,12 +63,14 @@ public final class DbContentionTrace {
                 case "TRANSACTION":bodyNs+=duration;break;
                 case "COMMIT":commitNs+=duration;break;
                 case "HELPER_CALL":helperNs+=duration;break;
+                case "IMPLICIT_WRITE":implicitNs+=duration;break;
                 default:break;
             }
             phaseAt=now;
         }
         public synchronized void failed(Throwable failure){error=failure==null?"unknown":failure.getClass().getSimpleName();}
         private synchronized String activeLine(){
+            if(closed)return "";
             String frames="";
             if(System.nanoTime()-started>=250_000_000L){
                 StackTraceElement[] stack=thread.getStackTrace();
@@ -88,18 +90,18 @@ public final class DbContentionTrace {
                 if(stats!=null){stats.count++;if(!failure.isEmpty())stats.failures++;
                     stats.totalMax=Math.max(stats.totalMax,total);stats.openMax=Math.max(stats.openMax,openNs);
                     stats.waitMax=Math.max(stats.waitMax,waitNs);stats.bodyMax=Math.max(stats.bodyMax,bodyNs);
-                    stats.commitMax=Math.max(stats.commitMax,commitNs);stats.helperMax=Math.max(stats.helperMax,helperNs);
+                    stats.commitMax=Math.max(stats.commitMax,commitNs);stats.helperMax=Math.max(stats.helperMax,helperNs);stats.implicitMax=Math.max(stats.implicitMax,implicitNs);
                     if(!failure.isEmpty())stats.lastError=failure;
                 }
             }
         }
     }
     private static final class Stats {
-        long count,failures,totalMax,openMax,waitMax,bodyMax,commitMax,helperMax;String lastError="";
+        long count,failures,totalMax,openMax,waitMax,bodyMax,commitMax,helperMax,implicitMax;String lastError="";
         String line(String operation){return "completed={op="+operation+";count="+count+";failures="+failures+
                 ";maxTotalMs="+ms(totalMax)+";maxOpenMs="+ms(openMax)+";maxBeginMs="+ms(waitMax)+
                 ";maxBodyMs="+ms(bodyMax)+";maxCommitMs="+ms(commitMax)+";maxHelperCallMs="+ms(helperMax)+
-                ";lastError="+lastError+"}";}
+                ";maxImplicitWriteMs="+ms(implicitMax)+";lastError="+lastError+"}";}
     }
     public static String snapshot(){
         StringBuilder out=new StringBuilder("build=db-contention-v1;process="+process+";pid="+pid+";version="+version+

@@ -23,6 +23,8 @@ public final class DbContentionTraceRegression {
         snapshot=DbContentionTrace.snapshot();
         require(snapshot.contains("op=busy;count=1;failures=1"),"failed acquisition lost");
         require(snapshot.contains("IllegalStateException")&&!snapshot.contains("secret title"),"only error class may be logged");
+        try(DbContentionTrace.Scope implicit=DbContentionTrace.start("implicit")){implicit.phase("IMPLICIT_WRITE");Thread.sleep(15);}
+        require(DbContentionTrace.snapshot().matches("(?s).*op=implicit;[^\n]*maxImplicitWriteMs=[1-9][0-9]*;.*"),"implicit writer tail timing lost");
         Object monitor=new Object();CountDownLatch waiting=new CountDownLatch(1);
         Thread worker=new Thread(()->{try(DbContentionTrace.Scope scope=DbContentionTrace.start("monitor")){
             scope.phase("HELPER_CALL");waiting.countDown();synchronized(monitor){} }},"blocked-worker");

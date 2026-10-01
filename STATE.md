@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Workstream backend — B1 diagnostica, 2026-10-02
+Implementata 5.12.114-db-contention-trace in PR123, branch backend/reliability-audit riallineato a beta5d92b9daa6a023ce866fceccd0f6d5c632caca6e. Misure bounded fuori SQLite per operazioni radar/coda/BGG, incluse scritture legacy Vinted e attese HELPER_CALL; esportazione background ogni5s, PID/versione/timestamp, snapshot precedente preservato. Nessuna modifica a schema, filtri, timeout, synchronized, pricing o servizi remoti. dbContention entra nella diagnostica esistente.
+Primo head a99e04c643b81e7b36924cf58bdbb64a01658f66: nuovo harness JVM e regressioni fino agli Android unit test passati in CI327, build completa non ancora confermata. Review ha richiesto separazione PRE_TRANSACTION da OPEN_DATABASE e copertura holder Vinted: correzioni incluse nel nuovo head, verifiche finali e distribuzione firmata ancora da completare. Non dichiarare disponibilità APK né soluzione degli stalli prima delle rispettive prove. Locale checkout parziale senza Java/assets:57script CI passati,22non eseguibili; script storici fuori workflow includono guard obsolete/non applicabili, nessun risultato totale suite dichiarato.
+Unico prossimo passo dopo CI/build/distribuzione verificate: ricevere diagnostica iniziale e finale dal telefono con prova descritta nella specifica backend. A ogni step indicare cosa fatto, cosa verificare, come e cosa restituire.
+
+
 ## Obiettivo attivo e ripresa — 2026-10-02, 00:14 Europe/Rome
 Gruppo2 ampliato consegnato in5.12.113 via App Tester; semantica d'interesse ed esempio BGG ricevuti e approvati. Prossimo passo frontend: prova sul telefono del gruppo2, in particolare link BGG/anteprima/ripristino, dettaglio e azioni contestuali. Poi gruppo3 Motore con numeri e periodi reali, coordinandosi con il workstream backend; non duplicare il gruppo2. «Top» accetta la direzione Home5.12.112, ma prestazioni e resa della nuova consegna non sono ancora misurate.
 

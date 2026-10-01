@@ -676,7 +676,7 @@ public final class MarketStore {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.recordSighting");
         try{
         if (card == null) return -1L;
-        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         String fp = fingerprint(card);
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
@@ -750,7 +750,7 @@ public final class MarketStore {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.applyAnalysis");
         try{
         if (card == null || analysis == null) return;
-        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Long listingId = listingIdForCard(db,card);
@@ -1029,7 +1029,7 @@ public final class MarketStore {
         try{
         if (isVintedPaused()) return null;
         if (!test2bOwner && isTest2bExclusiveActive()) return null;
-        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Job job = null;
@@ -1075,7 +1075,7 @@ public final class MarketStore {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.claimNextBggJob");
         try{
         if (isBggPaused()) return null;
-        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Job job = null;
@@ -1122,7 +1122,7 @@ public final class MarketStore {
         try{
         if (isBggPaused()) return new ArrayList<>();
         int wanted=Math.max(1,Math.min(20,limit));
-        trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             List<Job> jobs=new ArrayList<>();
@@ -1518,7 +1518,7 @@ public final class MarketStore {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.applyBggMetadata");
         try{
         if (m == null || TextUtils.isEmpty(m.bggId)) return;
-        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Long id = scalarLong(db, "SELECT id FROM games WHERE bgg_id=?", new String[]{m.bggId});
@@ -1867,7 +1867,7 @@ public final class MarketStore {
     public int reconcileQueue() {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.reconcileQueue");
         try{
-        trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         long now=System.currentTimeMillis();
         int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
