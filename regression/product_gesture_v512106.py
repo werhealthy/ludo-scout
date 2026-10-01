@@ -20,7 +20,7 @@ public class MotionEvent {
  int action,pointers;float y;
  public MotionEvent(int a,float v,int p){action=a;y=v;pointers=p;}
  public int getAction(){return action;} public int getActionMasked(){return action;}
- public int getPointerCount(){return pointers;} public float getY(){return y;}
+ public int getPointerCount(){return pointers;} public float getY(){return y;} public float getX(){return y;}
 }
 """
 harness=r"""
