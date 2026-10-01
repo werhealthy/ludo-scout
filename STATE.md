@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Current milestone — Ubongo premium visual correction 5.12.111
+5.12.111-premium-home (1000128) uploaded to Firebase at 2026-10-01 20:55:26 UTC and separately distributed to testers/groups at 20:55:27 UTC (22:55 Europe/Rome), confirmed by signed job110578632016. PR120 merged85694d0438dee8d09c906397d3f740ee710b763a. Exact final head64b226f550bc684e87574cd3f73a63a16fb3a7f8 passed PR323 (36924235643): all regressions/SQLite fixtures, premium geometry120 cases and actual360dp boundary, Android unit tests, compile and review APK. Independent final rereview found no remaining findings. Signed beta128 (36924578103) passed tests/build/expected-certificate verification and both Firebase delivery operations.
+
+The user rejected 5.12.110's rough photographic floor and stone pedestal on 2026-10-01: they wanted a modest integrated depth effect following the supplied Ubongo screenshot, not decorative sculptural assets. This direction supersedes the earlier Home asset treatment; Ludo memory, game favorites and functional backlog remain intact.
+- Home feature and preview cards now use native cached charcoal/violet gradients, soft lighting and restrained metallic borders. Home no longer references or decodes game_scene_floor/game_scene_plinth. Existing generated assets remain historical; the Ludo room remains in use.
+- Featured hero uses artwork left/information right, including square covers, on normal 360dp phones (288dp actual inner width); narrow screens and larger font scales retain a stacked fallback. A wider text allocation preserves button room. The image/base height follows measured information height rather than forcing a giant square-cover card.
+- Premium box geometry centers the full projection with a dark LEFT spine and preserves cover aspect ratio. Smooth thin violet base is grounded near the bottom, with contact shading and a subtle clipped reflection of the actual cover. Cached shaders/matrices/paths are prepared outside drawing; no new raster backgrounds, generated covers or rendering dependency.
+- Legacy detail geometry and shading remain unchanged. BGG covers/data, prices, routes, game favorites and last-Ludo-game behavior stay intact.
+- Test-only PR320 reproduced missing premium geometry; PR322 reproduced the real 360dp/padding boundary. Final regression exercises 120 aspect/bounds/base combinations, invalid inputs and small-screen/font fallback. CI/source review cannot prove actual Android shader appearance or phone frame timing.
+Phone acceptance: compare directly with Ubongo reference; card compactness, left spine, subtle reflection, smooth base contact, premium gradient/border, text/button room at 360dp and large fonts. Do not claim visual approval from compilation alone.
+
+
 ## Current milestone — Grounded scenes, redesigned Ludo and game favorites 5.12.110
 5.12.110-scene-favorites (1000127) uploaded to Firebase at2026-10-01 19:15:58 UTC and separately distributed to testers/groups at19:15:59 UTC (21:15 Europe/Rome), explicitly confirmed in signed job110538363316 logs. PR119 mergeda87d6d442a53144a55536857e0b5ba211b4cc04e. Final heada3127101338faa69226dc79a52158a88789ec063 passed PR run319 (36912124710): all regressions/SQLite fixtures, new executable game preference + real Activity-method fixtures, Android JUnit, compile and review APK. Signed beta127 (36912505410) passed tests/build/expected-certificate verification and Firebase upload/tester distribution.
 

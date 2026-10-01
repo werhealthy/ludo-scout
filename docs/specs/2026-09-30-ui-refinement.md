@@ -1,5 +1,8 @@
 # Ludo Scout — UI refinement, five reviewable steps
 
+## Correzione prioritaria — riferimento Ubongo, 2026-10-01
+Il feedback più recente rifiuta il pavimento fotografico e il piedistallo in pietra di5.12.110. Richiesta: profondità discreta, card viola metallizzata, base liscia integrata, fianco della scatola a sinistra e riflesso leggero come Ubongo. Implementazione5.12.111: gradienti/shader nativi condivisi tra evidenza e anteprime, geometria centrata, riflesso della copertina reale e layout affiancato anche con copertine quadrate su telefoni360dp. Fallback verticale per larghezze ridotte/testo grande. Nessun nuovo fondale illustrato; Ludo/Preferiti/dati e backlog funzionale restano invariati. Verifica visiva sul telefono ancora necessaria.
+
 ## Priorità aggiornate — feedback 2026-10-01, 20:43 Europe/Rome
 Il gruppo richiesto è stato implementato in5.12.110: nuovi asset/scena Home, ambiente e redesign Ludo, consiglio più leggibile/interattivo, ultimo gioco mantenuto e Preferiti per identità BGG con cuore condiviso tra annunci. Vedere milestone e asset per i limiti verificati. La vecchia restrizione “nessun nuovo redesign Ludo” è superata dalla richiesta esplicita.
 - Primo controllo sul telefono: profondità e contatto della base, proporzioni scena/copertine, testo grande, ritorno all'ultimo gioco e cuori su più annunci dello stesso gioco.
