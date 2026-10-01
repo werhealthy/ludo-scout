@@ -1,11 +1,10 @@
 # Ludo Scout — Current state
 
 ## Workstream backend — B1 diagnostica, 2026-10-02
-Implementata 5.12.114-db-contention-trace in PR123, branch backend/reliability-audit riallineato a beta5d92b9daa6a023ce866fceccd0f6d5c632caca6e. Misure bounded fuori SQLite per operazioni radar/coda/BGG, incluse scritture legacy Vinted e attese HELPER_CALL; esportazione background ogni5s, PID/versione/timestamp, snapshot precedente preservato. Nessuna modifica a schema, filtri, timeout, synchronized, pricing o servizi remoti. dbContention entra nella diagnostica esistente.
-Primo head a99e04c643b81e7b36924cf58bdbb64a01658f66: nuovo harness JVM e regressioni fino agli Android unit test passati in CI327, build completa non ancora confermata. Review ha richiesto separazione PRE_TRANSACTION da OPEN_DATABASE e copertura holder Vinted: correzioni incluse nel nuovo head, verifiche finali e distribuzione firmata ancora da completare. Non dichiarare disponibilità APK né soluzione degli stalli prima delle rispettive prove. Locale checkout parziale senza Java/assets:57script CI passati,22non eseguibili; script storici fuori workflow includono guard obsolete/non applicabili, nessun risultato totale suite dichiarato.
-Unico prossimo passo dopo CI/build/distribuzione verificate: ricevere diagnostica iniziale e finale dal telefono con prova descritta nella specifica backend. A ogni step indicare cosa fatto, cosa verificare, come e cosa restituire.
-
-
+Implementata osservabilità bounded delle attese DB/thread, fuori SQLite, con snapshot per processo e sessione precedente. `dbContention` entra nella diagnostica esistente. Nessuna modifica a schema, filtri, timeout, synchronized, pricing o servizi remoti.
+PR123 integrata in beta, merge `b7747372c656c79fed4c624091db9e2d30395490`. Head finale `80d6f345ae82cd5aab7f3a9eefb739cad8d3b300` verificato da CI330 (36936402812): regressioni, harness JVM, fixture SQLite, Android unit test, compilazione e APK di revisione superati. Review indipendente: corretti separazione PRE_TRANSACTION e copertura holder Vinted; nessuna criticità importante residua. Build firmata beta132 (36936664563), job110618411054: test/build/certificato atteso superati. Firebase upload riuscito 2026-10-01 22:46:41.218 UTC e distribuzione tester/gruppi riuscita 22:46:41.899 UTC, versione `5.12.114-db-contention-trace (1000132)`. Nessuna misura sul telefono o riduzione di crash/stalli ancora dimostrata.
+Locale checkout parziale senza Java/assets: 57 script CI passati, 22 non eseguibili; nessuna suite locale completa dichiarata.
+Unico prossimo passo: ricevere diagnostica iniziale e finale dal telefono con prova descritta nella specifica backend. B1 resta aperto. A ogni step indicare cosa fatto, cosa verificare, come e cosa restituire. Gruppi aperti: backend 5, frontend 5.
 
 ## Revisione visuale — feedback 2026-10-02, 00:23 Europe/Rome
 Conteggio attuale: **5 gruppi tematici aperti**, aggiornare in ogni risposta. Conteggiare gruppi sostanziosi, non singole modifiche o build; aggiornare il totale se il feedback cambia il backlog. Frontend attivo, backlog backend separato.
