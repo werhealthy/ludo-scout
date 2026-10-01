@@ -661,56 +661,46 @@ private void applyDiscoverChrome(){
     
 
     private final class FeaturedBoxView extends View{
-        private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
-        private final Paint fillPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint strokePaint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Matrix coverMatrix=new Matrix();
-        private Bitmap cover;private int edgeColor=Color.rgb(58,50,76);
-
-        FeaturedBoxView(){super(MainActivity.this);setLayerType(View.LAYER_TYPE_SOFTWARE,null);setContentDescription("Scatola del gioco in prospettiva");}
-
-        void setCover(Bitmap bitmap){cover=bitmap;edgeColor=sampleEdge(bitmap);invalidate();}
-
-        @Override protected void onDraw(Canvas canvas){
-            super.onDraw(canvas);if(cover==null||cover.isRecycled()||getWidth()<=0||getHeight()<=0)return;
-            float vw=getWidth(),vh=getHeight(),pad=dp(7);float ratio=cover.getWidth()/(float)Math.max(1,cover.getHeight());
-            int mode=HomePresentation.coverMode(cover.getWidth(),cover.getHeight());float depthRatio=mode==HomePresentation.WIDE?.075f:mode==HomePresentation.TALL?.065f:.082f;
-            float maxW=Math.max(dp(48),vw-pad*2),maxH=Math.max(dp(54),vh-pad*2-dp(10));
-            float frontW=Math.min(maxW/(1f+depthRatio),maxH*ratio);float frontH=frontW/Math.max(.2f,ratio);
-            float depth=Math.max(dp(8),Math.min(dp(22),frontW*depthRatio)),topDepth=Math.max(dp(3),depth*.30f),tilt=Math.min(dp(7),frontH*.018f);
-            float objectW=frontW+depth,left=(vw-objectW)/2f,top=(vh-frontH)/2f-dp(3),right=left+frontW,bottom=top+frontH;
-            float outerRight=right+depth,outerTop=top+topDepth,outerBottom=bottom-topDepth;
-
-            fillPaint.setShader(null);fillPaint.setColor(Color.argb(30,0,0,0));canvas.drawOval(left-dp(4),bottom-dp(2),outerRight+dp(7),bottom+dp(14),fillPaint);
-            fillPaint.setColor(Color.argb(50,0,0,0));canvas.drawOval(left+frontW*.08f,bottom+dp(1),outerRight-dp(1),bottom+dp(9),fillPaint);
-            fillPaint.setColor(Color.argb(76,0,0,0));canvas.drawOval(left+frontW*.18f,bottom+dp(2),right+depth*.58f,bottom+dp(6),fillPaint);
-
-            float[] frontPts={left,top+tilt,right,top,right,bottom,left,bottom-tilt};
-            float[] topPts={left,top+tilt,right,top,outerRight,outerTop,left+depth*.78f,top+tilt+topDepth};
-            float[] sidePts={right,top,outerRight,outerTop,outerRight,outerBottom,right,bottom};
-            Path topFace=quad(topPts),sideFace=quad(sidePts),frontFace=quad(frontPts);
-
-            int sideDark=shade(edgeColor,.44f),sideLight=shade(edgeColor,.66f),topDark=shade(edgeColor,.62f),topLight=shade(edgeColor,.88f);
-            fillPaint.setShader(new LinearGradient(left,top,outerRight,outerTop,topLight,topDark,Shader.TileMode.CLAMP));canvas.drawPath(topFace,fillPaint);
-            fillPaint.setShader(new LinearGradient(right,0,outerRight,0,sideLight,sideDark,Shader.TileMode.CLAMP));canvas.drawPath(sideFace,fillPaint);
-            fillPaint.setShader(null);
-
-            coverMatrix.reset();float[] src={0,0,cover.getWidth(),0,cover.getWidth(),cover.getHeight(),0,cover.getHeight()};coverMatrix.setPolyToPoly(src,0,frontPts,0,4);canvas.drawBitmap(cover,coverMatrix,bitmapPaint);
-
-            int save=canvas.save();canvas.clipPath(frontFace);fillPaint.setShader(new LinearGradient(left,top,right,bottom,new int[]{Color.argb(18,255,255,255),Color.TRANSPARENT,Color.argb(22,0,0,0)},new float[]{0f,.55f,1f},Shader.TileMode.CLAMP));canvas.drawRect(left,top,right,bottom,fillPaint);canvas.restoreToCount(save);fillPaint.setShader(null);
-
-            strokePaint.setStyle(Paint.Style.STROKE);strokePaint.setStrokeWidth(Math.max(1f,dp(.55f)));strokePaint.setColor(Color.argb(54,255,255,255));canvas.drawPath(topFace,strokePaint);strokePaint.setColor(Color.argb(42,255,255,255));canvas.drawLine(right,top,right,bottom,strokePaint);
-            strokePaint.setColor(Color.argb(55,0,0,0));canvas.drawLine(left,top+tilt,left,bottom-tilt,strokePaint);strokePaint.setStyle(Paint.Style.FILL);
+        private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG),fillPaint=new Paint(Paint.ANTI_ALIAS_FLAG),edgePaint=new Paint(Paint.ANTI_ALIAS_FLAG),shadowPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Matrix coverMatrix=new Matrix();private final Path frontPath=new Path(),topPath=new Path(),sidePath=new Path();private final FeaturedBoxGeometry geometry=new FeaturedBoxGeometry();private final RectF flatBounds=new RectF(),ambient=new RectF(),contact=new RectF();private final float[] source=new float[8];
+        private Bitmap cover;private int edgeColor;private boolean prepared,failed;private LinearGradient sideLight,topLight,frontLight;
+        FeaturedBoxView(){super(MainActivity.this);setContentDescription("Scatola del gioco in prospettiva");}
+        void setCover(Bitmap bitmap){cover=bitmap;failed=false;try{edgeColor=sampleEdge(bitmap);}catch(RuntimeException e){failed=true;}prepare();invalidate();}
+        @Override protected void onSizeChanged(int w,int h,int ow,int oh){super.onSizeChanged(w,h,ow,oh);prepare();}
+        private void path(Path path,float[] p){path.reset();path.moveTo(p[0],p[1]);for(int i=2;i<8;i+=2)path.lineTo(p[i],p[i+1]);path.close();}
+        private void prepare(){
+            prepared=false;if(cover==null||cover.isRecycled()||getWidth()<=0||getHeight()<=0)return;
+            float ratio=cover.getWidth()/(float)cover.getHeight(),w=Math.min(getWidth(),getHeight()*ratio),h=w/ratio;flatBounds.set((getWidth()-w)/2,(getHeight()-h)/2,(getWidth()+w)/2,(getHeight()+h)/2);
+            if(failed)return;
+            try{
+                if(!geometry.update(getWidth(),getHeight(),cover.getWidth(),cover.getHeight(),getResources().getDisplayMetrics().density))return;
+                source[0]=0;source[1]=0;source[2]=cover.getWidth();source[3]=0;source[4]=cover.getWidth();source[5]=cover.getHeight();source[6]=0;source[7]=cover.getHeight();coverMatrix.reset();if(!coverMatrix.setPolyToPoly(source,0,geometry.front,0,4))return;
+                path(frontPath,geometry.front);path(topPath,geometry.top);path(sidePath,geometry.side);
+                float l=geometry.left,r=l+geometry.width,b=geometry.bottom,d=geometry.depth;
+                topLight=new LinearGradient(l,geometry.top[3],r,b,shade(edgeColor,1.08f),shade(edgeColor,.82f),Shader.TileMode.CLAMP);
+                sideLight=new LinearGradient(r,0,r+d,0,shade(edgeColor,.70f),shade(edgeColor,.48f),Shader.TileMode.CLAMP);
+                frontLight=new LinearGradient(l,0,r,b,new int[]{Color.argb(12,255,255,255),Color.TRANSPARENT,Color.argb(16,0,0,0)},new float[]{0,.6f,1},Shader.TileMode.CLAMP);
+                ambient.set(l-geometry.width*.12f,b-geometry.height*.025f,r+d+geometry.width*.12f,b+geometry.height*.10f);contact.set(l+geometry.width*.06f,b-2,r+d-geometry.width*.03f,b+geometry.height*.035f);prepared=true;
+            }catch(RuntimeException e){failed=true;}
         }
-
-        private Path quad(float[] p){Path path=new Path();path.moveTo(p[0],p[1]);path.lineTo(p[2],p[3]);path.lineTo(p[4],p[5]);path.lineTo(p[6],p[7]);path.close();return path;}
+        @Override protected void onDraw(Canvas canvas){
+            super.onDraw(canvas);if(cover==null||cover.isRecycled())return;
+            if(!prepared){canvas.drawBitmap(cover,null,flatBounds,bitmapPaint);return;}
+            int save=canvas.save();try{
+                // Concentric translucent ovals approximate a soft penumbra without blur/software layers.
+                shadowPaint.setShader(null);for(int i=7;i>=0;i--){float inset=geometry.width*.009f*i;shadowPaint.setColor(Color.argb(4+i,0,0,0));canvas.drawOval(ambient.left+inset,ambient.top+inset*.25f,ambient.right-inset,ambient.bottom-inset*.25f,shadowPaint);}shadowPaint.setColor(Color.argb(68,0,0,0));canvas.drawOval(contact,shadowPaint);
+                fillPaint.setShader(topLight);canvas.drawPath(topPath,fillPaint);fillPaint.setShader(sideLight);canvas.drawPath(sidePath,fillPaint);canvas.drawBitmap(cover,coverMatrix,bitmapPaint);
+                int frontSave=canvas.save();canvas.clipPath(frontPath);fillPaint.setShader(frontLight);canvas.drawPaint(fillPaint);canvas.restoreToCount(frontSave);
+                edgePaint.setStyle(Paint.Style.STROKE);edgePaint.setStrokeWidth(Math.max(1,getResources().getDisplayMetrics().density*.5f));edgePaint.setColor(Color.argb(45,255,255,255));canvas.drawPath(topPath,edgePaint);edgePaint.setColor(Color.argb(50,0,0,0));canvas.drawLine(geometry.front[2],geometry.front[3],geometry.front[4],geometry.front[5],edgePaint);
+            }catch(RuntimeException e){failed=true;prepared=false;canvas.restoreToCount(save);save=canvas.save();canvas.drawBitmap(cover,null,flatBounds,bitmapPaint);}finally{canvas.restoreToCount(save);}
+        }
         private int sampleEdge(Bitmap bitmap){
             if(bitmap==null||bitmap.getWidth()<2||bitmap.getHeight()<2)return Color.rgb(58,50,76);
             long rr=0,gg=0,bb=0;int count=0,x=Math.max(0,Math.min(bitmap.getWidth()-1,(int)(bitmap.getWidth()*.90f)));
             for(int i=1;i<=7;i++){int y=Math.min(bitmap.getHeight()-1,(int)(bitmap.getHeight()*(i/8f)));int c=bitmap.getPixel(x,y);rr+=Color.red(c);gg+=Color.green(c);bb+=Color.blue(c);count++;}
             int base=Color.rgb((int)(rr/count),(int)(gg/count),(int)(bb/count));float[] hsv=new float[3];Color.colorToHSV(base,hsv);hsv[1]=Math.min(.72f,hsv[1]*.82f+.08f);hsv[2]=Math.max(.18f,Math.min(.56f,hsv[2]*.72f));return Color.HSVToColor(hsv);
         }
-        private int shade(int color,float factor){return Color.rgb(Math.max(0,Math.min(255,(int)(Color.red(color)*factor))),Math.max(0,Math.min(255,(int)(Color.green(color)*factor))),Math.max(0,Math.min(255,(int)(Color.blue(color)*factor))));}
+        private int shade(int c,float f){return Color.rgb(Math.min(255,(int)(Color.red(c)*f)),Math.min(255,(int)(Color.green(c)*f)),Math.min(255,(int)(Color.blue(c)*f)));}
     }
 
     private View discoverBoxArtwork(DealRecord d,int width,int height){
