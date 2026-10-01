@@ -38,7 +38,9 @@ public class MarketNavigationRegression extends ScreenBase {
     String query="catan", databaseQuery="azul", languageFilter="IT";
     int catalogCategory=2, databaseCategory=4, catalogVisible=48;
     long selectedGameId=0, engineDayStart=0, engineEnteredAt=0;
-    boolean openingPreset=false;\n    Dialog activeDetailDialog,activeResolutionDialog;String activeDealSignature="";boolean suppressDetailDismissState=false;\n    static class Dialog { boolean showing=true; boolean isShowing(){return showing;} }
+    boolean openingPreset=false;
+    Dialog activeDetailDialog,activeResolutionDialog;String activeDealSignature="";boolean suppressDetailDismissState=false;
+    static class Dialog { boolean showing=true; boolean isShowing(){return showing;} }
     Map<String,Integer> tabScrollPositions=new HashMap<>();
     Deque<String> tabHistory=new ArrayDeque<>();
     FakeScroll scroll=new FakeScroll();
@@ -138,12 +140,17 @@ public class MarketNavigationRegression extends ScreenBase {
             MarketNavigationRegression::returnsFromBundleToSource,
             MarketNavigationRegression::staleTabRestoreDoesNotMoveAnotherView,
             MarketNavigationRegression::staleBundleRestoreDoesNotMoveAnotherView,
-            MarketNavigationRegression::returnsFromGameToCatalogPosition,\n            MarketNavigationRegression::relatedListingBackRestoresParent,\n            MarketNavigationRegression::unrelatedDismissDoesNotClearCurrentListing,\n            MarketNavigationRegression::closedParentIsNotRestored,\n            MarketNavigationRegression::replacementPreservesNewSignature};
+            MarketNavigationRegression::returnsFromGameToCatalogPosition,
+            MarketNavigationRegression::relatedListingBackRestoresParent,
+            MarketNavigationRegression::unrelatedDismissDoesNotClearCurrentListing,
+            MarketNavigationRegression::closedParentIsNotRestored,
+            MarketNavigationRegression::replacementPreservesNewSignature};
         for(Runnable test:tests){try{test.run();System.out.println("PASS navigation scenario");}
             catch(AssertionError e){failed++;System.out.println("FAIL "+e.getMessage());}}
         if(failed>0)throw new AssertionError(failed+" navigation scenarios failed");
     }
-    __PRODUCTION_METHODS__\n    __FINISH_DETAIL__
+    __PRODUCTION_METHODS__
+    __FINISH_DETAIL__
 }
 """.replace("__PRODUCTION_METHODS__", methods).replace("__FINISH_DETAIL__", finish)
 with tempfile.TemporaryDirectory() as temp:
