@@ -22,7 +22,7 @@ def method(signature):
 
 methods = "\n".join(method(s) for s in [
     "private void openMarketTab(", "private void navigate(",
-    "private void closeDatabaseGame(", "@Override public void onBackPressed("
+    "private void dismissMarketDetailStack(", "private void openGameTag(", "private void closeDatabaseGame(", "@Override public void onBackPressed("
 ])
 if "private void finishListingDetail(" in ui:
     finish = method("private void finishListingDetail(")
@@ -38,9 +38,9 @@ public class MarketNavigationRegression extends ScreenBase {
     String query="catan", databaseQuery="azul", languageFilter="IT";
     int catalogCategory=2, databaseCategory=4, catalogVisible=48;
     long selectedGameId=0, engineDayStart=0, engineEnteredAt=0;
-    boolean openingPreset=false;
+    boolean openingPreset=false;int databaseVisible=24;String databaseScope="verified";Dialog activeGameOverlay;ArrayList<Dialog> marketDetailDialogs=new ArrayList<>();
     Dialog activeDetailDialog,activeResolutionDialog;String activeDealSignature="";boolean suppressDetailDismissState=false;
-    static class Dialog { boolean showing=true; boolean isShowing(){return showing;} }
+    static class Dialog { boolean showing=true; boolean isShowing(){return showing;} Runnable onDismiss;void dismiss(){showing=false;if(onDismiss!=null)onDismiss.run();} }
     Map<String,Integer> tabScrollPositions=new HashMap<>();
     Deque<String> tabHistory=new ArrayDeque<>();
     FakeScroll scroll=new FakeScroll();
@@ -133,6 +133,16 @@ public class MarketNavigationRegression extends ScreenBase {
         n.finishListingDetail(old,parent,"source");
         equal(null,n.activeDetailDialog,"Replacement clears old owner");equal("replacement",n.activeDealSignature,"Replacement signature");
     }
+    static void categoryFromNestedBundleClosesAncestors(){
+        MarketNavigationRegression n=new MarketNavigationRegression();
+        Dialog source=new Dialog(),bundle=new Dialog(),member=new Dialog();
+        n.marketDetailDialogs.addAll(Arrays.asList(source,bundle,member));n.activeDetailDialog=member;n.activeDealSignature="member";
+        member.onDismiss=()->n.finishListingDetail(member,source,"source");
+        source.onDismiss=()->n.finishListingDetail(source,null,"");
+        n.openGameTag("Economic");n.uiUpdates.flush();
+        equal(false,source.isShowing(),"Source closed for category");equal(false,bundle.isShowing(),"Bundle closed for category");equal(false,member.isShowing(),"Member closed for category");
+        equal("database",n.tab,"Category destination");equal("Economic",n.databaseQuery,"Category query");equal(null,n.activeDetailDialog,"No detail owner");equal("",n.activeDealSignature,"No hidden signature");
+    }
     public static void main(String[] args){
         int failed=0;
         Runnable[] tests={MarketNavigationRegression::retainsSiblingPositions,
@@ -144,7 +154,7 @@ public class MarketNavigationRegression extends ScreenBase {
             MarketNavigationRegression::relatedListingBackRestoresParent,
             MarketNavigationRegression::unrelatedDismissDoesNotClearCurrentListing,
             MarketNavigationRegression::closedParentIsNotRestored,
-            MarketNavigationRegression::replacementPreservesNewSignature};
+            MarketNavigationRegression::replacementPreservesNewSignature,MarketNavigationRegression::categoryFromNestedBundleClosesAncestors};
         for(Runnable test:tests){try{test.run();System.out.println("PASS navigation scenario");}
             catch(AssertionError e){failed++;System.out.println("FAIL "+e.getMessage());}}
         if(failed>0)throw new AssertionError(failed+" navigation scenarios failed");
