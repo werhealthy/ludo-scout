@@ -24,6 +24,11 @@ methods = "\n".join(method(s) for s in [
     "private void openMarketTab(", "private void navigate(",
     "private void closeDatabaseGame(", "@Override public void onBackPressed("
 ])
+if "private void finishListingDetail(" in ui:
+    finish = method("private void finishListingDetail(")
+else:
+    original = method("dialog.setOnDismissListener(x->")
+    finish = "private void finishListingDetail(Dialog dialog,Dialog parent,String parentSignature)" + original[original.index("{"):]
 harness = r"""
 import java.util.*;
 class ScreenBase { public void onBackPressed() {} }
@@ -33,7 +38,7 @@ public class MarketNavigationRegression extends ScreenBase {
     String query="catan", databaseQuery="azul", languageFilter="IT";
     int catalogCategory=2, databaseCategory=4, catalogVisible=48;
     long selectedGameId=0, engineDayStart=0, engineEnteredAt=0;
-    boolean openingPreset=false;
+    boolean openingPreset=false;\n    Dialog activeDetailDialog,activeResolutionDialog;String activeDealSignature="";boolean suppressDetailDismissState=false;\n    static class Dialog { boolean showing=true; boolean isShowing(){return showing;} }
     Map<String,Integer> tabScrollPositions=new HashMap<>();
     Deque<String> tabHistory=new ArrayDeque<>();
     FakeScroll scroll=new FakeScroll();
@@ -102,6 +107,30 @@ public class MarketNavigationRegression extends ScreenBase {
         equal("catalog",n.tab,"Game Back destination");equal(720,n.scroll.y,"Game Back position");
         equal(0L,n.selectedGameId,"Selected detail cleared");
     }
+    static void relatedListingBackRestoresParent(){
+        MarketNavigationRegression n=new MarketNavigationRegression();
+        Dialog parent=new Dialog(),child=new Dialog();n.activeDetailDialog=child;n.activeDealSignature="child";
+        n.finishListingDetail(child,parent,"source");
+        equal(parent,n.activeDetailDialog,"Related listing Back parent");equal("source",n.activeDealSignature,"Related listing Back signature");
+    }
+    static void unrelatedDismissDoesNotClearCurrentListing(){
+        MarketNavigationRegression n=new MarketNavigationRegression();
+        Dialog old=new Dialog(),current=new Dialog();n.activeDetailDialog=current;n.activeDealSignature="current";
+        n.finishListingDetail(old,null,"");
+        equal(current,n.activeDetailDialog,"Unrelated dismiss owner");equal("current",n.activeDealSignature,"Unrelated dismiss signature");
+    }
+    static void closedParentIsNotRestored(){
+        MarketNavigationRegression n=new MarketNavigationRegression();
+        Dialog parent=new Dialog(),child=new Dialog();parent.showing=false;n.activeDetailDialog=child;n.activeDealSignature="child";
+        n.finishListingDetail(child,parent,"source");
+        equal(null,n.activeDetailDialog,"Closed parent");equal("",n.activeDealSignature,"Closed parent signature");
+    }
+    static void replacementPreservesNewSignature(){
+        MarketNavigationRegression n=new MarketNavigationRegression();
+        Dialog old=new Dialog(),parent=new Dialog();n.activeDetailDialog=old;n.activeDealSignature="replacement";n.suppressDetailDismissState=true;
+        n.finishListingDetail(old,parent,"source");
+        equal(null,n.activeDetailDialog,"Replacement clears old owner");equal("replacement",n.activeDealSignature,"Replacement signature");
+    }
     public static void main(String[] args){
         int failed=0;
         Runnable[] tests={MarketNavigationRegression::retainsSiblingPositions,
@@ -109,14 +138,14 @@ public class MarketNavigationRegression extends ScreenBase {
             MarketNavigationRegression::returnsFromBundleToSource,
             MarketNavigationRegression::staleTabRestoreDoesNotMoveAnotherView,
             MarketNavigationRegression::staleBundleRestoreDoesNotMoveAnotherView,
-            MarketNavigationRegression::returnsFromGameToCatalogPosition};
+            MarketNavigationRegression::returnsFromGameToCatalogPosition,\n            MarketNavigationRegression::relatedListingBackRestoresParent,\n            MarketNavigationRegression::unrelatedDismissDoesNotClearCurrentListing,\n            MarketNavigationRegression::closedParentIsNotRestored,\n            MarketNavigationRegression::replacementPreservesNewSignature};
         for(Runnable test:tests){try{test.run();System.out.println("PASS navigation scenario");}
             catch(AssertionError e){failed++;System.out.println("FAIL "+e.getMessage());}}
         if(failed>0)throw new AssertionError(failed+" navigation scenarios failed");
     }
-    __PRODUCTION_METHODS__
+    __PRODUCTION_METHODS__\n    __FINISH_DETAIL__
 }
-""".replace("__PRODUCTION_METHODS__", methods)
+""".replace("__PRODUCTION_METHODS__", methods).replace("__FINISH_DETAIL__", finish)
 with tempfile.TemporaryDirectory() as temp:
     source = Path(temp) / "MarketNavigationRegression.java"
     source.write_text(harness)
