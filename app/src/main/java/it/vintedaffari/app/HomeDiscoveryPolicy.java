@@ -12,5 +12,5 @@ final class HomeDiscoveryPolicy {
   return !HomePresentation.matchesDependence(language,"DEP")||"IT".equals(edition)||"EN".equals(edition)||"?".equals(edition);
  }
  static int railWidth(int usable,int gap){return Math.max(1,Math.round((usable-1.25f*gap)/2.15f));}
- static int discountBand(int percent){return percent<10?0:percent<30?1:percent<80?2:3;}
+ static int discountBand(int percent){return percent<20?0:percent<35?1:percent<50?2:3;}
 }
