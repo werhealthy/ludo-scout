@@ -1,5 +1,60 @@
 # Ludo Scout — Current state
 
+## Backlog prioritario consolidato — feedback 2026-10-01, 20:09 Europe/Rome
+
+Questo elenco è operativo e sostituisce le precedenti indicazioni di “prossimo step”. Unisce i punti già aperti senza duplicarli. Il feedback di oggi ha precedenza. È un aggiornamento di requisiti, non una dichiarazione di implementazione.
+
+### 1. Home: scena in evidenza e gerarchia delle anteprime
+- Rivedere insieme centratura, profondità dello sfondo e integrazione scatola/piedistallo. Il prodotto è ancora poco immerso; controllare il possibile decentramento con screenshot reali.
+- Scure ombreggiature sulle facce laterali/superiori; meno luminosità artificiale. Migliorare contatto scatola/base e ombra sotto il piedistallo, evitando effetto sospeso.
+- Esplorare una base che emerge dal basso e un passaggio nero/grigio nella card: ipotesi visive da confrontare, non soluzioni già approvate. Conservare Home scura e cover reale.
+- Correggere la freccia del CTA usando il pack di icone esistente.
+- Usare le card Catalogo come riferimento di equilibrio, con un linguaggio comune e gerarchie diverse per funzione: classifica BGG → voto; arrivi recenti → data/tempo di pubblicazione dell'annuncio; migliori offerte → convenienza verificata e qualità del gioco.
+- Verificare che “recente” si riferisca alla pubblicazione quando nota; non sostituirla silenziosamente con data di acquisizione da Ludo. Dati sconosciuti restano espliciti.
+- Tag percentuali e voto più equilibrato in classifica BGG sono già consegnati: preservare e rifinire nello stesso sistema, non riaprire un job identico.
+- La combinazione qualità/convenienza riguarda presentazione e comprensione; eventuali nuove formule/criteri di ordinamento vanno proposti separatamente prima di cambiare la selezione.
+
+### 2. Dettagli prodotto e azioni di interesse contestuali
+- Annuncio/scheda gioco troppo didascalici e lunghi: ridurre prosa, raggruppare fatti, usare icone con significato leggibile e distribuire informazioni nello spazio. Approfondimenti su richiesta, senza nascondere dati essenziali o unknown.
+- Spostare Mi interessa / Non mi interessa nel menu dei tre puntini; renderlo raggiungibile anche dall'annuncio in evidenza.
+- Nuova regola esplicita: Non mi interessa sull'evidenza rimuove quel candidato da quella posizione nel contesto corrente; NON cancella l'annuncio, NON nasconde il gioco dal Catalogo e NON diventa automaticamente una preferenza negativa globale.
+- Distinguere l'esclusione contestuale dall'eventuale gusto persistente; chiarire anche l'effetto di Mi interessa prima di riutilizzare la preferenza globale attuale.
+- Durata dell'esclusione (“adesso”), reset e possibilità di annullamento ancora da definire. Nessuna durata arbitraria approvata.
+- Preservare accesso BGG/Vinted, lingue/dipendenza dal testo, navigazione e gesto controllato già consegnati; ripresentarli con meno rumore. Accessibilità: non sostituire tutto con icone prive di etichetta/descrizione.
+
+### 3. Motore: numeri comprensibili, andamento e movimento
+- Riattivare l'analisi del Motore per questi requisiti; precedente standby non impedisce l'audit richiesto. Il cerchio Giochi percepito sempre a zero va spiegato attraverso query, ambito e liste reali, non riempito artificialmente.
+- Distinguere “presenti ora in una fase” da “passati/elaborati nel periodo”: il primo è carico corrente, il secondo è attività storica. Non sommare annunci, giochi distinti e scroll come se fossero la stessa unità.
+- Confrontare una vista di attività giornaliera/ultime24ore e una vista del carico attuale. Proposta raccomandata da validare: attività del periodo in primo piano, fasi correnti separate come dettaglio operativo. Giorno civile, finestra mobile e reset NON ancora scelti; lo storico non va cancellato.
+- Ogni numero deve avere unità, periodo e lista coerente; mantenere drilldown esatto e contatori veritieri anche per dati incompleti.
+- Riprendere il requisito già aperto dei delta: frecce rosso/verde visibili, baseline e durata comprensibili. L'assenza percepita va verificata; confronto “dall'ultima visita” rimane una proposta, non una decisione.
+- Rendere più evidente l'animazione dei cerchi durante attività reale, distinguendo lavoro attivo, attesa e pausa; movimento rispettoso delle animazioni disattivate. Includere loading, padding e raggruppamento già aperti, senza duplicare il lavoro consegnato.
+
+### 4. Motore: resa del riconoscimento, filtri e stabilità
+- Il basso numero percepito di nuovi giochi per run è un problema da misurare, non prova che tutti i filtri siano troppo severi.
+- Ricostruire il percorso: annunci acquisiti → riconosciuti come giochi → identità BGG → qualità/idoneità → prezzo/link verificati → Catalogo. Separare giochi già noti e annunci duplicati dai nuovi ingressi.
+- Quantificare scarti, review, dati mancanti, attese/retry e blocchi, con motivi e campioni reali. Distinguere basso ingresso da perdita nel riconoscimento, filtro intenzionale o coda non completata.
+- Valutare recuperi/filtri troppo restrittivi solo dopo l'audit; nessun abbassamento automatico di soglie o ammissione di falsi positivi.
+- Unire all'indagine i punti di stabilità tuttora aperti: SQLite lock/crash/ANR, tempi UI, lease/heartbeat vecchi, run attivi troppo a lungo e recupero dei job. Le vecchie diagnostiche non descrivono automaticamente lo stato odierno.
+- Miglioramenti al layout, join indicizzati e altre correzioni consegnate non sono prova che tutte queste cause siano risolte. Pricing e trust/pubblicazione restano invariati finché non viene approvata una modifica specifica.
+
+### 5. Verifica trasversale di Ludo, Libreria e interazioni
+- Pet Ludo5.12.108 già consegnato: verificare sul telefono proporzioni, controlli visibili, animazioni/tocco, suggerimenti reali e Cacce/Gusti. Nessun nuovo redesign del faccione/scroll: direzione superata.
+- Libreria5.12.107 già consegnata: controllare voti storici/zero/nessun voto, prezzi di vendita reali/vuoti, backfill e ripristino, keyboard/insets dei bottom sheet, testi grandi e annullamento.
+- Preservare rating personali, prezzo vendita e navigazione consegnati; una presentazione “scaffale” più completa resta esplorazione secondaria, non priorità e non requisito di rifare la Libreria.
+- Verifica comune di icone, target touch, titoli lunghi, cover mancanti, contrasto, ritorno/posizione e animazioni disattivate durante i gruppi precedenti.
+
+### Già consegnato: non duplicare come nuovo lavoro
+- Card Catalogo, palette/tag del risparmio, classifica BGG, preview Bundle.
+- Catalogo Annunci/Giochi con accesso Bundle separato e navigazione collegata.
+- Gerarchia BGG/Ludo, lingua/dipendenza, gesto annuncio→gioco e personalizzazione: questa ultima richiede ora la revisione semantica del gruppo2.
+- Libreria con voto0–5 preservato, vendita/backfill e finestre dal basso.
+- Scena pet Ludo e azioni visibili. Tutti richiedono ancora accettazione visiva/di interazione sul telefono.
+
+Prossimo gruppo raccomandato: Home completa (gruppo1), con proposta visiva della scena in evidenza e confronto delle gerarchie per sezione, poi implementazione verificata. Prima di toccare i filtri Motore o l'interesse persistente, presentare il comportamento concreto da approvare.
+
+
+
 ## Current milestone — Interactive Ludo pet scene 5.12.108
 5.12.108-ludo-pet (1000125) uploaded to Firebase at2026-10-01 18:05:40 UTC and separately distributed to testers/groups at18:05:41 UTC (20:05 Europe/Rome), explicitly confirmed in signed job110508767016 logs. PR117 merged527b71b46802477c8e648297838b3fad38e79926. Final head2cfc41ef024a8b5de29ec67d619ed1d4c76edd7a passed PR run310 (36903297123), all existing regressions/SQLite fixtures, new executable pet state harness, Android JUnit, Java compilation and review APK. Signed beta run125 (36903679457) passed tests/build/expected-certificate verification and Firebase upload/tester distribution.
 
@@ -188,11 +243,4 @@ PR100 Android validation passed all regressions and Java compilation. Signed bet
 
 Latest user diagnostic on v87 reports five post-install UI crashes and one ANR; SQLiteDatabaseLockedException; busy_timeout8000ms; Activity snapshot load5751ms; Vinted PROCESSING lease around94min; queue heartbeat around95min; eight runnable Vinted jobs; current scroll active over five hours. Root cause of queue stalling and lock contention is not yet established. This Home step does not fix those crashes/ANR or claim to unblock the queue.
 
-User requested ordered, reviewable steps rather than one broad rewrite. See docs/specs/2026-09-30-ui-refinement.md:
-1. Home — delivered; validate on phone.
-2. Motore/stability — NEXT: UI SQLite work, queue leases/watchdog, truthful loading, balanced layout, clear delta baseline/duration.
-3. Catalog/detail — clickable filters, meaningful offer labels, larger BGG rating, Material provider actions, finger-controlled transition and navigation relationship. Replacement of Annunci/Bundle/Giochi selector remains an open product decision.
-4. Ludo — minimal purple pet inspired by attached reference; large opening presence, collapses on scroll.
-5. Collection/shared interactions — bookshelf exploration, liking0–5 with preserved existing ratings, sale-price entry/backfill, bottom-slide modals and purposeful motion.
-
-Historical note: the v91 visual validation recommendation above is superseded by the current milestone and v97 hero baseline.
+L'elenco operativo attuale è il backlog prioritario consolidato in testa a questo file e in docs/specs/2026-09-30-ui-refinement.md. Le vecchie indicazioni su selector Catalogo, faccione Ludo e prossimi step sono superate dalle consegne e dal feedback2026-10-01.
