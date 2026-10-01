@@ -186,3 +186,6 @@ jobs:
           chmod +x ./gradlew
           ./gradlew --no-daemon :app:compileDebugJavaWithJavac
 
+
+      - name: Build review APK
+        run: ./gradlew --no-daemon :app:assembleDebug
