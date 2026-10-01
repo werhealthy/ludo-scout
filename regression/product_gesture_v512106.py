@@ -52,14 +52,16 @@ public class ProductGestureRegression {
  static void cancelNeverOpens(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(3,200);equal(0,n.opens,"Android cancelled touch");}
  static void arrivingAtBottomDoesNotCountEarlierScroll(){ScrollView sc=new ScrollView();sc.y=0;Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,400);sc.y=500;sc.send(2,200);sc.send(1,200);equal(0,n.opens,"ordinary scroll to bottom");}
  static void insufficientPullDoesNotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,240);sc.send(1,240);equal(0,n.opens,"incomplete progress");}
- static void fullIntentionalPullOpensOnce(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,220);sc.send(1,220);sc.send(1,220);equal(1,n.opens,"completed gesture");}
+ static void fullIntentionalPullOpensOnce(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,70);sc.send(1,70);sc.send(1,70);equal(1,n.opens,"completed gesture");}
+ static void shortOldPullDoesNotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(1,200);equal(0,n.opens,"short pull must remain reading");}
+ static void ongoingScrollCannotBecomePull(){ScrollView sc=new ScrollView();sc.y=0;Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,500);sc.y=500;sc.send(2,350);sc.send(2,100);sc.send(1,100);equal(0,n.opens,"same touch cannot arm at bottom");}
  static void retreatCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(2,280);sc.send(1,280);equal(0,n.opens,"retreat");}
  static void finalReleaseRetreatCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(1,280);equal(0,n.opens,"retreat at final release");}
  static void closedSourceCannotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);d.showing=false;sc.send(1,200);equal(0,n.opens,"dismissed source");}
  static void unavailablePreloadCannotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);n.ready=false;sc.send(1,200);equal(0,n.opens,"unavailable preload");}
  static void extraPointerCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.touch.on(sc,new MotionEvent(5,200,2));sc.send(1,200);equal(0,n.opens,"multiple fingers");}
  public static void main(String[] args){
-  int failures=0;Runnable[] tests={ProductGestureRegression::cancelNeverOpens,ProductGestureRegression::arrivingAtBottomDoesNotCountEarlierScroll,ProductGestureRegression::insufficientPullDoesNotOpen,ProductGestureRegression::fullIntentionalPullOpensOnce,ProductGestureRegression::retreatCancels,ProductGestureRegression::closedSourceCannotOpen,ProductGestureRegression::unavailablePreloadCannotOpen,ProductGestureRegression::extraPointerCancels,ProductGestureRegression::finalReleaseRetreatCancels};
+  int failures=0;Runnable[] tests={ProductGestureRegression::cancelNeverOpens,ProductGestureRegression::arrivingAtBottomDoesNotCountEarlierScroll,ProductGestureRegression::insufficientPullDoesNotOpen,ProductGestureRegression::fullIntentionalPullOpensOnce,ProductGestureRegression::retreatCancels,ProductGestureRegression::closedSourceCannotOpen,ProductGestureRegression::unavailablePreloadCannotOpen,ProductGestureRegression::extraPointerCancels,ProductGestureRegression::finalReleaseRetreatCancels,ProductGestureRegression::shortOldPullDoesNotOpen,ProductGestureRegression::ongoingScrollCannotBecomePull};
   for(Runnable test:tests)try{test.run();System.out.println("PASS product gesture");}catch(AssertionError e){failures++;System.out.println("FAIL "+e.getMessage());}
   if(failures>0)throw new AssertionError(failures+" gesture scenarios failed");
  }
@@ -72,4 +74,81 @@ with tempfile.TemporaryDirectory() as temp:
     (p/"android/view/MotionEvent.java").write_text(motion)
     (p/"ProductGestureRegression.java").write_text(harness)
     subprocess.run(["javac","-d",temp,str(p/"android/view/MotionEvent.java"),str(p/"ProductGestureRegression.java")],check=True)
-    subprocess.run(["java","-cp",temp,"ProductGestureRegression"],check=True)
+    gesture_result=subprocess.run(["java","-cp",temp,"ProductGestureRegression"],check=False)
+
+# Characterize first-layout clamping: execute the real pager against a
+# deterministic Android boundary whose scroll range uses measured child width.
+pager_sources={
+"android/content/Context.java": "package android.content; public class Context {}",
+"android/view/MotionEvent.java": motion,
+"android/view/View.java": r"""
+package android.view;
+public class View {
+ public int width,measuredWidth;public android.widget.LinearLayout.LayoutParams lp;
+ public int getWidth(){return width;}public int getMeasuredWidth(){return measuredWidth;}
+ public void setLayoutParams(android.widget.LinearLayout.LayoutParams p){lp=p;}
+ public android.widget.LinearLayout.LayoutParams getLayoutParams(){return lp;}
+ public int getPaddingLeft(){return 0;}public int getPaddingRight(){return 0;}
+ public static class MeasureSpec {public static int getSize(int s){return s;} }
+ public void post(Runnable r){android.widget.HorizontalScrollView.tasks.add(r);}
+}
+""",
+"android/widget/LinearLayout.java":r"""
+package android.widget;
+import android.view.View;import android.content.Context;import java.util.*;
+public class LinearLayout extends View {
+ final java.util.List<View> children=new ArrayList<>();
+ public LinearLayout(Context c){}
+ public static class LayoutParams {public int width,height;public LayoutParams(int w,int h){width=w;height=h;}}
+ public void addView(View v,LayoutParams p){v.setLayoutParams(p);children.add(v);}
+ public int getChildCount(){return children.size();}public View getChildAt(int i){return children.get(i);}
+ public void measurePages(){measuredWidth=0;for(View v:children){v.measuredWidth=v.lp.width;measuredWidth+=v.measuredWidth;}}
+}
+""",
+"android/widget/HorizontalScrollView.java":r"""
+package android.widget;
+import android.view.*;import android.content.Context;import java.util.*;
+public class HorizontalScrollView extends View {
+ public static final int OVER_SCROLL_NEVER=2;public static final java.util.List<Runnable> tasks=new ArrayList<>();
+ LinearLayout child;int scroll;public HorizontalScrollView(Context c){}
+ public static class LayoutParams {public LayoutParams(int w,int h){}}
+ public void setHorizontalScrollBarEnabled(boolean b){}public void setFillViewport(boolean b){}public void setOverScrollMode(int m){}
+ public void addView(LinearLayout v,LayoutParams p){child=v;}
+ public void smoothScrollTo(int x,int y){scrollTo(x,y);}
+ public void scrollTo(int x,int y){scroll=Math.max(0,Math.min(x,Math.max(0,child.measuredWidth-width)));}
+ public int getScrollX(){return scroll;}
+ protected void onMeasure(int w,int h){measuredWidth=w;child.measurePages();}
+ protected void onSizeChanged(int w,int h,int ow,int oh){}
+ protected void onLayout(boolean changed,int l,int t,int r,int b){scrollTo(scroll,0);}
+ public void layoutFixture(int w){onMeasure(w,600);int old=width;width=w;onSizeChanged(w,600,old,600);onLayout(true,0,0,w,600);for(Runnable r:new ArrayList<>(tasks))r.run();tasks.clear();}
+ public boolean onInterceptTouchEvent(MotionEvent e){return false;}public boolean onTouchEvent(MotionEvent e){return true;}
+ public void fling(int v){}
+}
+""",
+"it/vintedaffari/app/PagerRegression.java":r"""
+package it.vintedaffari.app;
+import android.view.View;import android.content.Context;
+public class PagerRegression {
+ static void eq(int want,int got,String label){if(want!=got)throw new AssertionError(label+": "+got+" expected "+want);}
+ public static void main(String[] args){
+  GalleryPager pager=new GalleryPager(new Context());for(int i=0;i<4;i++)pager.addPage(new View());
+  int[] selected={-1};pager.setListener(i->selected[0]=i);pager.go(2);pager.layoutFixture(360);
+  eq(720,pager.getScrollX(),"open third photo on first layout");eq(2,selected[0],"selected photo");
+  pager.layoutFixture(240);eq(480,pager.getScrollX(),"resize preserves selected photo");
+  pager.go(3);eq(720,pager.getScrollX(),"next photo");
+  pager.go(99);eq(720,pager.getScrollX(),"clamp final page");pager.go(-1);eq(0,pager.getScrollX(),"clamp first page");
+  System.out.println("PASS production GalleryPager initial layout and resize");
+ }
+}
+"""
+}
+with tempfile.TemporaryDirectory() as temp:
+    p=Path(temp)
+    for path,code in pager_sources.items():
+        dest=p/path;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_text(code)
+    for name in ("GalleryPager","GalleryPosition"):
+        dest=p/("it/vintedaffari/app/"+name+".java");dest.write_text((root/("app/src/main/java/it/vintedaffari/app/"+name+".java")).read_text())
+    subprocess.run(["javac","-d",temp,*map(str,p.rglob("*.java"))],check=True)
+    pager_result=subprocess.run(["java","-cp",temp,"it.vintedaffari.app.PagerRegression"],check=False)
+if gesture_result.returncode or pager_result.returncode:
+    raise AssertionError("Product gesture/gallery behavior failed")
