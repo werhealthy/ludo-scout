@@ -824,7 +824,7 @@ private void applyDiscoverChrome(){
                 cell.addView(appIcon(icons[i],18,CYAN),new LinearLayout.LayoutParams(dp(24),dp(24)));
                 TextView value=text(values[i],15,TEXT,Typeface.BOLD);value.setGravity(Gravity.CENTER);cell.addView(value,new LinearLayout.LayoutParams(-1,-2));
                 TextView label=text(labels[i],11,MUTED,Typeface.NORMAL);label.setGravity(Gravity.CENTER);label.setPadding(0,dp(4),0,0);cell.addView(label,new LinearLayout.LayoutParams(-1,-2));
-                cell.setContentDescription(labels[i]+": "+("—".equals(values[i])?"dato non disponibile":values[i]));row.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
+                cell.setContentDescription(labels[i]+": "+("—".equals(values[i])?"dato non disponibile":values[i]));cell.setFocusable(true);for(int child=0;child<cell.getChildCount();child++)cell.getChildAt(child).setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);row.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
             }grid.addView(row,new LinearLayout.LayoutParams(-1,-2));
         }return grid;
     }
@@ -1076,7 +1076,7 @@ private void renderDatabase(){
 
     private void renderDatabaseDetailInto(LinearLayout host,GameRecord g,Runnable backAction){renderDatabaseDetailInto(host,g,backAction,null);}
     private void renderDatabaseDetailInto(LinearLayout host,GameRecord g,Runnable backAction,GameDetailData snapshot){
-        LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);TextView back=appIcon(LudoIcons.CHEVRON_LEFT,24,TEXT);back.setGravity(Gravity.CENTER);back.setOnClickListener(v->backAction.run());toolbar.addView(back,new LinearLayout.LayoutParams(dp(44),dp(52)));toolbar.addView(text("Gioco",17,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));TextView help=roundIconButton("?",CYAN);help.setContentDescription("Correggi associazione BGG");help.setOnClickListener(v->chooseManualBggMatch(g));toolbar.addView(gameFavoriteButton(g.bggId,g.name),new LinearLayout.LayoutParams(dp(48),dp(48)));toolbar.addView(help,new LinearLayout.LayoutParams(dp(40),dp(40)));TextView more=roundIconButton("⋯",TEXT);more.setContentDescription("Altre azioni del gioco");more.setOnClickListener(v->{DealRecord preference=new DealRecord();preference.bggId=g.bggId;preference.gameName=g.name;preference.signature="game:"+g.bggId;showProductActions(preference,false);});toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));host.addView(toolbar);
+        LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);TextView back=appIcon(LudoIcons.CHEVRON_LEFT,24,TEXT);back.setGravity(Gravity.CENTER);back.setOnClickListener(v->backAction.run());toolbar.addView(back,new LinearLayout.LayoutParams(dp(44),dp(52)));toolbar.addView(text("Gioco",17,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));TextView help=roundIconButton("?",CYAN);help.setContentDescription("Correggi associazione BGG");help.setOnClickListener(v->chooseManualBggMatch(g));toolbar.addView(gameFavoriteButton(g.bggId,g.name),new LinearLayout.LayoutParams(dp(48),dp(48)));toolbar.addView(help,new LinearLayout.LayoutParams(dp(48),dp(48)));TextView more=roundIconButton("⋯",TEXT);more.setContentDescription("Altre azioni del gioco");more.setOnClickListener(v->{DealRecord preference=new DealRecord();preference.bggId=g.bggId;preference.gameName=g.name;preference.signature="game:"+g.bggId;showProductActions(preference,false);});toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));host.addView(toolbar);
 
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(0,dp(8),0,dp(8));hero.addView(productBoxArtwork(g.bggId,TextUtils.isEmpty(g.imageUrl)?g.thumbnailUrl:g.imageUrl,g.name),new LinearLayout.LayoutParams(-1,productMediaHeight()));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(0,dp(12),0,0);TextView name=text(g.name,26,TEXT,Typeface.BOLD);name.setMaxLines(3);copy.addView(name);
         Integer composite=snapshot==null?gameQualityScore(g):snapshot.quality;copy.addView(productRatingRow(g.rating,composite==null?"":String.format(Locale.ITALY,"%.1f",composite/10.0),()->{if(!TextUtils.isEmpty(g.bggId))openBgg(g.bggId);},()->{if(composite!=null)showGameScoreInfo(g,composite);}));
@@ -1573,7 +1573,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
 
         View photos=listingPhotoThumbnails(d);if(photos!=null){addProductSection(box,text("Foto dell’annuncio",13,MUTED,Typeface.NORMAL),20);LinearLayout.LayoutParams photosParams=new LinearLayout.LayoutParams(-1,dp(72));photosParams.topMargin=dp(8);box.addView(photos,photosParams);}
         LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);box.addView(productInfo,new LinearLayout.LayoutParams(-1,-2));
-        Runnable updateProductInfo=()->{productInfo.removeAllViews();
+        Runnable updateProductInfo=()->{decision.setText(DealEvaluator.evaluate(d).label);decision.setTextColor(dealAccent(d));productInfo.removeAllViews();
         productInfo.addView(productRatingRow(d.rating,scoreLabel(d),()->{if(!TextUtils.isEmpty(d.bggId))openBgg(d.bggId);},()->showLudoScoreInfo(d)));
         productInfo.addView(productLanguagePanel(d.languageCode,()->editListingInfo(d,dialog)));
         addProductSection(productInfo,productFacts(d.minPlayers!=null?d.minPlayers:game==null?null:game.minPlayers,d.maxPlayers!=null?d.maxPlayers:game==null?null:game.maxPlayers,d.playtime!=null?d.playtime:game==null?null:game.playtime,game==null?null:game.minAge,d.weight!=null?d.weight:game==null?null:game.weight),12);
@@ -3023,7 +3023,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         bggSearch.details(id,false,new BggSearchClient.Callback(){
             public void ok(List<BggSearchClient.Game> games){runOnUiThread(()->{
                 detailRefreshes.remove(id);if(isFinishing()||isDestroyed())return;
-                if(games==null||games.isEmpty()||games.get(0)==null){if(detail.isShowing()){status.setText("Dati BGG non disponibili. Restano quelli già presenti.");status.setVisibility(View.VISIBLE);}return;}
+                if(games==null||games.isEmpty()||games.get(0)==null){OperationCenter.error(MainActivity.this,"detail:"+id,OperationCenter.MATCH,name(d),"Risposta BGG vuota");if(detail.isShowing()){status.setText("Dati BGG non disponibili. Restano quelli già presenti.");status.setVisibility(View.VISIBLE);}return;}
                 BggSearchClient.Game g=games.get(0);db.applyBggGame(g);
                 if(g.marketUsedCount!=null&&g.marketUsedCount>0)marketStore.saveBggMarketStats(g.id,g.marketUsedMedianCents,g.marketUsedMinCents,g.marketUsedCount,System.currentTimeMillis());
                 prefs.edit().putLong(id,System.currentTimeMillis()).apply();
