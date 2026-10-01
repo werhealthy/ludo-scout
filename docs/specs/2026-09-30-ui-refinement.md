@@ -1,16 +1,24 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
-## Scaletta operativa unica — aggiornata 2026-10-02, 00:53 Europe/Rome
+## Scaletta operativa unica — aggiornata 2026-10-02, 01:25 Europe/Rome
 
 Questo file è la fonte unica per le cose da fare. Leggerlo all'inizio di ogni sessione insieme a `AGENTS.md` e `STATE.md`. Le priorità qui sotto prevalgono sulle vecchie indicazioni di “prossimo step” nella cronologia. Aggiornare questi gruppi senza duplicare i lavori già consegnati.
 
-## Scaletta frontend attiva — 4 gruppi da implementare
-Home/design system consegnata; accettazione visuale sul telefono ancora da fare, separata dal conteggio d'implementazione. Backlog backend separato.
-1. **Scheda prodotto: redesign UX/UI completo.** Prossimo gruppo raccomandato. Media contenuti; titolo/prezzo/sconto e CTA Vinted subito leggibili; voti BGG/Ludo distinti su riga compatta; lingua/dipendenza con indicatori e correzione secondaria; giocatori/durata/età con icone e valori; categorie subordinate; descrizione/spiegazioni espandibili. Preservare foto reali, BGG/scheda gioco, gesto intenzionale, interesse/favoriti e override/ripristino.
-2. **Motore: numeri, periodo e movimento.** Dati reali, query coerenti, annunci versus giochi distinti, baseline/delta e periodo da definire, animazioni legate all'attività.
-3. **Motore: riconoscimento, filtri e stabilità.** Coordinarsi con il workstream backend, usare diagnostica e misure; non duplicare audit o abbassare soglie senza evidenze/approvazione.
-4. **Verifica trasversale Ludo, Libreria e interazioni.** Memoria/favoriti, rating e prezzi vendita, accessibilità, tastiera/insets, Back e animazioni.
+## Scaletta frontend attiva — 3 gruppi da implementare
+Home e scheda prodotto consegnate; verifiche visuali sul telefono separate dal conteggio d'implementazione. Backlog backend separato.
+1. **Motore: numeri, periodo e movimento.** Prossimo gruppo raccomandato. Dati reali, query coerenti, annunci versus giochi distinti, baseline/delta e periodo da definire, animazioni legate all'attività.
+2. **Motore: riconoscimento, filtri e stabilità.** Coordinarsi con il workstream backend, usare diagnostica e misure; non duplicare audit o abbassare soglie senza evidenze/approvazione.
+3. **Verifica trasversale Ludo, Libreria e interazioni.** Memoria/favoriti, rating e prezzi vendita, accessibilità, tastiera/insets, Back e animazioni.
 In ogni risposta indicare il conteggio aggiornato; consegne per tematica con più correzioni coerenti.
+
+## Scheda prodotto e podio BGG — 5.12.116
+Feedback del2026-10-02: Home5.12.115 accettata in generale («Mi sembra tutto top»), con richiesta di CTA coerente e copertine3D nella classifica a dimensioni decrescenti. «Partiamo» autorizza anche il redesign prodotto proposto. Questa direzione supera la regola flat della classifica storica5.12.115; offerte/recenti/Catalogo restano flat.
+Annuncio: toolbar quieta, media144–208dp, titolo/prezzo/sconto e azione primaria Vinted prima delle informazioni secondarie, foto reali72dp, BGG/Ludo compatti, lingua/dipendenza e fatti con icone (giocatori/durata/età/complessità), categorie e descrizione progressive. Scheda gioco usa la stessa gerarchia; metadati canonici, mercato/storico, prezzi, annunci/simili e creatori restano disponibili. Correzione del match nei tre puntini; preservati foto, preferiti/interesse, override/ripristino e gesto intenzionale.
+CTA evidenza usa il pulsante primario condiviso lime, ripple, minimo48dp e gruppo icona Font Awesome/testo centrato. Il vecchio glyph era già Font Awesome: corretta la composizione visuale, non introdotto un altro pacchetto. Classifica: renderer3D nativo/cache esistente, copertine116×152/104×128/96×112dp per rank1/2/3, superficie primo posto distinta e fallback verticale per testo grande/schermi stretti.
+Arricchimento BGG aggiorna il contenitore visibile della scheda aperta, conserva età/descrizione canoniche non restituite dal client, rilascia richieste e mantiene dati validi su risultato vuoto/errore; dopo chiusura aggiorna il modello ma non le viste. Nessuna modifica a schema, soglie, pricing, dipendenze o politiche backend.
+PR126 integrata, merge59cf929e4a34d35a83421d2fa49d608a5e71a94e. Head9fa59cc1a51d8c8cc0f0f848da428e139b68314e riallineato a beta68da1347efe7bc80aa9484082c2987523823940c, preservando il checkpoint backend B1. CI336(36939987591), job110628991161: tutte le regressioni, fixture JVM/SQLite, unit test prezzi, compilazione Java e APK superati. Nuova fixture esegue il callback reale estratto per aggiornamento aperto, metadati preservati, risposta tardiva e risultati vuoti/errore. Review finale senza criticità importanti; nessuna verifica rendering/TalkBack/threading sul dispositivo dichiarata.
+Build firmata beta134(36940300749), job110629983136 completata con successo: certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato; upload Firebase riuscito2026-10-01 23:24:38.831UTC e distribuzione tester/gruppi riuscita23:24:39.831UTC (2026-10-02 01:24Europe/Rome), versione5.12.116-product-redesign(1000134).
+Prova telefono ancora aperta: screenshot evidenza/podio BGG e scheda annuncio/gioco; controllare CTA, foto, cuore/menu, azione Vinted e gesto, anche con testo grande. Accettazione5.12.115 generale ricevuta; nuovo layout116 non ancora accettato. Risoluzione live URL BGG e persistenza override dopo riavvio restano prove separate non esplicitamente confermate.
 
 ## Home — sistema di card 5.12.115
 Direzione approvata con «Ok facciamo così» il2026-10-02: cover flat nelle liste, 3D in evidenza/dettaglio, componenti comuni e hero compatto. PR125 integrata in beta, merge21e8bad325ca523637f04970b5c9e4e7439ae345. Conservata la nuova diagnostica backend5.12.114 riallineando il branch prima dell'ultima CI.
