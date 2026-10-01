@@ -109,8 +109,8 @@ public final class MainActivity extends Activity {
         QueueKeepAliveService.ensureRunning(this);
     }
 
-    @Override protected void onResume(){super.onResume();engineUiResumed=true;if("activity".equals(tab)){engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,f);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
-    @Override protected void onPause(){engineUiResumed=false;uiUpdates.removeCallbacks(activityStatusPulse);persistTransientUiSession();super.onPause();}
+    @Override protected void onResume(){super.onResume();petResumed=true;petLoadedAt=0;if(petView!=null)petView.setResumed(true);engineUiResumed=true;if("activity".equals(tab)){engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,f);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
+    @Override protected void onPause(){petResumed=false;if(petView!=null)petView.setResumed(false);engineUiResumed=false;uiUpdates.removeCallbacks(activityStatusPulse);persistTransientUiSession();super.onPause();}
     @Override public void onTrimMemory(int level){
         super.onTrimMemory(level);
         if(level>=TRIM_MEMORY_RUNNING_LOW){
@@ -1139,13 +1139,46 @@ private void showFilterSheet(){
 
 
     // ---------- OCCHIO DI LUDO: local companion ----------
+    private final LudoPetState petState=new LudoPetState();
+    private LudoPetView petView;private boolean petResumed;
+    private LocalScoutBrain.Snapshot petSnapshot;private List<DealRecord> petHuntDeals=Collections.emptyList();private List<LibraryGame> petLibrary=Collections.emptyList();
+    private final Map<String,Long> petGameIds=new HashMap<>();private boolean petLoading;private long petLoadedAt;private String petFailure;
+    private void requestPetSnapshot(){
+        if(petLoading||petSnapshot!=null&&System.currentTimeMillis()-petLoadedAt<15000)return;petLoading=true;
+        uiDataIo.execute(()->{LocalScoutBrain.Snapshot snapshot=null;List<DealRecord> hunts=Collections.emptyList();List<LibraryGame> library=Collections.emptyList();Map<String,Long> games=new HashMap<>();String failure=null;
+            try{List<DealRecord> deals=db.getDeals("trusted",600);hunts=db.getDeals("trusted_any_price",800);library=libraryDb.all();snapshot=intelligence.analyze(deals,bundleDb,library);for(DealRecord pick:snapshot.picks)if(!TextUtils.isEmpty(pick.vintedUrl)&&!TextUtils.isEmpty(pick.bggId)&&!TextUtils.isEmpty(pick.signature)){GameRecord game=marketStore.gameStatsByBggId(pick.bggId);if(game!=null)games.put(pick.signature,game.id);}}
+            catch(RuntimeException error){failure="Non riesco a leggere i consigli. Riproviamo?";}
+            final LocalScoutBrain.Snapshot ready=snapshot;final List<DealRecord> readyHunts=hunts;final List<LibraryGame> readyLibrary=library;final String error=failure;
+            runOnUiThread(()->{petLoading=false;if(isFinishing()||isDestroyed())return;petFailure=error;petLoadedAt=System.currentTimeMillis();if(error==null){petSnapshot=ready;petHuntDeals=readyHunts;petLibrary=readyLibrary;petGameIds.clear();petGameIds.putAll(games);petState.refresh(games.keySet().toArray(new String[0]));}else{petSnapshot=null;petGameIds.clear();petState.refresh(new String[0]);}if("companion".equals(tab))scheduleRender(0);});
+        });
+    }
+    private DealRecord petSuggestion(){if(petSnapshot==null||petState.selected()==null)return null;for(DealRecord d:petSnapshot.picks)if(petState.selected().equals(d.signature))return d;return null;}
     private void renderCompanion(){
-        List<DealRecord> deals=db.getDeals("trusted",600);List<DealRecord> huntDeals=db.getDeals("trusted_any_price",800);List<LibraryGame> library=libraryDb.all();LocalScoutBrain.Snapshot snap=intelligence.analyze(deals,bundleDb,library);
-        body.addView(companionHeader(snap));
-        LinearLayout.LayoutParams tabsLp=new LinearLayout.LayoutParams(-1,dp(54));tabsLp.bottomMargin=dp(22);body.addView(companionTabs(),tabsLp);
-        if("hunts".equals(companionSection)){renderHunts(huntDeals);return;}
-        if("profile".equals(companionSection)){renderLibraryInsights(snap,library);body.addView(companionProfileTrustCard(library));body.addView(languageStats(snap));return;}
-        renderAdvice(snap);
+        requestPetSnapshot();body.setPadding(dp(18),dp(16),dp(18),dp(16));body.setBackgroundColor(BG);
+        body.addView(text("Ludo",28,TEXT,Typeface.BOLD));
+        final DealRecord chosen=petSuggestion();
+        LinearLayout scene=new LinearLayout(this);scene.setOrientation(LinearLayout.VERTICAL);scene.setPadding(dp(12),dp(12),dp(12),dp(16));scene.setBackground(round(Color.rgb(27,18,44),26,1,Color.rgb(58,40,82)));
+        String phrase=petLoading&&petSnapshot==null?"Sto cercando tra i tuoi giochi…":petFailure!=null?petFailure:chosen!=null?"Ecco la mia proposta.":petSnapshot!=null&&petGameIds.isEmpty()?"Nessun consiglio convincente adesso. Avviamo una caccia?":"Cerchiamo il prossimo gioco?";
+        TextView speech=text(phrase,18,Color.rgb(40,22,61),Typeface.NORMAL);speech.setPadding(dp(16),dp(12),dp(16),dp(12));speech.setBackground(round(Color.rgb(239,228,255),20,0,0));speech.setGravity(Gravity.CENTER);scene.addView(speech,new LinearLayout.LayoutParams(-1,-2));
+        FrameLayout stage=new FrameLayout(this);stage.setBackground(new Drawable(){private final Paint p=new Paint(3);public void draw(Canvas c){Rect b=getBounds();p.setColor(Color.rgb(52,33,76));c.drawOval(b.left-b.width()*.3f,b.top+b.height()*.72f,b.right+b.width()*.3f,b.bottom+b.height()*.3f,p);}public void setAlpha(int a){}public void setColorFilter(android.graphics.ColorFilter f){}public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}});
+        Button hunts=petSideButton("Cacce",LudoIcons.SEARCH,()->openPetSpace(false));FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);hp.topMargin=dp(12);stage.addView(hunts,hp);
+        Button tastes=petSideButton("Gusti",LudoIcons.HEART,()->openPetSpace(true));FrameLayout.LayoutParams tp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);tp.topMargin=dp(12);stage.addView(tastes,tp);
+        LinearLayout actors=new LinearLayout(this);actors.setGravity(Gravity.CENTER_VERTICAL);petView=new LudoPetView(this);petView.lookAtGame(chosen!=null);petView.setResumed(petResumed);actors.addView(petView,new LinearLayout.LayoutParams(0,-1,chosen==null?1f:.56f));
+        if(chosen!=null){View box=productBoxArtwork(chosen.bggId,chosen.bggImageUrl,name(chosen));actors.addView(box,new LinearLayout.LayoutParams(0,-1,.44f));}
+        FrameLayout.LayoutParams actorsLp=new FrameLayout.LayoutParams(-1,-1);actorsLp.topMargin=dp(84);actorsLp.bottomMargin=dp(4);stage.addView(actors,actorsLp);
+        int available=getResources().getDisplayMetrics().heightPixels;int stageHeight=Math.max(dp(260),Math.min(dp(350),available/2-dp(75)));scene.addView(stage,new LinearLayout.LayoutParams(-1,stageHeight));
+        if(chosen!=null){TextView title=text(name(chosen),18,TEXT,Typeface.BOLD);title.setGravity(Gravity.CENTER);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);scene.addView(title);String reason=petSnapshot.pickReasons.get(chosen.signature);if(!TextUtils.isEmpty(reason)){TextView why=text(reason,13,Color.rgb(211,194,233),Typeface.NORMAL);why.setGravity(Gravity.CENTER);why.setPadding(0,dp(6),0,dp(8));scene.addView(why);}}
+        String action=petFailure!=null?"Riprova":chosen!=null?"Apri il gioco":petSnapshot!=null&&petGameIds.isEmpty()?"Avvia una caccia":"Consigliami";
+        Button primary=button(action,Color.rgb(121,58,207));primary.setTextColor(Color.WHITE);primary.setMinHeight(dp(56));primary.setEnabled(!petLoading||petSnapshot!=null);primary.setOnClickListener(v->{if(petFailure!=null){petLoadedAt=0;requestPetSnapshot();render();return;}if(chosen!=null){Long id=petGameIds.get(chosen.signature);if(id!=null)openGameDetailOverlay(id);return;}if(petGameIds.isEmpty()){openPetSpace(false);return;}petState.suggest();render();if(petView!=null)petView.react();});scene.addView(primary,new LinearLayout.LayoutParams(-1,-2));
+        if(chosen!=null){TextView again=secondaryTextAction("Un altro consiglio");again.setMinHeight(dp(48));again.setGravity(Gravity.CENTER);again.setOnClickListener(v->{petState.suggest();render();});scene.addView(again);}
+        LinearLayout.LayoutParams sceneLp=new LinearLayout.LayoutParams(-1,-2);sceneLp.topMargin=dp(16);body.addView(scene,sceneLp);
+    }
+    private Button petSideButton(String label,String icon,Runnable action){Button b=button(label,Color.rgb(72,46,103));b.setTextColor(Color.WHITE);b.setTextSize(14);b.setMinHeight(dp(56));b.setMinWidth(dp(110));b.setPadding(dp(12),dp(8),dp(12),dp(8));b.setCompoundDrawablesWithIntrinsicBounds(iconDrawable(icon,Color.WHITE,18),null,null,null);b.setCompoundDrawablePadding(dp(8));b.setContentDescription("Apri "+label);b.setOnClickListener(v->action.run());return b;}
+    private void openPetSpace(boolean profile){
+        if(petSnapshot==null){Toast.makeText(this,"Attendi il caricamento, poi riprova.",Toast.LENGTH_SHORT).show();return;}
+        Dialog panel=fullScreenPanel(profile?"I miei gusti":"Le mie cacce");LinearLayout host=panel.findViewById(SHEET_ID);LinearLayout previous=body;
+        try{body=host;if(profile){renderLibraryInsights(petSnapshot,petLibrary);body.addView(companionProfileTrustCard(petLibrary));body.addView(languageStats(petSnapshot));}else renderHunts(petHuntDeals);}finally{body=previous;}
+        if(petView!=null)petView.setResumed(false);panel.setOnDismissListener(d->{if(petView!=null&&"companion".equals(tab))petView.setResumed(petResumed);});panel.show();
     }
     private View companionTabs(){LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(SURFACE2,18,1,OUTLINE));addCompanionTab(tabs,"Per me","for_you");addCompanionTab(tabs,"Cacce","hunts");addCompanionTab(tabs,"Profilo","profile");return tabs;}
     private void addCompanionTab(LinearLayout tabs,String label,String value){boolean on=value.equals(companionSection);TextView t=text(label,13,on?TEXT:MUTED,Typeface.BOLD);t.setGravity(Gravity.CENTER);t.setBackground(round(on?Color.rgb(61,42,90):Color.TRANSPARENT,13,0,0));t.setOnClickListener(v->{companionSection=value;render();if(scroll!=null)scroll.scrollTo(0,0);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(4);tabs.addView(t,lp);}
