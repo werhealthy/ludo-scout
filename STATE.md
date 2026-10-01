@@ -1,5 +1,19 @@
 # Ludo Scout — Current state
 
+## Current milestone — Home box previews and hierarchy 5.12.109
+5.12.109-home-box-cards (1000126) uploaded to Firebase at2026-10-01 18:35:45 UTC and separately distributed to testers/groups at18:35:46 UTC (20:35 Europe/Rome), confirmed in signed job110521729455 logs. PR118 merged95a77b251ace8b28a1ca56fcd5c4162bb3cc6188. Final heada20409231c38770d75cb96ccf3ca792fa40a64e8 passed PR run314 (36907046099): all regressions/SQLite fixtures,60 new geometry cases, Android JUnit, Java compile and review APK. Signed beta126 (36907538365) passed tests/build/certificate/Firebase upload/tester distribution.
+
+User approved direct implementation of the grouped Home refinement on2026-10-01, asking to preserve current cards while making them closer to Catalog and varying hierarchy by section. First 2.5D rollout is Home only; Catalog/Library extension awaits phone performance/visual acceptance.
+- Home offer/recent cards retain existing horizontal rails, title/price/data/routes and square artwork area, with12dp padding,18dp corners and16sp two-line title. Publication is17sp prominent in fresh with16sp price; offers emphasize20sp raw BGG quality and14sp real-saving badge with18sp price. Ranking retains22sp rating and real-saving palette. Large-font score/language stacks; language min48dp target.
+- Home preview/ranking artwork uses the existing cached Canvas box renderer without pedestal, complete real cover aspect, subtle dark depth and ellipse shadow; product artwork lookup/decode off UI thread, missing-cover placeholder and flat-cover renderer fallback retained. No physical 3D model, new asset/dependency or animation loop/per-frame bitmap allocations.
+- Complete no-pedestal box centering is corrected in the5arg geometry; separate pedestal-aware6arg geometry/details remain unchanged. New executable production-Java fixture sweeps60combinations of size/aspect, independent complete-box center/bounds/aspect expectations plus invalid bounds. Test-only PR311 reproduced the off-center failure.
+- Hero uses Home-scoped darker top/side factors, centered charcoal radial backdrop with restrained violet, ground shadow beneath existing pedestal and pack FontAwesome right arrow with relative aligned drawable. Shared default detail/product artwork remains unchanged; existing transparent pedestal PNG reused.
+- Old visual source guards updated only for approved preview helper, section savings placement and explicit Home-scoped renderer; BGG-only source and real discount/price checks remain. Compile constant missing during first code pass was corrected before final validation.
+- Independent read-only review of finala204092 found no critical/important blockers. No changes to selection/order, pricing/eligibility, interest semantics, schema, dependencies, Catalog/Library previews, pet or Motore.
+- Phone verification still required for Home scroll fluidity with multiple boxes, square/tall/wide covers, missing cover, large text, actual hero centering/pedestal grounding, sides darkness and arrow alignment. CI/geometry do not prove device visual acceptance or frame timing.
+Next grouped block: product detail clarity and contextual interest actions (backlog group2), defining temporary featured dismissal separately from persistent taste before changing behavior. First accept/refine Home on phone; only extend box previews elsewhere once fluidity is confirmed.
+
+
 ## Backlog prioritario consolidato — feedback 2026-10-01, 20:09 Europe/Rome
 
 Questo elenco è operativo e sostituisce le precedenti indicazioni di “prossimo step”. Unisce i punti già aperti senza duplicarli. Il feedback di oggi ha precedenza. È un aggiornamento di requisiti, non una dichiarazione di implementazione.
@@ -51,11 +65,11 @@ Questo elenco è operativo e sostituisce le precedenti indicazioni di “prossim
 - Libreria con voto0–5 preservato, vendita/backfill e finestre dal basso.
 - Scena pet Ludo e azioni visibili. Tutti richiedono ancora accettazione visiva/di interazione sul telefono.
 
-Prossimo gruppo raccomandato: Home completa (gruppo1), con proposta visiva della scena in evidenza e confronto delle gerarchie per sezione, poi implementazione verificata. Prima di toccare i filtri Motore o l'interesse persistente, presentare il comportamento concreto da approvare.
+Prossimo gruppo raccomandato: verificare Home5.12.109 sul telefono, quindi dettagli prodotto e interesse contestuale (gruppo2). Implementazione iniziale del gruppo1 consegnata; accettazione visiva/prestazioni e qualsiasi estensione2,5D a Catalogo/Libreria restano pendenti. Prima di toccare i filtri Motore o l'interesse persistente, presentare il comportamento concreto da approvare.
 
 
 
-## Current milestone — Interactive Ludo pet scene 5.12.108
+## Previous verified milestone — Interactive Ludo pet scene 5.12.108
 5.12.108-ludo-pet (1000125) uploaded to Firebase at2026-10-01 18:05:40 UTC and separately distributed to testers/groups at18:05:41 UTC (20:05 Europe/Rome), explicitly confirmed in signed job110508767016 logs. PR117 merged527b71b46802477c8e648297838b3fad38e79926. Final head2cfc41ef024a8b5de29ec67d619ed1d4c76edd7a passed PR run310 (36903297123), all existing regressions/SQLite fixtures, new executable pet state harness, Android JUnit, Java compilation and review APK. Signed beta run125 (36903679457) passed tests/build/expected-certificate verification and Firebase upload/tester distribution.
 
 User approved the final scene proposal with “Bello, creiamolo ma i bottoni devono essere più visibili” on2026-10-01. This supersedes giant opening face, scroll-collapse mascot, stacked action cards and double horizontal dock proposals.
