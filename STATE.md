@@ -1,6 +1,15 @@
 # Ludo Scout — Current state
 
-## Current milestone — Home light scene 5.12.100
+## Current milestone — Restore dark Home 5.12.101
+5.12.101-home-dark (1000118) uploaded at2026-10-01 08:59:37 UTC and distributed to Firebase testers/groups successfully at08:59:38 UTC (10:59 Europe/Rome). PR110 merged atb4bfef8cc956cdb2883d7b6effaf4b56214cedbe. PR validation run283 (36839029792), headd0234dde1eeb51b8ef224c8785b183aff6d9073c, passed full regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run118 (36839440906) passed tests, APK build, certificate verification, upload and distribution.
+User rejected the light Home experiment and explicitly liked the product page. Restore dark Home, preserve approved product visual design. Home light transition is removed; earlier5.12.100 light direction is superseded.
+- Greeting, dark background, featured card and system-bar appearance restored from5.12.99. Shared product box still uses8.5% depth with darker cover-derived sides and contact shadow.
+- Product details, actual photo thumbnails/gallery, bounded20dp BGG logo and renderer/async loading remain identical to5.12.100. Direct source comparison confirmed preservation.
+- Only MainActivity Home composition and release version changed. No schema/dependency/engine/navigation changes. Motore remains on standby.
+- User's product-page approval is recorded; no emulator/device verification performed here. Phone check: dark Home restored and product page retained.
+Next single milestone: Catalog preview hierarchy/layout, keeping navigation structure and filters intact.
+
+## Superseded Home experiment — 5.12.100
 5.12.100-home-light (1000117) uploaded to Firebase at2026-10-01 08:36:15 UTC and distributed to testers/groups at08:36:16 UTC (10:36 Europe/Rome). PR109 merged at3e828d3792bfd0a2978665238f9303b4d61968fa. PR validation run282 (36836501727), heade191020a026d4fbd72bd21a85862c1c9a574fe8e, passed full regressions, SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run117 (36836915201) passed full regressions/tests, APK build, certificate verification and Firebase distribution. Initial validation rejected a5.13 release label; version stayed on the existing5.12 beta line, without weakening the guard.
 User feedback on5.12.99: side was too thick and too bright; listing photo text action had a clipped icon. User requested an unframed luminous Home top transitioning into dark sections through angular theatrical light, reversing the attached dark-to-light reference.
 - Shared cover side reduced from13% to8.5%, darker cover-derived top/side lighting. Existing centered cover front, pedestal PNG, aspect ratio, contact shadow and async loader preserved across product details.
