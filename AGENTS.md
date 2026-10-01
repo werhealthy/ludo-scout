@@ -25,6 +25,8 @@ Le keyword `frontend` e `backend` selezionano il workstream della chat. Entrambi
 Per Vinted, ottimizzare velocità e affidabilità riducendo richieste inutili, duplicati e lavoro remoto. Non tentare di aggirare CAPTCHA, blocchi anti-bot, rate limit o altri controlli della piattaforma; HTTP 403/429 e challenge sono segnali di backoff e riduzione della pressione.
 
 ## Gestione della scaletta
+- In ogni risposta indica quanti gruppi tematici aperti mancano alla fine della scaletta. Conta gruppi sostanziosi, non micro-fix; aggiorna il totale quando nuovi feedback cambiano il backlog. Specifica il conteggio frontend separatamente dal backlog backend.
+- Raggruppa ogni consegna per tematica, con più correzioni coerenti.
 - Aggiorna il file esistente con i nuovi feedback, consolidando i duplicati in gruppi sostanziosi.
 - Mantieni distinti lavori da fare, implementati, verificati automaticamente e accettati sul telefono.
 - Non riaprire come nuovi job le attività già consegnate; conserva le verifiche pendenti.
