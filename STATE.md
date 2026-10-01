@@ -4,6 +4,13 @@
 
 5.12.94-engine-intake (1000111), Firebase upload/tester distribution confirmed 2026-10-01 07:49 Europe/Rome (05:49 UTC). PR103 merged at 1189820b673bbe1bef854912dab483a8e40898e8. Head 8fd93850d97f424a7b6cf033f226f91e76ee898e passed PR run271 (36821073751), including full regressions, Java-generated SQLite, Android tests/compile and review APK. Signed beta run111 (36821361426) succeeded; Firebase explicitly confirmed upload and distribution.
 
+## Pending step 5.12.95 — Home reference and waiting scroll row
+
+- User selected compact waiting-scroll row instead of intake circle. Count/list share lightweight temporal grouping after current owner's end, no joined enrichment. Dedicated background list opens existing all-announcement run inspector, including raw cards without price/BGG. Global pending analysis remains a separate compact action; never sum announcement count with scrolls/games.
+- Hero removes visible dismissal action; personalization still available on catalog previews and unchanged. Artwork background transparent; title/rating/language/description/real used-market benchmark/CTA in copy column for square/tall, wide/narrow/large-font stacked fallback. Renderer remains isolated; no realism claim. Pedestal asset not supplied yet, await user asset.
+- Device v94 snapshot 67ms; intake opt-in OFF ~13h, queue heartbeat recent and processing lease35s. Old run remains ACTIVE with unresolved/retry work; do not claim stalled runs or SQLite crash root fixed. v94 install has0 post-install crashes/ANRs; older radar SQLiteBusy crash predates install.
+- Pending review, full CI/JUnit/compile/APK, beta merge and verified Firebase distribution before announcing availability.
+
 ## Current Motore/UI step
 
 - Separate Da analizzare circle is GLOBAL announcement intake, not another active-scroll game phase. Shows canonical active PENDING_ANALYSIS listings plus latest raw pending sightings without any canonical listing. Raw signatures deduplicate and completion wins by (observed_at,id). Count/list use same SQL; direct phase=-2 route works even with no pipelineRun. Data remains truthful while queue is paused. Count changes animate once; throttled background arrivals request fresh snapshots. Existing 5-phase scroll logic and publish/trust gates preserved; do not sum global announcement intake with scoped game phases.
