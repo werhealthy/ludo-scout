@@ -12,7 +12,7 @@ final class LudoPetView extends View {
  LudoPetView(Context context){super(context);setContentDescription("Ludo, il tuo compagno di giochi");setFocusable(true);setOnClickListener(v->react());}
  void setResumed(boolean value){resumed=value;sync();}
  void lookAtGame(boolean value){lookingRight=value;invalidate();}
- void react(){reaction=1f;announceForAccessibility("Ludo ti saluta");invalidate();}
+ void react(){reaction=ValueAnimator.areAnimatorsEnabled()?1f:0f;announceForAccessibility("Ludo ti saluta");invalidate();}
  private void sync(){boolean run=LudoPetState.animate(ValueAnimator.areAnimatorsEnabled(),resumed,isAttachedToWindow()&&getWindowVisibility()==VISIBLE&&isShown());if(!run){if(idle!=null){idle.cancel();idle=null;}phase=0;reaction=0;invalidate();return;}if(idle!=null)return;idle=ValueAnimator.ofFloat(0,1);idle.setDuration(4200);idle.setRepeatCount(ValueAnimator.INFINITE);idle.setInterpolator(new android.view.animation.LinearInterpolator());idle.addUpdateListener(a->{phase=(Float)a.getAnimatedValue();reaction=Math.max(0,reaction-.018f);invalidate();});idle.start();}
  @Override protected void onAttachedToWindow(){super.onAttachedToWindow();sync();}
  @Override protected void onDetachedFromWindow(){if(idle!=null){idle.cancel();idle=null;}super.onDetachedFromWindow();}
