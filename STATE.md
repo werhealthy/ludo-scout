@@ -1,6 +1,16 @@
 # Ludo Scout — Current state
 
-## Current milestone — Catalog card refinement 5.12.103
+## Current milestone — Grouped Phase5 market previews 5.12.104
+5.12.104-market-previews (1000121) uploaded to Firebase at 2026-10-01 12:49:50 UTC and distributed to testers/groups at 12:49:50 UTC (14:49 Europe/Rome), separately confirmed in signed job110374703683 logs. PR113 merged at3be0adae846f98ed76ccbc5015b61777411738ea. PR validation run286 (36863477090), headc625c7750427a63d2229840453fae47d70c67b68, passed regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run121 (36863954605) passed tests, APK build, certificate verification, Firebase upload and tester distribution.
+- User requested grouping related phases into larger fixes. This delivery combines BGG ranking cards, confirmed Bundle previews and a documented Catalog navigation proposal. Future grouping recorded in docs/specs/2026-09-30-ui-refinement.md.
+- Home BGG ranking uses the canonical real-saving badge/colors (previously plain pink percentage),22sp rating/16sp star (previously27/23),16sp max2-line title,68dp square cover and26dp medal. Rating/price are separated. BGG rank is secondary, voter evidence remains accessible. Narrow screens/large text stack values and facts without fixed text heights.
+- Confirmed Bundle Catalog previews use seller, actual member count, up to3existing covers and2-line group title; open existing detail. The inherited tall tile with estimated offer subtotal is replaced only here; no promoted combined price/discount without data. Existing membership/eligibility, sorting, prospect cards, Home Bundle tile, detailed calculations and routing unchanged.
+- Reviewed diff changes only these2renderers, release identity and the existing UI spec. No dependencies/schema/navigation/queue changes. Approved dark Home/product stage preserved.
+- No device/emulator available. Visual checks pending: long titles, absent rating/saving, badge palette, large text;2/3/many-game Bundles and detail opening.
+Navigation proposal pending explicit product approval: two tabs Annunci / Giochi, Annunci default, separate compact Bundle header action; game -> actual linked offers, offer -> linked game and confirmed same-seller Bundle, Bundle -> member offers/seller. Preserve Back position and independent filter/search state. Existing3-way selector unchanged.
+Next single step: phone-review5.12.104 and approve/refine this navigation proposal, then implement the connected Catalog/detail flow as one grouped update. Motore remains on standby.
+
+## Previous verified milestone — Catalog card refinement 5.12.103
 5.12.103-catalog-refinement (1000120) uploaded to Firebase at 2026-10-01 12:32:10 UTC and distributed to testers/groups at 12:32:11 UTC (14:32 Europe/Rome). PR112 merged at a3dbfd9a745e3f9e851b865765862673f4ca9a74. PR validation run285 (36861462186), head58a8229fe35cd3433ca0bc6bf920d3d2bd300dae, passed regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run120 (36861930808) passed tests, APK build, signing-certificate verification, Firebase upload and tester distribution; separate upload/distribution confirmations verified in job110367986562 logs.
 - Catalog ellipsis has a28dp visible circle and14sp glyph inside the unchanged48dp clickable target; full accessible action label preserved.
 - Unknown publication date is only “?” in Catalog preview; screen-reader description remains “Data di pubblicazione sconosciuta”. Known dates and detail-page date semantics unchanged.

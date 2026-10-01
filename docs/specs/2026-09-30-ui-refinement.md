@@ -76,3 +76,8 @@ Navigation proposal — NOT APPROVED / NOT IMPLEMENTED:
 - Product approval of the proposed two-tab-plus-Bundle-entry navigation is required before replacement of the existing selector.
 
 Delivery: full existing PR regressions/SQLite/Android JUnit/Java/APK, source diff review, signed beta build, separate Firebase upload/distribution confirmation. Visual acceptance on phone remains required for long titles, absent saving/rating, large text,2/3/many-game bundles.
+
+### Verified delivery
+5.12.104-market-previews (1000121), PR113 merged3be0adae846f98ed76ccbc5015b61777411738ea. PR286 (36863477090) and signed beta121 (36863954605) passed regressions/SQLite/JUnit/Java/APK. Firebase separately confirmed upload and tester distribution at2026-10-01 12:49:50UTC (14:49 Europe/Rome). No device/emulator visual acceptance claimed. Navigation remains a proposal.
+
+Clarification superseding the earlier saving-color wording:50%+ means a green saving badge, not automatic Offertona classification. Existing total-price/used-benchmark evaluation remains separate and unchanged.
