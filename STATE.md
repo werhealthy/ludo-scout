@@ -1,5 +1,8 @@
 # Ludo Scout — Current state
 
+## Obiettivo attivo e ripresa — 2026-10-01, 23:11 Europe/Rome
+Scaletta unica: `docs/specs/2026-09-30-ui-refinement.md`; istruzioni di lettura a ogni nuova sessione in `AGENTS.md`. Prossimo gruppo: ingrandire card/immagini BGG e provare scatole libere senza riquadro interno anche sulle altre card, insieme alla rifinitura Home del gruppo1. La5.12.111 è distribuita ma l'accettazione visiva sul telefono resta aperta. Il nuovo gruppo non è ancora implementato. Non occorre un prompt lungo per riprendere: leggere istruzioni, stato e scaletta. Aggiornamento solo documentale, nessuna nuova APK.
+
 ## Current milestone — Ubongo premium visual correction 5.12.111
 5.12.111-premium-home (1000128) uploaded to Firebase at 2026-10-01 20:55:26 UTC and separately distributed to testers/groups at 20:55:27 UTC (22:55 Europe/Rome), confirmed by signed job110578632016. PR120 merged85694d0438dee8d09c906397d3f740ee710b763a. Exact final head64b226f550bc684e87574cd3f73a63a16fb3a7f8 passed PR323 (36924235643): all regressions/SQLite fixtures, premium geometry120 cases and actual360dp boundary, Android unit tests, compile and review APK. Independent final rereview found no remaining findings. Signed beta128 (36924578103) passed tests/build/expected-certificate verification and both Firebase delivery operations.
 
