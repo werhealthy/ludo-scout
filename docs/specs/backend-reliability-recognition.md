@@ -119,3 +119,17 @@ Introdurre osservabilità limitata per claim, acquisizione radar, applicazione m
 5. Solo dopo l'evidenza, applicare il fix minimo e confrontare prima/dopo.
 
 Nessuna modifica a soglie di riconoscimento, ranking, pricing o schema in questo milestone senza approvazione separata.
+
+## B1 — diagnostica implementata, 2026-10-02
+
+Richiesta utente «Vai»: misure circoscritte, nessun fix del comportamento. `DbContentionTrace` registra fino a 32 operazioni concorrenti e 32 aggregati per processo, con tempi monotoni, massimi/count/failure e operazioni in corso. Export daemon ogni 5 secondi fuori SQLite, file atomici limitati a 32 KiB per processo; conservata anche l'ultima sessione precedente. PID, versione e timestamp distinguono dati correnti e storici. Nessun titolo, URL o messaggio d'errore: solo classe errore e nomi tecnici.
+
+Strumentati record legacy, recordSighting/applyAnalysis canonici, claim Vinted/BGG singolo/batch, applyBggGame/applyBggMetadata e reconcileQueue. Fasi: SETUP, OPEN_DATABASE, ACQUIRE_WRITER, TRANSACTION, HELPER_CALL, COMMIT, POST_TRANSACTION. `maxBeginMs` comprende pool connessioni e SQLite begin, non misura esclusivamente il lock OS. `maxHelperCallMs` comprende attesa monitor e lavoro del metodo; thread BLOCKED e primi frame sulle operazioni >=250ms aiutano l'attribuzione senza modificare synchronized. Il monitor all'ingresso dei metodi sincronizzati DealDatabase non viene misurato direttamente. `maxBodyMs` esclude i tratti helper marcati. Massimi di fasi diverse possono appartenere a chiamate diverse: non sommarli. Copertura mirata, non di tutti i writer/query. `reconcileQueue` include sotto-manutenzioni nel totale; la fase iniziale non equivale a una singola apertura DB.
+
+La diagnostica esistente esporta `dbContention`; letture solo di file su percorso background già presente. Files assenti/stale e errori export sono espliciti. Nessuna prova di riduzione crash/lock o overhead sul dispositivo finché mancano dati reali. La diagnostica generale usa ancora SQLite: se il suo export rimane bloccato, serve un ulteriore percorso file-only; non dichiarare che l'export risolve tutti i deadlock.
+
+## Comunicazione e prova sul telefono
+
+A ogni step backend indicare: cosa è stato fatto; cosa controllare; come eseguire la prova; cosa restituire. Distinguere test automatici da prova reale. Dopo build firmata e distribuita: aggiornare senza cancellare dati, copiare una diagnostica iniziale, attivare acquisizione e scorrere normalmente annunci di giochi su Vinted per 2–3 minuti, tornare in Ludo Scout e lasciare lavorare 5 minuti; copiare diagnostica finale completa e segnalare blocchi/crash e circa quando sono accaduti. Niente riavvio intenzionale tra le due diagnostiche. Se l'export non termina, riportare questo fatto senza insistere con molti tentativi. Controllare presenza di `dbContention`, versione/PID/at/freshness per processo. La prova prepara la baseline per attribuire attese, non deve dimostrare un miglioramento già promesso.
+
+Verifiche e disponibilità: da completare su head finale CI e distribuzione; non dichiarare APK disponibile prima di conferma distinta upload Firebase/distribuzione tester. Unico prossimo passo dopo consegna: confrontare le due diagnostiche del telefono.

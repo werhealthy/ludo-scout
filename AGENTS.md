@@ -36,3 +36,7 @@ Per Vinted, ottimizzare velocità e affidabilità riducendo richieste inutili, d
 Preserva dati reali, preferiti per identità BGG, memoria Ludo, rating personali, navigazione e pricing verificato. Non cambiare filtri, soglie, schema, dipendenze o servizi senza una decisione specifica autorizzata.
 Per modifiche al codice esegui i controlli pertinenti e il workflow di regressioni/build esistente; registra prove e limiti. La distribuzione beta verificata già autorizzata richiede build firmata, certificato atteso, conferma distinta di upload Firebase e distribuzione ai tester.
 Non dichiarare approvazione visiva o prestazioni sul telefono sulla base della sola CI. Modifiche esclusivamente documentali non richiedono una nuova APK.
+
+
+## Comunicazione del workstream backend
+A ogni consegna spiegare sinteticamente cosa è stato fatto, cosa l’utente deve verificare, come eseguire la prova e cosa deve restituire (per esempio due diagnostiche complete con tempi/versione). Se non serve una prova sul telefono, dirlo. Non richiedere test di una funzione diagnostica prima che una build che la contiene sia verificata e distribuita.

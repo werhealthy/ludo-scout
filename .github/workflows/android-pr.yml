@@ -40,8 +40,14 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run database contention trace behavior regression
+        run: python3 regression/db_contention_trace.py
+
       - name: Run game favorites and durable Ludo memory regression
         run: python3 regression/game_preferences_v512110.py
+
+      - name: Run contextual product customization regression
+        run: python3 regression/product_customization_v512113.py
 
       - name: Run premium scene geometry regression
         run: python3 regression/premium_scene_v512111.py
@@ -225,3 +231,4 @@ jobs:
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=PR Review,O=Ludo Scout,C=IT"
       - name: Build review APK
         run: ./gradlew --no-daemon :app:assembleDebug
+
