@@ -160,3 +160,45 @@ with tempfile.TemporaryDirectory() as temp:
     pager_result=subprocess.run(["java","-cp",temp,"it.vintedaffari.app.PagerRegression"],check=False)
 if gesture_result.returncode or pager_result.returncode:
     raise AssertionError("Product gesture/gallery behavior failed")
+
+# The real preparation callback must offer recovery after an empty/failed snapshot.
+prepare=extract("private void prepareGameTransition(")
+prepared_model=extract("private static final class PreparedGameOverlay")
+recovery=r"""
+import java.util.*;
+public class RecoveryRegression {
+ static class Dialog {boolean showing=true;boolean isShowing(){return showing;}}
+ static class TextView {Runnable click;String value="";boolean clickable;
+  void setText(String s){value=s;}void setOnClickListener(java.util.function.Consumer<TextView> c){click=c==null?null:()->c.accept(this);}
+  void setClickable(boolean b){clickable=b;}
+ }
+ static class GameRecord {}
+ static class GameDetailData {}
+ static class MarketStore {boolean available;GameRecord gameStats(long id){return available?new GameRecord():null;}}
+ static class Executor {List<Runnable> queue=new ArrayList<>();void execute(Runnable r){queue.add(r);}void drain(){queue.remove(0).run();}}
+ final MarketStore marketStore=new MarketStore();final Executor uiDataIo=new Executor();
+ final Map<Dialog,PreparedGameOverlay> preparedGameOverlays=new HashMap<>();
+ boolean destroyed;boolean isFinishing(){return false;}boolean isDestroyed(){return destroyed;}
+ GameDetailData loadGameDetailData(GameRecord g){return new GameDetailData();}
+ void runOnUiThread(Runnable r){r.run();}Dialog buildPreparedGameOverlay(GameRecord g,GameDetailData s,Runnable done){return new Dialog();}
+ void updateGamePullHint(TextView hint,float progress,boolean ready){hint.setText(ready?"ready":"waiting");}
+ static void check(boolean b,String label){if(!b)throw new AssertionError(label);}
+ public static void main(String[] args){
+  RecoveryRegression a=new RecoveryRegression();Dialog source=new Dialog();TextView hint=new TextView();
+  a.prepareGameTransition(source,42,hint);a.uiDataIo.drain();
+  check(hint.click!=null,"failed preparation has no retry action");
+  a.marketStore.available=true;hint.click.run();a.uiDataIo.drain();
+  check(a.preparedGameOverlays.get(source).dialog!=null,"retry did not prepare game");
+  check(hint.click==null,"retry action remains after success");
+  a=new RecoveryRegression();source=new Dialog();hint=new TextView();a.prepareGameTransition(source,42,hint);source.showing=false;a.uiDataIo.drain();
+  check(hint.click==null,"closed listing received recovery controls");
+  System.out.println("PASS real game preparation failure/retry and closed-source guard");
+ }
+ __MODEL__
+ __PREPARE__
+}
+""".replace("__MODEL__",prepared_model).replace("__PREPARE__",prepare)
+with tempfile.TemporaryDirectory() as temp:
+    p=Path(temp)/"RecoveryRegression.java";p.write_text(recovery)
+    subprocess.run(["javac","-d",temp,str(p)],check=True)
+    subprocess.run(["java","-cp",temp,"RecoveryRegression"],check=True)
