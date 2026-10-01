@@ -60,7 +60,7 @@ checks=[
     ("Catalog uses the shared product grammar in a two-column grid",
      "appendCatalogCards(results,list" in market and "col<2" in market and "catalogProductCard(deals.get(index))" in market),
     ("Listing detail has one dominant Vinted provider action",
-     'providerLinkCard(R.drawable.provider_vinted_logo,"Vinted"' in detail and
+     'productPrimaryButton(hasVinted?"Apri su Vinted"' in detail and
      'if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);' in detail and
      "providerAction(" not in detail),
     ("Listing detail moves corrective actions into contextual menu",

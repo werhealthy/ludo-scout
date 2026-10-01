@@ -96,3 +96,57 @@ with tempfile.TemporaryDirectory() as temp:
  (d/'android/content/SharedPreferences.java').write_text(prefs);(d/'android/content/Context.java').write_text(context);(d/'CoverStorageRegression.java').write_text(harness)
  subprocess.run(['javac','-d',temp,str(d/'android/content/SharedPreferences.java'),str(d/'android/content/Context.java'),str(src/'GamePreferenceState.java'),str(d/'CoverStorageRegression.java')],check=True)
  subprocess.run(['java','-cp',temp,'it.vintedaffari.app.CoverStorageRegression',str(d/'files')],check=True)
+
+# Exercise actual detail enrichment at its remote/render boundaries. No device-layout claim.
+ui=(src/'MainActivity.java').read_text()
+refresh=extract(ui,'private void refreshDetailBgg(')
+java=r'''package it.vintedaffari.app;
+import java.util.*;
+public class MainActivity {
+ static final int MODE_PRIVATE=0;
+ static class TextUtils {static boolean isEmpty(String value){return value==null||value.isEmpty();}}
+ static class View {static final int VISIBLE=0,GONE=8;}
+ static class TextView {String value="";int visibility=8;void setText(String s){value=s;}void setVisibility(int v){visibility=v;}}
+ static class Dialog {boolean showing=true;boolean isShowing(){return showing;}}
+ static class FrameLayout {static class LayoutParams {LayoutParams(int w,int h){}}void removeAllViews(){}void addView(Object v,LayoutParams p){}}
+ static class SharedPreferences {long value;long getLong(String k,long fallback){return value;}Editor edit(){return new Editor();}class Editor {Editor putLong(String k,long v){value=v;return this;}void apply(){}}}
+ static class BggSearchClient {
+  interface Callback {void ok(List<Game> games);void error(String e);}
+  static class Game {String id="12",name="Real game",imageUrl="",categories="Strategy";Double rating=7.5,weight=2.1;Integer rank=20,voters=400,qualityScore=74,marketUsedCount,marketUsedMedianCents,marketUsedMinCents,minPlayers=2,maxPlayers=4,playtime=45;}
+  Callback pending;boolean configured(){return true;}void details(String id,boolean force,Callback cb){pending=cb;}
+ }
+ static class Db {void applyBggGame(BggSearchClient.Game g){}}
+ static class MarketStore {void saveBggMarketStats(String id,Integer a,Integer b,Integer c,long at){}}
+ static class OperationCenter {static final int MATCH=1;static void running(MainActivity a,String k,int n,String t){}static void done(MainActivity a,String k,int n,String t){}static void error(MainActivity a,String k,int n,String t,String e){}}
+ static class ArtworkStore {static void downloadBgg(MainActivity a,String id,String url){}}
+ final Set<String> detailRefreshes=new HashSet<>();final SharedPreferences prefs=new SharedPreferences();final BggSearchClient bggSearch=new BggSearchClient();final Db db=new Db();final MarketStore marketStore=new MarketStore();
+ boolean ending;boolean isFinishing(){return ending;}boolean isDestroyed(){return false;}SharedPreferences getSharedPreferences(String s,int mode){return prefs;}
+ void runOnUiThread(Runnable r){r.run();}String name(DealRecord d){return d.gameName;}Object dealProductArtwork(DealRecord d){return new Object();}
+ __REFRESH__
+ static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
+ static DealRecord deal(){DealRecord d=new DealRecord();d.bggId="12";d.gameName="Old name";d.rating=6.0;return d;}
+ public static void main(String[] args){
+  MainActivity a=new MainActivity();DealRecord d=deal();GameRecord canonical=new GameRecord();canonical.minAge=10;canonical.description="Real local description";TextView status=new TextView();Dialog dialog=new Dialog();final double[] shown={0};final int[] updates={0};
+  final DealRecord observed=d;a.refreshDetailBgg(d,status,false,new FrameLayout(),dialog,()->{updates[0]++;shown[0]=observed.rating;},canonical);
+  a.bggSearch.pending.ok(Collections.singletonList(new BggSearchClient.Game()));
+  check(updates[0]==1&&shown[0]==7.5,"open detail did not receive enriched rating");
+  check(d.playtime==45&&canonical.playtime==45&&canonical.minPlayers==2,"enriched facts did not reach visible-section model");
+  check(canonical.minAge==10&&"Real local description".equals(canonical.description),"partial remote model erased canonical metadata");
+  check(status.visibility==View.VISIBLE&&!a.detailRefreshes.contains("12"),"completion left stale pending state");
+  a=new MainActivity();d=deal();dialog=new Dialog();status=new TextView();final int[] closedUpdates={0};
+  a.refreshDetailBgg(d,status,false,new FrameLayout(),dialog,()->closedUpdates[0]++,null);dialog.showing=false;a.bggSearch.pending.ok(Collections.singletonList(new BggSearchClient.Game()));
+  check(closedUpdates[0]==0&&d.rating==7.5,"late response updated closed UI or lost valid cached data");
+  for(boolean empty:new boolean[]{true,false}){
+   a=new MainActivity();d=deal();dialog=new Dialog();status=new TextView();final int[] errors={0};
+   a.refreshDetailBgg(d,status,false,new FrameLayout(),dialog,()->errors[0]++,null);String loading=status.value;
+   if(empty)a.bggSearch.pending.ok(Collections.emptyList());else a.bggSearch.pending.error("network unavailable");
+   check(errors[0]==0&&d.rating==6.0,"empty/error response replaced prior facts");
+   check(status.visibility==View.VISIBLE&&!status.value.equals(loading)&&!a.detailRefreshes.contains("12"),"failure unavailable or request not released");
+  }
+  System.out.println("PASS real detail enrichment: visible update, canonical metadata, closed dialog and empty/error preservation");
+ }
+}'''.replace('__REFRESH__',refresh)
+with tempfile.TemporaryDirectory() as temp:
+ p=Path(temp)/'MainActivity.java';p.write_text(java)
+ subprocess.run(['javac','-d',temp,str(src/'DealRecord.java'),str(src/'GameRecord.java'),str(p)],check=True)
+ subprocess.run(['java','-cp',temp,'it.vintedaffari.app.MainActivity'],check=True)

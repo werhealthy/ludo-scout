@@ -34,24 +34,25 @@ checks=[
      '" · "+languageShort(d.languageCode)+" · "+publicationDisplay(d)' not in detail),
     ("listing detail exposes canonical game navigation",
      'text("Scheda gioco",14,TEXT,Typeface.BOLD)' in detail and
-     'new LinearLayout.LayoutParams(-1,dp(48))' in detail and
+     'gameLink.setMinHeight(dp(48))' in detail and
      'if(game!=null)' in detail and
      "openGameDetailOverlay(game.id)" in detail),
     ("listing detail keeps provider identity",
-     'provider_vinted_logo,"Vinted"' in detail and
+     '"Apri su Vinted"' in detail and 'productPrimaryButton' in detail and
      "productRatingRow(d.rating" in detail and "openBgg(d.bggId)" in detail and
      "provider_bgg_logo" in ui),
-    ("correction affordance is immediate",
-     'roundIconButton("?",CYAN)' in detail and
-     "showMatchCorrection(d,dialog)" in detail),
+    ("correction affordance is available in the contextual menu",
+     "showDetailActions(d,dialog" in detail and
+     'menuAction("Correggi gioco associato",TEXT)' in ui and
+     "showMatchCorrection(d,detail)" in ui),
     ("Ludo Score is inspectable and composite",
      "showLudoScoreInfo" in ui and
      "QualityComposite.score(g.rank,null,g.rating,g.voters)" in ui and
      "rank 55% · geek 20% · votanti 15% · media 10%" in ui),
     ("tags navigate into game database",
      "openGameTag(String tag)" in ui and
-     'addLinkedMetaSection(host,"Categorie"' in game and
-     'addLinkedMetaSection(host,"Meccaniche"' in game),
+     'addLinkedMetaSection(taxonomy,"Categorie"' in game and
+     'addLinkedMetaSection(taxonomy,"Meccaniche"' in game),
     ("game search includes taxonomy and creators",
      "LOWER(COALESCE(g.categories,'')) LIKE ?" in market and
      "LOWER(COALESCE(g.mechanics,'')) LIKE ?" in market and
