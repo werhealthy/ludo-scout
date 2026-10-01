@@ -4,7 +4,7 @@ ui=(root/'app/src/main/java/it/vintedaffari/app/MainActivity.java').read_text()
 db=(root/'app/src/main/java/it/vintedaffari/app/DealDatabase.java').read_text()
 hero=ui.split('private View heroOpportunityCard')[1].split('private View discoverFlatArtwork')[0]
 assert 'Non mi interessa' not in hero, 'Hero must not contain dismissal text'
-assert 'benchmarkCents' in hero and 'STRIKE_THRU_TEXT_FLAG' in hero, 'Comparison must use real benchmark'
+assert 'STRIKE_THRU_TEXT_FLAG' not in hero, 'User removed struck comparison price'
 assert 'Scroll in attesa' in ui and 'renderEngineWaiting' in ui, 'Waiting scrolls need a direct list'
 assert 'waitingObservationSessions().size()' in db, 'Count and waiting list must share membership'
 assert 'engineIntakeItems()' in ui, 'Pending raw announcements must remain reachable'

@@ -2,7 +2,7 @@ package it.vintedaffari.app;
 /** Reusable artwork geometry. No knowledge of the hero or its data selection. */
 final class FeaturedBoxGeometry {
  final float[] front=new float[8],top=new float[8],side=new float[8];
- float width,height,depth,left,bottom;
+ float width,height,depth,left,bottom,pedestalLeft,pedestalTop,pedestalWidth,pedestalHeight;
  boolean update(int viewW,int viewH,int coverW,int coverH,float density){
   if(viewW<2||viewH<2||coverW<=0||coverH<=0||!Float.isFinite(density)||density<=0)return false;
   float ratio=coverW/(float)coverH;if(ratio<.15f||ratio>6)return false;
@@ -11,6 +11,22 @@ final class FeaturedBoxGeometry {
   width=Math.min(usableW/1.09f,usableH*ratio);height=width/ratio;depth=width*.075f;
   left=(viewW-width-depth)/2;float y=(viewH-height)/2;bottom=y+height;
   float right=left+width,rise=depth*.38f,tilt=height*.012f;
+  set(front,left,y+tilt,right,y,right,bottom,left,bottom-tilt);
+  set(top,left,y+tilt,left+depth,y+tilt-rise,right+depth,y-rise,right,y);
+  set(side,right,y,right+depth,y-rise,right+depth,bottom-rise,right,bottom);
+  return true;
+ }
+ /** Pedestal-aware fitting: one uniform PNG scale and a shared surface anchor. */
+ boolean update(int viewW,int viewH,int coverW,int coverH,float density,float pedestalRatio){
+  if(!Float.isFinite(pedestalRatio)||pedestalRatio<=0||viewW<2||viewH<2||coverW<=0||coverH<=0||!Float.isFinite(density)||density<=0)return false;
+  float ratio=coverW/(float)coverH;if(ratio<.15f||ratio>6)return false;
+  float pad=Math.min(6*density,Math.min(viewW,viewH)*.06f),usableW=viewW-2*pad,usableH=viewH-2*pad;
+  float baseScale=1.075f*1.28f,baseHeightPerWidth=baseScale/pedestalRatio;
+  width=Math.min(usableW/baseScale,usableH/(1/ratio+baseHeightPerWidth*.60f+.075f*.38f));height=width/ratio;depth=width*.075f;
+  pedestalWidth=width*baseScale;pedestalHeight=pedestalWidth/pedestalRatio;
+  float rise=depth*.38f,totalHeight=height+pedestalHeight*.60f+rise,y=(viewH-totalHeight)/2+rise;
+  left=(viewW-width-depth)/2;bottom=y+height;pedestalLeft=(viewW-pedestalWidth)/2;pedestalTop=bottom-pedestalHeight*.40f;
+  float right=left+width,tilt=height*.012f;
   set(front,left,y+tilt,right,y,right,bottom,left,bottom-tilt);
   set(top,left,y+tilt,left+depth,y+tilt-rise,right+depth,y-rise,right,y);
   set(side,right,y,right+depth,y-rise,right+depth,bottom-rise,right,bottom);
