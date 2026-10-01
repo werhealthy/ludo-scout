@@ -113,3 +113,20 @@ User approved the concrete grouped design with “vai” on2026-10-01: raw BGG r
 Next grouped block: Library previews/personal ratings and sale-price entry, with shared bottom sheets and accessibility. Motore remains on standby.
 
 The concrete in-chat design was presented and explicitly approved before implementation. Intentional pull requirements in section3 are implemented for prepared linked-game destinations; device gesture/visual acceptance remains pending. Earlier Home/Motore/Library historical requirements are not automatically closed.
+
+
+## 2026-10-01 — Grouped Library design and schema approved; delivered
+5.12.107-library-interactions (1000124) uploaded to Firebase at2026-10-01 16:19:41 UTC and separately distributed to testers/groups at16:19:42 UTC (18:19 Europe/Rome), explicitly confirmed in signed job110465000317 logs. PR116 merged39913c18530f96759e38038c3acb983a02146233. Final head3942962c5a2ed1c57370ca6f25d26bbc8ca19ed5 passed PR run305 (36890098114): all regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run124 (36890615976) passed regressions/tests, APK build, expected-certificate verification and Firebase upload/tester distribution.
+
+User explicitly approved the presented grouped Library design and nullable actual-sale-price schema with “vai” on2026-10-01.
+- Library previews lead with actual covers and personal taste; aggregate payment summary and filler leave the primary hierarchy. Search, owned/Sold scopes and existing product artwork remain.
+- Personal rating display uses0–5stars. Stored0–10values remain exact without bulk rewrite; legacy7 displays3.5/5, zero is meaningful and distinct from missing. Rating removal storesnull. Whole-star choices write corresponding even legacy values.
+- Approved SQLite version8 adds nullable sale_price_cents. Sale entry permits unknownblank or actualzero, validates exact decimal cents/negative/precision/overflow. Historical backfill changes only actual proceeds on Sold, keeping original sale date/reason and purchase/rating. Restore-owned explicitly confirms clearing sale fields. Sold purchase editing is omitted to avoid the existing acquisition path silently resetting sale history.
+- Library mutations run off UI thread; failures keep inputs for retry. Sheet-scoped single-flight guard rejects rapid second taps and dismissed sheets; successful writes return to the active originating detail and scroll. Leaving during a write does not reopen it.
+- Shared bottom sheets use bounded wrap-content height, upward220ms entrance/160ms exit, safe insets/keyboard resizing and disabled-animation fallback. No new dependencies. No emulator/device visual or keyboard validation performed.
+- Executable production-Java/SQLite tests cover migration fixtures1–7, nullable fresh schema, preserved ratings7/10/null/zero, actual sale/backfill/restore/owned guard, five-star display and12euro-input boundaries. Async production-method harness covers double submission, failure/retry and leaving during save.
+- Test-only run301 reproduced15pre-implementation data/display failures; run304 reproduced2writes from duplicate taps before the single-flight fix. Legacy UX phase2 guard was intentionally updated for approved rows/search/history without the primary payment summary. Final independent review of3942962 found no Critical/Important issues.
+Phone checks pending: long titles/enlarged text, legacy3.5stars/zero/no vote, actual/blank/zero sale and historical price, restore confirmation, keyboard/navigation bars, cancellation and disabled animations.
+Next grouped block: Ludo app mascot presence/collapse/motion. Present concrete visual prototype before replacing mascot assets; use the user's supplied reference when available in this conversation. Motore stability/motion remains on standby.
+
+This supersedes the pending implementation status of section5 for Library covers/taste, sale price and shared sheets. No full bookshelf redesign, keyboard/device visual acceptance or Ludo mascot replacement is claimed.
