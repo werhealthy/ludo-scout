@@ -127,7 +127,7 @@ public class MainActivity {
  static DealRecord deal(){DealRecord d=new DealRecord();d.bggId="12";d.gameName="Old name";d.rating=6.0;return d;}
  public static void main(String[] args){
   MainActivity a=new MainActivity();DealRecord d=deal();GameRecord canonical=new GameRecord();canonical.minAge=10;canonical.description="Real local description";TextView status=new TextView();Dialog dialog=new Dialog();final double[] shown={0};final int[] updates={0};
-  a.refreshDetailBgg(d,status,false,new FrameLayout(),dialog,()->{updates[0]++;shown[0]=d.rating;},canonical);
+  final DealRecord observed=d;a.refreshDetailBgg(d,status,false,new FrameLayout(),dialog,()->{updates[0]++;shown[0]=observed.rating;},canonical);
   a.bggSearch.pending.ok(Collections.singletonList(new BggSearchClient.Game()));
   check(updates[0]==1&&shown[0]==7.5,"open detail did not receive enriched rating");
   check(d.playtime==45&&canonical.playtime==45&&canonical.minPlayers==2,"enriched facts did not reach visible-section model");
@@ -138,10 +138,10 @@ public class MainActivity {
   check(closedUpdates[0]==0&&d.rating==7.5,"late response updated closed UI or lost valid cached data");
   for(boolean empty:new boolean[]{true,false}){
    a=new MainActivity();d=deal();dialog=new Dialog();status=new TextView();final int[] errors={0};
-   a.refreshDetailBgg(d,status,false,new FrameLayout(),dialog,()->errors[0]++,null);
+   a.refreshDetailBgg(d,status,false,new FrameLayout(),dialog,()->errors[0]++,null);String loading=status.value;
    if(empty)a.bggSearch.pending.ok(Collections.emptyList());else a.bggSearch.pending.error("network unavailable");
    check(errors[0]==0&&d.rating==6.0,"empty/error response replaced prior facts");
-   check(status.visibility==View.VISIBLE&&!a.detailRefreshes.contains("12"),"failure unavailable or request not released");
+   check(status.visibility==View.VISIBLE&&!status.value.equals(loading)&&!a.detailRefreshes.contains("12"),"failure unavailable or request not released");
   }
   System.out.println("PASS real detail enrichment: visible update, canonical metadata, closed dialog and empty/error preservation");
  }
