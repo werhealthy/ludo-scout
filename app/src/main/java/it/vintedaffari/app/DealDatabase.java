@@ -348,7 +348,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "COUNT(DISTINCT CASE WHEN "+attention+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+trustHold+" THEN l.id END),"+
                 "COUNT(DISTINCT CASE WHEN "+coreRemaining+" THEN l.id END) "+
-                "FROM observations o LEFT JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
+                "FROM observations o LEFT JOIN market_listings l ON (l.legacy_signature=o.signature AND l.legacy_signature<>'') OR ((l.legacy_signature IS NULL OR l.legacy_signature='') AND l.temp_fingerprint=o.signature) "+
                 "LEFT JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature "+
                 "WHERE o.observed_at>=? AND o.observed_at<=?";
         int[] out=new int[7];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<7;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
@@ -359,11 +359,11 @@ public final class DealDatabase extends SQLiteOpenHelper {
         // Raw observation rows are historical telemetry and older builds could leave duplicate
         // PENDING_ANALYSIS rows behind for one signature. Product progress must follow the current
         // canonical listing state, otherwise an already-analysed card can keep an old job alive.
-        String pendingSql="SELECT COUNT(DISTINCT l.id) FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
+        String pendingSql="SELECT COUNT(DISTINCT l.id) FROM observations o JOIN market_listings l ON (l.legacy_signature=o.signature AND l.legacy_signature<>'') OR ((l.legacy_signature IS NULL OR l.legacy_signature='') AND l.temp_fingerprint=o.signature) "+
                 "WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND l.enrichment_state='PENDING_ANALYSIS'";
         try(Cursor c=getReadableDatabase().rawQuery(pendingSql,new String[]{String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst())s.analysisPendingListings=c.getInt(0);}
         String coreSql="SELECT COUNT(DISTINCT l.id),COUNT(DISTINCT CASE WHEN j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE') THEN l.id END) "+
-                "FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
+                "FROM observations o JOIN market_listings l ON (l.legacy_signature=o.signature AND l.legacy_signature<>'') OR ((l.legacy_signature IS NULL OR l.legacy_signature='') AND l.temp_fingerprint=o.signature) "+
                 "JOIN processing_jobs j ON j.listing_id=l.id AND j.job_type=? WHERE o.observed_at>=? AND o.observed_at<=?";
         try(Cursor c=getReadableDatabase().rawQuery(coreSql,new String[]{MarketStore.JOB_VINTED,String.valueOf(s.startAt),String.valueOf(s.endAt)})){if(c.moveToFirst()){s.coreWorkListings=c.getInt(0);s.corePendingListings=c.getInt(1);}}
         s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings-s.heldListings)+s.analysisPendingListings;
@@ -459,6 +459,8 @@ public final class DealDatabase extends SQLiteOpenHelper {
         return out;
     }
 
+    public synchronized int engineIntakeCount(){try(Cursor c=getReadableDatabase().rawQuery(EngineIntakeSql.count(),null)){return c.moveToFirst()?c.getInt(0):0;}}
+    public synchronized List<PipelineItem> engineIntakeItems(){List<PipelineItem> out=new ArrayList<>();try(Cursor c=getReadableDatabase().rawQuery(EngineIntakeSql.rows()+" ORDER BY title COLLATE NOCASE",null)){while(c.moveToNext()){PipelineItem item=new PipelineItem();item.identity=c.getString(0);item.signature=c.getString(1);item.gameId=0;item.phase=0;item.title=c.getString(5);out.add(item);}}return out;}
     public synchronized int[] enginePipelineCounts(long startAt,long endAt){
         int[] counts=new int[5];startAt=clampEngineStart(startAt);if(endAt<startAt)return counts;
         try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.query(),new String[]{String.valueOf(startAt),String.valueOf(endAt)})){
@@ -491,7 +493,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
                 "CASE WHEN COALESCE(l.manual_review_required,0)=1 OR (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id='')) THEN 1 ELSE 0 END,"+
                 "CASE WHEN COALESCE(l.manual_review_required,0)=0 AND NOT (g.match_state='BGG_MATCH_REVIEW' AND (g.bgg_id IS NULL OR g.bgg_id='')) AND (l.enrichment_state='NEEDS_REVIEW' OR l.match_state='BGG_VARIANT_REVIEW' "+
                 "OR COALESCE(d.verification_state,'') IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK')) THEN 1 ELSE 0 END "+
-                "FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature "+
+                "FROM observations o JOIN market_listings l ON (l.legacy_signature=o.signature AND l.legacy_signature<>'') OR ((l.legacy_signature IS NULL OR l.legacy_signature='') AND l.temp_fingerprint=o.signature) "+
                 "LEFT JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature "+
                 "WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND g.id IS NOT NULL AND g.database_visible=1 AND (g.rating IS NULL OR g.rating>=6.0) "+
                 "GROUP BY l.id ORDER BY l.last_seen DESC LIMIT ?";
@@ -503,7 +505,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized Set<String> observationReadySignatures(long startAt,long endAt){
-        Set<String> out=new HashSet<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;String sql="SELECT DISTINCT o.signature FROM observations o JOIN market_listings l ON COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=o.signature JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=6.0 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' AND l.enrichment_state='COMPLETE' AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.enrichment_state<>'NEEDS_REVIEW' AND g.match_state<>'BGG_MATCH_REVIEW' AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){while(c.moveToNext()){String sig=c.getString(0);if(sig!=null&&!sig.isEmpty())out.add(sig);}}return out;
+        Set<String> out=new HashSet<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;String sql="SELECT DISTINCT o.signature FROM observations o JOIN market_listings l ON (l.legacy_signature=o.signature AND l.legacy_signature<>'') OR ((l.legacy_signature IS NULL OR l.legacy_signature='') AND l.temp_fingerprint=o.signature) JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=o.signature WHERE o.observed_at>=? AND o.observed_at<=? AND l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=6.0 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' AND l.enrichment_state='COMPLETE' AND l.match_state='MATCHED' AND COALESCE(l.manual_review_required,0)=0 AND l.enrichment_state<>'NEEDS_REVIEW' AND g.match_state<>'BGG_MATCH_REVIEW' AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE'))";try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){while(c.moveToNext()){String sig=c.getString(0);if(sig!=null&&!sig.isEmpty())out.add(sig);}}return out;
     }
     public synchronized int countNeedsVerification(){return countDeals("verify");}
     /** Lightweight summary for the Activity screen: COUNT in SQL, never materialize 4x500 DealRecord objects on Main. */

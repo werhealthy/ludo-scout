@@ -17,7 +17,7 @@ android {
         // via LUDO_VERSION_CODE so every distributed beta can update the previous one.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
         versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 175
-        versionName '5.12.93-featured-box-refinement'
+        versionName '5.12.94-engine-intake'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')

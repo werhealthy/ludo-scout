@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Run indexed engine join regression
+        run: python3 regression/engine_join_plan_v51294.py
       - name: Run Home layout and loading regression
         run: python3 regression/home_render_v51290.py
       - name: Run Discover visual polish regression
@@ -44,6 +46,8 @@ jobs:
       - name: Run Home category SQLite fixtures
         run: python3 regression/discover_category_sql_v51284.py
 
+      - name: Run global pending intake SQLite fixtures
+        run: python3 regression/engine_intake_sql_v51294.py
       - name: Run exclusive Motore pipeline SQLite fixtures
         run: python3 regression/engine_pipeline_sql_v51286.py
 
