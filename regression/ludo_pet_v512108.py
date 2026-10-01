@@ -26,5 +26,5 @@ public class PetRegression {
 }'''
 with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)/"PetRegression.java";p.write_text(harness)
- subprocess.run(["javac","-d",tmp,str(source),str(p)],check=True)
+ subprocess.run(["javac","-d",tmp,str(source),str(root/"app/src/main/java/it/vintedaffari/app/GamePreferenceState.java"),str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.PetRegression"],check=True)
