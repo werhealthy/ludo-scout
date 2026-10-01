@@ -41,6 +41,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run pet suggestion and lifecycle regression
+        run: python3 regression/ludo_pet_v512108.py
+
       - name: Run Library migration and personal rating regression
         run: python3 regression/library_data_v512107.py
 
