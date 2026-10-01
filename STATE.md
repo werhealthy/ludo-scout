@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Verified release — 5.12.97
+5.12.97-featured-foreground (1000114) uploaded and distributed to Firebase testers/groups successfully at 2026-10-01 07:05:53 UTC. PR106 merged at 5934b175d6d08845252e6d28821c4d7963c36b61. PR validation run274 (36827544924) and signed beta run114 (36827966382) passed regressions, Android JUnit, Java compilation, APK build and signing verification.
+- Square cover mode uses a full-width artwork stage above details; tall covers use52% artwork width. Uniform pedestal scale reduced to allow a larger box, preserving40% contact anchor. Cached elliptical radial contact and ambient shadows; layered violet background, brighter12sp featured pill and shared Font Awesome CTA chevron.
+- Geometry JUnit asserts square foreground occupancy and bounds;336 numerical geometry cases checked. Existing async decode, posted hierarchy rebuild, fallback, pricing and discovery remain unchanged.
+- No device/emulator visual acceptance performed. Next step: validate square/tall hero size, box/pedestal contact, label and CTA on the phone with this build.
+
 ## Verified release
 
 5.12.96-featured-pedestal (1000113), Firebase upload and tester distribution explicitly confirmed 2026-10-01 08:47 Europe/Rome (06:47 UTC). PR105 merged at faec3f30799e4edc5ab97de504d187e717aefdbf. Head5472250ea1d6d6fbc698298b2facaf99c5610674 passed PR run273 (36825989458), including full regressions, Java-generated SQLite, Android JUnit/compile and review APK. Signed beta run113 (36826317727) completed successfully with Firebase upload and tester distribution confirmed.
