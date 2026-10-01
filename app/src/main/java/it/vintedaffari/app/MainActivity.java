@@ -1707,7 +1707,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         int[] phases=pipelineRun==null?new int[5]:db.enginePipelineCounts(pipelineRun.startAt,pipelineRun.endAt);
         int activeMask=pipelineRun==null?0:db.enginePipelineActiveMask(pipelineRun.startAt,pipelineRun.endAt);int intakeCount=db.engineIntakeCount();
         getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activitySnapshotTiming","ownerMs="+(ownerAt-started)+";reviewMs="+(reviewAt-ownerAt)+";pipelineMs="+(System.currentTimeMillis()-reviewAt)).apply();
-        EngineOverviewSnapshot snapshot=new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,Collections.emptyList(),Collections.emptyList());snapshot.pipelineRun=pipelineRun;snapshot.phases=phases;snapshot.activeMask=activeMask;snapshot.intakeCount=intakeCount;snapshot.bggPaused=marketStore.isBggPaused();snapshot.vintedPaused=marketStore.isVintedPaused();snapshot.vintedWaitUntil=VintedPublicSession.waitUntil(this);return snapshot;
+        boolean bggPaused=marketStore.isBggPaused(),vintedPaused=marketStore.isVintedPaused();long vintedWaitUntil=VintedPublicSession.waitUntil(this);EngineOverviewSnapshot snapshot=new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,Collections.emptyList(),Collections.emptyList());snapshot.pipelineRun=pipelineRun;snapshot.phases=phases;snapshot.activeMask=activeMask;snapshot.intakeCount=intakeCount;snapshot.bggPaused=bggPaused;snapshot.vintedPaused=vintedPaused;snapshot.vintedWaitUntil=vintedWaitUntil;return snapshot;
     }
 
     private void requestEngineOverviewSnapshot(){
