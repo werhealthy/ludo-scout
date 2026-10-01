@@ -45,6 +45,17 @@ Non è training automatico in produzione. È un loop controllato: baseline → i
 
 Mettere periodicamente in discussione anche una soluzione considerata buona, ma cambiarla solo quando emerge evidenza migliore. Conservare casi regressivi e correzioni manuali come test. Una nuova soluzione deve battere la precedente almeno sulla metrica obiettivo senza peggiorare falsi positivi, stabilità o costi operativi rilevanti.
 
+## B1 — note di audit iniziali (ipotesi, non root cause)
+- Database condiviso multi-processo con WAL e `busy_timeout=8000`: una collisione di scrittura può bloccare un chiamante fino a 8 s prima dell'errore.
+- La coda ha già backpressure e recovery: Vinted tratta il database occupato con retry breve, il supervisor mantiene heartbeat e recupera lease stale. Aggiungere altri retry non è la prima leva.
+- L'overview Motore viene già caricata su `engineUiIo`: il vecchio snapshot lento non è semplicemente un caso di query pesante lasciata sul main thread.
+- Hotspot da misurare: `MarketStore.claimNextVintedJobInternal` e `claimNextBggJob` aprono transazioni per query + claim; sono ad alta frequenza e competono con radar/UI.
+- `DealDatabase.applyBggGame` aggiorna i deal e poi scansiona/parsa tutti i `listing_overrides` dentro la stessa transazione; è un candidato a sezione critica troppo ampia se gli override crescono.
+- `DealDatabase.inferMissingLanguages` esegue potenzialmente molti update riga-per-riga mentre mantiene aperto il cursore di scansione: possibile writer churn anche senza una singola transazione lunga.
+- `VintedPublicSession` scrive il ledger SQLite anche per cache hit e usa transazioni per gate/contatori: utile per verità cross-processo, ma da misurare come possibile pressione di scrittura diagnostica.
+
+Primo intervento ammesso: osservabilità a basso impatto che distingua **tempo di attesa per acquisire il writer lock** e **tempo di lock mantenuto**, etichettati per processo/operazione e persistiti fuori dal database per non peggiorare la contesa. Nessun cambio di timeout o retry finché questi dati non indicano il colpevole.
+
 ## Primo milestone
 **Attribuzione contesa SQLite e stabilità delle code.**
 
