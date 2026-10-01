@@ -408,13 +408,25 @@ public final class DealDatabase extends SQLiteOpenHelper {
     /** UI-facing count stays intentionally lightweight. It counts newly acquired sessions after the
      * current owner using timestamps only; older yielded work is shown as DEFERRED in run history and
      * diagnostics instead of making the overview rebuild every session's joined state. */
-    public synchronized int waitingObservationSessionCount(){
-        ObservationSession active=activeObservationSession();if(active==null)return 0;
-        int sessions=0;long previous=-1L;
-        try(Cursor c=getReadableDatabase().rawQuery("SELECT observed_at FROM observations WHERE observed_at>? ORDER BY observed_at ASC",new String[]{String.valueOf(active.endAt)})){
-            while(c.moveToNext()){long at=c.getLong(0);if(previous<0||at-previous>=ENGINE_SESSION_GAP_MS)sessions++;previous=at;}
+    public synchronized int waitingObservationSessionCount(){return waitingObservationSessions().size();}
+
+    /** Same temporal grouping for the overview count and its direct list. No joined enrichment here. */
+    public synchronized List<ObservationSession> waitingObservationSessions(){
+        List<ObservationSession> sessions=new ArrayList<>();ObservationSession active=activeObservationSession();if(active==null)return sessions;
+        long previous=-1L;ObservationSession current=null;Set<String> unique=new HashSet<>();
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT observed_at,signature FROM observations WHERE observed_at>? ORDER BY observed_at ASC",new String[]{String.valueOf(active.endAt)})){
+            while(c.moveToNext()){long at=c.getLong(0);if(previous<0||at-previous>=ENGINE_SESSION_GAP_MS){if(current!=null)current.uniqueListings=unique.size();current=new ObservationSession(at);sessions.add(current);unique=new HashSet<>();}current.endAt=at;current.observations++;String signature=c.getString(1);if(signature!=null)unique.add(signature);previous=at;}
         }
-        return sessions;
+        if(current!=null)current.uniqueListings=unique.size();return sessions;
+    }
+
+    /** Raw acquired cards stay visible before any canonical game or listing exists. */
+    public synchronized List<PipelineItem> waitingScrollItems(long start,long end){
+        List<PipelineItem> items=new ArrayList<>();
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT signature,MAX(vinted_title) FROM observations WHERE observed_at>=? AND observed_at<=? AND signature IS NOT NULL GROUP BY signature ORDER BY MAX(observed_at) DESC",new String[]{String.valueOf(start),String.valueOf(end)})){
+            while(c.moveToNext()){PipelineItem item=new PipelineItem();item.identity="observed:"+c.getString(0);item.signature=c.getString(0);item.title=c.getString(1);items.add(item);}
+        }
+        return items;
     }
 
     public synchronized boolean isObservationSessionWaiting(ObservationSession session){

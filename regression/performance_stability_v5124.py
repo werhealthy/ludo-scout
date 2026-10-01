@@ -19,7 +19,7 @@ checks = [
     ("screenshots serialized", "SCREENSHOT_IN_FLIGHT" in thumbs and "compareAndSet(false,true)" in thumbs),
     ("remote thumbnail decode uses RGB565", "opts.inPreferredConfig=Bitmap.Config.RGB_565" in thumbs),
     ("active run state cached", "ACTIVE_RUN_CACHE_MS" in db and "cachedActiveRunAt" in db),
-    ("waiting runs use lightweight timestamp query", 'SELECT observed_at FROM observations WHERE observed_at>?' in db),
+    ("waiting runs use lightweight timestamp query", 'SELECT observed_at,signature FROM observations WHERE observed_at>?' in db and 'waitingObservationSessions().size()' in db),
 ]
 
 failed = [name for name, ok in checks if not ok]
@@ -28,3 +28,4 @@ for name, ok in checks:
 if failed:
     raise SystemExit("Performance/stability regression failed: " + ", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} performance/stability guards")
+
