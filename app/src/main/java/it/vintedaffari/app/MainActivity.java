@@ -618,7 +618,7 @@ private void applyDiscoverChrome(){
         if(!flag.isEmpty()){TextView emblem=text(flag,17,TEXT,Typeface.NORMAL);row.addView(emblem,new LinearLayout.LayoutParams(dp(25),dp(26)));}else row.addView(appIcon("\uf1ab",13,MUTED),new LinearLayout.LayoutParams(dp(22),dp(26)));
         row.addView(text("?".equals(code)?"n.d.":code,11,TEXT,Typeface.BOLD));boolean independent=HomePresentation.matchesDependence(value,"IND"),dependent=HomePresentation.matchesDependence(value,"DEP");TextView lock=appIcon(independent?"\uf3c1":dependent?"\uf023":LudoIcons.INFO,12,independent?TEAL:dependent?TEXT:MUTED);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(24),dp(26));ip.leftMargin=dp(3);row.addView(lock,ip);row.setContentDescription("Edizione: "+HomePresentation.editionName(value)+". "+HomePresentation.dependenceLabel(value)+". Tocca per informazioni");return row;
     }
-    private View discoverLanguageIndicator(DealRecord d){View row=languageIndicators(d.languageCode);row.setOnClickListener(v->showLanguageHelp());return row;}
+    private View discoverLanguageIndicator(DealRecord d){View row=languageIndicators(d.languageCode);row.setMinimumHeight(dp(48));row.setOnClickListener(v->showLanguageHelp());return row;}
 
 
     /** Seamless violet studio surface; lighting scales with the card, no raster floor. */
@@ -724,10 +724,10 @@ private void applyDiscoverChrome(){
         FrameLayout art=new FrameLayout(this);FeaturedBoxView box=new FeaturedBoxView(true,false);art.addView(box,new FrameLayout.LayoutParams(-1,-1));
         TextView placeholder=discoverTextWeight(coverPlaceholder(d),12,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
         ImageView image=new ImageView(this);image.setVisibility(View.INVISIBLE);art.addView(image,new FrameLayout.LayoutParams(dp(1),dp(1)));
-        String summary=discoverGameDescription(d);final int[] previous={-1,-1};Runnable arrange=()->{
+        String summary=discoverGameDescription(d);final int[] previous={-1,-1,-1,-1};Runnable arrange=()->{
             Drawable cover=image.getDrawable();int width=cover==null?1:Math.max(1,cover.getIntrinsicWidth()),height=cover==null?1:Math.max(1,cover.getIntrinsicHeight());
-            int mode=HomePresentation.coverMode(width,height);int available=content.getWidth()-content.getPaddingLeft()-content.getPaddingRight();
-            if(available<=0)available=getResources().getDisplayMetrics().widthPixels-dp(72);if(previous[0]==mode&&previous[1]==available)return;previous[0]=mode;previous[1]=available;
+            int available=content.getWidth()-content.getPaddingLeft()-content.getPaddingRight();
+            if(available<=0)available=getResources().getDisplayMetrics().widthPixels-dp(72);int fontBits=Float.floatToIntBits(getResources().getConfiguration().fontScale);if(previous[0]==width&&previous[1]==height&&previous[2]==available&&previous[3]==fontBits)return;previous[0]=width;previous[1]=height;previous[2]=available;previous[3]=fontBits;
             if(art.getParent()!=null)((ViewGroup)art.getParent()).removeView(art);content.removeAllViews();
             LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
             TextView eyebrow=discoverTextWeight("Gioco in evidenza",12,Color.rgb(242,231,255),600);eyebrow.setCompoundDrawablesRelativeWithIntrinsicBounds(iconDrawable(LudoIcons.STAR,DISCOVER_ORANGE,12),null,null,null);eyebrow.setCompoundDrawablePadding(dp(6));
