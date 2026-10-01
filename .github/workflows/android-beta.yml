@@ -41,6 +41,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run Home box geometry regression
+        run: python3 regression/home_box_v512109.py
+
       - name: Run pet suggestion and lifecycle regression
         run: python3 regression/ludo_pet_v512108.py
 
