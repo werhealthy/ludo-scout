@@ -35,10 +35,19 @@ public class GamePreferenceRegression {
   first.toggle("456");expect("456".equals(first.lastGame()),"favorite removal does not reset Ludo");
   first.remember("000123");expect("123".equals(first.lastGame()),"intentional next game replaces memory canonically");
   expect(first.favorites().isEmpty(),"all game favorites removed");
+  LudoPetState cycle=new LudoPetState();
+  cycle.refreshGames(new String[]{"A1","A2","B","bad"},new String[]{"123","00123","456","listing:789"});
+  expect("A1".equals(cycle.suggest()),"first game uses its first eligible listing");
+  expect(!cycle.eligible("A2")&&!cycle.eligible("bad"),"duplicate and invalid game identities not selectable");
+  expect("B".equals(cycle.suggest()),"another advice reaches a distinct BGG game");
+  expect("A1".equals(cycle.suggest()),"cycle remains bounded across distinct games");
+  cycle.select("A2");expect("A1".equals(cycle.selected()),"duplicate listing cannot move canonical selection");
+  cycle.refreshGames(new String[]{"A3","B"},new String[]{"123","456"});
+  cycle.select("A3");expect("B".equals(cycle.suggest()),"refresh and remembered-game restore still advance");
   System.out.println("PASS game favorites across listings, persistence, identity and independent last-game memory");
  }
 }'''
 with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)/"GamePreferenceRegression.java";p.write_text(harness)
- subprocess.run(["javac","-d",tmp,str(source),str(p)],check=True)
+ subprocess.run(["javac","-d",tmp,str(source),str(root/"app/src/main/java/it/vintedaffari/app/LudoPetState.java"),str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.GamePreferenceRegression"],check=True)
