@@ -3023,12 +3023,12 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         bggSearch.details(id,false,new BggSearchClient.Callback(){
             public void ok(List<BggSearchClient.Game> games){runOnUiThread(()->{
                 detailRefreshes.remove(id);if(isFinishing()||isDestroyed())return;
-                if(games==null||games.isEmpty()){if(detail.isShowing()){status.setText("Dati BGG non disponibili. Restano quelli già presenti.");status.setVisibility(View.VISIBLE);}return;}
+                if(games==null||games.isEmpty()||games.get(0)==null){if(detail.isShowing()){status.setText("Dati BGG non disponibili. Restano quelli già presenti.");status.setVisibility(View.VISIBLE);}return;}
                 BggSearchClient.Game g=games.get(0);db.applyBggGame(g);
                 if(g.marketUsedCount!=null&&g.marketUsedCount>0)marketStore.saveBggMarketStats(g.id,g.marketUsedMedianCents,g.marketUsedMinCents,g.marketUsedCount,System.currentTimeMillis());
                 prefs.edit().putLong(id,System.currentTimeMillis()).apply();
                 d.rating=g.rating;d.rank=g.rank;d.voters=g.voters;d.qualityScore=g.qualityScore;d.bggImageUrl=g.imageUrl;d.bggCategories=g.categories;d.minPlayers=g.minPlayers;d.maxPlayers=g.maxPlayers;d.playtime=g.playtime;d.weight=g.weight;
-                if(canonical!=null){canonical.rating=g.rating;canonical.rank=g.rank;canonical.voters=g.voters;canonical.minPlayers=g.minPlayers;canonical.maxPlayers=g.maxPlayers;canonical.playtime=g.playtime;canonical.minAge=g.minAge;canonical.weight=g.weight;canonical.categories=g.categories;canonical.description=g.description;}
+                if(canonical!=null){canonical.rating=g.rating;canonical.rank=g.rank;canonical.voters=g.voters;canonical.minPlayers=g.minPlayers;canonical.maxPlayers=g.maxPlayers;canonical.playtime=g.playtime;canonical.weight=g.weight;canonical.categories=g.categories;}
                 OperationCenter.done(MainActivity.this,"detail:"+id,OperationCenter.MATCH,g.name);if(!TextUtils.isEmpty(g.imageUrl))ArtworkStore.downloadBgg(MainActivity.this,id,g.imageUrl);
                 if(!detail.isShowing())return;hero.removeAllViews();hero.addView(dealProductArtwork(d),new FrameLayout.LayoutParams(-1,-1));onUpdated.run();status.setText("Dati BGG aggiornati");status.setVisibility(View.VISIBLE);
             });}
