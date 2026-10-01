@@ -15,6 +15,9 @@ home = between(ui, "private void renderDiscover()", "private List<DealRecord> li
 header = between(ui, "private View discoverHeader()", "private String discoverGreetingName")
 categories = between(ui, "private void addDiscoverCategories()", "private GameRecord discoverGame")
 product = between(ui, "private View discoverProductCard", "private void addDiscoverTopRatedRail")
+score = between(ui, "private LinearLayout homeScore", "private View homeMetadata")
+price = between(ui, "private View homePrice", "private View discoverProductCard")
+metadata = between(ui, "private View homeMetadata", "private View homePrice")
 top_rail = between(ui, "private void addDiscoverTopRatedRail", "private View discoverTopRatedCard")
 top_card = between(ui, "private View discoverTopRatedCard", "private View heroOpportunityCard")
 hero = between(ui, "private View heroOpportunityCard", "private View discoverFlatArtwork")
@@ -47,16 +50,16 @@ checks = [
      "setProductArtwork(source,placeholder,d.bggId,d.bggImageUrl" in ui and
      "firstListingPhoto" not in product and
      "setDealArtwork" not in product),
-    ("product discount uses real data and section hierarchy",
-     "discoverDiscountBadge(d,fresh?11:14)" in product and "card.addView(badge,savingLp)" in product and "total(d)" in product),
+    ("product price and discount share a data-backed row",
+     "homePrice(d)" in product and "discoverDiscountBadge(d,12)" in price and "total(d)" in price),
     ("fresh variant promotes publication time",
      "publicationDisplay(d)" in product and "if(fresh)" in product),
     ("offer variant promotes BGG rating with Font Awesome star",
-     "LudoIcons.STAR" in product and "d.rating" in product),
+     "homeMetadata(d)" in product and "homeScore(d,14)" in metadata and "LudoIcons.STAR" in score and "d.rating" in score),
     ("BGG list labels its overall BGG rank",
      '" BGG"' in top_card and "d.rank" in top_card and "d.voters" in top_card),
     ("BGG rating remains visible beside price",
-     "LudoIcons.STAR" in top_card and "d.rating" in top_card),
+     "homeScore(d,18)" in top_card and "LudoIcons.STAR" in score and "d.rating" in score),
     ("reference section order is hero, categories, offers, BGG, latest",
      home.index("heroOpportunityCard") < home.index("addDiscoverCategories") <
      home.index("addDiscoverValueRail") < home.index("addDiscoverTopRatedRail") <
@@ -80,4 +83,3 @@ failed = [name for name, ok in checks if not ok]
 if failed:
     raise SystemExit("Discover visual polish regression failed: " + ", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} Discover visual polish guards")
-

@@ -38,7 +38,7 @@ checks=[
      "publicationAgeMinutes(a)" in home and
      "publicationAgeMinutes(b)" in home),
     ("BGG rail exposes rank, votes and rating",
-     "d.rating" in top and "d.voters" in top and "d.rank" in top and
+     "homeScore(d,18)" in top and "d.voters" in top and "d.rank" in top and
      '" BGG"' in top),
     ("featured opportunity uses canonical BGG content",
      "FeaturedBoxView box=new FeaturedBoxView(true,false)" in opportunity and
@@ -80,4 +80,3 @@ failed=[name for name,ok in checks if not ok]
 if failed:
     raise SystemExit("5.12.39 UX system regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} UX system guards")
-
