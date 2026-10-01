@@ -1,6 +1,15 @@
 # Ludo Scout — Current state
 
-## Current milestone — Catalog card hierarchy 5.12.102
+## Current milestone — Catalog card refinement 5.12.103
+5.12.103-catalog-refinement (1000120) uploaded to Firebase at 2026-10-01 12:32:10 UTC and distributed to testers/groups at 12:32:11 UTC (14:32 Europe/Rome). PR112 merged at a3dbfd9a745e3f9e851b865765862673f4ca9a74. PR validation run285 (36861462186), head58a8229fe35cd3433ca0bc6bf920d3d2bd300dae, passed regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run120 (36861930808) passed tests, APK build, signing-certificate verification, Firebase upload and tester distribution; separate upload/distribution confirmations verified in job110367986562 logs.
+- Catalog ellipsis has a28dp visible circle and14sp glyph inside the unchanged48dp clickable target; full accessible action label preserved.
+- Unknown publication date is only “?” in Catalog preview; screen-reader description remains “Data di pubblicazione sconosciuta”. Known dates and detail-page date semantics unchanged.
+- Shared real savings badges:0–19% neutral blue-gray,20–34% blue,35–49% teal,50%+ green. Updated existing boundary JUnit assertions. White text contrast ranges6.51:1–9.45:1.
+- Offertona classification remains separate: existing total-price/used-benchmark criteria unchanged. No fabricated discounts, pricing/schema/dependency/filter/navigation/engine changes. Approved dark Home/product design preserved.
+- Diff reviewed. No device/emulator available; phone review pending for ellipsis tap/menu, “?” date and distinct saving bands.
+Next single step: verify these three corrections on phone, then Phase5 proposes the Catalog relationship/navigation between games, listings and same-seller bundles for explicit product approval before changing the selector.
+
+## Previous verified milestone — Catalog card hierarchy 5.12.102
 5.12.102-catalog-cards (1000119) uploaded to Firebase at2026-10-01 09:22:39 UTC and distributed to testers/groups at09:22:39 UTC (11:22 Europe/Rome). PR111 merged atb757202670b76da576850e9838a1a1e65881ddc5. PR validation run284 (36841557104), head8ab21a421993fc4ef087dc722aa7743295acf81e, passed full regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run119 (36841883324) passed tests, APK build, certificate verification, Firebase upload and tester distribution.
 - Catalog listing cards now have a square BGG cover, visible publication date, title limited to two lines, BGG rating, compact edition, price and a saving badge only when data supports it. The top-right action has a48dp target and no longer competes with the date.
 - Search, filters, active chips, ordering, data membership, pagination, detail routing, product page and Home stay unchanged. No schema/dependency/navigation/queue work.
