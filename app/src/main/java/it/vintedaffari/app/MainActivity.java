@@ -89,12 +89,12 @@ public final class MainActivity extends Activity {
             // Queue updates can be very frequent. Keep the overview alive, but do not rebuild a
             // thumbnail-heavy run inspector every couple of seconds.
             long minUiGap="run".equals(engineSection)?12_000L:6_000L;
-            if("activity".equals(tab)&&now-lastQueueUiRenderAt>=minUiGap){lastQueueUiRenderAt=now;uiUpdates.removeCallbacks(refreshData);uiUpdates.postDelayed(refreshData,220);}
+            if("activity".equals(tab)&&now-lastQueueUiRenderAt>=minUiGap){if("overview".equals(engineSection))requestEngineOverviewSnapshot();lastQueueUiRenderAt=now;uiUpdates.removeCallbacks(refreshData);uiUpdates.postDelayed(refreshData,220);}
             return;
         }
         reconcileResolvedOperationErrorsAsync();
         long minUiGap="run".equals(engineSection)?12_000L:6_000L;
-        if("activity".equals(tab)&&now-lastQueueUiRenderAt>=minUiGap){lastQueueUiRenderAt=now;uiUpdates.removeCallbacks(refreshData);uiUpdates.postDelayed(refreshData,280);}
+        if("activity".equals(tab)&&now-lastQueueUiRenderAt>=minUiGap){if("overview".equals(engineSection))requestEngineOverviewSnapshot();lastQueueUiRenderAt=now;uiUpdates.removeCallbacks(refreshData);uiUpdates.postDelayed(refreshData,280);}
         // Database ordering/content does not need to repaint for each background job completion.
     }};
 
@@ -1630,7 +1630,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if(enginePhaseItems==null){body.addView(engineSnapshotMessage("Carico gli elementi…"));return;}
         body.addView(text(enginePhaseItems.size()+" elementi",13,MUTED,Typeface.NORMAL));
         if(enginePhase==-1&&engineOverviewSnapshot!=null)body.addView(engineCurrentRunHero(engineOverviewSnapshot.pipelineRun,System.currentTimeMillis(),engineOverviewSnapshot.waitingRuns));
-        for(int i=0;i<Math.min(enginePhaseVisible,enginePhaseItems.size());i++){DealDatabase.PipelineItem item=enginePhaseItems.get(i);GameRecord game=enginePhaseGames.get(item.gameId);LinearLayout row=verticalCard();row.setPadding(dp(16),dp(16),dp(16),dp(16));TextView title=text(game==null?item.title:game.name,17,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);row.addView(title);row.addView(text(enginePhase==-2?"In attesa dell’analisi":titles[item.phase],12,CYAN,Typeface.NORMAL));if(game!=null)row.setOnClickListener(v->openDatabaseGame(item.gameId,"activity"));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(12);body.addView(row,rp);}
+        for(int i=0;i<Math.min(enginePhaseVisible,enginePhaseItems.size());i++){DealDatabase.PipelineItem item=enginePhaseItems.get(i);GameRecord game=enginePhaseGames.get(item.gameId);LinearLayout row=verticalCard();row.setPadding(dp(16),dp(16),dp(16),dp(16));String itemTitle=game==null?item.title:game.name;TextView title=text(TextUtils.isEmpty(itemTitle)?"Annuncio acquisito":itemTitle,17,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);row.addView(title);row.addView(text(enginePhase==-2?"In attesa dell’analisi":titles[item.phase],12,CYAN,Typeface.NORMAL));if(game!=null)row.setOnClickListener(v->openDatabaseGame(item.gameId,"activity"));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(12);body.addView(row,rp);}
         if(enginePhaseVisible<enginePhaseItems.size()){TextView more=secondaryTextAction("Mostra altri elementi");more.setOnClickListener(v->{enginePhaseVisible+=24;render();});body.addView(more);}
     }
 
