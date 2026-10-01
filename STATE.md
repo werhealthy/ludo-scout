@@ -1,5 +1,12 @@
 # Ludo Scout — Current state
 
+## Workstream backend — B1 diagnostica, 2026-10-02
+Implementata 5.12.114-db-contention-trace in PR123, branch backend/reliability-audit riallineato a beta5d92b9daa6a023ce866fceccd0f6d5c632caca6e. Misure bounded fuori SQLite per operazioni radar/coda/BGG, incluse scritture legacy Vinted e attese HELPER_CALL; esportazione background ogni5s, PID/versione/timestamp, snapshot precedente preservato. Nessuna modifica a schema, filtri, timeout, synchronized, pricing o servizi remoti. dbContention entra nella diagnostica esistente.
+Primo head a99e04c643b81e7b36924cf58bdbb64a01658f66: nuovo harness JVM e regressioni fino agli Android unit test passati in CI327, build completa non ancora confermata. Review ha richiesto separazione PRE_TRANSACTION da OPEN_DATABASE e copertura holder Vinted: correzioni incluse nel nuovo head, verifiche finali e distribuzione firmata ancora da completare. Non dichiarare disponibilità APK né soluzione degli stalli prima delle rispettive prove. Locale checkout parziale senza Java/assets:57script CI passati,22non eseguibili; script storici fuori workflow includono guard obsolete/non applicabili, nessun risultato totale suite dichiarato.
+Unico prossimo passo dopo CI/build/distribuzione verificate: ricevere diagnostica iniziale e finale dal telefono con prova descritta nella specifica backend. A ogni step indicare cosa fatto, cosa verificare, come e cosa restituire.
+
+
+
 ## Revisione visuale — feedback 2026-10-02, 00:23 Europe/Rome
 Conteggio attuale: **5 gruppi tematici aperti**, aggiornare in ogni risposta. Conteggiare gruppi sostanziosi, non singole modifiche o build; aggiornare il totale se il feedback cambia il backlog. Frontend attivo, backlog backend separato.
 1. **Home: sistema comune di card e hero.** Riaperto da nuove evidenze visive, non reimplementazione delle funzioni già consegnate. Unificare spaziature, tipografia, badge risparmio, lingua, cuore e allineamenti. Offerte e recenti devono condividere struttura; data piccola/secondaria, titolo e prezzo prioritari; BGG mantiene voto/rank come gerarchia specifica. Evitare percentuale a tutta larghezza e date grandi/bold. Hero troppo vuoto sopra la scatola: disposizione compatta e altezza guidata dal contenuto, fallback verticale intenzionale. Proposta da validare: cover flat non ritagliate nelle liste Home/Catalogo, 3D solo hero/dettaglio. Non estendere indiscriminatamente il renderer.

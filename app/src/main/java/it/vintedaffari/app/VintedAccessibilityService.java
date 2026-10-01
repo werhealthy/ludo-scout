@@ -1712,6 +1712,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "bggHistoricalRevalidation={"+marketDiag.historicalBggRevalidationSummary()+"}\n"+
                 "bggLocalMatch={"+bggLocalMatchSummary+"}\n"+
                 "bggReviewWrite={"+bggReviewWriteSummary+"}\n"+
+                "dbContention={\n"+DbContentionTrace.readSummaries(context.getApplicationContext().getFilesDir())+"}\n"+
                 "processCrashJournal={"+processCrashSummary+"}\n"+
                 "systemExitHistory={"+systemExitSummary+"}\n"+
                 "vintedPriceRefresh={"+priceRefreshSummary+"}\n"+
@@ -1783,4 +1784,5 @@ public final class VintedAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+
 
