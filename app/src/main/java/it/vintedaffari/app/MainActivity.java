@@ -1144,8 +1144,8 @@ private void showFilterSheet(){
     private LocalScoutBrain.Snapshot petSnapshot;private List<DealRecord> petHuntDeals=Collections.emptyList();private List<LibraryGame> petLibrary=Collections.emptyList();
     private final Map<String,Long> petGameIds=new HashMap<>();private boolean petLoading;private long petLoadedAt;private String petFailure;
     private void requestPetSnapshot(){
-        if(petLoading||petSnapshot!=null&&System.currentTimeMillis()-petLoadedAt<15000)return;petLoading=true;
-        uiDataIo.execute(()->{LocalScoutBrain.Snapshot snapshot=null;List<DealRecord> hunts=Collections.emptyList();List<LibraryGame> library=Collections.emptyList();Map<String,Long> games=new HashMap<>();String failure=null;
+        if(petLoading||(petSnapshot!=null||petFailure!=null)&&System.currentTimeMillis()-petLoadedAt<15000)return;petLoading=true;
+        uiDataIo.execute(()->{LocalScoutBrain.Snapshot snapshot=null;List<DealRecord> hunts=Collections.emptyList();List<LibraryGame> library=Collections.emptyList();Map<String,Long> games=new java.util.LinkedHashMap<>();String failure=null;
             try{List<DealRecord> deals=db.getDeals("trusted",600);hunts=db.getDeals("trusted_any_price",800);library=libraryDb.all();snapshot=intelligence.analyze(deals,bundleDb,library);for(DealRecord pick:snapshot.picks)if(!TextUtils.isEmpty(pick.vintedUrl)&&!TextUtils.isEmpty(pick.bggId)&&!TextUtils.isEmpty(pick.signature)){GameRecord game=marketStore.gameStatsByBggId(pick.bggId);if(game!=null)games.put(pick.signature,game.id);}}
             catch(RuntimeException error){failure="Non riesco a leggere i consigli. Riproviamo?";}
             final LocalScoutBrain.Snapshot ready=snapshot;final List<DealRecord> readyHunts=hunts;final List<LibraryGame> readyLibrary=library;final String error=failure;
@@ -1178,7 +1178,7 @@ private void showFilterSheet(){
         if(petSnapshot==null){Toast.makeText(this,"Attendi il caricamento, poi riprova.",Toast.LENGTH_SHORT).show();return;}
         Dialog panel=fullScreenPanel(profile?"I miei gusti":"Le mie cacce");LinearLayout host=panel.findViewById(SHEET_ID);LinearLayout previous=body;
         try{body=host;if(profile){renderLibraryInsights(petSnapshot,petLibrary);body.addView(companionProfileTrustCard(petLibrary));body.addView(languageStats(petSnapshot));}else renderHunts(petHuntDeals);}finally{body=previous;}
-        if(petView!=null)petView.setResumed(false);panel.setOnDismissListener(d->{if(petView!=null&&"companion".equals(tab))petView.setResumed(petResumed);});panel.show();
+        if(petView!=null)petView.setResumed(false);panel.setOnDismissListener(d->{petLoadedAt=0;if(petView!=null&&"companion".equals(tab)){petView.setResumed(petResumed);scheduleRender(0);}});panel.show();
     }
     private View companionTabs(){LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(SURFACE2,18,1,OUTLINE));addCompanionTab(tabs,"Per me","for_you");addCompanionTab(tabs,"Cacce","hunts");addCompanionTab(tabs,"Profilo","profile");return tabs;}
     private void addCompanionTab(LinearLayout tabs,String label,String value){boolean on=value.equals(companionSection);TextView t=text(label,13,on?TEXT:MUTED,Typeface.BOLD);t.setGravity(Gravity.CENTER);t.setBackground(round(on?Color.rgb(61,42,90):Color.TRANSPARENT,13,0,0));t.setOnClickListener(v->{companionSection=value;render();if(scroll!=null)scroll.scrollTo(0,0);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(4);tabs.addView(t,lp);}
