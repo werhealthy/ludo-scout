@@ -59,3 +59,20 @@ Catalog cards use square BGG cover, publication date, max-two-line title, BGG ra
 
 ## 2026-10-01 — Catalog phone review additions
 For the next Catalog refinement, preserve the current card structure and make three targeted changes: (1) top-right ellipsis must remain a48dp accessible target but have a smaller, less prominent visible circle; (2) unknown publication date is displayed as “?” rather than a full “Data pubblicazione n/d” label; (3) discounts need an explicit visual scale. Proposed product rule: 0–19% neutral slate, 20–34% blue, 35–49% teal, 50%+ green as “Offertona”. Only verified saving data receives a color/badge; no inferred original prices.
+
+## 2026-10-01 — Grouped Phase5: market previews and navigation proposal
+User requests fewer, broader updates combining related improvements. Group card hierarchy, Bundle previews and Catalog navigation review in one milestone; preserve separate approval for material navigation changes. Future delivery groups: (A) Catalog/market previews and navigation; (B) product details, language/personalization and controlled transitions; (C) Library/shared sheets and accessibility; (D) Ludo mascot once reference is available; (E) Motore stability and motion after resuming it.
+
+Implemented preview scope:
+- Home BGG ranking reuses discoverDiscountBadge, hence the same real-saving data and0–19/20–34/35–49/50+ palette. Rating22sp with16sp star, title16sp capped2lines, square68dp artwork and compact rank medal26dp. Price and rating occupy distinct areas; BGG rank stays secondary and voter evidence remains accessible. Narrow/large-font layouts stack values and facts; no fixed text heights.
+- Catalog confirmed Bundle cards emphasize actual seller, game count, up to3existing cover fronts and2-line group title, opening existing Bundle detail. Replace the inherited tall Home tile only in the Bundle Catalog list. Do not promote estimated offer totals as an actual combined purchase price. Existing game eligibility, grouping, order, prospect section and detail calculations/routes preserved.
+
+Navigation proposal — NOT APPROVED / NOT IMPLEMENTED:
+- Keep Annunci as default Catalog entry for shopping; two equal tabs: Annunci and Giochi.
+- Move Bundle from the three-way selector to a distinct compact header action. Bundle is a seller-based shopping group, not a third form of game identity.
+- A game detail lists its actual linked offers; an offer has an explicit game link only when linked and can expose same-seller Bundle only when a confirmed group exists. Existing unknown/unlinked offers remain visible and actionable.
+- Bundle detail opens each member offer and the seller. Preserve Back position and separate filter/search state for game/listing views.
+- Do not redesign bottom navigation, introduce migrations or change eligibility/pricing to implement this relationship.
+- Product approval of the proposed two-tab-plus-Bundle-entry navigation is required before replacement of the existing selector.
+
+Delivery: full existing PR regressions/SQLite/Android JUnit/Java/APK, source diff review, signed beta build, separate Firebase upload/distribution confirmation. Visual acceptance on phone remains required for long titles, absent saving/rating, large text,2/3/many-game bundles.
