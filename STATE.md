@@ -1,6 +1,17 @@
 # Ludo Scout — Current state
 
-## Current milestone — Product box stage 5.12.99
+## Current milestone — Home light scene 5.12.100
+5.12.100-home-light (1000117) uploaded to Firebase at2026-10-01 08:36:15 UTC and distributed to testers/groups at08:36:16 UTC (10:36 Europe/Rome). PR109 merged at3e828d3792bfd0a2978665238f9303b4d61968fa. PR validation run282 (36836501727), heade191020a026d4fbd72bd21a85862c1c9a574fe8e, passed full regressions, SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run117 (36836915201) passed full regressions/tests, APK build, certificate verification and Firebase distribution. Initial validation rejected a5.13 release label; version stayed on the existing5.12 beta line, without weakening the guard.
+User feedback on5.12.99: side was too thick and too bright; listing photo text action had a clipped icon. User requested an unframed luminous Home top transitioning into dark sections through angular theatrical light, reversing the attached dark-to-light reference.
+- Shared cover side reduced from13% to8.5%, darker cover-derived top/side lighting. Existing centered cover front, pedestal PNG, aspect ratio, contact shadow and async loader preserved across product details.
+- Listing photos are64dp clickable thumbnails below artwork, excluding BGG cover. Real gallery/index remains reachable; decoding stays off UI thread and stale image callbacks are guarded. No thumbnail rail when no real listing photo exists.
+- BGG rating logo now has20dp explicit bounds, removing oversized intrinsic-image layout/clipping.
+- Home greeting and featured artwork/details share one pale full-width scene with dark text, contrasting CTA and semantic icons. Old featured card outline/fill removed. Cached144dp angular light backdrop follows measured content into existing dark category/offer sections; no fixed text overlay or invented imagery. Home system-bar appearance is scoped, navigation remains unchanged.
+- No new assets/dependencies/schema or queue changes. Motore work remains on standby, stability/motion issues remain open.
+-336-case numerical geometry bounds sweep passed; text contrast checked16.6:1 primary,7.1:1 secondary on Home light background. Existing regression/SQLite/Android JUnit/Java/APK checks recorded below.
+- No device/emulator available, no visual approval claimed. Next single step: phone review of light-to-dark transition, thinner darker side, photo thumbnails/gallery and compact BGG logo.
+
+## Previous verified milestone — Product box stage 5.12.99
 5.12.99-product-box-stage (1000116) uploaded at2026-10-01 07:37:59 UTC and distributed to testers/groups successfully at07:38:00 UTC (09:38 Europe/Rome). Signed beta run116 (36831018836) passed regression tests, Android unit tests, APK build and certificate verification. PR108 merged at1c3152ecce6e3d94728be055700cb8b89f10c584. PR validation run279 (36830670319), heade7b4338f79571e9aa473dec45d157ce3c59c7f64, passed regressions, SQLite fixtures, Android JUnit, Java compilation and review APK.
 - User explicitly paused Motore work and redirected the milestone to foreground product boxes. Existing Motore layout/counts/navigation and unresolved queue/SQLite stability issues remain unchanged.
 - Visible cover front is centered over the existing transparent pedestal. Side depth13% of front width (previously7.5%); cover-derived hue/saturation, brighter edge lighting and broader/stronger cached contact shadows. Front is kept complete with real aspect ratio. Uniform pedestal geometry retained.
