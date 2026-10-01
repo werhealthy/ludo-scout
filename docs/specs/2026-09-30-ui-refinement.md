@@ -81,3 +81,18 @@ Delivery: full existing PR regressions/SQLite/Android JUnit/Java/APK, source dif
 5.12.104-market-previews (1000121), PR113 merged3be0adae846f98ed76ccbc5015b61777411738ea. PR286 (36863477090) and signed beta121 (36863954605) passed regressions/SQLite/JUnit/Java/APK. Firebase separately confirmed upload and tester distribution at2026-10-01 12:49:50UTC (14:49 Europe/Rome). No device/emulator visual acceptance claimed. Navigation remains a proposal.
 
 Clarification superseding the earlier saving-color wording:50%+ means a green saving badge, not automatic Offertona classification. Existing total-price/used-benchmark evaluation remains separate and unchanged.
+
+
+## 2026-10-01 — Navigation proposal approved and delivered
+5.12.105-catalog-navigation (1000122) uploaded to Firebase at 2026-10-01 14:58:10 UTC and separately distributed to testers/groups at 14:58:10 UTC (16:58 Europe/Rome), confirmed in signed job110429267970 logs. PR114 merged atad475ad702e8618dada5a10e6eb730c2552bfad8. PR validation run293 (36879669999), head26b2053aa413d3b0b9348e7bdebf749b34d3a552, passed full regressions/SQLite, 11 navigation behavior cases, Android JUnit, Java compilation and review APK. Signed beta run122 (36880064442) passed tests/build/signature/upload/distribution.
+
+User's “next” approves the preceding two-tab/Bundle-entry proposal. Implemented as a grouped navigation and connected-detail update.
+- Annunci / Giochi are sibling tabs; Bundle is a distinct header entry with Back. Independent search/filter/pagination state and scroll positions retained; delayed restores are scoped to their destination.
+- Actual linked game offers open internal announcement detail. A labeled 48dp “Scheda gioco” action opens the canonical linked game; Vinted remains the provider action inside detail.
+- Same-seller partner and Bundle member details preserve their source for Back. Category navigation explicitly closes the nested listing/Bundle stack so it cannot cover the Games destination.
+- Added 11 JVM behavior scenarios executing production routing/lifecycle methods. Existing glyph-only source guards now recognize the labeled accessible game action. Independent code review caught the nested category issue; correction re-reviewed and approved.
+- Approved Home/product visuals, canonical data mapping, eligibility/prices, schema, dependencies and Motore remain unchanged. No device/emulator validation; phone checks: tab search/filter/position, Bundle Back, game→offer→Bundle→member→Back, and member category destination.
+Next grouped block: product detail hierarchy, language/personalization and the intentional announcement→game gesture, preserving the approved product artwork. Motore remains on standby.
+
+
+This approval supersedes earlier statements that the two-tab proposal is pending. Historical pricing and Motore stability requirements remain open.
