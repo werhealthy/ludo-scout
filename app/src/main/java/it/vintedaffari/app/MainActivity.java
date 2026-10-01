@@ -647,7 +647,7 @@ private void applyDiscoverChrome(){
     };}
 
     private View homePreviewBox(DealRecord d){
-        FrameLayout stage=new FrameLayout(this);stage.setBackground(premiumSurface(false));stage.setClipToOutline(true);FeaturedBoxView box=new FeaturedBoxView(true,true);stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
+        FrameLayout stage=new FrameLayout(this);FeaturedBoxView box=new FeaturedBoxView(true,true);stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
         TextView placeholder=discoverTextWeight(coverPlaceholder(d),10,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);stage.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
         ImageView source=new ImageView(this);source.setVisibility(View.INVISIBLE);stage.addView(source,new FrameLayout.LayoutParams(dp(1),dp(1)));
         setProductArtwork(source,placeholder,d.bggId,d.bggImageUrl,"home-preview:"+d.signature+":"+d.bggId,()->{Drawable art=source.getDrawable();if(art instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)art).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,null);placeholder.setVisibility(View.GONE);}}});return stage;
@@ -681,21 +681,22 @@ private void applyDiscoverChrome(){
     }
 
     private View discoverTopRatedCard(DealRecord d,int rank){
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(12),dp(12),dp(12),dp(12));
-        row.setBackground(round(DISCOVER_SURFACE,14,1,DISCOVER_OUTLINE));
+        boolean stacked=getResources().getConfiguration().fontScale>1.3f||getResources().getDisplayMetrics().widthPixels<dp(360);
+        LinearLayout row=new LinearLayout(this);row.setOrientation(stacked?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(12),dp(16),dp(12),dp(16));
+        row.setBackground(premiumSurface(false));
         int medal=rank==1?Color.rgb(255,214,118):rank==2?Color.rgb(143,148,157):DISCOVER_ORANGE;
-        TextView position=discoverTextWeight(String.valueOf(rank),13,Color.BLACK,700);position.setGravity(Gravity.CENTER);position.setBackground(round(medal,999,0,0));position.setContentDescription("Posizione "+rank+" nella selezione");row.addView(position,new LinearLayout.LayoutParams(dp(26),dp(26)));
-        View cover=homePreviewBox(d);LinearLayout.LayoutParams coverLp=new LinearLayout.LayoutParams(dp(68),dp(68));coverLp.leftMargin=dp(10);row.addView(cover,coverLp);
-        LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setPadding(dp(12),0,0,0);
+        TextView position=discoverTextWeight(String.valueOf(rank),13,Color.BLACK,700);position.setGravity(Gravity.CENTER);position.setBackground(round(medal,999,0,0));position.setContentDescription("Posizione "+rank+" nella selezione");
+        FrameLayout cover=(FrameLayout)homePreviewBox(d);FrameLayout.LayoutParams medalLp=new FrameLayout.LayoutParams(dp(26),dp(26),Gravity.TOP|Gravity.START);cover.addView(position,medalLp);row.addView(cover,new LinearLayout.LayoutParams(stacked?-1:dp(112),dp(stacked?176:128)));
+        LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setPadding(stacked?0:dp(12),stacked?dp(12):0,0,0);
         TextView title=discoverTextWeight(name(d),16,DISCOVER_TEXT,700);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));center.addView(heading);
-        boolean stacked=getResources().getConfiguration().fontScale>1.3f||getResources().getDisplayMetrics().widthPixels<dp(360);LinearLayout values=new LinearLayout(this);values.setOrientation(stacked?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);values.setGravity(Gravity.CENTER_VERTICAL);values.setPadding(0,dp(5),0,0);
+        LinearLayout values=new LinearLayout(this);values.setOrientation(stacked?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);values.setGravity(Gravity.CENTER_VERTICAL);values.setPadding(0,dp(5),0,0);
         LinearLayout score=new LinearLayout(this);score.setGravity(Gravity.CENTER_VERTICAL);score.addView(appIcon(LudoIcons.STAR,16,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(22),dp(28)));
         score.addView(discoverTextWeight(d.rating==null?"—":String.format(Locale.ITALY,"%.1f",d.rating),22,DISCOVER_TEXT,700));score.setContentDescription(d.rating==null?"Voto BGG non disponibile":String.format(Locale.ITALY,"Voto BGG %.1f su 10",d.rating));values.addView(score);
         TextView price=discoverTextWeight(total(d),17,DISCOVER_TEXT,600);price.setSingleLine(true);price.setGravity((stacked?Gravity.START:Gravity.END)|Gravity.CENTER_VERTICAL);price.setPadding(stacked?0:dp(8),stacked?dp(3):0,0,0);price.setAutoSizeTextTypeUniformWithConfiguration(12,17,1,android.util.TypedValue.COMPLEX_UNIT_SP);values.addView(price,stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));center.addView(values,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout facts=new LinearLayout(this);facts.setOrientation(stacked?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);facts.setGravity(stacked?Gravity.START:Gravity.CENTER_VERTICAL);facts.setPadding(0,dp(5),0,0);
         String meta=d.rank==null?"BGG":("#"+d.rank+" BGG");TextView proof=discoverTextWeight(meta,10,DISCOVER_MUTED,400);proof.setSingleLine(true);proof.setEllipsize(TextUtils.TruncateAt.END);proof.setContentDescription((d.rank==null?"Classifica BGG non disponibile":"Classifica BGG: "+d.rank)+(d.voters==null?". Numero di voti non disponibile":String.format(Locale.ITALY,". %,d voti",d.voters)));facts.addView(proof,stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
         TextView savingBadge=discoverDiscountBadge(d,10);if(savingBadge!=null){LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);badgeLp.leftMargin=stacked?0:dp(6);badgeLp.topMargin=stacked?dp(4):0;facts.addView(savingBadge,badgeLp);}center.addView(facts,new LinearLayout.LayoutParams(-1,-2));
-        row.addView(center,new LinearLayout.LayoutParams(0,-2,1));row.setOnClickListener(v->openDetail(d));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);row.setLayoutParams(lp);return row;
+        row.addView(center,stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));row.setOnClickListener(v->openDetail(d));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);row.setLayoutParams(lp);return row;
     }
 
     private View heroOpportunityCard(DealRecord d){
