@@ -41,6 +41,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run Catalog navigation behavior regression
+        run: python3 regression/market_navigation_v512105.py
+
       - name: Run engine performance metrics behavior regression
         run: |
           mkdir -p .regression-build
