@@ -1,6 +1,22 @@
 # Ludo Scout — Current state
 
-## Current milestone — Grouped Library interactions 5.12.107
+## Current milestone — Interactive Ludo pet scene 5.12.108
+5.12.108-ludo-pet (1000125) uploaded to Firebase at2026-10-01 18:05:40 UTC and separately distributed to testers/groups at18:05:41 UTC (20:05 Europe/Rome), explicitly confirmed in signed job110508767016 logs. PR117 merged527b71b46802477c8e648297838b3fad38e79926. Final head2cfc41ef024a8b5de29ec67d619ed1d4c76edd7a passed PR run310 (36903297123), all existing regressions/SQLite fixtures, new executable pet state harness, Android JUnit, Java compilation and review APK. Signed beta run125 (36903679457) passed tests/build/expected-certificate verification and Firebase upload/tester distribution.
+
+User approved the final scene proposal with “Bello, creiamolo ma i bottoni devono essere più visibili” on2026-10-01. This supersedes giant opening face, scroll-collapse mascot, stacked action cards and double horizontal dock proposals.
+- Compact pet scene has flat purple vector cloud, neutral existing app typography, breathing/blinking/tap reaction and gaze toward actual game. Pet keeps the same allocated size before/after suggestion; no huge-face initial mode.
+- Cacce/Gusti are filled contrasting icon+label buttons, min56dp target, with automatically measured control area independent from artwork. One primary action Consigliami becomes Apri il gioco; optional Un altro consiglio remains accessible. Existing bottom navigation preserved.
+- Existing intelligence/eligible recommendations are loaded off the main thread; only current real eligible IDs map to canonical game overlay. Empty/removed suggestions clear actionable selection; missing/failed data is explicit, retry throttled and does not invent an offer.
+- Actual product artwork/pedestal reused next to pet. Recommendation reason remains readable. Scenes contain no fabricated price/rating/reward/progress data or new dependencies/schema.
+- Existing Cacce/Gusti render in dedicated full-screen panels. Mutations refresh the active panel host; underlying pet remains paused. Last successful profile snapshot is retained on refresh failure to prevent null-profile crash, while actionable suggestions are cleared.
+- Motion is lifecycle-bound to resumed/attached/shown window, canceled on detach/pause/hidden window; disabled-animation fallback including tap reaction. No device/emulator validation of motion or Android lifecycle.
+- New executable real Java state harness checks12 suggestion/lifecycle cases: intentional selection, preservation, current eligibility/removal, empty/invalid/duplicate inputs, bounded cycling and disabled/paused/detached animation gate. Test-only PR run306 reproduced absent behavior before implementation.
+- Independent review caught stable-size, stale Cacce mutation and null-profile failure defects; corrections re-reviewed on exact final2cfc41e with no remaining blockers. Harness verifies state policy, not actual Android drawing/dispatch/animator mechanics.
+Phone checks: full pet and box/covers; visible controls with large fonts/small screen; tap/blink/gaze, disabled animations/backgrounding; real suggestion/empty/error states and game Back; Cacce add/delete and Gusti panels. Static image mockups are design references, not exact on-device verification.
+Next recommended step: phone acceptance/refinement of5.12.108 pet scene and visible actions. Motore stability/motion remains on standby until user resumes it.
+
+
+## Previous verified milestone — Grouped Library interactions 5.12.107
 5.12.107-library-interactions (1000124) uploaded to Firebase at2026-10-01 16:19:41 UTC and separately distributed to testers/groups at16:19:42 UTC (18:19 Europe/Rome), explicitly confirmed in signed job110465000317 logs. PR116 merged39913c18530f96759e38038c3acb983a02146233. Final head3942962c5a2ed1c57370ca6f25d26bbc8ca19ed5 passed PR run305 (36890098114): all regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run124 (36890615976) passed regressions/tests, APK build, expected-certificate verification and Firebase upload/tester distribution.
 
 User explicitly approved the presented grouped Library design and nullable actual-sale-price schema with “vai” on2026-10-01.
