@@ -55,3 +55,7 @@ Restore5.12.99 dark Home composition/header/featured card/status-bar appearance.
 ## 2026-10-01 — Catalog cards delivered (latest)
 5.12.102-catalog-cards (1000119), PR111 mergeb757202670b76da576850e9838a1a1e65881ddc5, uploaded/distributed through Firebase App Tester at11:22 Europe/Rome. PR284 and signed beta119 passed checks.
 Catalog cards use square BGG cover, publication date, max-two-line title, BGG rating, compact edition, real price and saving only when verified; their action is a48dp target. Search/filters/category active state/order/pagination/detail routes unchanged. No changes to schema, dependencies, queue or navigation structure. Device review pending: density/height with normal and large text; historical date, unknown rating/language, saving/no-saving examples. The Annunci/Bundle/Giochi selector is still unresolved and should not be replaced without a product decision.
+
+
+## 2026-10-01 — Catalog phone review additions
+For the next Catalog refinement, preserve the current card structure and make three targeted changes: (1) top-right ellipsis must remain a48dp accessible target but have a smaller, less prominent visible circle; (2) unknown publication date is displayed as “?” rather than a full “Data pubblicazione n/d” label; (3) discounts need an explicit visual scale. Proposed product rule: 0–19% neutral slate, 20–34% blue, 35–49% teal, 50%+ green as “Offertona”. Only verified saving data receives a color/badge; no inferred original prices.

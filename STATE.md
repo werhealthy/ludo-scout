@@ -5,7 +5,7 @@
 - Catalog listing cards now have a square BGG cover, visible publication date, title limited to two lines, BGG rating, compact edition, price and a saving badge only when data supports it. The top-right action has a48dp target and no longer competes with the date.
 - Search, filters, active chips, ordering, data membership, pagination, detail routing, product page and Home stay unchanged. No schema/dependency/navigation/queue work.
 - No emulator/device visual review available. Verify text density and card height on phone; test a historical listing date, unknown rating/language, a saving and a listing without saving.
-Next single milestone: Catalog filter polish or announce/bundle relationship design; the selector replacement still needs an explicit product decision.
+Next single milestone: Catalog card refinement from phone review. Reduce the visual weight of the top-right ellipsis without reducing its48dp target; publication date unknown becomes only “?”; define and apply a visible savings scale so ordinary/strong/exceptional savings differ and “Offertona” follows an explicit threshold. Then verify cards on phone. The selector replacement still needs an explicit product decision.
 
 ## Previous verified milestone — Restore dark Home 5.12.101
 5.12.101-home-dark (1000118) uploaded at2026-10-01 08:59:37 UTC and distributed to Firebase testers/groups successfully at08:59:38 UTC (10:59 Europe/Rome). PR110 merged atb4bfef8cc956cdb2883d7b6effaf4b56214cedbe. PR validation run283 (36839029792), headd0234dde1eeb51b8ef224c8785b183aff6d9073c, passed full regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run118 (36839440906) passed tests, APK build, certificate verification, upload and distribution.
