@@ -43,6 +43,9 @@ jobs:
       - name: Run game favorites and durable Ludo memory regression
         run: python3 regression/game_preferences_v512110.py
 
+      - name: Run premium scene geometry regression
+        run: python3 regression/premium_scene_v512111.py
+
       - name: Run Home box geometry regression
         run: python3 regression/home_box_v512109.py
 
