@@ -1,6 +1,13 @@
 # Ludo Scout — Current state
 
-## Current milestone — Restore dark Home 5.12.101
+## Current milestone — Catalog card hierarchy 5.12.102
+5.12.102-catalog-cards (1000119) uploaded to Firebase at2026-10-01 09:22:39 UTC and distributed to testers/groups at09:22:39 UTC (11:22 Europe/Rome). PR111 merged atb757202670b76da576850e9838a1a1e65881ddc5. PR validation run284 (36841557104), head8ab21a421993fc4ef087dc722aa7743295acf81e, passed full regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run119 (36841883324) passed tests, APK build, certificate verification, Firebase upload and tester distribution.
+- Catalog listing cards now have a square BGG cover, visible publication date, title limited to two lines, BGG rating, compact edition, price and a saving badge only when data supports it. The top-right action has a48dp target and no longer competes with the date.
+- Search, filters, active chips, ordering, data membership, pagination, detail routing, product page and Home stay unchanged. No schema/dependency/navigation/queue work.
+- No emulator/device visual review available. Verify text density and card height on phone; test a historical listing date, unknown rating/language, a saving and a listing without saving.
+Next single milestone: Catalog filter polish or announce/bundle relationship design; the selector replacement still needs an explicit product decision.
+
+## Previous verified milestone — Restore dark Home 5.12.101
 5.12.101-home-dark (1000118) uploaded at2026-10-01 08:59:37 UTC and distributed to Firebase testers/groups successfully at08:59:38 UTC (10:59 Europe/Rome). PR110 merged atb4bfef8cc956cdb2883d7b6effaf4b56214cedbe. PR validation run283 (36839029792), headd0234dde1eeb51b8ef224c8785b183aff6d9073c, passed full regressions/SQLite fixtures, Android JUnit, Java compilation and review APK. Signed beta run118 (36839440906) passed tests, APK build, certificate verification, upload and distribution.
 User rejected the light Home experiment and explicitly liked the product page. Restore dark Home, preserve approved product visual design. Home light transition is removed; earlier5.12.100 light direction is superseded.
 - Greeting, dark background, featured card and system-bar appearance restored from5.12.99. Shared product box still uses8.5% depth with darker cover-derived sides and contact shadow.
