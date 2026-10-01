@@ -673,10 +673,12 @@ public final class MarketStore {
     }
 
     public long recordSighting(VintedCard card, ListingClassifier.Result listing, long now) {
+        DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.recordSighting");
+        try{
         if (card == null) return -1L;
-        SQLiteDatabase db = helper.getWritableDatabase();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         String fp = fingerprint(card);
-        db.beginTransaction();
+        trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             long id;
             int previousPrice = Integer.MIN_VALUE;
@@ -738,14 +740,18 @@ public final class MarketStore {
             db.setTransactionSuccessful();
             return id;
         } finally {
-            db.endTransaction();
+            trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");}
         }
+    
+        }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
 
     public void applyAnalysis(VintedCard card, GameAnalysis analysis, ListingClassifier.Result listing, long now) {
+        DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.applyAnalysis");
+        try{
         if (card == null || analysis == null) return;
-        SQLiteDatabase db = helper.getWritableDatabase();
-        db.beginTransaction();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
+        trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Long listingId = listingIdForCard(db,card);
             if (listingId == null) { db.setTransactionSuccessful(); return; }
@@ -799,7 +805,9 @@ public final class MarketStore {
             if(liveResolve)enqueueListingJob(db, listingId, JOB_VINTED, now,320,"LIVE_DEAL");
             if ("MATCHED".equals(matchState)&&bggRefreshDue(db,gameId,now)) enqueueGameJob(db, gameId, JOB_BGG, now);
             db.setTransactionSuccessful();
-        } finally { db.endTransaction(); }
+        } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
+    
+        }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
 
     private static boolean shouldAutoResolveVinted(GameAnalysis a){
@@ -1017,10 +1025,12 @@ public final class MarketStore {
     }
 
     private Job claimNextVintedJobInternal(long now, boolean test2bOwner) {
+        DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.claimNextVintedJobInternal");
+        try{
         if (isVintedPaused()) return null;
         if (!test2bOwner && isTest2bExclusiveActive()) return null;
-        SQLiteDatabase db = helper.getWritableDatabase();
-        db.beginTransaction();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
+        trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Job job = null;
             // Core identity and deep metadata share exactly one public-page lane. Core always wins.
@@ -1028,7 +1038,9 @@ public final class MarketStore {
                 if (running.moveToFirst()) { db.setTransactionSuccessful(); return null; }
             }
             boolean allowHistory = vintedHistoryAllowed(db, now);
+            trace.phase("HELPER_CALL");
             DealDatabase.ObservationSession activeRun=test2bOwner?null:helper.activeObservationSession();
+            trace.phase("TRANSACTION");
             String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY','OPENED_VERIFY') OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH','CATALOG_RECOVERY')) OR (? > 0 AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql = "SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
                     "FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
@@ -1052,22 +1064,28 @@ public final class MarketStore {
             }
             db.setTransactionSuccessful();
             return job;
-        } finally { db.endTransaction(); }
+        } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
+    
+        }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
 
 
 
     public Job claimNextBggJob(long now) {
+        DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.claimNextBggJob");
+        try{
         if (isBggPaused()) return null;
-        SQLiteDatabase db = helper.getWritableDatabase();
-        db.beginTransaction();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
+        trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Job job = null;
             // BGG can use two lanes, but never fan out without a bound.
             try (Cursor running = db.rawQuery("SELECT COUNT(*) FROM processing_jobs WHERE job_type=? AND state=?", new String[]{JOB_BGG, PROCESSING})) {
                 if (running.moveToFirst() && running.getInt(0) >= 2) { db.setTransactionSuccessful(); return null; }
             }
+            trace.phase("HELPER_CALL");
             boolean allowHistory = historyAllowed(db, now, JOB_BGG);DealDatabase.ObservationSession run=helper.activeObservationSession();
+            trace.phase("TRANSACTION");
             String historyExtra=allowHistory?"":"AND j.source<>? ";
             String runExtra=run==null?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR EXISTS (SELECT 1 FROM market_listings l WHERE l.game_id=j.game_id AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql = "SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
@@ -1092,23 +1110,29 @@ public final class MarketStore {
             }
             db.setTransactionSuccessful();
             return job;
-        } finally { db.endTransaction(); }
+        } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
+    
+        }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
 
 
     /** Claims one HTTP-sized BGG batch atomically. XML API2 accepts at most 20 ids per thing call. */
     public List<Job> claimBggBatch(long now,int limit) {
+        DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.claimBggBatch");
+        try{
         if (isBggPaused()) return new ArrayList<>();
         int wanted=Math.max(1,Math.min(20,limit));
-        SQLiteDatabase db=helper.getWritableDatabase();
-        db.beginTransaction();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
+        trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             List<Job> jobs=new ArrayList<>();
             // One batch request at a time. This is still up to 20 database jobs per HTTP call.
             try(Cursor running=db.rawQuery("SELECT 1 FROM processing_jobs WHERE job_type=? AND state=? LIMIT 1",new String[]{JOB_BGG,PROCESSING})){
                 if(running.moveToFirst()){db.setTransactionSuccessful();return jobs;}
             }
+            trace.phase("HELPER_CALL");
             boolean allowHistory=historyAllowed(db,now,JOB_BGG);DealDatabase.ObservationSession run=helper.activeObservationSession();
+            trace.phase("TRANSACTION");
             String historyExtra=allowHistory?"":"AND j.source<>? ";
             String runExtra=run==null?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY') OR EXISTS (SELECT 1 FROM market_listings l WHERE l.game_id=j.game_id AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql="SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
@@ -1127,7 +1151,9 @@ public final class MarketStore {
                 if(changed==1){job.state=PROCESSING;job.attempt++;job.progress=Math.max(15,job.progress);job.processingStartedAt=started;claimed.add(job);}
             }
             db.setTransactionSuccessful();return claimed;
-        } finally {db.endTransaction();}
+        } finally {trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");}}
+    
+        }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
 
 
@@ -1489,9 +1515,11 @@ public final class MarketStore {
     }
 
     public void applyBggMetadata(BggMetadata m) {
+        DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.applyBggMetadata");
+        try{
         if (m == null || TextUtils.isEmpty(m.bggId)) return;
-        SQLiteDatabase db = helper.getWritableDatabase();
-        db.beginTransaction();
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db = helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
+        trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             Long id = scalarLong(db, "SELECT id FROM games WHERE bgg_id=?", new String[]{m.bggId});
             if (id == null) { db.setTransactionSuccessful(); return; }
@@ -1573,10 +1601,12 @@ public final class MarketStore {
             ContentValues done = new ContentValues(); done.put("state", COMPLETE); done.put("updated_at", System.currentTimeMillis()); done.put("next_attempt_at", 0); done.put("last_error", ""); done.put("progress",100);
             db.update("processing_jobs", done, "job_key=?", new String[]{"bgg:" + id});
             try(Cursor ready=db.rawQuery("SELECT id FROM market_listings WHERE game_id=? AND lifecycle='ACTIVE' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' AND vinted_url IS NOT NULL AND vinted_url<>''",new String[]{String.valueOf(id)})){
-                while(ready.moveToNext())helper.materializeCanonicalDeal(ready.getLong(0));
+                while(ready.moveToNext()){trace.phase("HELPER_CALL");try{helper.materializeCanonicalDeal(ready.getLong(0));}finally{trace.phase("TRANSACTION");}}
             }
             db.setTransactionSuccessful();
-        } finally { db.endTransaction(); }
+        } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
+    
+        }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
 
     /** Counts real BGG categories attached to visible, matched games for the Discover category rail. */
@@ -1835,10 +1865,12 @@ public final class MarketStore {
     }
 
     public int reconcileQueue() {
-        SQLiteDatabase db=helper.getWritableDatabase();
+        DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.reconcileQueue");
+        try{
+        trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         long now=System.currentTimeMillis();
         int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
-        db.beginTransaction();
+        trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
             done.put("last_error","not runnable anymore");
@@ -1894,12 +1926,14 @@ public final class MarketStore {
             int autoVariants=db.update("market_listings",variantExcluded,orphanWhere+" AND NOT EXISTS(SELECT 1 FROM processing_jobs p WHERE p.listing_id=market_listings.id AND p.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY'))",new String[]{JOB_VINTED_DEEP,PENDING,PROCESSING,FAILED_RETRYABLE});
             changed+=orphanVariants+autoVariants;
             db.setTransactionSuccessful();
-        } finally { db.endTransaction(); }
+        } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
         // Catalog health uses the same paced public-page lane, but only when no Motore scroll owns
         // it. One exact item at a time is enough to refresh a small catalog without starving discovery.
         changed+=enqueueCatalogHealthCheckIfIdle(now);
         if(changed>0)notifyQueueChanged();
         return changed;
+    
+        }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
 
     public int enqueueCatalogHealthCheckIfIdle(long now){
@@ -3505,4 +3539,5 @@ public final class MarketStore {
     private static String safe(String s){return s==null?"":(s.length()>600?s.substring(0,600):s);}
     private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Long)v.put(k,(Long)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
+
 

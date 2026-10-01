@@ -159,7 +159,7 @@ Vertical cards share larger cover-first layout, explicit edition and text-depend
 - Verification: 61 local source regressions plus SQLite fixture (--source-eval) passed; Java/Android checks delegated to PR CI due missing local JDK. Independent review addressed filter transaction/reset/restore and ready gate/drilldown mismatches. Visual validation on Android remains manual: 320–393dp, large fonts, long names, catalogue filter cancel/apply/reset/sort/pagination, Ludo→Motore and phase counts.
 - User preference persists: automatically merge verified updates to beta and distribute on Firebase App Tester; confirm upload and tester distribution success before availability claims.
 
-## Home component contract — 5.12.114 (2026-10-02)
+## Home component contract — 5.12.115 (2026-10-02)
 The approved flat-list direction supersedes earlier 3D Home preview guidance. Home offers/latest/BGG and Catalog use real uncropped front covers; 3D remains in the featured hero and product detail. Existing cover override precedence and favorites listeners remain shared.
 - Home list surfaces: navy, 16dp corner, one quiet outline; 12dp internal padding/gutters. Purple studio lighting belongs to the featured scene.
 - Offers/latest share media148dp, title16sp/two lines, score14sp plus edition/dependence, price20sp and compact discount12sp on one row. Larger fonts stack metadata/price; price can fit to14sp without truncating currency. Latest adds publication12sp regular/muted, never a button or a bold status banner.

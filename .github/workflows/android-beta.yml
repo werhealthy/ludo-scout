@@ -41,6 +41,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run database contention trace behavior regression
+        run: python3 regression/db_contention_trace.py
+
       - name: Run game favorites and durable Ludo memory regression
         run: python3 regression/game_preferences_v512110.py
 
@@ -277,4 +280,5 @@ jobs:
             --app "$FIREBASE_APP_ID" \
             --testers "$FIREBASE_TESTERS" \
             --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+
 
