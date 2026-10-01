@@ -25,7 +25,9 @@ checks=[
      'publicationText(d,12,Typeface.NORMAL)' in detail and
      '" · "+languageShort(d.languageCode)+" · "+publicationDisplay(d)' not in detail),
     ("listing detail exposes canonical game navigation",
-     'roundIconButton("▦",CYAN)' in detail and
+     'text("Scheda gioco",14,TEXT,Typeface.BOLD)' in detail and
+     'new LinearLayout.LayoutParams(-1,dp(48))' in detail and
+     'if(game!=null)' in detail and
      "openGameDetailOverlay(game.id)" in detail),
     ("listing detail keeps provider identity",
      'provider_vinted_logo,"Vinted"' in detail and
