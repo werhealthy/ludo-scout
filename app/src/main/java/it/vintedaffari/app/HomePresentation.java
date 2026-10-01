@@ -21,7 +21,7 @@ final class HomePresentation {
     static String editionName(String value){String edition=languageLabel(value).split(" · ")[0];switch(edition){case "IT":return "Italiano";case "EN":return "Inglese";case "FR":return "Francese";case "DE":return "Tedesco";case "ES":return "Spagnolo";case "NL":return "Olandese";case "PT":return "Portoghese";default:return "Edizione da verificare";}}
     static String editionFlag(String value){String edition=languageLabel(value).split(" · ")[0];switch(edition){case "IT":return "🇮🇹";case "EN":return "🇬🇧";case "FR":return "🇫🇷";case "DE":return "🇩🇪";case "ES":return "🇪🇸";case "NL":return "🇳🇱";case "PT":return "🇵🇹";default:return "";}}
     static String dependenceLabel(String value){String label=languageLabel(value);return label.endsWith("indipendente")?"Non serve la lingua":label.endsWith(" · testo")?"Serve la lingua":"Testo da verificare";}
-    static boolean heroInline(float availableDp,float fontScale){return Float.isFinite(availableDp)&&availableDp>=290&&Float.isFinite(fontScale)&&fontScale>0&&fontScale<=1.15f;}
+    static boolean heroInline(float availableDp,float fontScale){return Float.isFinite(availableDp)&&availableDp>=280&&Float.isFinite(fontScale)&&fontScale>0&&fontScale<=1.15f;}
     static int coverMode(int width,int height){
         if(width<=0||height<=0)return SQUARE;
         float ratio=width/(float)height;
