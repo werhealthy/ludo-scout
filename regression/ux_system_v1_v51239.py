@@ -46,7 +46,7 @@ checks=[
      "discoverGameDescription(d)" in opportunity and
      "name(d)" in opportunity and "total(d)" in opportunity and "discoverDiscountBadge(d" in opportunity),
     ("featured opportunity renders the BGG cover as an adaptive 2.5D box",
-     "setPolyToPoly" in ui and "topFace=quad(topPts)" in ui and "sideFace=quad(sidePts)" in ui and "sampleEdge(bitmap)" in ui),
+     "setPolyToPoly" in ui and "path(topPath,geometry.top)" in ui and "path(sidePath,geometry.side)" in ui and "sampleEdge(bitmap)" in ui),
     ("Discover greeting matches the approved Home reference",
      '"Bentornato,"' in header and
      "discoverGreetingName()" in header),
