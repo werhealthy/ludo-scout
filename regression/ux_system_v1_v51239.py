@@ -42,7 +42,7 @@ checks=[
      '" BGG"' in top),
     ("featured opportunity uses canonical BGG content",
      "FeaturedBoxView box=new FeaturedBoxView()" in opportunity and
-     "setDiscoverBggArtwork(image,placeholder,d" in opportunity and
+     "setFeaturedArtwork(image,placeholder,d" in opportunity and
      "discoverGameDescription(d)" in opportunity and
      "name(d)" in opportunity and "total(d)" in opportunity and "discoverDiscountBadge(d" in opportunity),
     ("featured opportunity renders the BGG cover as an adaptive 2.5D box",

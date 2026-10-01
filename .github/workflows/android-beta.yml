@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Run featured pedestal regression
+        run: python3 regression/featured_pedestal_v51296.py
       - name: Run Home reference and waiting scroll regression
         run: python3 regression/home_engine_reference_v51295.py
       - name: Run indexed engine join regression
