@@ -104,6 +104,7 @@ java=r'''package it.vintedaffari.app;
 import java.util.*;
 public class MainActivity {
  static final int MODE_PRIVATE=0;
+ static class TextUtils {static boolean isEmpty(String value){return value==null||value.isEmpty();}}
  static class View {static final int VISIBLE=0,GONE=8;}
  static class TextView {String value="";int visibility=8;void setText(String s){value=s;}void setVisibility(int v){visibility=v;}}
  static class Dialog {boolean showing=true;boolean isShowing(){return showing;}}
