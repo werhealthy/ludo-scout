@@ -28,18 +28,17 @@ checks=[
      "listings, games and tags form a connected graph" in system and
      "Other listings of the same game" in system),
     ("listing detail separates metadata into distinct visual objects",
-     'productRatingRow(d.rating,scoreLabel(d)' in detail and
-     "productLanguagePanel(d.languageCode" in detail and
+     'productQuickFacts(d.rating' in detail and
+     "d.languageCode==null" in detail and
      'publicationText(d,12,Typeface.NORMAL)' in detail and
      '" · "+languageShort(d.languageCode)+" · "+publicationDisplay(d)' not in detail),
     ("listing detail exposes canonical game navigation",
-     'text("Scheda gioco",14,TEXT,Typeface.BOLD)' in detail and
-     'gameLink.setMinHeight(dp(48))' in detail and
-     'if(game!=null)' in detail and
-     "openGameDetailOverlay(game.id)" in detail),
+     "installPullToGame(sc,pullHint,game.id,dialog)" in detail and
+     "prepareGameTransition(dialog,game.id,pullHint)" in detail and
+     "performAccessibilityAction" in ui),
     ("listing detail keeps provider identity",
-     '"Apri su Vinted"' in detail and 'productPrimaryButton' in detail and
-     "productRatingRow(d.rating" in detail and "openBgg(d.bggId)" in detail and
+     '"Apri Vinted"' in detail and 'productProviderAction' in detail and
+     "productQuickFacts(d.rating" in detail and "openBgg(d.bggId)" in detail and
      "provider_bgg_logo" in ui),
     ("correction affordance is available in the contextual menu",
      "showDetailActions(d,dialog" in detail and
@@ -51,8 +50,8 @@ checks=[
      "rank 55% · geek 20% · votanti 15% · media 10%" in ui),
     ("tags navigate into game database",
      "openGameTag(String tag)" in ui and
-     'addLinkedMetaSection(taxonomy,"Categorie"' in game and
-     'addLinkedMetaSection(taxonomy,"Meccaniche"' in game),
+     'linkedDealTagStrip(null,g)' in game and
+     'addLinkedMetaSection(mechanics,"Meccaniche"' in game),
     ("game search includes taxonomy and creators",
      "LOWER(COALESCE(g.categories,'')) LIKE ?" in market and
      "LOWER(COALESCE(g.mechanics,'')) LIKE ?" in market and

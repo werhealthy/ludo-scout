@@ -26,7 +26,13 @@ public class MotionEvent {
 harness=r"""
 import android.view.MotionEvent;
 public class ProductGestureRegression {
- static class View {int height=1000;int getHeight(){return height;} }
+ static class Bundle {}
+ static class View {int height=1000;int getHeight(){return height;}
+  static class AccessibilityDelegate {
+   public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){}
+   public boolean performAccessibilityAction(View host,int action,Bundle args){return false;}
+  }
+ }
  interface Touch {boolean on(View v,MotionEvent e);}
  static class ScrollView extends View {
   int y=500;View child=new View();Touch touch;
@@ -37,7 +43,7 @@ public class ProductGestureRegression {
   void send(int action,float finger){touch.on(this,new MotionEvent(action,finger,1));}
  }
  static class Animation {Animation alpha(float a){return this;}Animation setDuration(long t){return this;}void start(){}}
- static class TextView {float alpha,progress;void setAlpha(float a){alpha=a;}void setText(String s){}Animation animate(){return new Animation();}}
+ static class TextView extends View {AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}float alpha,progress;void setAlpha(float a){alpha=a;}void setText(String s){}Animation animate(){return new Animation();}}
  static class Dialog {boolean showing=true;boolean isShowing(){return showing;}void dismiss(){showing=false;}}
  boolean ready=true;int opens;Dialog activeDetailDialog; 
  float dp(float v){return v;}int dp(int v){return v;}
@@ -73,7 +79,9 @@ with tempfile.TemporaryDirectory() as temp:
     p=Path(temp);(p/"android/view").mkdir(parents=True)
     (p/"android/view/MotionEvent.java").write_text(motion)
     (p/"ProductGestureRegression.java").write_text(harness)
-    subprocess.run(["javac","-d",temp,str(p/"android/view/MotionEvent.java"),str(p/"ProductGestureRegression.java")],check=True)
+    (p/"android/view/accessibility").mkdir(parents=True)
+    (p/"android/view/accessibility/AccessibilityNodeInfo.java").write_text('package android.view.accessibility; public class AccessibilityNodeInfo {public static final int ACTION_CLICK=16;public static class AccessibilityAction {public AccessibilityAction(int id,String label){}}public void addAction(AccessibilityAction a){}public void setClickable(boolean b){}}')
+    subprocess.run(["javac","-d",temp,str(p/"android/view/MotionEvent.java"),str(p/"ProductGestureRegression.java"),str(p/"android/view/accessibility/AccessibilityNodeInfo.java")],check=True)
     gesture_result=subprocess.run(["java","-cp",temp,"ProductGestureRegression"],check=False)
 
 # Characterize first-layout clamping: execute the real pager against a
