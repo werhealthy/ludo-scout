@@ -153,7 +153,7 @@ public final class QueueKeepAliveService extends Service {
     }
 
     private synchronized void superviseLanes(boolean userWake){
-        if(!alive||market==null)return;long now=System.currentTimeMillis();
+        if(!alive||market==null)return;startBrowserLane();long now=System.currentTimeMillis();
         boolean vintedNeeds=market.runnableVintedDueCount(now)>0||market.deferredVintedReadyCount(now)>0||market.activeRunDeferredVintedCount()>0;
         long gate=VintedPublicSession.nextAllowedAt(this);
         boolean vintedCanRun=gate<=now;
@@ -171,6 +171,7 @@ public final class QueueKeepAliveService extends Service {
     }
 
     private synchronized void startBrowserLane(){
+        if(!alive||market==null)return;
         if(browserFuture!=null&&!browserFuture.isDone())return;
         browserExecutor=Executors.newSingleThreadExecutor(r->new Thread(r,"ludo-browser-local-lane"));browserFuture=browserExecutor.submit(this::browserLoop);
     }
