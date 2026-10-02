@@ -164,7 +164,7 @@ public final class VintedPublicSession {
         DealDatabase helper=null;SQLiteDatabase db=null;long now=System.currentTimeMillis();
         try{
             helper=new DealDatabase(context.getApplicationContext());db=helper.getWritableDatabase();
-            db.beginTransactionNonExclusive();
+            db.beginTransactionNonExclusive();ensureLedgerEpoch(db,now);
             incLedger(db,"photo:"+event,now);
             if("http".equals(event)){
                 String outcome=code==403?"403":code==429?"429":code>=200&&code<400?"ok":"other";
