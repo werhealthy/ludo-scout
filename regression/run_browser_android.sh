@@ -27,8 +27,6 @@ adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
 chmod +x gradlew
-./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-adb shell am instrument -w -r -e class it.vintedaffari.app.BrowserCaptureStoreTest it.vintedaffari.app.test/android.test.InstrumentationTestRunner
-./gradlew --no-daemon :app:connectedDebugAndroidTest
+classes=$(rg --files app/src/androidTest/java | sed -n 's#app/src/androidTest/java/##; s#/#.#g; s#\.java$##; /Test$/p' | paste -sd, -)
+test -n "$classes"
+./gradlew --no-daemon :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.class=$classes"

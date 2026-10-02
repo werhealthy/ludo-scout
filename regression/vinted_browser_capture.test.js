@@ -66,3 +66,15 @@ test('SPA router updates URL before DOM without importing stale cards or initial
 test('unreadable sticker never promotes protection price to sticker',async()=>{const f=fixture({cards:[card('/items/44-x','Catan, Brand: Kosmos, Condizioni: Ottime, 1,234.00 €, 1235.00 € incl.')]});await sleep();assert.equal(f.items()[0]?.priceCents,null);});
 
 test('hash-only SPA navigation retains page token and records',async()=>{const f=fixture();f.window.LudoCaptureControl.setPageToken(12);await f.fetch({items:[item(1)]});await sleep();f.messages.length=0;f.window.history.pushState(null,'','#details');await f.fetch({items:[item(2)]});await sleep();assert.equal(f.messages.some(m=>m.kind==='location'),false);assert.deepEqual(f.items().map(x=>x.id),['2']);assert.equal(f.messages.find(m=>m.items?.length)?.pageToken,12);f.window.LudoCaptureControl.captureNow();await sleep();assert.equal(f.messages.find(m=>m.complete)?.page.observed,2);});
+
+test('three transient commit retries stop instead of flooding the bridge',async()=>{
+ const f=fixture({ack:false});await f.fetch({items:[item()]});await until(()=>f.messages.some(m=>m.seq));
+ for(let i=0;i<3;i++){const current=f.messages.filter(m=>m.seq).at(-1);f.window.LudoCapture.onmessage({data:'retry:'+current.seq});if(i<2)await until(()=>f.messages.filter(m=>m.seq).at(-1).seq!==current.seq);}
+ const count=f.messages.length;await new Promise(r=>setTimeout(r,500));assert.equal(f.messages.length,count);assert.equal(f.requests.length,1);
+});
+test('terminal commit rejection stops intake until an explicit user action',async()=>{
+ const f=fixture({ack:false});await f.fetch({items:[item()]});await until(()=>f.messages.some(m=>m.seq));const last=f.messages.filter(m=>m.seq).at(-1);f.window.LudoCapture.onmessage({data:'rejected:'+last.seq});await f.fetch({items:[item(11)]});const count=f.messages.length;await sleep();assert.equal(f.messages.length,count);f.window.LudoCaptureControl.captureNow();await until(()=>f.messages.length>count);f.window.LudoCaptureControl.setEnabled(false);
+});
+test('a lost acknowledgement retries the packet without fetching a page',async()=>{
+ const f=fixture({ack:false});await f.fetch({items:[item()]});await until(()=>f.messages.some(m=>m.seq));const first=f.messages.filter(m=>m.seq)[0];const end=Date.now()+6500;while(f.messages.filter(m=>m.seq).length<2&&Date.now()<end)await new Promise(r=>setTimeout(r,30));assert.equal(f.messages.filter(m=>m.seq).length,2);assert.equal(f.messages.filter(m=>m.seq)[1].items[0].id,first.items[0].id);assert.equal(f.requests.length,1);f.window.LudoCaptureControl.setEnabled(false);
+});
