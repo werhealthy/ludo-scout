@@ -714,7 +714,7 @@ private void applyDiscoverChrome(){
         row.addView(cover,new LinearLayout.LayoutParams(stacked?-1:dp(imageWidth),dp(stacked?imageHeight+32:imageHeight)));
         LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setPadding(stacked?0:dp(12),stacked?dp(12):0,0,0);
         TextView title=discoverTextWeight(name(d),rank==1?19:rank==2?17:16,DISCOVER_TEXT,700);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);
-        LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.setPadding(0,0,dp(44),0);center.addView(heading);
+        LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.setPadding(0,0,dp(44),0);heading.setMinimumHeight(stacked?0:dp(40));center.addView(heading);
         LinearLayout values=new LinearLayout(this);values.setOrientation(stacked?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);values.setGravity(Gravity.CENTER_VERTICAL);
         values.addView(homeScore(d,18));TextView price=discoverTextWeight(total(d),16,DISCOVER_TEXT,600);price.setSingleLine(true);price.setGravity((stacked?Gravity.START:Gravity.END)|Gravity.CENTER_VERTICAL);
         price.setPadding(stacked?0:dp(8),stacked?dp(6):0,0,0);price.setAutoSizeTextTypeUniformWithConfiguration(12,16,1,android.util.TypedValue.COMPLEX_UNIT_SP);
