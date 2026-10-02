@@ -144,9 +144,21 @@ public class MarketNavigationRegression extends ScreenBase {
         equal(false,source.isShowing(),"Source closed for category");equal(false,bundle.isShowing(),"Bundle closed for category");equal(false,member.isShowing(),"Member closed for category");
         equal("database",n.tab,"Category destination");equal("Economic",n.databaseQuery,"Category query");equal(null,n.activeDetailDialog,"No detail owner");equal("",n.activeDealSignature,"No hidden signature");
     }
+    static void motorBackFollowsHistoryHierarchy(){
+        MarketNavigationRegression n=new MarketNavigationRegression();
+        n.tab="activity";n.engineSection="run";n.engineDayStart=1;
+        n.onBackPressed();equal("day",n.engineSection,"Motor run Back");
+        n.onBackPressed();equal("history",n.engineSection,"Motor day Back");
+        n.onBackPressed();equal("overview",n.engineSection,"Motor history Back");
+        n.engineSection="run";n.engineDayStart=0;
+        n.onBackPressed();equal("overview",n.engineSection,"Direct run Back");
+        for(String section:new String[]{"phase","review","waiting"}){
+            n.engineSection=section;n.onBackPressed();equal("overview",n.engineSection,"Work list Back");
+        }
+    }
     public static void main(String[] args){
         int failed=0;
-        Runnable[] tests={MarketNavigationRegression::retainsSiblingPositions,
+        Runnable[] tests={MarketNavigationRegression::retainsSiblingPositions,MarketNavigationRegression::motorBackFollowsHistoryHierarchy,
             MarketNavigationRegression::retainsIndependentSearchAndFilters,
             MarketNavigationRegression::returnsFromBundleToSource,
             MarketNavigationRegression::staleTabRestoreDoesNotMoveAnotherView,
@@ -166,6 +178,8 @@ public class MarketNavigationRegression extends ScreenBase {
 """.replace("__PRODUCTION_METHODS__", methods).replace("__FINISH_DETAIL__", finish)
 with tempfile.TemporaryDirectory() as temp:
     source = Path(temp) / "MarketNavigationRegression.java"
-    source.write_text(harness)
+    # Compile the real presentation dependency used by extracted MainActivity methods.
+    presentation=(root / "app/src/main/java/it/vintedaffari/app/EngineOverviewPresentation.java").read_text()
+    source.write_text(harness + "\n" + presentation.replace("package it.vintedaffari.app;", ""))
     subprocess.run(["javac", "-d", temp, str(source)], check=True)
     subprocess.run(["java", "-cp", temp, "MarketNavigationRegression"], check=True)
