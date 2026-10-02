@@ -280,7 +280,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if (pkg == null || !VINTED_PACKAGE.contentEquals(pkg)) return;
         showScanOverlay();
 
-        long eventNow=System.currentTimeMillis();pendingVintedEventDiag++;
+        long eventNow=System.currentTimeMillis();radarCounters.recordEvent(eventNow,event.getEventType());pendingVintedEventDiag++;
         if(lastVintedEventDiagFlushAt==0L||eventNow-lastVintedEventDiagFlushAt>=2_000L||pendingVintedEventDiag>=64L){
             SharedPreferences p=diag();long delta=pendingVintedEventDiag;pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
             long eventTotal=radarCounters.add("vintedEvents",delta);int eventType=event.getEventType();
@@ -312,6 +312,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             String previous="";
             try{previous=marketStore.diagnosticState("a11y_intake").detail;}catch(Throwable error){Log.w(TAG,"Intake seed unavailable",error);}
             for(String key:RadarIntakeCounters.KEYS)seed.put(key,Math.max(legacy.get(key),parseLongField(previous,key,0L)));
+            for(String[] group:RadarIntakeCounters.LAST_GROUPS)for(String key:group)seed.put(key,parseLongField(previous,key,0L));
             radarCounters.initialize(radarCounterFile(),seed,System.currentTimeMillis());radarCounters.persist(radarCounterFile());
             handler.post(()->{if(!radarDestroyed)publishA11yDiagnosticSnapshot();});
         });
@@ -325,14 +326,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             return;
         }
         lastA11yDiagnosticPublishAt=now;
-        SharedPreferences p=diag();long eventAt=p.getLong("lastEventAt",0L);if(eventAt<=0L)return;
-        String payload="build=a11y-intake-v2;app="+BuildConfig.VERSION_NAME+";pid="+android.os.Process.myPid()+";"+radarCounters.metadata()+";eventAt="+eventAt+";eventType="+p.getInt("lastEventType",0)+
-                ";vintedEvents="+radarCounters.get("vintedEvents")+";scans="+radarCounters.get("scans")+
-                ";lastCardsParsed="+p.getInt("lastCardsParsed",0)+";cardsParsedTotal="+radarCounters.get("cardsParsedTotal")+
-                ";analysisBatches="+radarCounters.get("analysisBatches")+";localAnalysisLastBatchAt="+p.getLong("localAnalysisLastBatchAt",0)+
-                ";localAnalysisLastBatchSize="+p.getInt("localAnalysisLastBatchSize",0)+";analysesStored="+radarCounters.get("analysesStored")+
-                ";classifierBlocked="+radarCounters.get("classifierBlocked")+";nonGameRejected="+radarCounters.get("nonGameRejected")+
-                ";analysisCommitted="+radarCounters.get("analysisCommitted")+";analysisQuarantined="+radarCounters.get("analysisQuarantined");
+        String payload="build=a11y-intake-v3;app="+BuildConfig.VERSION_NAME+";pid="+android.os.Process.myPid()+";"+radarCounters.diagnosticPayload();
         queueA11yDiagnosticSnapshot(payload);
     }
 
@@ -521,6 +515,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 }
             }
         } else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
+        radarCounters.recordScan(System.currentTimeMillis(),discovered.size());
         p.edit()
                 .putInt("lastCardsParsed", discovered.size())
                 .putLong("cardsParsedTotal", radarCounters.add("cardsParsedTotal",discovered.size()))
@@ -690,6 +685,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     // and produces work; the queue process owns network consumption and can batch BGG.
                     maybeResolveLink(card);
                 }
+                radarCounters.recordAnalysis(System.currentTimeMillis(),count);
                 diag().edit().putLong("analysesStored",radarCounters.add("analysesStored",count))
                         .putString("lastError","").putLong("localAnalysisLastBatchAt",System.currentTimeMillis())
                         .putInt("localAnalysisLastBatchSize",count).putInt("localAnalysisLastCommitted",committed)
@@ -1777,7 +1773,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "a11yProbeLastExtraSample="+p.getString("a11yProbeLastExtraSample","")+"\n"+
                 "a11yProbeLastRequestedExtra="+p.getString("a11yProbeLastRequestedExtra","")+"\n"+
                 "a11yProbeLastAncestorExplicit="+p.getString("a11yProbeLastAncestorExplicit","")+"\n"+
-                "vintedIdsCapturedFromAccessibility="+p.getLong("vintedIdsCapturedFromAccessibility",0)+" / cardsParsed="+p.getLong("cardsParsedTotal",0)+"\n"+
+                "vintedIdsCapturedFromAccessibility="+p.getLong("vintedIdsCapturedFromAccessibility",0)+" / cardsParsed="+a11yCardsParsedTotal+"; idsSource=legacy-process-prefs; cardsSource=a11y-intake"+"\n"+
                 "lastAccessibilityVintedId="+p.getString("lastAccessibilityVintedId","")+"\n"+
                 "manualRecovery={suppressedCards="+p.getLong("manualRecoverySuppressedCards",0)+", lastVisible="+p.getInt("manualRecoveryLastVisible",0)+", exactHintApplied="+p.getBoolean("manualRecoveryExactHintApplied",false)+", target="+safeDiag(p.getString("manualRecoveryTarget",""))+"}\n"+
                 "libraryLastError="+p.getString("libraryLastError","")+"\n"+

@@ -20,6 +20,15 @@ public final class RadarReliabilityRegression {
         check(freshRestart.get("eventAt")==100&&freshRestart.get("eventType")==32,"restart lost event timestamp/type pair");
         check(freshRestart.get("localAnalysisLastBatchAt")==120&&freshRestart.get("localAnalysisLastBatchSize")==1,"restart lost analysis timestamp/size pair");
         check(freshRestart.get("scanAt")==110&&freshRestart.get("lastCardsParsed")==4,"restart lost scan timestamp/card count pair");
+        freshRestart.recordEvent(130,64);freshRestart.recordEvent(125,2048);
+        freshRestart.recordScan(140,0);freshRestart.recordAnalysis(150,5);freshRestart.persist(freshFile);
+        RadarIntakeCounters liveReload=new RadarIntakeCounters();liveReload.initialize(freshFile,freshness,400);
+        check(liveReload.get("eventAt")==130&&liveReload.get("eventType")==64,"older callback overwrote event pair");
+        check(liveReload.get("scanAt")==140&&liveReload.get("lastCardsParsed")==0,"empty scan not preserved");
+        check(liveReload.get("localAnalysisLastBatchAt")==150&&liveReload.get("localAnalysisLastBatchSize")==5,"live analysis pair not persisted");
+        check(liveReload.diagnosticPayload().contains("analysisSource=live-owner"),"live provenance lost");
+        RadarIntakeCounters initializing=new RadarIntakeCounters();initializing.recordEvent(1000,16);initializing.initialize(freshFile,freshness,1100);
+        check(initializing.get("eventAt")==1000&&initializing.get("eventType")==16,"initialization rolled back a live callback");
         File dir=Files.createTempDirectory("radar-test").toFile(),file=new File(dir,"intake.properties");
         Map<String,Long> seed=new HashMap<>();seed.put("cardsParsedTotal",14248L);
         RadarIntakeCounters first=new RadarIntakeCounters();first.add("cardsParsedTotal",3);first.initialize(file,seed,1000);check(first.get("cardsParsedTotal")==14251,"events during initialization lost");first.persist(file);
