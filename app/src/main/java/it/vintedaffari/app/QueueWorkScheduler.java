@@ -126,4 +126,15 @@ public final class QueueWorkScheduler {
                     .enqueueUniqueWork(UNIQUE_CONTINUE, ExistingWorkPolicy.REPLACE, request);
         } catch (Throwable ignored) {}
     }
+
+    static final String ACTION_BROWSER = "it.vintedaffari.app.BROWSER_LOCAL_WAKE";
+    static final String ACTION_BROWSER_RECOVERY = "it.vintedaffari.app.BROWSER_LOCAL_RECOVERY";
+    private static final String BROWSER_NOW="ludo-browser-local-now",BROWSER_RECOVERY="ludo-browser-local-recovery",BROWSER_CONTINUE="ludo-browser-local-continue";
+    static OneTimeWorkRequest browserRequest(){return new OneTimeWorkRequest.Builder(BrowserLocalDrainWorker.class).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).addTag("ludo-browser-local").build();}
+    static PeriodicWorkRequest browserRecoveryRequest(){return new PeriodicWorkRequest.Builder(BrowserLocalDrainWorker.class,15,TimeUnit.MINUTES).addTag("ludo-browser-local-recovery").build();}
+    public static void scheduleLocalBrowser(Context context){if(context==null)return;if(!isDefaultProcess(context)){wakeDefaultProcess(context,ACTION_BROWSER,0);return;}Context app=context.getApplicationContext();runLocalOffMain(()->scheduleLocalBrowserInOwner(app));}
+    static void scheduleLocalBrowserInOwner(Context context){WorkManager.getInstance(context).enqueueUniqueWork(BROWSER_NOW,ExistingWorkPolicy.APPEND_OR_REPLACE,browserRequest());ensureLocalBrowserRecoveryInOwner(context);QueueKeepAliveService.ensureRunning(context);}
+    public static void ensureLocalBrowserRecovery(Context context){if(context==null)return;if(!isDefaultProcess(context)){wakeDefaultProcess(context,ACTION_BROWSER_RECOVERY,0);return;}Context app=context.getApplicationContext();runLocalOffMain(()->ensureLocalBrowserRecoveryInOwner(app));}
+    static void ensureLocalBrowserRecoveryInOwner(Context context){WorkManager.getInstance(context).enqueueUniquePeriodicWork(BROWSER_RECOVERY,ExistingPeriodicWorkPolicy.KEEP,browserRecoveryRequest());}
+    static void scheduleLocalBrowserAfter(Context context,long delay){OneTimeWorkRequest next=new OneTimeWorkRequest.Builder(BrowserLocalDrainWorker.class).setInitialDelay(Math.max(10_000L,delay),TimeUnit.MILLISECONDS).addTag("ludo-browser-local").build();WorkManager.getInstance(context).enqueueUniqueWork(BROWSER_CONTINUE,ExistingWorkPolicy.REPLACE,next);}
 }

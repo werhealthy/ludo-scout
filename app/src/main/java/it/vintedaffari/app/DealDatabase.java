@@ -10,7 +10,7 @@ import java.util.*;
 
 public final class DealDatabase extends SQLiteOpenHelper {
     private static final String DB_NAME="vinted_affari.db";
-    private static final int DB_VERSION=21;
+    private static final int DB_VERSION=22;
     private static final String COLS="id,signature,first_seen,last_seen,seen_count,vinted_title,brand,item_condition,item_price_cents,protected_price_cents,favorites,analysis_status,bgg_id,game_name,display_name,rating,bgg_rank,voters,quality_score,tier,tier_label,total_cents,benchmark_cents,offer_cents,shipping_cents,discount,language_code,match_reason,lifecycle,confirmed,listing_type,verification_state,verification_reason,vinted_url,resolved_at,shipping_verified_cents,vinted_item_id,image_url,link_confidence,link_reason,published_label,bgg_image_url,bgg_categories,bgg_minplayers,bgg_maxplayers,bgg_weight,bgg_playtime,seller_id,seller_name,listing_photos_csv";
 
     public static final class MissingCounts { public int published, metadata, link, bgg; }
@@ -119,6 +119,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         db.execSQL("CREATE INDEX idx_deals_bgg ON deals(bgg_id)");
         db.execSQL("CREATE INDEX idx_deals_seller ON deals(seller_id)");
         MarketStore.createSchema(db);
+        BrowserCaptureSql.create(db);
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV){
         if(oldV<2){safeAlter(db,"ALTER TABLE observations ADD COLUMN listing_type TEXT");safeAlter(db,"ALTER TABLE observations ADD COLUMN verification_state TEXT");safeAlter(db,"ALTER TABLE observations ADD COLUMN verification_reason TEXT");safeAlter(db,"ALTER TABLE deals ADD COLUMN listing_type TEXT");safeAlter(db,"ALTER TABLE deals ADD COLUMN verification_state TEXT");safeAlter(db,"ALTER TABLE deals ADD COLUMN verification_reason TEXT");}
@@ -141,6 +142,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         if(oldV<19){MarketStore.upgradeV18ToV19(db);}
         if(oldV<20){MarketStore.upgradeV19ToV20(db);}
         if(oldV<21){MarketStore.upgradeV20ToV21(db);}
+        if(oldV<22){BrowserCaptureSql.create(db);}
     }
     private static void safeAlter(SQLiteDatabase db,String sql){try{db.execSQL(sql);}catch(Exception ignored){}}
 
@@ -155,8 +157,16 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public synchronized void recordBlocked(VintedCard c,ListingClassifier.Result l,long n){recordSighting(c,l,n);}
     public synchronized void record(VintedCard card,GameAnalysis a,ListingClassifier.Result listing,long now){
         DbContentionTrace.Scope trace=DbContentionTrace.start("DealDatabase.record");
-        try{if(card==null||a==null)return;String sig=signature(card);boolean anomaly=ListingClassifier.isExtremePriceAnomaly(a);String verify=anomaly?"PRICE_ANOMALY":(!"matched".equals(a.status)?"MATCH_UNCERTAIN":"OK");String reason=anomaly?"Prezzo totale anomalo: verifica espansione/accessorio/annuncio incompleto.":null;if(listing!=null&&listing.type==ListingClassifier.Type.EXPANSION&&"OK".equals(verify)){verify="EXPANSION_CHECK";reason="Espansione: verifica benchmark della stessa edizione.";}DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(card,a);trace.phase("OPEN_DATABASE");SQLiteDatabase db=getWritableDatabase();trace.phase("PRE_TRANSACTION");trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");try{ContentValues obs=commonValues(card,a,listing,verify,reason);int changed=db.update("observations",obs,"id=(SELECT id FROM observations WHERE signature=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS' ORDER BY observed_at DESC LIMIT 1)",new String[]{sig});if(changed==0){obs.put("signature",sig);obs.put("observed_at",now);db.insert("observations",null,obs);}boolean review="PRICE_ANOMALY".equals(verify)||"EXPANSION_CHECK".equals(verify);boolean candidate="matched".equals(a.status)&&DealPolicy.ratingEligible(a.averageRating)&&"OK".equals(verify);if(review)upsertDeal(db,sig,card,a,listing,verify,reason,now,"verify",a.tierLabel);else if(candidate){upsertDeal(db,sig,card,a,listing,verify,reason,now,evaluation.storageTier(),evaluation.label);if(!evaluation.visible())markPriceFiltered(db,sig,now);}db.setTransactionSuccessful();}finally{trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");}}
+        try{if(card==null||a==null)return;trace.phase("OPEN_DATABASE");SQLiteDatabase db=getWritableDatabase();trace.phase("PRE_TRANSACTION");trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");try{recordAnalysis(db,card,a,listing,now,signature(card));db.setTransactionSuccessful();}finally{trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");}}
         }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
+    }
+    /** Shared persistence boundary; caller owns the transaction. No Java monitor under a SQLite writer. */
+    void recordAnalysis(SQLiteDatabase db,VintedCard card,GameAnalysis a,ListingClassifier.Result listing,long now,String sig){
+        if(card==null||a==null)return;
+        boolean anomaly=ListingClassifier.isExtremePriceAnomaly(a);String verify=anomaly?"PRICE_ANOMALY":(!"matched".equals(a.status)?"MATCH_UNCERTAIN":"OK");String reason=anomaly?"Prezzo totale anomalo: verifica espansione/accessorio/annuncio incompleto.":null;if(listing!=null&&listing.type==ListingClassifier.Type.EXPANSION&&"OK".equals(verify)){verify="EXPANSION_CHECK";reason="Espansione: verifica benchmark della stessa edizione.";}DealEvaluator.Evaluation evaluation=DealEvaluator.evaluate(card,a);ContentValues obs=commonValues(card,a,listing,verify,reason);obs.remove("seller_name");int changed=db.update("observations",obs,"id=(SELECT id FROM observations WHERE signature=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS' ORDER BY observed_at DESC LIMIT 1)",new String[]{sig});if(changed==0){obs.put("signature",sig);obs.put("observed_at",now);db.insertOrThrow("observations",null,obs);}boolean review="PRICE_ANOMALY".equals(verify)||"EXPANSION_CHECK".equals(verify);boolean candidate="matched".equals(a.status)&&DealPolicy.ratingEligible(a.averageRating)&&"OK".equals(verify);if(review)upsertDeal(db,sig,card,a,listing,verify,reason,now,"verify",a.tierLabel);else if(candidate){upsertDeal(db,sig,card,a,listing,verify,reason,now,evaluation.storageTier(),evaluation.label);if(!evaluation.visible())markPriceFiltered(db,sig,now);}
+    }
+    void recordBrowserFiltered(SQLiteDatabase db,VintedCard card,ListingClassifier.Result listing,long now,String sig,String reason){
+        ContentValues v=new ContentValues();v.put("signature",sig);v.put("observed_at",now);v.put("vinted_title",card.title);v.put("brand",card.brand);v.put("item_condition",card.condition);v.put("item_price_cents",cents(card.itemPrice));put(v,"protected_price_cents",card.protectedPrice==null?null:cents(card.protectedPrice));v.put("analysis_status","excluded");v.put("listing_type",listing.type.name());v.put("verification_state","BLOCKED_CLASSIFIER");v.put("verification_reason",reason);db.insertOrThrow("observations",null,v);
     }
     /** Hunts are intent-first, not resale-first. Preserve an otherwise valid matched listing even
      * when its price is merely average; exact identity/review gates still decide whether it is shown/notified. */
@@ -178,8 +188,21 @@ public final class DealDatabase extends SQLiteOpenHelper {
         if(!review&&!evaluation.visible()){upsertDeal(db,sig,card,analysis,listing,"OK",null,System.currentTimeMillis(),"filtered","");markPriceFiltered(db,sig,System.currentTimeMillis());return null;}upsertDeal(db,sig,card,analysis,listing,review?"EXPANSION_CHECK":"OK",review?"Controlla gioco base o espansione":null,System.currentTimeMillis(),review?"verify":evaluation.storageTier(),review?analysis.tierLabel:evaluation.label);
         DealRecord previous=findBySignature(sig);List<String> photos=new ArrayList<>();if(previous!=null&&previous.listingPhotosCsv!=null)photos.addAll(Arrays.asList(previous.listingPhotosCsv.split(",")));if(item.photosCsv!=null&&!item.photosCsv.isEmpty())photos.addAll(Arrays.asList(item.photosCsv.split(",")));if(item.imageUrl!=null&&!item.imageUrl.isEmpty())photos.add(item.imageUrl);applyResolvedLink(sig,item.id,item.url,item.imageUrl,100,"Pagina del venditore verificata",seller,seller,android.text.TextUtils.join(",",PhotoIdentity.unique(photos)),System.currentTimeMillis());if(item.publishedLabel!=null){ContentValues date=new ContentValues();date.put("published_label",item.publishedLabel);db.update("deals",date,"signature=?",new String[]{sig});}return findBySignature(sig);
     }
-    private static void upsertDeal(SQLiteDatabase db,String sig,VintedCard card,GameAnalysis a,ListingClassifier.Result l,String verify,String reason,long now,String forcedTier){upsertDeal(db,sig,card,a,l,verify,reason,now,forcedTier,null);}private static void upsertDeal(SQLiteDatabase db,String sig,VintedCard card,GameAnalysis a,ListingClassifier.Result l,String verify,String reason,long now,String forcedTier,String forcedLabel){ContentValues deal=commonValues(card,a,l,verify,reason);deal.put("signature",sig);deal.put("last_seen",now);deal.put("lifecycle","ACTIVE");deal.put("tier",forcedTier);if(forcedLabel!=null)deal.put("tier_label",forcedLabel);Cursor c=db.rawQuery("SELECT id,seen_count,confirmed FROM deals WHERE signature=?",new String[]{sig});if(c.moveToFirst()){deal.put("seen_count",c.getInt(1)+1);deal.put("confirmed",c.getInt(2));db.update("deals",deal,"id=?",new String[]{String.valueOf(c.getLong(0))});}else{deal.put("first_seen",now);deal.put("seen_count",1);deal.put("confirmed",0);db.insert("deals",null,deal);}c.close();applyUserOverride(db,sig);}private static void markPriceFiltered(SQLiteDatabase db,String sig,long now){ContentValues v=new ContentValues();v.put("lifecycle","REMOVED");v.put("tier","filtered");v.put("tier_label","");v.put("verification_state","PRICE_FILTERED");v.put("verification_reason","Prezzo automaticamente escluso dal filtro convenienza");v.put("last_seen",now);db.update("deals",v,"signature=?",new String[]{sig});}
+    private static void upsertDeal(SQLiteDatabase db,String sig,VintedCard card,GameAnalysis a,ListingClassifier.Result l,String verify,String reason,long now,String forcedTier){upsertDeal(db,sig,card,a,l,verify,reason,now,forcedTier,null);}private static void upsertDeal(SQLiteDatabase db,String sig,VintedCard card,GameAnalysis a,ListingClassifier.Result l,String verify,String reason,long now,String forcedTier,String forcedLabel){ContentValues deal=commonValues(card,a,l,verify,reason);if(card.itemId!=null&&!card.itemId.isEmpty()){deal.put("vinted_item_id",card.itemId);deal.put("vinted_url",card.itemUrl);deal.put("link_confidence",100);deal.put("link_reason","Identità osservata nel browser");}deal.put("signature",sig);deal.put("last_seen",now);deal.put("lifecycle","ACTIVE");deal.put("tier",forcedTier);if(forcedLabel!=null)deal.put("tier_label",forcedLabel);Cursor c=db.rawQuery("SELECT id,seen_count,confirmed FROM deals WHERE signature=?",new String[]{sig});if(c.moveToFirst()){deal.put("seen_count",c.getInt(1)+1);deal.put("confirmed",c.getInt(2));db.update("deals",deal,"id=?",new String[]{String.valueOf(c.getLong(0))});}else{deal.put("first_seen",now);deal.put("seen_count",1);deal.put("confirmed",0);db.insertOrThrow("deals",null,deal);}c.close();applyUserOverride(db,sig);}private static void markPriceFiltered(SQLiteDatabase db,String sig,long now){ContentValues v=new ContentValues();v.put("lifecycle","REMOVED");v.put("tier","filtered");v.put("tier_label","");v.put("verification_state","PRICE_FILTERED");v.put("verification_reason","Prezzo automaticamente escluso dal filtro convenienza");v.put("last_seen",now);db.update("deals",v,"signature=?",new String[]{sig});}
 
+    private static String trustedCatalogClause(){return " AND bgg_id IS NOT NULL AND bgg_id<>'' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' AND vinted_url IS NOT NULL AND vinted_url<>''"+
+                    " AND COALESCE(verification_state,'') IN ('OK','USER_CONFIRMED')"+
+                    " AND COALESCE(listing_type,'') IN ('BASE_GAME','EXPANSION','GAME')"+
+                    " AND EXISTS (SELECT 1 FROM market_listings l JOIN games g ON g.id=l.game_id WHERE "+
+                    "(l.legacy_signature=deals.signature OR (deals.vinted_item_id IS NOT NULL AND l.vinted_item_id=deals.vinted_item_id)) "+
+                    "AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' "+
+                    "AND COALESCE(l.manual_review_required,0)=0 AND g.match_state='MATCHED' AND g.bgg_id=deals.bgg_id "+
+                    "AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
+                    "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')))";}
+    static boolean browserCatalogReady(SQLiteDatabase db,long listingId){
+        String sql="SELECT 1 FROM deals WHERE signature=(SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?) AND lifecycle='ACTIVE' AND tier IN ('hot','good','offer','fair','insufficient','hunt') AND rating IS NOT NULL AND rating>=6.0"+trustedCatalogClause()+" LIMIT 1";
+        try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(listingId)})){return c.moveToFirst();}
+    }
     public synchronized List<DealRecord> getDeals(String filter,int limit){
         String where="lifecycle='ACTIVE'";List<String>a=new ArrayList<>();boolean trusted="trusted".equals(filter)||"trusted_any_price".equals(filter);
         if("hot".equals(filter)){where+=" AND tier=?";a.add("hot");}
@@ -191,17 +214,8 @@ public final class DealDatabase extends SQLiteOpenHelper {
         else if("trusted_any_price".equals(filter))where+=" AND tier IN ('hot','good','offer','fair','insufficient','hunt')";
         else if(!"all_with_review".equals(filter))where+=" AND tier IN ('hot','good','offer','fair','insufficient','hunt')";
         if(!"all_with_review".equals(filter))where+=" AND rating IS NOT NULL AND rating>=6.0";
-        if(trusted){
-            where+=" AND bgg_id IS NOT NULL AND bgg_id<>'' AND vinted_item_id IS NOT NULL AND vinted_item_id<>'' AND vinted_url IS NOT NULL AND vinted_url<>''"+
-                    " AND COALESCE(verification_state,'') IN ('OK','USER_CONFIRMED')"+
-                    " AND COALESCE(listing_type,'') IN ('BASE_GAME','EXPANSION','GAME')"+
-                    " AND EXISTS (SELECT 1 FROM market_listings l JOIN games g ON g.id=l.game_id WHERE "+
-                    "(l.legacy_signature=deals.signature OR (deals.vinted_item_id IS NOT NULL AND l.vinted_item_id=deals.vinted_item_id)) "+
-                    "AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED' "+
-                    "AND COALESCE(l.manual_review_required,0)=0 AND g.match_state='MATCHED' AND g.bgg_id=deals.bgg_id "+
-                    "AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0 "+
-                    "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY') AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')))";
-        }
+        if(trusted)where+=trustedCatalogClause();
+
         a.add(String.valueOf(Math.max(1,limit)));Cursor c=getReadableDatabase().rawQuery("SELECT "+COLS+" FROM deals WHERE "+where+" ORDER BY last_seen DESC LIMIT ?",a.toArray(new String[0]));List<DealRecord>out=new ArrayList<>();while(c.moveToNext())out.add(readDeal(c));c.close();return out;
     }
 
@@ -636,6 +650,5 @@ public final class DealDatabase extends SQLiteOpenHelper {
     private static String inferLanguage(String raw){return ListingLanguageDetector.detect(raw);}
     private static boolean hasAny(String s,String... terms){if(s==null)return false;for(String t:terms)if(s.contains(t))return true;return false;}
     public synchronized int inferMissingLanguages(){int changed=0;SQLiteDatabase db=getWritableDatabase();try(Cursor c=db.rawQuery("SELECT signature,vinted_title FROM deals WHERE language_code IS NULL OR TRIM(language_code)=''",null)){while(c.moveToNext()){String code=inferLanguage(c.getString(1));if(code.isEmpty())continue;ContentValues v=new ContentValues();v.put("language_code",code);changed+=db.update("deals",v,"signature=?",new String[]{c.getString(0)});}}return changed;}
-    public static String signature(VintedCard c){return normalize(c.title)+"|"+normalize(c.brand)+"|"+cents(c.itemPrice);}private static String normalize(String v){if(v==null)return"";String n=Normalizer.normalize(v,Normalizer.Form.NFD).replaceAll("\\p{M}+","");return n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim();}private static int cents(double v){return(int)Math.round(v*100.0);}private static Integer ni(Cursor c,int i){return c.isNull(i)?null:c.getInt(i);}private static Double nd(Cursor c,int i){return c.isNull(i)?null:c.getDouble(i);}private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
+    public static String signature(VintedCard c){if(c.itemId!=null&&!c.itemId.isEmpty())return "vinted:"+c.itemId;return normalize(c.title)+"|"+normalize(c.brand)+"|"+cents(c.itemPrice);}private static String normalize(String v){if(v==null)return"";String n=Normalizer.normalize(v,Normalizer.Form.NFD).replaceAll("\\p{M}+","");return n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim();}private static int cents(double v){return(int)Math.round(v*100.0);}private static Integer ni(Cursor c,int i){return c.isNull(i)?null:c.getInt(i);}private static Double nd(Cursor c,int i){return c.isNull(i)?null:c.getDouble(i);}private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
-

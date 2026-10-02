@@ -10,6 +10,8 @@ relative=(ROOT/"app/src/main/java/it/vintedaffari/app/RelativeTime.java").read_t
 explore=(ROOT/"app/src/main/java/it/vintedaffari/app/BundleExploration.java").read_text(encoding="utf-8")
 
 trusted=db[db.index("public synchronized List<DealRecord> getDeals"):db.index("public synchronized List<DealRecord> getDealsByBggId")]
+if "where+=trustedCatalogClause()" in trusted:
+    trusted += db[db.index("private static String trustedCatalogClause()"):db.index("static boolean browserCatalogReady")]
 matched=market[market.index("private long upsertMatchedGame"):market.index("private long upsertProvisionalGame")]
 hero=ui[ui.index("private View heroDealV51"):ui.index("private View heroBundleV51")]
 hero_bundle=ui[ui.index("private View heroBundleV51"):ui.index("private void addDealRail")]

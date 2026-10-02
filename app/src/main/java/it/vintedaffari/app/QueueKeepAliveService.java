@@ -38,7 +38,9 @@ public final class QueueKeepAliveService extends Service {
 
     private volatile boolean alive=false;
     private final ScheduledExecutorService controlExecutor=Executors.newSingleThreadScheduledExecutor(r->{Thread t=new Thread(r,"ludo-queue-control");t.setDaemon(false);return t;});
-    private ExecutorService vintedExecutor,bggExecutor;
+    private ExecutorService vintedExecutor,bggExecutor,browserExecutor;
+    private Future<?> browserFuture;
+    private volatile BrowserAnalysisRunner browserRunner;
     private Future<?> vintedFuture,bggFuture;
     private int idleNotificationPulses=0;
     private int sessionStartRemaining=-1,lastRemaining=-1;
@@ -119,7 +121,7 @@ public final class QueueKeepAliveService extends Service {
 
     private void initializeBackground(){
         try{
-            db=new DealDatabase(this);market=new MarketStore(this,db);EngineStartupMaintenance.run(this,market);
+            db=new DealDatabase(this);market=new MarketStore(this,db);startBrowserLane();EngineStartupMaintenance.run(this,market);
             MarketStore.RuntimeStatus perf=market.diagnosticState("engine_performance");enginePerformance=EnginePerformanceMetrics.restore(perf.detail);lastEnginePerformancePersistAt=perf.updatedAt;
             market.touchProcessorHeartbeat();
         }catch(Throwable t){
@@ -129,7 +131,7 @@ public final class QueueKeepAliveService extends Service {
         try{bgg=new BggEnricher(this,db,market);bggMatcher=new BggSearchClient(this);}catch(Throwable t){Log.w(TAG,"bgg init",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:bgg",t);}
         try{market.applySafeModeQualityCutover();market.resetStaleProcessing();market.reconcileQueue();lastReconcileAt=System.currentTimeMillis();}
         catch(Throwable t){Log.e(TAG,"queue reconcile startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:reconcile",t);}
-        try{QueueWorkScheduler.ensureRecovery(this);}catch(Throwable t){Log.w(TAG,"recovery scheduler startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:recovery",t);}
+        try{QueueWorkScheduler.ensureRecovery(this);QueueWorkScheduler.ensureLocalBrowserRecovery(this);}catch(Throwable t){Log.w(TAG,"recovery scheduler startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:recovery",t);}
         try{QueueJobRunner.sweepMissing(this,market);}catch(Throwable t){Log.w(TAG,"sweep startup failed",t);ProcessCrashJournal.recordHandled(this,"queue:onCreate:sweep",t);}
         try{sessionStartRemaining=market.jobSummary().active();lastRemaining=sessionStartRemaining;lastProgressAt=System.currentTimeMillis();}catch(Throwable t){ProcessCrashJournal.recordHandled(this,"queue:onCreate:summary",t);}
         STARTING=false;
@@ -151,7 +153,7 @@ public final class QueueKeepAliveService extends Service {
     }
 
     private synchronized void superviseLanes(boolean userWake){
-        if(!alive||market==null)return;long now=System.currentTimeMillis();
+        if(!alive||market==null)return;startBrowserLane();long now=System.currentTimeMillis();
         boolean vintedNeeds=market.runnableVintedDueCount(now)>0||market.deferredVintedReadyCount(now)>0||market.activeRunDeferredVintedCount()>0;
         long gate=VintedPublicSession.nextAllowedAt(this);
         boolean vintedCanRun=gate<=now;
@@ -166,6 +168,23 @@ public final class QueueKeepAliveService extends Service {
         if(bggExecutor==null||bggExecutor.isShutdown()||bggFuture==null||bggFuture.isDone()||bggFuture.isCancelled())restartBggLane("start");
         else if(bggNeeds&&market.processingCount(MarketStore.JOB_BGG)==0&&bggStale&&(userWake||now-bh>LANE_STALE_MS+10_000L))restartBggLane("stale heartbeat");
         market.touchSupervisorHeartbeat();
+    }
+
+    private synchronized void startBrowserLane(){
+        if(!alive||market==null)return;
+        if(browserFuture!=null&&!browserFuture.isDone())return;
+        browserExecutor=Executors.newSingleThreadExecutor(r->new Thread(r,"ludo-browser-local-lane"));browserFuture=browserExecutor.submit(this::browserLoop);
+    }
+    private void browserLoop(){
+        BrowserCaptureStore captures=new BrowserCaptureStore(db);long idleAt=0;
+        try{while(alive&&!Thread.currentThread().isInterrupted()){
+            try{
+                market.touchLaneHeartbeat("browser");
+                if(captures.activeJobs()>0){if(browserRunner==null)browserRunner=new BrowserAnalysisRunner(this,db,market,captures);market.setLaneStatus("browser","ANALYZING","Analisi locale degli annunci acquisiti",0);boolean did=browserRunner.drainOnce(8,System.currentTimeMillis());idleAt=0;if(did){sendBroadcast(new Intent(OperationCenter.CHANGED).setPackage(getPackageName()));continue;}market.setLaneStatus("browser","WAITING","Attendo il prossimo tentativo locale",0);}
+                else{market.setLaneStatus("browser","IDLE","Nessun annuncio da analizzare",0);if(idleAt==0)idleAt=System.currentTimeMillis();if(browserRunner!=null&&System.currentTimeMillis()-idleAt>=5_000){browserRunner.close();browserRunner=null;}}
+                sleep(2_000L);
+            }catch(InterruptedException e){Thread.currentThread().interrupt();break;}catch(RuntimeException failure){try{market.setLaneStatus("browser","FAULT",safe(failure),0);}catch(RuntimeException ignored){}sleepQuiet(2_000L);}
+        }}finally{if(browserRunner!=null){browserRunner.close();browserRunner=null;}}
     }
 
     private synchronized void restartVintedLane(String why){
@@ -324,6 +343,6 @@ public final class QueueKeepAliveService extends Service {
     private Notification baseNotification(String text,int max,int progress,boolean indeterminate){NotificationCompat.Builder b=builder().setContentTitle("Ludo Scout").setContentText(text).setOngoing(true).setOnlyAlertOnce(true).setSilent(true);if(max>0||indeterminate)b.setProgress(Math.max(1,max),Math.max(0,progress),indeterminate);return b.build();}
     private NotificationCompat.Builder builder(){Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);PendingIntent pi=PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);return new NotificationCompat.Builder(this,CHANNEL).setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pi).setCategory(NotificationCompat.CATEGORY_PROGRESS);}
 
-    @Override public void onDestroy(){alive=false;RUNNING=false;STARTING=false;try{controlExecutor.shutdownNow();}catch(Throwable ignored){}try{if(vintedFuture!=null)vintedFuture.cancel(true);}catch(Throwable ignored){}try{if(bggFuture!=null)bggFuture.cancel(true);}catch(Throwable ignored){}try{if(vintedExecutor!=null)vintedExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggExecutor!=null)bggExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggMatcher!=null)bggMatcher.shutdown();}catch(Throwable ignored){}try{if(db!=null)db.close();}catch(Throwable ignored){}super.onDestroy();}
+    @Override public void onDestroy(){alive=false;if(browserRunner!=null)browserRunner.close();if(browserFuture!=null)browserFuture.cancel(true);if(browserExecutor!=null)browserExecutor.shutdownNow();RUNNING=false;STARTING=false;try{controlExecutor.shutdownNow();}catch(Throwable ignored){}try{if(vintedFuture!=null)vintedFuture.cancel(true);}catch(Throwable ignored){}try{if(bggFuture!=null)bggFuture.cancel(true);}catch(Throwable ignored){}try{if(vintedExecutor!=null)vintedExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggExecutor!=null)bggExecutor.shutdownNow();}catch(Throwable ignored){}try{if(bggMatcher!=null)bggMatcher.shutdown();}catch(Throwable ignored){}try{if(db!=null)db.close();}catch(Throwable ignored){}super.onDestroy();}
     @Override public IBinder onBind(Intent intent){return null;}
 }

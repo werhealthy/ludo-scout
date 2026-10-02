@@ -6,18 +6,21 @@ plugins {
 
 android {
     namespace 'it.vintedaffari.app'
+    useLibrary 'android.test.runner'
+    useLibrary 'android.test.base'
     compileSdk 35
 
     defaultConfig {
         applicationId 'it.vintedaffari.app'
         minSdk 28
         targetSdk 35
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
 
         // Local builds keep the source baseline. CI supplies a monotonic build number
         // via LUDO_VERSION_CODE so every distributed beta can update the previous one.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
-        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 195
-        versionName '5.12.146-ludo-rooms'
+        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 196
+        versionName '5.12.147-browser-local-engine'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')

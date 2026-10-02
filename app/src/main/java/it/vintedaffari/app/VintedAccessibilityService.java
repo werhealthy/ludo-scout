@@ -744,7 +744,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(best!=null)maybeScanBundles(best,force);
     }
 
-    private boolean networkPriority(DealRecord d){if(d==null)return false;if("hot".equals(d.tier))return true;if(d.qualityScore!=null&&d.qualityScore>=78)return true;return d.rating!=null&&d.rating>=7.5&&System.currentTimeMillis()-d.firstSeen<6*60*60_000L;}
+    private boolean networkPriority(DealRecord d){if(d==null)return false;if(marketStore!=null&&marketStore.isBrowserItem(d.vintedItemId))return false;if("hot".equals(d.tier))return true;if(d.qualityScore!=null&&d.qualityScore>=78)return true;return d.rating!=null&&d.rating>=7.5&&System.currentTimeMillis()-d.firstSeen<6*60*60_000L;}
     private double bundlePriority(DealRecord d){double p=d.qualityScore==null?50:d.qualityScore;if("hot".equals(d.tier))p+=30;if(d.rating!=null)p+=d.rating*2;long age=Math.max(0,System.currentTimeMillis()-d.firstSeen);p+=Math.max(0,18-age/3_600_000.0);return p;}
 
     private void resolveBacklog(){
@@ -937,6 +937,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
             bundleDatabase.increment("bundleCandidates");bundleDatabase.increment("bundleReady",cachedLocalBundles.size());bundleDatabase.increment("deepScanAvoided");
             OperationCenter.done(this,"bundle:"+source.sellerId,OperationCenter.BUNDLE,cachedLocalBundles.size()+" bundle · dati locali verificati");
             finishBundleSeller(source.sellerId,1000L);sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));return;
+        }
+        if(!force&&marketStore!=null&&marketStore.isBrowserItem(source.vintedItemId)){
+            bundleDatabase.setDiagnostic(source.signature,source.sellerId,"SNAPSHOT_EMPTY",0,0,0,"Attendo altri annunci osservati: cattura browser senza richieste remote");finishBundleSeller(source.sellerId,3000L);return;
         }
         // The local seller graph above is zero-request. Network bundle discovery waits until
         // no Motore run owns the public Vinted lane, even if its next core job is still deferred.
@@ -1729,6 +1732,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
                 "engineLocalOnly={"+engineLocalOnlySummary+"}\n"+
                 "engineResetEvidence={"+engineResetEvidence+"}\n"+
+                "browserEngine={"+BrowserCaptureDiagnostics.summary(db,marketDiag)+"}\n"+
                 "browserCapture={"+context.getSharedPreferences("vinted_browser_experiment",Context.MODE_PRIVATE).getString("report","state=NOT_RUN")+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
