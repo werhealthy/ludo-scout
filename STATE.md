@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — UX browser aggiornata e audit filtri personali, 2026-10-02 14:57
+
+Utente autorizza direzione e primo test con «Cominciamo»: scroll libero da Ludo con cattura ON, consultazione semplice OFF+azione Cattura, card Esplora bundle apre direttamente pagina Vinted con catturaON. Recovery conferma ID aperto senza share tra app; lingua indipendente verificata non richiede conferma; lingua necessaria estera non va in suggerimenti/bundle, catalogo in fondo. Pubblicazione fondamentale: no timestamp foto/first_seen sostitutivi. Profilo catturato solo per pagine già caricate, copertura parziale esplicita. Zero nuovi servizi a pagamento.
+Audit read-only su beta266594c: Home filtra owned; LocalScoutBrain filtra posseduti soltanto in picks e non fresh/topRated/cheapest/bundlePicks. MainActivity.bundleGameEligible non consulta library e controlla soltanto5prefissi esteri; BundlePlanner privo gate owned/lingua. Home offerEligible ammette?DEP. Acropolis sul telefono non ispezionato, causa specifica identità non provata. language-engine usa languageDependence/evidence, BggMetadata Java non espone il campo; provenienza necessaria.
+Specifiche aggiornate nel backlog backend, piano browser sperimentale docs/plans/2026-10-02-vinted-browser-experiment.md. Piano da rivedere secondo writing-plans prima codice; esecuzione diretta proposta, nessuna delegazione avviata. Nessun codice, fixture, dipendenza installata, APK o correzione suggerimenti ancora consegnata. Browser non scrive catalogo nel primo test; intake produzione e filtri sono consegne distinte per limitare rischio.
+Prossimo passo unico: revisione piano e conferma esecuzione diretta, poi implementazione/test browser. Frontend130 preservato. Backend5/frontend7, nessun gruppo chiuso.
+
+
 ## Backend — proposta browser passivo e vincolo zero servizi a pagamento, 2026-10-02
 
 Feedback utente14:40Europe/Rome: preferisce nuove ricerche avviate dalla sezione Ludo, vuole ridurre realmente richieste e migliorare bundle, nessuna tecnologia a pagamento. Audit read-only su beta266594cfa5a05d06f6b3c77aeb8f753f4994c260: URL presente evita ricerca ma resolveExistingMetadata continua a chiamare verifyPublicItem; seller/data mancanti possono generare VINTED_DEEP. VintedCard/recordSighting non portano ID esatto; necessario intake arricchito. BundlePlanner riusa stesso sellerID localmente; SellerBundleScanner deep riprova pagine item, senza catalogo esposto nel report. Specifica proposta e criteri del test nel backlog backend sezione “Proposta B2 — browser Vinted passivo”, non decisione di sostituzione o implementazione.

@@ -1,5 +1,9 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback backend 2026-10-02 14:57 — browser e suggerimenti affidabili
+Nuove ricerche da Ludo aprono Vinted in-app con cattura attiva; consultazione normale OFF con comando Cattura; card Esplora bundle apre direttamente Vinted/cattura, senza scheda prodotto intermedia. Recovery dall'ID attualmente aperto evita share tra app. Specifica e piano nel backlog backend, codice non implementato. Lingua indipendente verificata non richiede conferma, lingua necessaria ignota resta da verificare, estera non IT/EN esclusa da suggerimenti/bundle e in fondo al catalogo. Giochi posseduti esclusi da ogni suggerimento e membro bundle. Nuovo audit backend trova gate non uniformi in Ludo/Bundle: fix pendente, non chiudere il requisito. Pubblicazione fondamentale e nessun timestamp foto/first_seen sostitutivo. Frontend7/backend5, requisiti consolidati nelle aree esistenti; coordinare MainActivity per evitare conflitti.
+
+
 ## Feedback 2026-10-02 14:22 — proporzioni annuncio e Home
 
 Il feedback più recente corregge la posizione della barra: sotto le foto Vinted, sopra il riepilogo. Riquadro per titolo del gioco/offerta/prezzo; titolo originale dell'annuncio e informazioni successive sulla pagina, senza un ulteriore riquadro. Artwork annuncio occupa lo spazio reale sopra i pulsanti provider; testo a due righe e contenuti aggiuntivi riducono l'altezza disponibile. Conservare un minimo leggibile quando il contenuto richiede scroll, senza tagliare dati o riservare spazio al gesto.
