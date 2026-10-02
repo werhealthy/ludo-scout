@@ -76,6 +76,11 @@ jobs:
       - name: Run pet suggestion and lifecycle regression
         run: python3 regression/ludo_pet_v512108.py
 
+      - name: Verify Ludo monthly offers and paired Library shelves
+        run: |
+          python3 regression/ludo_monthly_overview.py
+          python3 regression/ludo_offers_shelves.py
+
       - name: Run Library migration and personal rating regression
         run: python3 regression/library_data_v512107.py
 

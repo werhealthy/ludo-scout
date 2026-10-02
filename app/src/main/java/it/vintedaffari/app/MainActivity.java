@@ -1442,7 +1442,7 @@ private void showFilterSheet(){
         if(scroll!=null)scroll.post(()->{if("companion".equals(tab)&&target.equals(rooms.room())){scroll.scrollTo(0,y);scroll.announceForAccessibility(rooms.isHome()?"Libreria":LudoRoomState.HUNTS.equals(rooms.room())?"Cacce":"Esplorazione");}});
     }
     private View ludoRoomTabs(){LinearLayout tabs=new LinearLayout(this);tabs.setPadding(0,dp(4),0,dp(4));addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE);addLudoRoomTab(tabs,"Cacce",LudoRoomState.HUNTS);addLudoRoomTab(tabs,"Libreria",LudoRoomState.HOME);return tabs;}
-    private void addLudoRoomTab(LinearLayout tabs,String title,String room){boolean selected=room.equals(ludoRoomState().room());TextView item=text(title,14,selected?TEXT:MUTED,Typeface.BOLD);item.setGravity(Gravity.CENTER);item.setMinHeight(dp(48));item.setSelected(selected);item.setContentDescription(title+", stanza di Ludo"+(selected?", selezionata":""));item.setBackground(round(selected?Color.rgb(61,42,90):Color.TRANSPARENT,12,0,0));item.setOnClickListener(v->switchLudoRoom(room));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(4);tabs.addView(item,lp);}
+    private void addLudoRoomTab(LinearLayout tabs,String title,String room){boolean selected=room.equals(ludoRoomState().room());TextView item=text(title,14,selected?TEXT:MUTED,Typeface.BOLD);item.setGravity(Gravity.CENTER);item.setMinHeight(dp(48));item.setSelected(selected);item.setContentDescription(title+", stanza di Ludo"+(selected?", selezionata":""));item.setBackground(round(selected?Color.rgb(61,42,90):Color.TRANSPARENT,12,0,0));item.setPadding(dp(8),dp(10),dp(8),dp(10));item.setOnClickListener(v->switchLudoRoom(room));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(8);tabs.addView(item,lp);}
     private void renderLudoHomeScene(){renderLudoEnvironment(LudoRoomState.HOME);}
     private Drawable ludoFireplaceBackground(){
         return new Drawable(){final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final Path flame=new Path();
@@ -1461,7 +1461,7 @@ private void showFilterSheet(){
         renderLudoOverview();renderLudoSearch();
     }
 
-    private Integer ludoMonthGames,ludoMonthAboveSix;private boolean ludoOverviewLoading;private long ludoOverviewAt,ludoOverviewMonth;private String ludoOverviewError;private int ludoHuntsRequest;
+    private Integer ludoMonthGames,ludoMonthGreatBuys;private boolean ludoOverviewLoading;private long ludoOverviewAt,ludoOverviewMonth;private String ludoOverviewError;private int ludoHuntsRequest;
     private void renderLudoEnvironment(String room){
         boolean home=LudoRoomState.HOME.equals(room),hunts=LudoRoomState.HUNTS.equals(room);
         FrameLayout stage=new FrameLayout(this);stage.setBackgroundColor(BG);
@@ -1479,27 +1479,39 @@ private void showFilterSheet(){
         body.addView(stage,new LinearLayout.LayoutParams(-1,height));syncPetVisibility();
     }
     private LinearLayout ludoContent(){
-        LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(18),0,dp(18),0);body.addView(content,new LinearLayout.LayoutParams(-1,-2));return content;
+        LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(18),dp(12),dp(18),dp(16));body.addView(content,new LinearLayout.LayoutParams(-1,-2));return content;
     }
     private void requestLudoOverview(){
         long now=System.currentTimeMillis(),month=LudoMonthlyOverview.monthStart(now);
         if(ludoOverviewLoading||month==ludoOverviewMonth&&(ludoMonthGames!=null||ludoOverviewError!=null)&&now-ludoOverviewAt<15000)return;
-        if(month!=ludoOverviewMonth){ludoMonthGames=null;ludoMonthAboveSix=null;ludoOverviewError=null;}ludoOverviewLoading=true;
-        uiDataIo.execute(()->{Integer games=null,above=null;String error=null;try(android.database.Cursor cursor=db.getReadableDatabase().rawQuery(LudoMonthlyOverview.STATIC_QUERY,new String[]{String.valueOf(month),String.valueOf(now)})){if(cursor.moveToFirst()){games=cursor.getInt(0);above=cursor.getInt(1);}else error="Panoramica non disponibile";}catch(RuntimeException failure){error="Non riesco a leggere la panoramica.";}
-            final Integer found=games,quality=above;final String failure=error;
-            runOnUiThread(()->{ludoOverviewLoading=false;if(isFinishing()||isDestroyed())return;ludoMonthGames=found;ludoMonthAboveSix=quality;ludoOverviewError=failure;ludoOverviewAt=System.currentTimeMillis();ludoOverviewMonth=month;if("companion".equals(tab)&&LudoRoomState.EXPLORE.equals(ludoRoomState().room()))scheduleRender(0);});
+        if(month!=ludoOverviewMonth){ludoMonthGames=null;ludoMonthGreatBuys=null;ludoOverviewError=null;}ludoOverviewLoading=true;
+        uiDataIo.execute(()->{Integer games=null,greatBuys=null;String error=null;
+            try{
+                android.database.sqlite.SQLiteDatabase database=db.getReadableDatabase();
+                String[] bounds={String.valueOf(month),String.valueOf(now),String.valueOf(month),String.valueOf(now)};
+                Set<String> identities=new HashSet<>();
+                try(android.database.Cursor cursor=database.rawQuery(LudoMonthlyOverview.SNAPSHOT_QUERY,bounds)){
+                    while(cursor.moveToNext()){
+                        games=cursor.getInt(0);if(cursor.isNull(1))continue;
+                        DealRecord deal=new DealRecord();deal.bggId=cursor.getString(1);deal.itemPriceCents=cursor.getInt(2);deal.totalCents=cursor.isNull(3)?null:cursor.getInt(3);deal.benchmarkCents=cursor.isNull(4)?null:cursor.getInt(4);deal.protectedPriceCents=cursor.isNull(5)?null:cursor.getInt(5);deal.shippingCents=cursor.isNull(6)?null:cursor.getInt(6);deal.shippingVerifiedCents=cursor.isNull(7)?null:cursor.getInt(7);deal.offerCents=cursor.isNull(8)?null:cursor.getInt(8);deal.tier=cursor.getString(9);
+                        if(DealEvaluator.evaluate(deal).decision==DealEvaluator.Decision.GREAT_BUY)identities.add(deal.bggId);
+                    }
+                }if(games==null)throw new IllegalStateException("Panoramica non disponibile");greatBuys=identities.size();
+            }catch(RuntimeException failure){games=null;greatBuys=null;error="Non riesco a leggere la panoramica.";}
+            final Integer found=games,quality=greatBuys;final String failure=error;
+            runOnUiThread(()->{ludoOverviewLoading=false;if(isFinishing()||isDestroyed())return;ludoMonthGames=found;ludoMonthGreatBuys=quality;ludoOverviewError=failure;ludoOverviewAt=System.currentTimeMillis();ludoOverviewMonth=month;if("companion".equals(tab)&&LudoRoomState.EXPLORE.equals(ludoRoomState().room()))scheduleRender(0);});
         });
     }
     private void renderLudoOverview(){
         requestLudoOverview();LinearLayout content=ludoContent();TextView month=text("QUESTO MESE",12,LIME,Typeface.BOLD);month.setLetterSpacing(.10f);content.addView(month);
-        LinearLayout stats=new LinearLayout(this);stats.setGravity(Gravity.TOP);stats.addView(ludoMetric(ludoMonthGames,"giochi trovati"),new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(0,-2,1);second.leftMargin=dp(18);stats.addView(ludoMetric(ludoMonthAboveSix,"con voto BGG > 6"),second);content.addView(stats);
-        TextView source=text(ludoOverviewError!=null?ludoOverviewError:ludoMonthGames!=null&&ludoMonthGames==0?"Il mese è appena da esplorare.":"Dagli annunci raccolti · ogni gioco contato una volta",12,MUTED,Typeface.NORMAL);source.setPadding(0,dp(8),0,dp(18));content.addView(source);
+        LinearLayout stats=new LinearLayout(this);stats.setOrientation(getResources().getConfiguration().fontScale>1.3f?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);stats.setGravity(Gravity.TOP);boolean stacked=stats.getOrientation()==LinearLayout.VERTICAL;stats.addView(ludoMetric(ludoMonthGames,"giochi trovati"),new LinearLayout.LayoutParams(stacked?-1:0,-2,stacked?0:1));LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(stacked?-1:0,-2,stacked?0:1);if(stacked)second.topMargin=dp(16);else second.leftMargin=dp(18);stats.addView(ludoMetric(ludoMonthGreatBuys,"con un’offertona attiva"),second);content.addView(stats);
+        TextView source=text(ludoOverviewError!=null?ludoOverviewError:ludoMonthGames!=null&&ludoMonthGames==0?"Il mese è appena da esplorare.":"Giochi raccolti questo mese · ogni gioco contato una volta. Offertone ancora disponibili, rispetto all’usato tipico.",12,MUTED,Typeface.NORMAL);source.setPadding(0,dp(12),0,0);content.addView(source);
         if(ludoOverviewError!=null){TextView retry=secondaryTextAction("Riprova");retry.setMinHeight(dp(48));retry.setOnClickListener(v->{ludoOverviewAt=0;requestLudoOverview();});content.addView(retry);}
     }
-    private View ludoMetric(Integer number,String label){LinearLayout metric=new LinearLayout(this);metric.setOrientation(LinearLayout.VERTICAL);metric.addView(text(number==null?"—":String.valueOf(number),48,TEXT,Typeface.BOLD));metric.addView(text(label,15,MUTED,Typeface.NORMAL));return metric;}
+    private View ludoMetric(Integer number,String label){LinearLayout metric=new LinearLayout(this);metric.setOrientation(LinearLayout.VERTICAL);metric.addView(text(number==null?"—":String.valueOf(number),48,TEXT,Typeface.BOLD));TextView caption=text(label,15,MUTED,Typeface.NORMAL);caption.setPadding(0,dp(4),0,0);metric.addView(caption);return metric;}
     private void renderLudoSearch(){
-        LinearLayout content=ludoContent();EditText search=input("Un gioco, oppure esplora tutto");search.setText(ludoSearchQuery);search.setSelection(search.getText().length());ludoSearchInput=search;search.setSingleLine(true);search.setContentDescription("Nome del gioco da cercare su Vinted");LinearLayout.LayoutParams searchLp=new LinearLayout.LayoutParams(-1,dp(52));searchLp.bottomMargin=dp(10);content.addView(search,searchLp);
-        Button browse=button("Trova nuovi giochi",VINTED_BG);browse.setTextColor(TEXT);Runnable beginSearch=()->{String term=search.getText().toString().trim();ludoSearchQuery=search.getText().toString();saveLudoRooms();openVintedBrowserExperiment("https://www.vinted.it/catalog"+(term.isEmpty()?"":"?search_text="+Uri.encode(term)),"SEARCH","");};browse.setOnClickListener(v->beginSearch.run());search.setOnEditorActionListener((v,a,event)->{beginSearch.run();return true;});content.addView(browse,new LinearLayout.LayoutParams(-1,dp(56)));
+        LinearLayout content=ludoContent();EditText search=input("Un gioco, oppure esplora tutto");search.setText(ludoSearchQuery);search.setSelection(search.getText().length());ludoSearchInput=search;search.setSingleLine(true);search.setContentDescription("Nome del gioco da cercare su Vinted");search.setMinHeight(dp(56));search.setPadding(dp(16),dp(12),dp(16),dp(12));LinearLayout.LayoutParams searchLp=new LinearLayout.LayoutParams(-1,-2);searchLp.bottomMargin=dp(12);content.addView(search,searchLp);
+        Button browse=button("Trova nuovi giochi",VINTED_BG);browse.setTextColor(TEXT);browse.setMinHeight(dp(56));browse.setPadding(dp(16),dp(12),dp(16),dp(12));Runnable beginSearch=()->{String term=search.getText().toString().trim();ludoSearchQuery=search.getText().toString();saveLudoRooms();openVintedBrowserExperiment("https://www.vinted.it/catalog"+(term.isEmpty()?"":"?search_text="+Uri.encode(term)),"SEARCH","");};browse.setOnClickListener(v->beginSearch.run());search.setOnEditorActionListener((v,a,event)->{beginSearch.run();return true;});content.addView(browse,new LinearLayout.LayoutParams(-1,-2));
     }
     private void renderLudoHunts(){
         LinearLayout host=ludoContent();host.addView(text("Carico le tue cacce…",16,MUTED,Typeface.NORMAL));
@@ -1792,8 +1804,8 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     }
 
     private static int libraryShelfCapacity(int availableDp,float fontScale){
-        int minimum=fontScale>1.3f?140:100;
-        return Math.max(1,(Math.max(0,availableDp-20)+12)/(minimum+12));
+        int minimum=fontScale>1.3f?176:140;
+        return Math.min(2,Math.max(1,(Math.max(0,availableDp-20)+12)/(minimum+12)));
     }
     private View libraryShelves(List<LibraryGame> games){
         LinearLayout shelves=new LinearLayout(this);shelves.setOrientation(LinearLayout.VERTICAL);
@@ -1808,16 +1820,16 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     private void fillLibraryShelves(LinearLayout shelves,List<LibraryGame> games,int capacity){
         shelves.removeAllViews();
         for(int start=0;start<games.size();start+=capacity){
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);if(start>0)lp.topMargin=dp(20);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);if(start>0)lp.topMargin=dp(24);
             shelves.addView(libraryShelf(games,start,Math.min(games.size(),start+capacity),capacity),lp);
         }
     }
     private View libraryShelf(List<LibraryGame> games,int start,int end,int capacity){
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);row.setPadding(dp(10),0,dp(10),dp(12));row.setMinimumHeight(dp(232));row.setBackground(libraryShelfBackdrop());
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);row.setPadding(dp(10),dp(8),dp(10),dp(16));row.setMinimumHeight(dp(320));row.setBackground(libraryShelfBackdrop());
         for(int i=start;i<end;i++){
             LibraryGame g=games.get(i);LinearLayout tile=new LinearLayout(this);tile.setOrientation(LinearLayout.VERTICAL);tile.setGravity(Gravity.CENTER_HORIZONTAL);
-            tile.addView(libraryShelfBox(g),new LinearLayout.LayoutParams(-1,dp(164)));
-            TextView name=text(g.name,13,TEXT,Typeface.BOLD);name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);name.setPadding(dp(4),dp(20),dp(4),0);tile.addView(name,new LinearLayout.LayoutParams(-1,-2));
+            tile.addView(libraryShelfBox(g),new LinearLayout.LayoutParams(-1,dp(224)));
+            TextView name=text(g.name,15,TEXT,Typeface.BOLD);name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);name.setPadding(dp(4),dp(32),dp(4),0);tile.addView(name,new LinearLayout.LayoutParams(-1,-2));
             TextView vote=text(libraryPersonalRatingLabel(g.personalRating),12,g.personalRating==null?MUTED:PINK,Typeface.NORMAL);vote.setGravity(Gravity.CENTER);vote.setPadding(dp(4),dp(6),dp(4),0);tile.addView(vote,new LinearLayout.LayoutParams(-1,-2));
             if("sold".equals(g.collectionState)){TextView sale=text(g.salePriceCents==null?"Venduto":"Venduto · "+money(g.salePriceCents),12,ORANGE,Typeface.NORMAL);sale.setGravity(Gravity.CENTER);sale.setPadding(0,dp(4),0,0);tile.addView(sale,new LinearLayout.LayoutParams(-1,-2));}
             tile.setFocusable(true);tile.setContentDescription(g.name+". Il tuo voto: "+libraryPersonalRatingLabel(g.personalRating)+("sold".equals(g.collectionState)?". Venduto":"")+". Apri il tuo gioco.");
@@ -1835,13 +1847,29 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     }
     private Drawable libraryShelfBackdrop(){
         return new Drawable(){
-            final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);LinearGradient wood;
-            @Override protected void onBoundsChange(Rect bounds){wood=new LinearGradient(0,dp(164),0,dp(178),new int[]{Color.rgb(102,72,83),Color.rgb(58,39,54),Color.rgb(36,26,42)},null,Shader.TileMode.CLAMP);}
-            public void draw(Canvas canvas){Rect b=getBounds();paint.setShader(null);paint.setColor(Color.argb(65,37,27,52));canvas.drawRect(b.left,b.top,b.right,dp(164),paint);paint.setShader(wood);canvas.drawRect(b.left,dp(164),b.right,dp(178),paint);paint.setShader(null);paint.setColor(Color.argb(100,191,150,165));canvas.drawRect(b.left,dp(164),b.right,dp(165),paint);paint.setColor(Color.argb(70,0,0,0));canvas.drawRect(b.left,dp(178),b.right,dp(183),paint);}
+            final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final Path surface=new Path(),leftWall=new Path(),rightWall=new Path();
+            LinearGradient wood,fascia,recess,shadow;float backY,frontY,lipY,shadowY;
+            @Override protected void onBoundsChange(Rect bounds){
+                float left=bounds.left,right=bounds.right,inset=Math.min(dp(28),bounds.width()*.09f);
+                backY=bounds.top+dp(198);frontY=bounds.top+dp(232);lipY=bounds.top+dp(248);shadowY=bounds.top+dp(260);
+                surface.reset();surface.moveTo(left+inset,backY);surface.lineTo(right-inset,backY);surface.lineTo(right,frontY);surface.lineTo(left,frontY);surface.close();
+                leftWall.reset();leftWall.moveTo(left,bounds.top);leftWall.lineTo(left+inset,bounds.top+dp(18));leftWall.lineTo(left+inset,backY);leftWall.lineTo(left,frontY);leftWall.close();
+                rightWall.reset();rightWall.moveTo(right,bounds.top);rightWall.lineTo(right-inset,bounds.top+dp(18));rightWall.lineTo(right-inset,backY);rightWall.lineTo(right,frontY);rightWall.close();
+                wood=new LinearGradient(0,backY,0,frontY,new int[]{Color.rgb(37,25,43),Color.rgb(73,47,64),Color.rgb(120,82,94)},null,Shader.TileMode.CLAMP);
+                fascia=new LinearGradient(0,frontY,0,lipY,Color.rgb(76,49,66),Color.rgb(32,22,39),Shader.TileMode.CLAMP);
+                recess=new LinearGradient(0,bounds.top,0,backY,Color.argb(150,15,11,26),Color.argb(90,48,31,56),Shader.TileMode.CLAMP);
+                shadow=new LinearGradient(0,lipY,0,shadowY,Color.argb(130,0,0,0),Color.TRANSPARENT,Shader.TileMode.CLAMP);
+            }
+            public void draw(Canvas canvas){
+                Rect b=getBounds();paint.setShader(recess);canvas.drawRect(b.left,b.top,b.right,backY,paint);
+                paint.setShader(null);paint.setColor(Color.argb(150,12,8,21));canvas.drawPath(leftWall,paint);canvas.drawPath(rightWall,paint);
+                paint.setShader(wood);canvas.drawPath(surface,paint);paint.setShader(fascia);canvas.drawRect(b.left,frontY,b.right,lipY,paint);
+                paint.setShader(shadow);canvas.drawRect(b.left,lipY,b.right,shadowY,paint);
+                paint.setShader(null);paint.setColor(Color.argb(130,206,161,177));canvas.drawRect(b.left,frontY,b.right,frontY+dp(1),paint);
+            }
             public void setAlpha(int alpha){}public void setColorFilter(ColorFilter filter){}public int getOpacity(){return PixelFormat.TRANSLUCENT;}
         };
     }
-
 private View libraryRow(LibraryGame g){
         LinearLayout row=new LinearLayout(this);row.setPadding(dp(12),dp(14),dp(12),dp(14));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(round(SURFACE,18,1,OUTLINE));row.addView(libraryCover(g),new LinearLayout.LayoutParams(dp(94),dp(112)));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(14),0,0,0);TextView title=text(g.name,18,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);
         TextView personal=text(libraryPersonalRatingLabel(g.personalRating),17,g.personalRating==null?MUTED:PINK,Typeface.BOLD);personal.setPadding(0,dp(7),0,dp(5));copy.addView(personal);if(g.rating!=null)copy.addView(text("BGG "+String.format(Locale.ITALY,"%.1f",g.rating)+(g.rank==null?"":" · #"+g.rank),12,MUTED,Typeface.NORMAL));
