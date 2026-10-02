@@ -69,6 +69,9 @@ jobs:
       - name: Run Home media recovery behavior regression
         run: python3 regression/home_media_v512119.py
 
+      - name: Run product pull motion regression
+        run: python3 regression/product_pull_motion.py
+
       - name: Run product gesture behavior regression
         run: python3 regression/product_gesture_v512106.py
 
@@ -236,4 +239,5 @@ jobs:
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=PR Review,O=Ludo Scout,C=IT"
       - name: Build review APK
         run: ./gradlew --no-daemon :app:assembleDebug
+
 

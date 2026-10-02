@@ -19,6 +19,7 @@ public class HomeMediaRegression {
  static class Prefs {Prefs edit(){return this;}Prefs putInt(String k,int v){return this;}Prefs putString(String k,String v){return this;}Prefs putBoolean(String k,boolean v){return this;}void apply(){}}
  final ExecutorService galleryNet=Executors.newSingleThreadExecutor();
  final Map<String,Bitmap> imageCache=new ConcurrentHashMap<>();
+ final Map<String,String> galleryPhotoResults=Collections.synchronizedMap(new LinkedHashMap<>());
  final File cache;static final int MODE_PRIVATE=0;
  HomeMediaRegression(File f){cache=f;}
  File getCacheDir(){return cache;}Prefs getSharedPreferences(String n,int mode){return new Prefs();}
@@ -50,18 +51,20 @@ public class HomeMediaRegression {
   test("foreign editions stay available outside offers",()->eq(HomeDiscoveryPolicy.eligible("20","a","FR|DEP",Collections.emptySet(),0),"declass rather than erase all Home candidates"),failures);
   test("observed variants recover same photo only",()->{List<String> urls=variants(missing,Arrays.asList(missing,good,other,good));eq(urls.equals(Arrays.asList(missing,good)),"must retain one known fallback of the same photo");},failures);
   test("cached alternative avoids remote requests",()->{physical=0;h.imageCache.clear();h.imageCache.put(good,new Bitmap(7));ImageView im=new ImageView();h.loadImageOn(h.galleryNet,im,Arrays.asList(missing,good),null,null);h.drain();eq(physical==0&&im.bitmap!=null&&im.bitmap.bytes==7,"all known cached variants must precede HTTP");},failures);
-  test("404 falls back to observed URL",()->{physical=0;h.imageCache.clear();ImageView im=new ImageView();h.loadImageOn(h.galleryNet,im,Arrays.asList(missing,good),null,null);h.drain();eq(physical==2&&im.bitmap!=null,"known fallback loads");},failures);
+  test("404 falls back to observed URL",()->{physical=0;h.imageCache.clear();ImageView im=new ImageView();h.loadImageOn(h.galleryNet,im,Arrays.asList(missing,good),null,null);h.drain();eq(physical==2&&im.bitmap!=null,"known fallback loads");eq(h.galleryPhotoResults.get(missing).contains("http:404")&&h.galleryPhotoResults.get(good).contains("result:fallback"),"each photo source retains its own result");},failures);
   for(String gate:new String[]{"blocked","limited"})test(gate+" does not fan out",()->{physical=0;h.imageCache.clear();ImageView im=new ImageView();int[] failed={0};h.loadImageOn(h.galleryNet,im,Arrays.asList("https://images.vinted.net/"+gate,good),null,()->failed[0]++);h.drain();eq(physical==1&&im.bitmap==null&&failed[0]==1,"remote control stops this attempt");},failures);
   test("failed input deletes temporary file",()->{try{h.decodeRemote(new InputStream(){public int read()throws IOException{throw new IOException("fixture");}});}catch(IOException expected){}eq(dir.list().length==0,"copy failure leaks temp file");},failures);
   // Clear any leaked file so the following assertion has an independent baseline.
   for(File f:dir.listFiles())f.delete();
   test("oversize input deletes temporary file",()->{try{h.decodeRemote(new InputStream(){int left=11*1024*1024;public int read(){return left-->0?1:-1;}public int read(byte[] b,int off,int len){if(left<=0)return -1;int n=Math.min(left,len);Arrays.fill(b,off,off+n,(byte)1);left-=n;return n;}});}catch(IOException expected){}eq(dir.list().length==0,"size rejection leaks temp file");},failures);
+  test("bounded photo trace keeps newest source",()->{h.galleryPhotoResults.clear();for(int i=0;i<70;i++)h.recordGalleryPhoto("https://images.vinted.net/"+i,"loaded",200,1);eq(h.galleryPhotoResults.size()==64&&!h.galleryPhotoResults.containsKey("https://images.vinted.net/0")&&h.galleryPhotoResults.containsKey("https://images.vinted.net/69"),"bounded session trace evicts oldest source");},failures);
   h.galleryNet.shutdownNow();if(!failures.isEmpty())throw new AssertionError(String.join("\n",failures));
  }
 }
 '''
-body=harness.replace("__METHODS__",method("private void loadImageOn(")+"\n"+method("private Bitmap decodeRemote("))
+body=harness.replace("__METHODS__",method("private void loadImageOn(")+"\n"+method("private void recordGalleryPhoto(")+"\n"+method("private Bitmap decodeRemote("))
 with tempfile.TemporaryDirectory() as tmp:
     out=Path(tmp);java=out/"HomeMediaRegression.java";java.write_text(body)
     subprocess.run(["javac","-d",tmp,str(java)]+[str(src/(n+".java")) for n in ["PhotoIdentity","HomeDiscoveryPolicy","HomePresentation","GamePreferenceState"]],check=True)
     subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.HomeMediaRegression",str(out/"cache")],check=True)
+
