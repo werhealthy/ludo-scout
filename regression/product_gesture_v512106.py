@@ -106,6 +106,7 @@ with tempfile.TemporaryDirectory() as temp:
     p=Path(temp);(p/"android/view").mkdir(parents=True)
     (p/"android/view/MotionEvent.java").write_text(motion)
     (p/"ProductGestureRegression.java").write_text(harness)
+    (p/"android/view/ViewConfiguration.java").write_text("package android.view;public class ViewConfiguration {public static ViewConfiguration get(Object context){return new ViewConfiguration();}public int getScaledTouchSlop(){return 8;}}")
     (p/"android/view/accessibility").mkdir(parents=True)
     (p/"android/view/accessibility/AccessibilityNodeInfo.java").write_text('package android.view.accessibility; public class AccessibilityNodeInfo {public static final int ACTION_CLICK=16;public static class AccessibilityAction {public AccessibilityAction(int id,String label){}}public void addAction(AccessibilityAction a){}public void setClickable(boolean b){}}')
     subprocess.run(["javac","-d",temp,str(p/"android/view/MotionEvent.java"),str(p/"ProductGestureRegression.java"),str(p/"android/view/accessibility/AccessibilityNodeInfo.java")],check=True)
