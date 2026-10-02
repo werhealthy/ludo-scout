@@ -18,4 +18,6 @@ public class BrowserCaptureStoreTest extends AndroidTestCase {
  public void testMissingCaptureIsAReadErrorNotAnEmptySearch(){try{store.snapshot(99999);fail("An unknown selected capture must not look like an empty started search");}catch(IllegalArgumentException expected){}}
  public void testDiagnosticCountsTheSameDurablePopulation(){long capture=store.beginCapture("https://www.vinted.it/catalog",10);store.commit(capture,1,Arrays.asList(card("101",null,10),card("102",1000,10)),10);String report=BrowserCaptureDiagnostics.summary(db,new MarketStore(getContext(),db));assertTrue(report,report.contains("captureId="+capture));assertTrue(report,report.contains("committedUnique=2"));assertTrue(report,report.contains("INCOMPLETE=1"));assertTrue(report,report.contains("QUEUED=1"));assertTrue(report,report.contains("globalLocalJobs=1"));}
 
+ public void testTitlelessExactIdRemainsIncompleteWithoutJob(){long capture=store.beginCapture("https://www.vinted.it/catalog",10);BrowserCandidate card=new BrowserCandidate("101","https://www.vinted.it/items/101","",1000,null,Collections.emptyMap(),Collections.emptyMap(),10);store.commit(capture,1,Collections.singletonList(card),10);assertEquals(1,store.snapshot(capture).rows.size());assertEquals("INCOMPLETE",store.snapshot(capture).rows.get(0).state);assertEquals(0,store.activeJobs());}
+
 }

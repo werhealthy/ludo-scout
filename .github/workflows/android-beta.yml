@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   build:
+    needs: browser_instrumentation
     name: Build signed debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -318,3 +319,38 @@ jobs:
 
 
 
+
+  browser_instrumentation:
+    name: Browser real SQLite and WebView contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Configure installed Android SDK and KVM
+        run: |
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          sudo chown "$(id -un)" /dev/kvm
+      - name: Create temporary instrumentation signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=Browser Tests,O=Ludo Scout,C=IT"
+      - name: Run browser instrumentation
+        run: bash regression/run_browser_android.sh
+
+      - name: Save browser contract reports and native screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-contract-evidence
+          path: |
+            browser-controls-screenshots
+            app/build/reports/androidTests/connected/debug
+            app/build/outputs/androidTest-results/connected/debug
+          if-no-files-found: ignore
