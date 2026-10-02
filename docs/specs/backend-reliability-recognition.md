@@ -1,8 +1,8 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
-## Proposta da approvare — consegna completa ricerca browser → Motore, feedback139
+## Contratto approvato — consegna completa ricerca browser → Motore, feedback139
 
-Stato: progettazione verificata sul codice, non implementazione e non nuova APK. Base audit fea1f3d6e1fbb4c306976c6d3a53c4ad8460865b. Il feedback più recente chiede una sola consegna sostanziosa con UI browser coerente al Catalogo e acquisizione reale fino alle code e al Motore. Questo contratto consolida B2/B4; UI browser e stato Motore restano nei gruppi frontend esistenti. Backend5/frontend7 aperti.
+Stato: contratto approvato in chat2026-10-02 18:05Europe/Rome, compresa migrazione additiva e coda locale indipendente da Accessibility. Progettazione verificata sul codice; piano scritto da revisionare prima del codice, nessuna nuova APK. Base audit fea1f3d6e1fbb4c306976c6d3a53c4ad8460865b. Il feedback più recente chiede una sola consegna sostanziosa con UI browser coerente al Catalogo e acquisizione reale fino alle code e al Motore. Questo contratto consolida B2/B4; UI browser e stato Motore restano nei gruppi frontend esistenti. Backend5/frontend7 aperti.
 
 ### Diagnosi139 e obiettivo
 
@@ -18,7 +18,7 @@ Raccomandazione: staging SQLite additivo per la cattura, identità per ID Vinted
 
 Alternative valutate: scrivere direttamente nelle tabelle legacy riduce i file ma non rappresenta prezzi ignoti e riusa firme ambigue; lasciare i campioni in memoria e chiamare l'analisi dalla Activity evita la migrazione ma perde lavoro alla chiusura e non dà ripresa affidabile. Lo staging aggiunge schema e responsabilità esplicite, preservando i dati e i filtri esistenti.
 
-Approvazione richiesta prima del codice: migrazione additiva e nuovo tipo di job locale browser, con esecuzione dell'analisi locale anche quando Accessibility è disabilitata. Nessuna nuova dipendenza o servizio a pagamento; nessuna modifica delle soglie BGG/pricing/classificazione o delle protezioni Vinted. Non avviare una pulizia/backfill distruttiva. Nessun recupero promesso per i156campioni già persi dalla memoria139.
+Decisione approvata: migrazione additiva e nuovo tipo di job locale browser, con esecuzione dell'analisi locale anche quando Accessibility è disabilitata. Nessuna nuova dipendenza o servizio a pagamento; nessuna modifica delle soglie BGG/pricing/classificazione o delle protezioni Vinted. Non avviare una pulizia/backfill distruttiva. Nessun recupero promesso per i156campioni già persi dalla memoria139.
 
 ### Contratto persistente
 
@@ -72,6 +72,8 @@ Test reali di pipeline con confini simulati: cattura → staging/membership → 
 Regressioni esistenti, fixture JS, unit Android, build/review APK e review indipendente prima del merge; riallineamento a beta preservando frontend concorrente. Una sola release firmata con certificato atteso, upload e distribuzione Firebase distintamente verificati. Non dichiarare UX/prestazioni telefono sulla base della CI.
 
 Prova sul telefono dopo la consegna: ricerca a prezzo basso per più risultati, due pagine al tocco, verifica barra/chip/pannello/insets/font grande, apri Motore e controlla elenco/conti/stati, chiudi e riapri senza cancellare dati, riapri uno stesso ID e verifica assenza duplicati. Restituire screenshot browser/Motore e due diagnostiche versione/tempi. Accettazione: gli ID confermati restano contabilizzati, gli elaborabili hanno lavoro/esito reale, gli incompleti hanno motivo visibile, nessun aumento automatico della rete Vinted dovuto ai campi assenti. I156campioni139 non possono essere recuperati retroattivamente se non salvati altrove.
+
+Piano operativo: [browser-engine-implementation-plan.md](browser-engine-implementation-plan.md). Il piano dettaglia i sette passaggi interni della sola consegna completa; non aggiunge gruppi al backlog.
 
 ## Backend — reset automatico disattivato139, verificato e distribuito
 

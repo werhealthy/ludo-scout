@@ -4,13 +4,19 @@
 
 Richiesta esplicita: interrompere le consegne di micro-fix, allineare la ricerca Vinted browser al design system reale del Catalogo e collegare tutti gli annunci validati al Motore con lavoro reale. Nessuna accettazione visiva del browser135/139.
 
-Contratto tecnico e UI unificato da approvare in [backend-reliability-recognition.md](backend-reliability-recognition.md), sezione “Proposta da approvare — consegna completa ricerca browser → Motore, feedback139”. È parte dei gruppi frontend Wizard/filtri e Motore esistenti, con responsabilità backend sull'intake; non un backlog parallelo.
+Contratto tecnico e UI unificato approvato18:05Europe/Rome in [backend-reliability-recognition.md](backend-reliability-recognition.md), sezione “Contratto approvato — consegna completa ricerca browser → Motore, feedback139”. È parte dei gruppi frontend Wizard/filtri e Motore esistenti, con responsabilità backend sull'intake; non un backlog parallelo.
 
 Cornice nativa: ricerca54dp e filtro con badge, pannello filtri/applica, chip attive rimuovibili, ordinamento compatto, icone coerenti Remus/FontAwesome, padding e safe insets, font grande/target48dp. Ricerche salvate in accesso dedicato. Separare ritorno, paginazione, cattura e accesso Motore per posizione e gerarchia. La WebView mantiene il sito. I filtri Catalogo BGG/sconto/lingua non diventano filtri Vinted senza dati corrispondenti.
 
 Motore: card vuota138 soltanto in assenza reale di ricerca/intake; con candidati mostrare acquisiti persistenti, incompleti, coda, analisi ed esiti. Vecchi job globali separati. Stessa popolazione per conti e liste, nessuna ruota di zeri per dati non salvati. La UI dipende dal writer durevole per ID, non dal report della Activity.
 
-Stato: proposta verificata sul codice, nessuna implementazione/APK nuova. Frontend7/backend5 aperti. Prossimo gruppo unico congiunto: browser → Motore completo; prova reset139 dopo riapertura conservata come verifica pendente, non come consegna bloccante separata.
+Stato: contratto approvato dall'utente, piano di implementazione scritto per review; nessuna implementazione/APK nuova. Frontend7/backend5 aperti. Prossimo gruppo unico congiunto: browser → Motore completo; prova reset139 dopo riapertura conservata come verifica pendente, non come consegna bloccante separata.
+
+## Feedback17:47 — Hero centrata e Motore con stati/movimento140
+
+Puntini Hero geometrici centrati (font ellissi138 rifiutato), stessa superficie36dp/simbolo18dp/target48dp/gap4dp del cuore neutro. Outline tag “Gioco in evidenza” viola, non teal; piedistallo Home sempre viola. Aiuto Motore nascosto se nessuna richiesta, con lavoro/cronologia preservati. Fasi0–3: grande attività osservata ora, piccolo altre voci in coda dello scroll; Pronti disponibilità, mai PROCESSING al centro. Cerchio intero pulsa4.5% durante attività reale; caption pausa/attesa, ferma in tali stati e con gate lifecycle/focus/attach/visibilità/animazioni. Ripartenza focus automatica entro500ms, callback eliminato su detach. Menu lettura numeri esplicita questa semantica. Query/raggruppamento/drilldown10s/gesto/percorsi esistenti invariati. Numeri/delta storici richiedono fonte backend duratura, non simulati.
+PR172/CI425 e beta161 superati; firma/upload/distribuzione tester distinti verificati, release140(1000161), evidenze in STATE. Accettazione telefono pendente. Nessun intake browser/reset/schema/rete/soglia/filtro modificato. Requisiti consolidati nel gruppo1Motore, nessuna chiusura dell'area. Prossimo gruppo frontend: percorso contestuale risoluzione/ritorno job, coordinato con ingresso dati backend; frontend7/backend5 aperti.
+
 
 ## Feedback17:18 — chiusura Hero e Motore senza ricerca
 

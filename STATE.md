@@ -1,14 +1,28 @@
 # Ludo Scout — Current state
 
-## Priorità aggiornata — browser → Motore completo, feedback139
+## Backend — browser → Motore approvato, piano operativo PR173
 
-Il feedback139 richiede un'unica prossima consegna con UI browser coerente al Catalogo e intake/code/esiti reali; nessun altro micro-fix come release autonoma. Audit base fea1f3d6e1fbb4c306976c6d3a53c4ad8460865b:156ID/96prezzi solo in memoria, catalogWrites0, observations totali0, run/captureNONE;1job residuo VINTED_DEEP PENDING/PACING distinto dalla ricerca. Stato UI snapshot pronto, non prova un problema di rendering dei job browser.
+L'utente approva in chat2026-10-02 18:05Europe/Rome la proposta PR173, compresa migrazione additiva e coda locale browser indipendente da Accessibility. Letto l'allegato CHATGPT_PROJECT_INSTRUCTIONS (1)(1).md: repository canonico, scelte materiali approvate, verifiche reali e comunicazione concisa. Nessuna modifica automatica di AGENTS/PROJECT dall'allegato.
 
-Il solo report139 conserva data1790938327666/riepilogo del reset: osservazione positiva ma non doppio riavvio né recupero storico. Le prove già distribuite139 restano valide; nessuna nuova APK qui.
+Contratto consolidato in docs/specs/backend-reliability-recognition.md e riferimento UI nella scaletta esistente. Piano tecnico docs/specs/browser-engine-implementation-plan.md:7passaggi interni per una sola consegna/release completa; source baseline6174d5b2eef80ada6fd836ffde91f42722f99238 con frontend140 preservato. Riscontrati runtime JsGameEngine con overlay Accessibility e scheduler recovery vincolato alla rete: il piano include modalità headless e recupero locale senza vincolo di connessione.
 
-Proposta tecnica e UI completa consolidata all'inizio di docs/specs/backend-reliability-recognition.md; frontend aggiornata nella scaletta unica. Richiede approvazione specifica per staging SQLite additivo e job locale browser con runtime indipendente da Accessibility. Poi piano di implementazione, test end-to-end e una sola release completa. Preservare dati/filtri/provenienza, identificare annunci per ID e non titolo/prezzo; niente job remoti Vinted per campi mancanti.
+Stato: documentazione e self-review del piano; nessun nuovo codice/APK/test prodotto eseguito. Schema/contratto già autorizzati, non richiedere nuovamente. Prima del codice la skill writing-plans richiede review del piano e scelta modalità; raccomandata Native (implementazione stesso agente, review indipendente finale). Branch backend/browser-complete-intake/PR173; riallineare prima del codice e del merge.
 
-Backend5/frontend7 aperti; nessun gruppo chiuso. Unico prossimo passo: revisione della proposta completa browser→Motore e autorizzazione della migrazione/ownership locale. La verifica del secondo avvio139 rimane pendente senza sostituire questa priorità.
+Diagnostica139 conserva data/reset originario e156ID/96prezzi solo in memoria; non dimostra doppio riavvio né writer. Frontend140 è ultima release già distribuita, evidenza nella sezione seguente. Backend5/frontend7 aperti, nessun gruppo chiuso. Unico prossimo passo: review del piano operativo e scelta modalità, poi implementare tutta la consegna nella stessa PR senza APK intermedie.
+
+## Frontend — correzioni Hero e movimento Motore140
+
+Feedback17:47Europe/Rome: puntini Hero ancora fuori centro, bordo verde del tag non coerente, nascondere richieste manuali vuote; integrare le specifiche di lettura/movimento Motore. PR172 sostituisce glyph ellissi con tre cerchi geometrici simmetrici, target48dp/superficie36dp/simbolo18dp e gap4dp preservati; stessi colori del cuore neutro. Tag Hero bordo viola112/72/145, piedistallo Home viola originale conservato. Non è accettazione visiva sul telefono.
+
+Motore nasconde aiuto quando recoveryCount0. Le fasi0–3 mostrano numero grande delle voci attive osservate, piccolo delle altre voci in coda; Pronti è disponibilità dello scroll e non entra nello stato PROCESSING del centro. Identità riconosciute raggruppate, scope/query/drilldown/cadenza10s invariati. Caption esplicite per pausa e attesa Vinted; cerchio intero pulsa4.5% durante attività, fermo per pausa/attesa e gate resume/focus/overview/attach/shown/animazioni di sistema. Gate500ms riprende al ritorno focus senza richiedere nuovo render, callback eliminato su detach. Numeri diretti, nessun incremento/delta spacciato per throughput. Menu Come leggere i numeri aggiornato. Gesto cronologia e risoluzioni già esistenti conservati; nessun nuovo writer/reset/schema/rete/soglia/filtro.
+
+CI423/run37030152542 fallisce sull'aspettativa precedente che anche phase4 sia attiva. Aggiornata la fixture160mask per escludere solo Pronti (disponibilità); aggiunta prova del centro con mask16, nessun indebolimento delle fasi0–3/pausa/attesa. Test JUnit aggiunti preservando i quattro test EngineMotionState preesistenti: Pronti, pausa/pacing e tutti7gate di movimento. CI425/run37030360750/job110915342014 success sullo head027b0fe57599e36ca9589d687b6188cb404bc700: regressioni complete/browser40/unitAndroid/compile/reviewAPK. Diff5file verificata, beta allineata a fea1f3d prima merge. PR172 merge20e20da7fb3b9a28c21d82bb92d8e51532f3bce4. Backend139 preservato.
+
+Beta161/run37030872662/job110917073668 success: regressioni/unitAndroid/APK e certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificati. Firebase upload2026-10-02T16:04:17.9952747Z e distribuzione distinta tester16:04:18.4072018Z. Release5.12.140-engine-motion(1000161), localCode189. Nessuna prova visiva/frame/lifecycle Android sul telefono dichiarata dai test di policy.
+
+Prova telefono: puntini e tag viola Hero; Motore senza lavoro/manual review con sola CTA; aprire fase e tornare, attività reale pulsante/pausa/attesa ferma, ritorno focus e animazioni di sistema disabilitate. Se il browser cattura ma la ruota resta vuota, restituire report: il writer intake è ancora assente, non sostituire i conteggi con il Catalogo. Storico conclusioni/delta resta aperto: job mutabili non sono eventi conclusi; nessuna scelta di periodo/reset implicita.
+Unico prossimo gruppo frontend: Motore, percorso contestuale di risoluzione e ritorno ai job nella stessa posizione, coordinato con l'intake backend. Browser restyling resta nel gruppo Wizard/filtri. Frontend7/backend5 aperti.
+
 
 ## Backend — reset automatico disattivato139, verificato e distribuito
 
