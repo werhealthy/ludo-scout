@@ -1690,7 +1690,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private final class GamePullProgress extends Drawable {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;
         void setProgress(float value){progress=Math.max(0f,Math.min(1f,value));invalidateSelf();}
-        @Override public void draw(Canvas canvas){if(progress<=0)return;Rect r=getBounds();float radius=dp(3f+13f*progress);circle.set(r.exactCenterX()-radius,r.exactCenterY()-radius,r.exactCenterX()+radius,r.exactCenterY()+radius);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2.5f));paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(OUTLINE);canvas.drawOval(circle,paint);paint.setColor(CYAN);canvas.drawArc(circle,-90,360*progress,false,paint);}
+        @Override public void draw(Canvas canvas){if(progress<=0)return;Rect r=getBounds();float radius=dp(3f+11.75f*progress);circle.set(r.exactCenterX()-radius,r.exactCenterY()-radius,r.exactCenterX()+radius,r.exactCenterY()+radius);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2.5f));paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(OUTLINE);canvas.drawOval(circle,paint);paint.setColor(CYAN);canvas.drawArc(circle,-90,360*progress,false,paint);}
         @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
         @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
         @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
@@ -1698,7 +1698,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
 
     private void updateGamePullHint(TextView hint,float progress,boolean ready){
         Drawable[] drawables=hint.getCompoundDrawables();if(drawables[1] instanceof GamePullProgress)((GamePullProgress)drawables[1]).setProgress(progress);
-        String label=!ready?(hint.isClickable()?"Preparazione non riuscita · tocca per riprovare":""):progress>=1?"Rilascia per aprire":progress>0?"Scheda gioco":"";
+        String label=!ready?(hint.isClickable()?"Preparazione non riuscita · tocca per riprovare":""):progress>=1?"Rilascia per aprire la scheda gioco":progress>0?"Scheda gioco":"";
         if(!label.contentEquals(hint.getText()))hint.setText(label);
         // Translate without relayout: ring, caption and content move together on the same progress.
         if(hint.getParent() instanceof View){View content=(View)hint.getParent();content.animate().cancel();
@@ -1800,10 +1800,10 @@ private void openDetail(DealRecord d){openDetail(d,false);}
             if(item.startsWith("file:")){report.append("; source=local; exists=").append(new File(item.substring(5)).exists());continue;}
             List<String> sources=gallerySources(deal,item);report.append("; knownSources=").append(sources.size());int variant=0;
             for(String source:sources){String host="unknown";try{host=new URL(source).getHost();}catch(Exception ignored){}String event=galleryPhotoResults.get(source);
-                report.append("\n  variant=").append(++variant).append("; host=").append(host).append("; ").append(event==null?"result:not_observed_this_session":event);
+                report.append("\n  variant=").append(++variant).append("; host=").append(host).append("; ").append(event==null?"result:not_in_recent_trace":event);
             }
         }
-        return report.append("\n\nEsiti delle fonti osservate in questa sessione; non prova disponibilità su Vinted. Nessuna nuova richiesta eseguita da questo controllo.").toString();
+        return report.append("\n\nUltime 64 fonti osservate in questa sessione; non prova disponibilità su Vinted. Nessuna nuova richiesta eseguita da questo controllo.").toString();
     }
     private void showListingPhotoDiagnostics(DealRecord deal){
         Dialog sheet=bottomSheet("Controlla foto");LinearLayout box=sheet.findViewById(SHEET_ID);
@@ -2155,14 +2155,14 @@ private void loadFirstRemote(ImageView im,List<String> urls,Runnable ok){loadFir
             int attempt=0;
             for(String u:urls){
                 if(im.getTag()!=request)return;attempt++;Bitmap cached=imageCache.get(u);if(cached!=null){runOnUiThread(()->{if(im.getTag()==request){im.setImageBitmap(cached);if(ok!=null)ok.run();}});return;}
-                HttpURLConnection c=null;
-                try{c=(HttpURLConnection)new URL(u).openConnection();c.setConnectTimeout(5000);c.setReadTimeout(8000);c.setInstanceFollowRedirects(true);c.setRequestProperty("User-Agent","Mozilla/5.0 Android LudoScout/5.2");int code=c.getResponseCode();
+                HttpURLConnection c=null;int responseCode=0;
+                try{c=(HttpURLConnection)new URL(u).openConnection();c.setConnectTimeout(5000);c.setReadTimeout(8000);c.setInstanceFollowRedirects(true);c.setRequestProperty("User-Agent","Mozilla/5.0 Android LudoScout/5.2");int code=c.getResponseCode();responseCode=code;
                     if(gallery){recordGalleryPhoto(u,"http",code,attempt);}if(gallery)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("galleryLastHttp",code).putString("galleryLastHost",new URL(u).getHost()).putString("galleryLastResult","http:"+code).putInt("galleryAttempts",attempt).apply();
                     if(gallery&&(code==403||code==429))break;
                     if(code<200||code>=400)continue;Bitmap b=decodeRemote(c.getInputStream());
                     if(b!=null){imageCache.put(u,b);if(gallery)recordGalleryPhoto(u,attempt>1?"fallback":"loaded",code,attempt);if(gallery)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("galleryLastResult",attempt>1?"fallback":"loaded").apply();runOnUiThread(()->{if(im.getTag()!=request)return;im.setImageBitmap(b);if(ok!=null)ok.run();});return;}
                     if(gallery)recordGalleryPhoto(u,"decode",code,attempt);if(gallery)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("galleryLastResult","decode").apply();
-                }catch(Exception ignored){if(gallery)recordGalleryPhoto(u,"io:"+ignored.getClass().getSimpleName(),0,attempt);if(gallery)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("galleryLastResult","io").apply();}finally{if(c!=null)c.disconnect();}
+                }catch(Exception ignored){if(gallery)recordGalleryPhoto(u,"io:"+ignored.getClass().getSimpleName(),responseCode,attempt);if(gallery)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("galleryLastResult","io").apply();}finally{if(c!=null)c.disconnect();}
             }
             if(fail!=null)runOnUiThread(()->{if(im.getTag()==request)fail.run();});
         });
