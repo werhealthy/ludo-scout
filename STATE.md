@@ -1,5 +1,14 @@
 # Ludo Scout — Current state
 
+## Feedback20:35 — rinviare il polish Libreria al contesto Ludo
+
+L'utente segnala che la Libreria144 non convince del tutto, ma chiede di riguardarla dopo averla integrata nella logica di Ludo e di passare al next step. Non registrare144 come accettata visivamente. Priorità di questa chat: rendere concreta la composizione Ludo con Libreria come stanza; la decisione Catalogo/Bundle20:00 resta valida nel backlog.
+
+Proposta circoscritta alle schermate esistenti, da confermare prima del cambio di navigazione: Ludo ha due stanze, Esplorazione e Casa. Esplorazione apre con Ludo esploratore, ricerca nuovi giochi come azione principale e consiglio corrente/ultimo gioco conservato; Preferiti e Cacce restano accessibili. Casa apre con Ludo vicino al camino e la Libreria reale sotto, ripiani verticali, ricerca collezione e aggiunta gioco; le scatole aprono la scheda personale144. Gusti e archivio Venduti restano secondari nel menu. Swipe orizzontale cambia stanza, selettore Esplorazione/Casa fornisce alternativa esplicita/accessibile; scroll verticale esplora il contenuto della stanza. Una volta approvata la composizione, accesso principale alla collezione in Ludo/Casa, riusando dati e componenti esistenti; gestione dei vecchi accessi Libreria da preservare con inoltro a Casa, senza duplicare collezioni.
+
+Questa è una proposta concreta, non un cambio già implementato: nessuna nuova APK, nessun asset/scenario sostituito, nessuna rimozione tab in questo checkpoint. Conservare preferiti BGG, rating, acquisti, storico vendite, Cacce, ultimo gioco e suggerimenti reali. Non aggiungere nuove logiche al Motore, che resta standby. Unico prossimo passo: confermare la composizione a due stanze, poi implementare il riuso Libreria in Casa. Frontend7/backend5 aperti.
+
+
 ## Frontend144 — Libreria verticale e scheda personale leggera
 
 Il “Vai”20:04 autorizza la rifinitura del feedback19:37. PR181 implementa ripiani successivi verticali, senza rail orizzontali: capacità dal viewport reale e font scale, ordine e tutti i risultati conservati. Stessa scatola/geometry/piano ombre già consegnati142; nessun nuovo asset necessario. Ricerca conservata; Venduti è archivio secondario nel menu root, con ritorno alla collezione nello stesso menu.
