@@ -5,7 +5,7 @@ Toolbar Vinted coerente con colori/tipografia/icone/capsule Ludo; chiudi e pausa
 
 ## Feedback approvato 2026-10-02 — scheda compatta e colore visibile
 
-Tre miniature52dp verticali accanto alla scatola, ultimo overlay+N per foto aggiuntive con galleria completa conservata. Barra informazioni senza riquadro, linea sottile e stesso margine del titolo. Alone radiale visibile del colore dealAccent esistente al posto del gradiente rettangolare troppo delicato; sfondo annuncio colorato e superfici locali traslucide senza cambiare design system globale o fill/loghi provider. Stessi contenuti, azioni, preferiti, gesto e dati; non aggiungere né eliminare informazioni. Browser backend132 preservato. Implementazione133 su frontend/product-gallery-glow; verifiche CI/distribuzione/telefono pendenti. Frontend7/backend5 aperti.
+Tre miniature52dp verticali accanto alla scatola, ultimo overlay+N per foto aggiuntive con galleria completa conservata. Barra informazioni senza riquadro, linea sottile e stesso margine del titolo. Alone radiale visibile del colore dealAccent esistente al posto del gradiente rettangolare troppo delicato; sfondo annuncio colorato e superfici locali traslucide senza cambiare design system globale o fill/loghi provider. Stessi contenuti, azioni, preferiti, gesto e dati; non aggiungere né eliminare informazioni. Browser backend132 preservato. Implementato PR155 e distribuito133(1000152): CI403 e beta152 tentativo2 superati; firma/upload/distribuzione tester distinti verificati, dettagli e flake350ms del test browser in STATE. Accettazione telefono pendente. Frontend7/backend5 aperti.
 
 
 ## Feedback attuale — azioni coerenti e colore offerta
