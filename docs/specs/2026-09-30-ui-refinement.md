@@ -1,5 +1,12 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback approvato16:06 — chiusura polish prodotto e avvio Motore
+
+Layout133 accettato dall'utente: conservarlo. Sfondo e glow devono seguire esattamente la palette del tag percentuale di sconto, condivisa tramite discountAccent, non la label Offertona; senza sconto positivo usare neutro. Cerchio azioni pieno48dp e glyph24dp, ratio1:2 anche quando un chiamante usa un pulsante più piccolo; eliminare inset7dp che restringeva la superficie. Area favorita48dp conservata, preferiti/semantica/fontAwesome invariati. Rimuovere ingresso testuale BrowserTest dalla scheda annuncio, senza cambiare gli altri ingressi browser. Implementazione134, CI/distribuzione/telefono pendenti. Fonti Material: developer.android.com/reference/kotlin/androidx/compose/material3/IconButton.composable (24dp/48dp).
+
+Prossimo gruppo Motore iniziato con audit sorgente: loadEngineOverviewSnapshot seleziona activeObservationSession o latestObservationSession; fasi e attività sono del relativo scroll, mentre intakeCount/recoveryCount sono globali. renderEngineOverview nasconde intake se entrambi i conteggi sono0 e conserva il box aiuto; i numeri dello scroll non equivalgono a tutto il Catalogo né ai campioni del browser sperimentale132. Tale browser conserva campioni/report ma non scrive intake del Motore (contratto backend132 ancora pendente). Non correggere questo con numeri fittizi, query globali mescolate al run o nuovo redesign senza diagnostica. Prossima analisi: ingressi/ritorno dei job e scope attuale, usando screenshot e report del telefono; storico conclusioni richiede ancora fonte duratura backend. Frontend7/backend5 aperti.
+
+
 ## Feedback browser 15:56 — proposta circoscritta
 Toolbar Vinted coerente con colori/tipografia/icone/capsule Ludo; chiudi e pausa/cattura, diagnostica nel menu, frecce pagine con indicatore/caricamento e nessun avanzamento autonomo. Chip ricerche salvate e ordinamento, categoria giochi da tavolo mantenuta, prezzo crescente+minimo variabile1€. Report132 dimostra500DOM ma0prezzi e nessun intakeMotore: migliorare prima estrazione/prepagina, non equiparare ID a schede pronte. Design in chat da approvare, nessun codice/nuovaAPK in questo checkpoint. Dettagli backend spec; frontend7/backend5 aperti.
 

@@ -342,7 +342,7 @@ private void applyDiscoverChrome(){
     private View gameFavoriteButton(String bggId,String gameName){return gameFavoriteButton(bggId,gameName,null);}
     private View gameFavoriteButton(String bggId,String gameName,Runnable reaction){
         final String id=GamePreferenceState.gameId(bggId);FrameLayout target=new FrameLayout(this);target.setMinimumHeight(dp(48));target.setMinimumWidth(dp(48));target.setFocusable(true);
-        TextView icon=appIcon(LudoIcons.HEART,20,TEXT);icon.setGravity(Gravity.CENTER);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);target.setPadding(dp(7),dp(7),dp(7),dp(7));target.addView(icon,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
+        TextView icon=appIcon(LudoIcons.HEART,20,TEXT);icon.setGravity(Gravity.CENTER);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);sizeIconAction(icon);target.addView(icon,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
         Runnable update=()->{boolean saved=gamePreferences().saved(id);icon.setTypeface(saved?LudoIcons.solid(this):LudoIcons.regular(this));icon.setTextColor(saved?Color.rgb(246,126,175):Color.rgb(226,221,242));icon.setAlpha(saved?1f:.75f);icon.setBackground(round(saved?Color.rgb(79,31,62):Color.rgb(23,20,34),999,1,saved?Color.rgb(164,64,112):Color.rgb(94,83,120)));target.setSelected(saved);target.setContentDescription((saved?"Rimuovi dai preferiti: ":"Salva gioco nei preferiti: ")+(TextUtils.isEmpty(gameName)?"gioco":gameName));target.setEnabled(id!=null);};
         final SharedPreferences prefs=gamePreferencePrefs();SharedPreferences.OnSharedPreferenceChangeListener changed=(p,key)->{if("favorites".equals(key))runOnUiThread(update);};
         target.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){prefs.registerOnSharedPreferenceChangeListener(changed);update.run();}public void onViewDetachedFromWindow(View v){prefs.unregisterOnSharedPreferenceChangeListener(changed);}});
@@ -590,7 +590,7 @@ private void applyDiscoverChrome(){
     private TextView discoverDiscountBadge(DealRecord d,float textSp){
         Integer saved=saving(d);if(saved==null||saved<=0)return null;
         TextView badge=discoverTextWeight("−"+saved+"%",textSp,DISCOVER_TEXT,400);badge.setGravity(Gravity.CENTER);
-        badge.setMinHeight(dp(24));badge.setPadding(dp(8),dp(4),dp(8),dp(4));int[] palette={Color.rgb(61,70,90),Color.rgb(49,80,138),Color.rgb(16,96,110),Color.rgb(12,108,60)};int color=palette[HomeDiscoveryPolicy.discountBand(saved)];badge.setBackground(round(color,7,1,color));return badge;
+        badge.setMinHeight(dp(24));badge.setPadding(dp(8),dp(4),dp(8),dp(4));int color=discountAccent(d);badge.setBackground(round(color,7,1,color));return badge;
     }
 
     private void addDiscoverFreshRail(List<DealRecord> deals){
@@ -882,8 +882,9 @@ private void applyDiscoverChrome(){
         @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
         @Override public int getOpacity(){return PixelFormat.OPAQUE;}
     };}
+    private int discountAccent(DealRecord d){Integer saved=saving(d);if(saved==null||saved<=0)return SURFACE2;int[] palette={Color.rgb(61,70,90),Color.rgb(49,80,138),Color.rgb(16,96,110),Color.rgb(12,108,60)};return palette[HomeDiscoveryPolicy.discountBand(saved)];}
     private int offerBackgroundColor(int accent,float amount){return Color.rgb(Math.round(Color.red(BG)*(1-amount)+Color.red(accent)*amount),Math.round(Color.green(BG)*(1-amount)+Color.green(accent)*amount),Math.round(Color.blue(BG)*(1-amount)+Color.blue(accent)*amount));}
-    private Drawable productPageBackground(DealRecord d){final int accent=dealAccent(d);return new Drawable(){
+    private Drawable productPageBackground(DealRecord d){final int accent=discountAccent(d);return new Drawable(){
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
         @Override protected void onBoundsChange(Rect bounds){paint.setShader(new RadialGradient(bounds.centerX(),bounds.top+dp(180),Math.max(dp(430),bounds.width()*.95f),new int[]{offerBackgroundColor(accent,.34f),offerBackgroundColor(accent,.16f),BG},new float[]{0,.55f,1},Shader.TileMode.CLAMP));}
         @Override public void draw(Canvas canvas){canvas.drawRect(getBounds(),paint);}
@@ -891,7 +892,7 @@ private void applyDiscoverChrome(){
         @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
         @Override public int getOpacity(){return PixelFormat.OPAQUE;}
     };}
-    private Drawable dealArtworkTint(DealRecord d){final int accent=dealAccent(d);return new Drawable(){
+    private Drawable dealArtworkTint(DealRecord d){final int accent=discountAccent(d);return new Drawable(){
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
         @Override protected void onBoundsChange(Rect bounds){float radius=Math.max(1,Math.max(bounds.width(),bounds.height())*.65f);paint.setShader(new RadialGradient(bounds.centerX(),bounds.top+bounds.height()*.4f,radius,new int[]{Color.argb(80,Color.red(accent),Color.green(accent),Color.blue(accent)),Color.argb(28,Color.red(accent),Color.green(accent),Color.blue(accent)),Color.TRANSPARENT},new float[]{0,.5f,1},Shader.TileMode.CLAMP));}
         @Override public void draw(Canvas canvas){canvas.drawRect(getBounds(),paint);}
@@ -1634,7 +1635,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView back=appIcon(LudoIcons.CHEVRON_LEFT,22,TEXT);back.setGravity(Gravity.CENTER);back.setContentDescription("Torna indietro");back.setOnClickListener(v->dialog.dismiss());toolbar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
         toolbar.addView(text("Annuncio",16,MUTED,Typeface.NORMAL),new LinearLayout.LayoutParams(0,-2,1));
         toolbar.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));
-        TextView more=roundIconButton(LudoIcons.ELLIPSIS_VERTICAL,TEXT,true);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));more.setBackground(new android.graphics.drawable.InsetDrawable(round(Color.argb(70,255,255,255),999,1,Color.argb(70,255,255,255)),dp(7)));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
+        TextView more=roundIconButton(LudoIcons.ELLIPSIS_VERTICAL,TEXT,true);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
         LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);
 
         LinearLayout mediaRow=new LinearLayout(this);mediaRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -1653,7 +1654,6 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView savingBadge=discoverDiscountBadge(d,12);if(savingBadge!=null){LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-2,-2);sp.leftMargin=large?0:dp(12);sp.topMargin=large?dp(6):0;moneyRow.addView(savingBadge,sp);}addProductSection(summary,moneyRow,4);
         if(d.offerCents!=null){TextView offer=text("Offerta "+money(d.offerCents),12,MUTED,Typeface.NORMAL);addProductSection(summary,offer,4);}
         boolean hasVinted=!TextUtils.isEmpty(d.vintedUrl);
-        if(hasVinted){TextView browser=secondaryTextAction("Consulta Vinted nel browser · test");browser.setOnClickListener(v->openVintedBrowserExperiment(d.vintedUrl,"VIEW",d.sellerId));addProductSection(box,browser,12);}
         LinearLayout actionBar=new LinearLayout(this);boolean stackedActions=getResources().getConfiguration().fontScale>1.2f;actionBar.setOrientation(stackedActions?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);actionBar.setPadding(dp(20),dp(12),dp(20),dp(12));actionBar.setBackgroundColor(Color.argb(150,Color.red(BG),Color.green(BG),Color.blue(BG)));
         Button vintedLink=productProviderAction(hasVinted?"Apri Vinted":"Collega annuncio",R.drawable.provider_vinted_logo,LIME,()->{if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);});
         actionBar.addView(vintedLink,stackedActions?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
@@ -1880,6 +1880,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private TextView detailSecondaryAction(String label){TextView v=text(label,13,CYAN,Typeface.BOLD);v.setGravity(Gravity.CENTER);v.setBackground(round(SURFACE2,14,0,0));return v;}
     private void showDetailActions(DealRecord d,Dialog detail,boolean missingNow,MarketStore.Job refreshJob){
         Dialog menu=bottomSheet("Azioni annuncio");LinearLayout box=menu.findViewById(SHEET_ID);addInterestActions(box,menu,d,true);
+        if(!TextUtils.isEmpty(d.vintedUrl)){TextView browser=menuAction("Apri nel browser Vinted",TEXT);browser.setOnClickListener(v->{menu.dismiss();openVintedBrowserExperiment(d.vintedUrl,"VIEW",d.sellerId);});box.addView(browser);}
         if(missingNow){TextView refresh=menuAction(refreshJob==null?"Aggiorna dati":"Dai priorità ai dati",CYAN);refresh.setOnClickListener(v->{menu.dismiss();requestDealRefresh(d);});box.addView(refresh);}
         TextView photos=menuAction("Controlla foto",TEXT);photos.setOnClickListener(v->{menu.dismiss();showListingPhotoDiagnostics(d);});box.addView(photos);
         TextView edit=menuAction("Modifica dati",TEXT);edit.setOnClickListener(v->{menu.dismiss();editListingInfo(d,detail);});box.addView(edit);
@@ -1908,7 +1909,8 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private TextView menuAction(String label,int color){TextView v=text(label,16,color,Typeface.BOLD);v.setGravity(Gravity.CENTER_VERTICAL);v.setMinHeight(dp(54));return v;}
     private TextView roundIconButton(String label,int color){TextView v=text(label,20,color,Typeface.BOLD);styleIconAction(v);return v;}
     private TextView roundIconButton(String glyph,int color,boolean fontAwesome){TextView v=appIcon(glyph,16,color);styleIconAction(v);return v;}
-    private void styleIconAction(TextView v){v.setGravity(Gravity.CENTER);v.setPadding(dp(7),dp(7),dp(7),dp(7));android.graphics.drawable.Drawable surface=round(SURFACE2,999,1,OUTLINE);v.setBackground(new android.graphics.drawable.InsetDrawable(surface,dp(7)));}
+    private void sizeIconAction(TextView v){v.setGravity(Gravity.CENTER);v.setPadding(0,0,0,0);v.setIncludeFontPadding(false);v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,dp(24));v.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot){int side=Math.min(r-l,b-t);if(side>0)v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,side*.5f);}});}
+    private void styleIconAction(TextView v){sizeIconAction(v);v.setBackground(round(SURFACE2,999,1,OUTLINE));}
     private TextView iconBadge(String glyph,int color){TextView v=appIcon(glyph,15,color==LIME?BG:TEXT);v.setBackground(round(color,999,0,0));return v;}
     private TextView scorePill(String label,int color){TextView v=text(label,13,BG,Typeface.BOLD);v.setGravity(Gravity.CENTER);v.setPadding(dp(13),0,dp(13),0);v.setBackground(round(color,999,0,0));return v;}
     private TextView softPill(String label){TextView v=text(label,12,TEXT,Typeface.BOLD);v.setGravity(Gravity.CENTER);v.setPadding(dp(12),0,dp(12),0);v.setBackground(round(SURFACE2,999,0,0));return v;}
