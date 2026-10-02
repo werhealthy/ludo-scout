@@ -74,6 +74,7 @@ assert 'https://www.vinted.it/catalog?search_text=catan' not in ui
 print("PASS Ludo composition: preserved library route, real collection, three selector tabs and themed scenes")
 import runpy
 runpy.run_path(str(root/"regression/ludo_monthly_overview.py"))
+runpy.run_path(str(root/"regression/ludo_hunts_ui.py"))
 
 def activity_method(signature):
  start=ui.index(signature);brace=ui.index("{",start);depth=0
