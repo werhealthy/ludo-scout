@@ -21,7 +21,7 @@ def method(signature):
     raise ValueError("Unclosed production method: " + signature)
 
 methods = "\n".join(method(s) for s in [
-    "private void openMarketTab(", "private void navigate(",
+    "private void openMarketTab(", "private void navigate(", "private String browserBackSection(",
     "private void dismissMarketDetailStack(", "private void openGameTag(", "private void closeDatabaseGame(", "@Override public void onBackPressed("
 ])
 if "private void finishListingDetail(" in ui:
@@ -37,7 +37,7 @@ public class MarketNavigationRegression extends ScreenBase {
     String tab="catalog", databaseDetailReturnTab="", engineSection="overview", returnTab="";
     String query="catan", databaseQuery="azul", languageFilter="IT";
     int catalogCategory=2, databaseCategory=4, catalogVisible=48;
-    long selectedGameId=0, engineDayStart=0, engineEnteredAt=0;
+    long selectedGameId=0, engineDayStart=0, engineEnteredAt=0, engineBrowserCaptureId=0;
     boolean openingPreset=false;int databaseVisible=24;String databaseScope="verified";Dialog activeGameOverlay;ArrayList<Dialog> marketDetailDialogs=new ArrayList<>();
     Dialog activeDetailDialog,activeResolutionDialog;String activeDealSignature="";boolean suppressDetailDismissState=false;
     static class Dialog { boolean showing=true; boolean isShowing(){return showing;} Runnable onDismiss;void dismiss(){showing=false;if(onDismiss!=null)onDismiss.run();} }
@@ -160,10 +160,11 @@ public class MarketNavigationRegression extends ScreenBase {
             n.engineSection=section;n.onBackPressed();equal("overview",n.engineSection,"Work list Back");
         }
     }
+    static void browserBackPreservesHierarchy(){MarketNavigationRegression n=new MarketNavigationRegression();n.tab="activity";n.engineBrowserCaptureId=42;n.engineSection="browser";n.onBackPressed();equal("overview",n.engineSection,"Browser group Back");equal(42L,n.engineBrowserCaptureId,"Capture preserved");n.engineSection="browser_day";n.onBackPressed();equal("history",n.engineSection,"Browser day Back");}
     static void roomBackUsesNavigationHooks(){MarketNavigationRegression n=new MarketNavigationRegression();n.tab="companion";n.scroll.y=640;n.tabHistory.push("discover");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomPositionRecords,"Back records room before leaving");equal(640,n.tabScrollPositions.get("companion"),"Back stores room scroll");n.tab="catalog";n.tabHistory.push("companion");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomEntries,"Back prepares room before entering");equal(640,n.scroll.y,"Back restores room scroll");}
     public static void main(String[] args){
         int failed=0;
-        Runnable[] tests={MarketNavigationRegression::roomBackUsesNavigationHooks,MarketNavigationRegression::retainsSiblingPositions,MarketNavigationRegression::motorBackFollowsHistoryHierarchy,
+        Runnable[] tests={MarketNavigationRegression::browserBackPreservesHierarchy,MarketNavigationRegression::roomBackUsesNavigationHooks,MarketNavigationRegression::retainsSiblingPositions,MarketNavigationRegression::motorBackFollowsHistoryHierarchy,
             MarketNavigationRegression::retainsIndependentSearchAndFilters,
             MarketNavigationRegression::returnsFromBundleToSource,
             MarketNavigationRegression::staleTabRestoreDoesNotMoveAnotherView,

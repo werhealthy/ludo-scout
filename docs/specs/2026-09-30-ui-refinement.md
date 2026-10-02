@@ -1,5 +1,16 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Decisione20:41 e consegna146 — Libreria come stanza di Ludo
+
+Approvato con “Vai” il modello Esplorazione/Casa. Implementato in146: cambio stanza via selettore esplicito/accessibile o swipe orizzontale intenzionale; dentro le stanze scroll verticale. Gesti verticali/diagonali/brevi/annullati/multitouch non cambiano stanza; swipe non interferisce con refresh o schede/pannelli coprenti.
+
+Esplorazione: Ludo esploratore nella foresta, ricerca manuale su Vinted basata sul gioco immesso come azione principale, consiglio corrente/ultimo gioco preservato, Preferiti/Cacce accessibili e Gusti nel menu. Casa: Ludo vicino al camino, Libreria reale sotto con ricerca/aggiunta, scaffali verticali adattivi, schede personali144 e Venduti secondari nel menu. Stesse fonti di dati, nessuna copia della collezione. Accesso principale Ludo/Casa; tab Libreria rimosso, accessi legacy/foto/draft inoltrati a Casa. Stanze, scroll indipendenti e testo ricerca sono conservati; Back salva e prepara lo stato stanza.146 supersede145 per Back e ricerca durante refresh.
+
+Implementazione e verifiche automatiche registrate in STATE.md (PR186/187). Non dichiarare accettazione visuale: utente20:35 ha rinviato il polish Libreria al contesto Ludo. Verificare sul telefono scene/gerarchia Casa, swipe vs scroll, ricerca e testo su refresh, Back/rotazione/riapertura, aggiunta/voto/vendita/BGG. Nessuna modifica a schema/backend/pricing/filtri/dipendenze o nuove scansioni; Motore standby.
+
+Frontend7/backend5 aperti. Unico prossimo gruppo raccomandato: composizione Catalogo unificato + Bundle/Esplora già approvata20:00, conservando le verifiche Ludo/Casa pendenti.
+
+
 ## Feedback20:35 — rinviare il polish Libreria al contesto Ludo
 
 L'utente segnala che la Libreria144 non convince del tutto, ma chiede di riguardarla dopo averla integrata nella logica di Ludo e di passare al next step. Non registrare144 come accettata visivamente. Priorità di questa chat: rendere concreta la composizione Ludo con Libreria come stanza; la decisione Catalogo/Bundle20:00 resta valida nel backlog.
@@ -537,4 +548,3 @@ User requested immediate grouped corrections on2026-10-01 20:43 Europe/Rome: cre
 - Test-only PR315 reproduced missing durable preferences, and PR318 reproduced missing distinct-game cycle APIs. Final executable Java regression verifies save/remove/reload/identity, canonical cycling and extracted real Activity methods for selection during refresh, removed-offer fallback, recreation and overlay/focus/lifecycle gates. Platform adapters are stubbed; this is not an Android device restart/instrumentation test. Existing pure pet lifecycle harness retains its12 cases.
 - Old UX guard corrected to explicitly inspect Home physical renderer instead of a coincidentally nearby default detail constructor; BGG content/price/route guards retained. Independent re-review of finala3127101338faa69226dc79a52158a88789ec063 found no remaining critical/important issues after duplicate-cycle, refresh-race and overlay-motion corrections.
 Phone acceptance: floor/plinth contact and depth at cover aspect ratios, backdrop crop, full pet/box and readable explanation at large fonts/small screens, Favorites save/remove reflected on multiple listings, return/restart retains last game, unavailable offer fallback, pet touch and pause/resume/disabled animation, scrolling/memory. CI does not prove visual acceptance, actual SharedPreferences process durability or frame time.
-
