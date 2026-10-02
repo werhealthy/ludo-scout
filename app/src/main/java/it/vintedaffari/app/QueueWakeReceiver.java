@@ -29,7 +29,9 @@ public final class QueueWakeReceiver extends BroadcastReceiver {
         try{
             WAKE_EXEC.execute(()->{
                 try{
-                    if(QueueWorkScheduler.ACTION_RECOVERY.equals(action)){
+                    if(QueueWorkScheduler.ACTION_BROWSER.equals(action)){QueueWorkScheduler.scheduleLocalBrowserInOwner(app);
+                    }else if(QueueWorkScheduler.ACTION_BROWSER_RECOVERY.equals(action)){QueueWorkScheduler.ensureLocalBrowserRecoveryInOwner(app);
+                    }else if(QueueWorkScheduler.ACTION_RECOVERY.equals(action)){
                         QueueWorkScheduler.ensureRecoveryLocal(app);
                     }else if(QueueWorkScheduler.ACTION_AFTER.equals(action)){
                         QueueWorkScheduler.scheduleAfterLocal(app,delay);

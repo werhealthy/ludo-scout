@@ -11,7 +11,7 @@ emulator -list-avds
 mkdir -p "$RUNNER_TEMP/ludo-browser-emulator"
 emulator -avd ludo-browser-tests -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/ludo-browser-emulator/emulator.log" 2>&1 &
 emulator_pid=$!
-trap 'adb logcat -d -b crash || true; adb logcat -d | grep -Ei "FATAL|crash|exception|instrumentation|testRunner|classnotfound|noclassdef" | tail -100 || true; tail -80 "$RUNNER_TEMP/ludo-browser-emulator/emulator.log"; adb emu kill || true' EXIT
+trap 'mkdir -p browser-controls-screenshots; adb pull /sdcard/Android/data/it.vintedaffari.app/files/browser-controls browser-controls-screenshots || true; adb logcat -d -b crash || true; adb logcat -d | grep -Ei "FATAL|crash|exception|instrumentation|testRunner|classnotfound|noclassdef" | tail -100 || true; tail -80 "$RUNNER_TEMP/ludo-browser-emulator/emulator.log"; adb emu kill || true' EXIT
 sleep 5
 if ! kill -0 "$emulator_pid" 2>/dev/null; then
   echo 'Emulator process exited before ADB became available'

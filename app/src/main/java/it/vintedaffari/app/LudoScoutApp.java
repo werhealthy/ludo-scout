@@ -9,6 +9,7 @@ public final class LudoScoutApp extends Application {
         super.onCreate();
         // The UI browser must not share the radar/queue WebView data directory.
         if (android.app.Application.getProcessName().endsWith(":ui")) android.webkit.WebView.setDataDirectorySuffix("ludo-ui");
+        if (getPackageName().equals(android.app.Application.getProcessName())) android.webkit.WebView.setDataDirectorySuffix("ludo-local");
         ProcessCrashJournal.install(this);
     }
 }

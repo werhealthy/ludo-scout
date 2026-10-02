@@ -292,3 +292,14 @@ jobs:
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=Browser Tests,O=Ludo Scout,C=IT"
       - name: Run browser instrumentation
         run: bash regression/run_browser_android.sh
+
+      - name: Save browser contract reports and native screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-contract-evidence
+          path: |
+            browser-controls-screenshots
+            app/build/reports/androidTests/connected/debug
+            app/build/outputs/androidTest-results/connected/debug
+          if-no-files-found: ignore
