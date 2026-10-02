@@ -52,7 +52,7 @@ Modifiche necessarie: DealDatabase, MarketStore, VintedCard, JsGameEngine, Vinte
 
 Test: nuovi JUnit puri per modello/presentazione; harness JVM di parser/protocollo/runner; SQLite Python usa schema/query reali; instrumentation senza librerie nuove per store/commit/runtime; fixture JS e workflow esistenti estesi. Shared files e motivazione dichiarati nella PR.
 
-### Task1: staging additivo e revisione atomica
+### Task 1: staging additivo e revisione atomica
 
 **Files:** Create BrowserCandidate.java, BrowserCaptureSql.java, BrowserCaptureStore.java; Modify DealDatabase.java DB_VERSION21→22/onCreate/onUpgrade; Test app/src/test/java/it/vintedaffari/app/BrowserCandidateTest.java, regression/browser_capture_sql.py, app/src/androidTest/java/it/vintedaffari/app/BrowserCaptureStoreTest.java.
 
@@ -64,7 +64,7 @@ Test: nuovi JUnit puri per modello/presentazione; harness JVM di parser/protocol
 - [ ] Claim at most8 in one short transaction; compare revision/lease at result commit. If candidate changed during processing keep one pending current revision; stale writer cannot finish/release a newer lease. Retry technical failures, no INCOMPLETE retry loop.
 - [ ] Run same tests GREEN plus startup_reset_disabled.py; commit “feat: persist browser captures and local analysis jobs”.
 
-### Task2: exact-ID materialization and passive provenance
+### Task 2: exact-ID materialization and passive provenance
 
 **Files:** Modify VintedCard.java, DealDatabase.java signature/record methods, MarketStore.java fingerprint/listing lookup/applyAnalysis/enqueue/reconcile/health/recovery; Create BrowserAnalysisCommitter.java; Test app/src/androidTest/java/it/vintedaffari/app/BrowserAnalysisCommitterTest.java, regression/browser_capture_provenance.py.
 
@@ -77,7 +77,7 @@ Test: nuovi JUnit puri per modello/presentazione; harness JVM di parser/protocol
 - [ ] Persist browser origin via staging/listing ID relationship and enforce it centrally in automatic Vinted enqueue and at consumer claim/recovery so alternate code paths cannot bypass it. Existing explicitly requested manual operations keep their user-authorized semantics; the capture itself never creates one.
 - [ ] Run GREEN and existing classification/identity/catalog regressions; commit “feat: materialize browser candidates by exact ID”.
 
-### Task3: local runtime and resumable queue without Accessibility
+### Task 3: local runtime and resumable queue without Accessibility
 
 **Files:** Create BrowserAnalysisRunner.java, BrowserLocalDrainWorker.java; Modify JsGameEngine.java, QueueKeepAliveService.java, QueueWorkScheduler.java, LudoScoutApp.java; Test regression/browser_analysis_runner.py, app/src/androidTest/java/it/vintedaffari/app/BrowserRuntimeTest.java.
 
@@ -90,7 +90,7 @@ Test: nuovi JUnit puri per modello/presentazione; harness JVM di parser/protocol
 - [ ] Schedule unique local wake and15min recovery without NetworkType constraint; preserve existing network-constrained jobs and priority lanes. Default process has its own WebView directory suffix initialized before any WebView; :ui ludo-ui and radar current runtime remain isolated.
 - [ ] Run GREEN and queue/runtime/workmanager regressions; commit “feat: drain browser analysis independently of accessibility”.
 
-### Task4: capture protocol confirms durable writes
+### Task 4: capture protocol confirms durable writes
 
 **Files:** Modify VintedBrowserActivity.java, app/src/main/assets/browser/vinted-capture.js; Test regression/vinted_browser_capture.test.js, regression/browser_capture_protocol.py.
 
@@ -102,7 +102,7 @@ Test: nuovi JUnit puri per modello/presentazione; harness JVM di parser/protocol
 - [ ] Keep malformed/rejected/overflow/database failures distinct. No ACK after failure; bounded protocol retry has terminal visible failure instead of indefinite duplicate flooding. Counters/diagnostics read committed data and distinguish confirmed/pending; wake local queue after successful commit.
 - [ ] Run GREEN including existing40browser fixtures; commit “feat: acknowledge browser items after durable intake”.
 
-### Task5: Catalog-style browser controls
+### Task 5: Catalog-style browser controls
 
 **Files:** Create VintedBrowserControls.java, BrowserSearchNavigation.java; Modify VintedBrowserActivity.java; Test app/src/test/java/it/vintedaffari/app/BrowserSearchNavigationTest.java, app/src/androidTest/java/it/vintedaffari/app/BrowserControlsTest.java, regression/browser_controls.py.
 
@@ -114,7 +114,7 @@ Test: nuovi JUnit puri per modello/presentazione; harness JVM di parser/protocol
 - [ ] Header close/title/menu, separate prev/page/next and capture controls; diagnostics in menu, compact status/CTA Motore. Apply safe WindowInsets, adaptive heights, keyboard/back dismissal and single-line vs wrap consciously; no broad shared-Catalog rewrite.
 - [ ] Run GREEN, capture screenshots emulator narrow/default and font1.5x, inspect spacing/icons/overlap. Record emulator screenshots as verification only, not user phone acceptance; commit “feat: align Vinted search controls with Catalog”.
 
-### Task6: persistent capture presentation and Motore integration
+### Task 6: persistent capture presentation and Motore integration
 
 **Files:** Create BrowserCapturePresentation.java; Modify MainActivity.java snapshot/readers/render/drilldown/history/navigation, EngineOverviewPresentation.java only needed additions, BrowserCaptureStore.java snapshot query; Test app/src/test/java/it/vintedaffari/app/BrowserCapturePresentationTest.java, regression/browser_engine_presentation.py, app/src/androidTest/java/it/vintedaffari/app/BrowserEnginePipelineTest.java.
 
@@ -127,7 +127,7 @@ Test: nuovi JUnit puri per modello/presentazione; harness JVM di parser/protocol
 - [ ] Preserve empty138 and separate global-job row; show stale/error/loading explicitly. Return from browser/run/detail preserves scope and scroll; diagnostics report durablecapture/job/funnel counts and local lane, not in-memory inferred work.
 - [ ] Run GREEN all existing engine/navigation regressions; commit “feat: show durable browser searches in Motore”.
 
-### Task7: full verification, alignment and one beta delivery
+### Task 7: full verification, alignment and one beta delivery
 
 **Files:** Modify .github/workflows/android-pr.yml, android-beta.yml, app/build.gradle; update existing specs and STATE only at checkpoint/merge. No new parallel product backlog.
 

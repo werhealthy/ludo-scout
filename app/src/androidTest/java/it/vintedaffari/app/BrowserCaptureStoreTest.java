@@ -1,0 +1,16 @@
+package it.vintedaffari.app;
+import android.test.AndroidTestCase;
+import android.database.Cursor;
+import java.util.*;
+/** Real Android SQLite, using the same helper as production. */
+public class BrowserCaptureStoreTest extends AndroidTestCase {
+ private DealDatabase db;private BrowserCaptureStore store;
+ protected void setUp()throws Exception{super.setUp();getContext().deleteDatabase("vinted_affari.db");db=new DealDatabase(getContext());store=new BrowserCaptureStore(db);}
+ protected void tearDown()throws Exception{db.close();getContext().deleteDatabase("vinted_affari.db");super.tearDown();}
+ private BrowserCandidate card(String id,Integer price,long at){return new BrowserCandidate(id,"https://www.vinted.it/items/"+id,"Azul",price,null,Collections.emptyMap(),Collections.emptyMap(),at);}
+ public void testDistinctIdsAndIdempotentMembership(){long capture=store.beginCapture("https://www.vinted.it/catalog",10);store.commit(capture,1,Arrays.asList(card("101",1000,10),card("102",1000,10)),10);store.commit(capture,1,Collections.singletonList(card("101",1000,20)),20);assertEquals(2,store.snapshot(capture).rows.size());assertEquals(2,store.claim(8,30).size());assertEquals(0,store.claim(8,31).size());}
+ public void testIncompleteHasNoJobAndCanResume(){long capture=store.beginCapture("https://www.vinted.it/catalog",10);store.commit(capture,1,Collections.singletonList(card("101",null,10)),10);assertEquals("INCOMPLETE",store.snapshot(capture).rows.get(0).state);assertTrue(store.claim(8,20).isEmpty());store.commit(capture,1,Collections.singletonList(card("101",1000,30)),30);assertEquals(1,store.claim(8,40).size());}
+ public void testRevisionChangeRejectsOldResult(){long capture=store.beginCapture("https://www.vinted.it/catalog",10);store.commit(capture,1,Collections.singletonList(card("101",1000,10)),10);BrowserCaptureStore.Claim old=store.claim(8,20).get(0);store.commit(capture,1,Collections.singletonList(card("101",900,30)),30);assertFalse(store.complete(old,"READY","",40));assertEquals(1,store.claim(8,50).size());}
+ public void testReceiptCountsCommittedIds(){long capture=store.beginCapture("https://www.vinted.it/catalog",10);BrowserCaptureStore.CommitReceipt result=store.commit(capture,1,Arrays.asList(card("101",null,10),card("102",1000,10)),10);assertEquals(2,result.confirmedIds);assertEquals(1,result.incompleteIds);assertEquals(0,result.updatedIds);}
+ public void testMigrationIsAdditive(){db.getWritableDatabase().execSQL("INSERT OR REPLACE INTO queue_controls(name,value) VALUES('browser-test-legacy',123)");db.getWritableDatabase().execSQL("DROP TABLE browser_capture_items");db.getWritableDatabase().execSQL("DROP TABLE browser_candidates");db.getWritableDatabase().execSQL("DROP TABLE browser_captures");db.getWritableDatabase().setVersion(21);db.close();db=new DealDatabase(getContext());store=new BrowserCaptureStore(db);assertEquals(22,db.getReadableDatabase().getVersion());try(Cursor c=db.getReadableDatabase().rawQuery("SELECT value FROM queue_controls WHERE name='browser-test-legacy'",null)){assertTrue(c.moveToFirst());assertEquals(123,c.getLong(0));}assertTrue(store.beginCapture("https://www.vinted.it/catalog",40)>0);}
+}
