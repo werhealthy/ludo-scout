@@ -768,14 +768,14 @@ public final class MarketStore {
         if(existing!=null&&!"ACTIVE".equals(lifecycle))return existing;
         ContentValues values=new ContentValues();values.put("vinted_item_id",card.itemId);values.put("vinted_url",card.itemUrl);values.put("vinted_title",card.title);values.put("current_price_cents",cents(card.itemPrice));
         if(!TextUtils.isEmpty(card.brand))values.put("brand",card.brand);if(!TextUtils.isEmpty(card.condition))values.put("item_condition",card.condition);if(!TextUtils.isEmpty(card.rawDescription))values.put("observed_text",card.rawDescription);
-        if(card.protectedPrice!=null)values.put("protected_price_cents",cents(card.protectedPrice));
+        if(card.protectedPrice!=null)values.put("protected_price_cents",cents(card.protectedPrice));else if(oldPrice!=null&&oldPrice!=cents(card.itemPrice))values.putNull("protected_price_cents");
         for(String[] field:new String[][]{{"sellerId","seller_id"},{"sellerName","seller_name"},{"publicationRaw","published_label"},{"language","language_code"}}){String value=candidate.metadata.get(field[0]);if(!TextUtils.isEmpty(value))values.put(field[1],value);}
         String photos=candidate.metadata.get("photos");if(!TextUtils.isEmpty(photos))try{org.json.JSONArray array=new org.json.JSONArray(photos);StringBuilder csv=new StringBuilder();for(int i=0;i<array.length();i++){if(csv.length()>0)csv.append(',');csv.append(array.getString(i));}values.put("listing_photos_csv",csv.toString());if(array.length()>0)values.put("image_url",array.getString(0));}catch(org.json.JSONException e){throw new IllegalArgumentException("Foto non leggibili",e);}
         values.put("last_seen",candidate.observedAt);
         long id;
         if(existing==null){values.put("temp_fingerprint","vinted:"+card.itemId);values.put("legacy_signature",signature);values.put("first_seen",candidate.observedAt);values.put("lifecycle",lifecycle);values.put("match_state","PENDING_ANALYSIS");values.put("enrichment_state","PENDING_ANALYSIS");id=db.insertOrThrow("market_listings",null,values);}
         else{id=existing;db.update("market_listings",values,"id=?",new String[]{String.valueOf(id)});db.execSQL("UPDATE market_listings SET seen_count=seen_count+1 WHERE id=?",new Object[]{id});}
-        Integer currentProtected=card.protectedPrice==null?oldProtected:cents(card.protectedPrice);
+        Integer currentProtected=card.protectedPrice==null?(oldPrice!=null&&oldPrice==cents(card.itemPrice)?oldProtected:null):Integer.valueOf(cents(card.protectedPrice));
         if(oldPrice==null||oldPrice!=cents(card.itemPrice)||!same(oldProtected,currentProtected)){ContentValues price=new ContentValues();price.put("listing_id",id);price.put("observed_at",candidate.observedAt);price.put("price_cents",cents(card.itemPrice));put(price,"protected_price_cents",currentProtected);price.put("source","browser-capture");db.insertOrThrow("price_observations",null,price);}
         return id;
     }

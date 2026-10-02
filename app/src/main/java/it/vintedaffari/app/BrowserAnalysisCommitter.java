@@ -7,7 +7,7 @@ import android.graphics.Rect;
 public final class BrowserAnalysisCommitter {
  private final DealDatabase helper;private final MarketStore market;private final BrowserCaptureStore captures;
  public BrowserAnalysisCommitter(DealDatabase helper,MarketStore market,BrowserCaptureStore captures){this.helper=helper;this.market=market;this.captures=captures;}
- static VintedCard toCard(BrowserCandidate c){return new VintedCard(c.title,c.metadata.getOrDefault("brand",""),c.metadata.getOrDefault("condition",""),c.priceCents/100.0,c.protectedPriceCents==null?null:c.protectedPriceCents/100.0,null,new Rect(),c.metadata.getOrDefault("description",""),c.metadata.getOrDefault("sellerName",""),c.itemId,c.url,"BROWSER_CAPTURE");}
+ static VintedCard toCard(BrowserCandidate c){return new VintedCard(c.title,c.metadata.getOrDefault("brand",""),c.metadata.getOrDefault("condition",""),c.priceCents/100.0,c.currentProtectedPriceCents()==null?null:c.currentProtectedPriceCents()/100.0,null,new Rect(),c.metadata.getOrDefault("description",""),c.metadata.getOrDefault("sellerName",""),c.itemId,c.url,"BROWSER_CAPTURE");}
  public boolean commit(BrowserCaptureStore.Claim claim,GameAnalysis analysis,long now){
   if(analysis==null||"error".equals(analysis.status))throw new IllegalArgumentException("Risposta di analisi non valida");
   VintedCard card=toCard(claim.candidate);ListingClassifier.Result listing=ListingClassifier.classify(card);
@@ -26,7 +26,7 @@ public final class BrowserAnalysisCommitter {
     helper.recordAnalysis(db,card,analysis,listing,claim.candidate.observedAt,signature);
     market.applyAnalysisInTransaction(db,card,analysis,listing,now);
     // Optional metadata is kept in the canonical deal when present, never synthesized.
-    db.execSQL("UPDATE deals SET seller_id=COALESCE((SELECT seller_id FROM market_listings WHERE id=?),seller_id),seller_name=COALESCE((SELECT seller_name FROM market_listings WHERE id=?),seller_name),image_url=COALESCE((SELECT image_url FROM market_listings WHERE id=?),image_url),listing_photos_csv=COALESCE((SELECT listing_photos_csv FROM market_listings WHERE id=?),listing_photos_csv),published_label=COALESCE((SELECT published_label FROM market_listings WHERE id=?),published_label) WHERE signature=?",new Object[]{listingId,listingId,listingId,listingId,listingId,signature});
+    db.execSQL("UPDATE deals SET protected_price_cents=(SELECT protected_price_cents FROM market_listings WHERE id=?),seller_id=COALESCE((SELECT seller_id FROM market_listings WHERE id=?),seller_id),seller_name=COALESCE((SELECT seller_name FROM market_listings WHERE id=?),seller_name),image_url=COALESCE((SELECT image_url FROM market_listings WHERE id=?),image_url),listing_photos_csv=COALESCE((SELECT listing_photos_csv FROM market_listings WHERE id=?),listing_photos_csv),published_label=COALESCE((SELECT published_label FROM market_listings WHERE id=?),published_label) WHERE signature=?",new Object[]{listingId,listingId,listingId,listingId,listingId,listingId,signature});
     if(gate.action==BoardGameIntakeGate.Action.REVIEW||ListingClassifier.isExtremePriceAnomaly(analysis)||listing.type==ListingClassifier.Type.EXPANSION){state="REVIEW";reason=gate.reason;}
     else if(!listing.hasPositiveBoardGameEvidence()){state="TYPE_UNVERIFIED";reason="Tipo di articolo non verificato nei dati osservati";}
     else if(!matched||analysis.averageRating==null){state="BGG_PENDING";reason="Identità o dati BGG da completare";}
