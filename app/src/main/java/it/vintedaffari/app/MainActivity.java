@@ -1649,8 +1649,8 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
         if(!TextUtils.isEmpty(g.bggId)){Button bgg=productProviderAction("BGG",R.drawable.provider_bgg_logo,SURFACE2,()->openBgg(g.bggId));bgg.setContentDescription("Apri la scheda originale su BoardGameGeek");footer.addView(bgg,new LinearLayout.LayoutParams(-1,dp(52)));}
         LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(scrollStage,new LinearLayout.LayoutParams(-1,0,1));page.addView(footer,new LinearLayout.LayoutParams(-1,-2));
         page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(24));return insets;});
-        d.setOnDismissListener(v->{PreparedGameOverlay pending=preparedGameOverlays.remove(d);if(pending!=null&&pending.dialog!=null)pending.dialog.dismiss();});
-        d.setContentView(page);d.show();page.requestApplyInsets();sc.post(()->sc.scrollTo(0,restoreY));prepareLibraryGameTransition(g,d,sc,scrollStage,box);Window w=d.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
+        d.setOnDismissListener(v->{libraryDetailDialogs.remove(d);PreparedGameOverlay pending=preparedGameOverlays.remove(d);if(pending!=null&&pending.dialog!=null)pending.dialog.dismiss();});
+        libraryDetailDialogs.add(d);d.setContentView(page);d.show();page.requestApplyInsets();sc.post(()->sc.scrollTo(0,restoreY));prepareLibraryGameTransition(g,d,sc,scrollStage,box);Window w=d.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
 
     }
     private static Long librarySaleDifference(Integer sale,Integer acquisition){return sale==null||acquisition==null?null:(long)sale-acquisition;}
@@ -1963,7 +1963,8 @@ private void openDetail(DealRecord d){openDetail(d,false);}
 
     private static final class PreparedGameOverlay {final long gameId;Dialog dialog;PreparedGameOverlay(long id){gameId=id;}}
     private final Map<Dialog,PreparedGameOverlay> preparedGameOverlays=new HashMap<>();
-    private boolean readyGameTransition(Dialog source,long gameId){PreparedGameOverlay ready=preparedGameOverlays.get(source);return !isFinishing()&&!isDestroyed()&&source.isShowing()&&activeDetailDialog==source&&(activeGameOverlay==null||!activeGameOverlay.isShowing())&&ready!=null&&ready.gameId==gameId&&ready.dialog!=null;}
+    private final Set<Dialog> libraryDetailDialogs=new HashSet<>();
+    private boolean readyGameTransition(Dialog source,long gameId){PreparedGameOverlay ready=preparedGameOverlays.get(source);return !isFinishing()&&!isDestroyed()&&source.isShowing()&&(activeDetailDialog==source||libraryDetailDialogs.contains(source))&&(activeGameOverlay==null||!activeGameOverlay.isShowing())&&ready!=null&&ready.gameId==gameId&&ready.dialog!=null;}
     private void showPreparedGameTransition(Dialog source,long gameId){
         if(!readyGameTransition(source,gameId))return;PreparedGameOverlay ready=preparedGameOverlays.get(source);Dialog target=ready.dialog;ready.dialog=null;activeGameOverlay=target;showGameOverlayWindow(target);
         Window window=target.getWindow();if(window!=null){View decor=window.getDecorView();decor.announceForAccessibility("Scheda gioco");if(ValueAnimator.areAnimatorsEnabled()){decor.setAlpha(0f);decor.setTranslationY(dp(32));decor.animate().alpha(1f).translationY(0f).setDuration(260).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();}}
