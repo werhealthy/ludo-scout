@@ -36,6 +36,23 @@ public final class VintedPhotoHashCache {
         }catch(Throwable ignored){}finally{try{helper.close();}catch(Throwable ignored){}}
     }
 
+    /** Exact URL, recent integer hash. Missing/corrupt tables are misses; no DDL here. */
+    public static Long lookupExact(Context context,String imageUrl){
+        if(context==null||TextUtils.isEmpty(imageUrl))return null;
+        String source=imageUrl.replace("&amp;","&"),key=PhotoIdentity.key(source);
+        if(TextUtils.isEmpty(key))return null;
+        DealDatabase helper=new DealDatabase(context.getApplicationContext());
+        long now=System.currentTimeMillis();
+        try{
+            SQLiteDatabase db=helper.getReadableDatabase();
+            try(Cursor cur=db.rawQuery("SELECT hash64 FROM "+TABLE+" WHERE photo_key=? AND REPLACE(image_url,'&amp;','&')=? AND typeof(hash64)='integer' AND last_at>=? AND last_at<=? LIMIT 1",
+                    new String[]{key,source,String.valueOf(now-24L*60L*60_000L),String.valueOf(now)})){
+                return cur.moveToFirst()?cur.getLong(0):null;
+            }
+        }catch(Throwable ignored){return null;}
+        finally{try{helper.close();}catch(Throwable ignored){}}
+    }
+
     public static Long lookup(SQLiteDatabase db,String imageUrl){
         if(db==null||TextUtils.isEmpty(imageUrl))return null;ensure(db);String key=PhotoIdentity.key(imageUrl);if(TextUtils.isEmpty(key))return null;
         try(Cursor c=db.rawQuery("SELECT hash64 FROM "+TABLE+" WHERE photo_key=? LIMIT 1",new String[]{key})){return c.moveToFirst()?c.getLong(0):null;}catch(Throwable ignored){return null;}

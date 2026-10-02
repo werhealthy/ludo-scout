@@ -157,6 +157,28 @@ public final class VintedPublicSession {
         }catch(Throwable ignored){}finally{try{if(db.inTransaction())db.endTransaction();}catch(Throwable ignored){}}
     }
 
+    /** Photo traffic is separate from the public-page budget and historical ledger.
+     * Bounded keys, no URLs/titles or permission/retry changes. */
+    public static void recordPhotoMatcherEvent(Context context,String event,int code){
+        if(context==null||!("cache".equals(event)||"download".equals(event)||"http".equals(event)||"error".equals(event)))return;
+        DealDatabase helper=null;SQLiteDatabase db=null;long now=System.currentTimeMillis();
+        try{
+            helper=new DealDatabase(context.getApplicationContext());db=helper.getWritableDatabase();
+            db.beginTransactionNonExclusive();
+            incLedger(db,"photo:"+event,now);
+            if("http".equals(event)){
+                String outcome=code==403?"403":code==429?"429":code>=200&&code<400?"ok":"other";
+                incLedger(db,"photo:http:"+outcome,now);
+            }
+            putControl(db,LEDGER_PREFIX+"photo:last",code,now,event);
+            db.setTransactionSuccessful();
+        }catch(Throwable ignored){}
+        finally{
+            try{if(db!=null&&db.inTransaction())db.endTransaction();}catch(Throwable ignored){}
+            try{if(helper!=null)helper.close();}catch(Throwable ignored){}
+        }
+    }
+
     /** Records a newly established exact Vinted identity. Unlike the old active-row delta,
      * this counter is monotonic inside the current ledger epoch and is not reduced when sold rows
      * later leave the active catalog. */
@@ -228,7 +250,7 @@ public final class VintedPublicSession {
             long linkedNow=0L;try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM market_listings WHERE vinted_item_id IS NOT NULL AND vinted_item_id<>''",null)){if(c.moveToFirst())linkedNow=c.getLong(0);}catch(Throwable ignored){}
             long activeDelta=Math.max(0L,linkedNow-startLinked),resolvedLinks=control(db,LEDGER_PREFIX+"link:resolved"),linkPhysical=control(db,LEDGER_PREFIX+"link:physical"),bundlePhysical=control(db,LEDGER_PREFIX+"bundle:physical"),physical=control(db,LEDGER_PREFIX+"physical"),cache=control(db,LEDGER_PREFIX+"cache");
             String ratio=resolvedLinks>0?String.format(Locale.US,"%.2f",linkPhysical/(double)resolvedLinks):"n/a";
-            return "build="+LEDGER_BUILD+", ageMs="+(startAt<=0?-1:Math.max(0L,now-startAt))+", physical="+physical+", cacheHits="+cache+", linkPhysical="+linkPhysical+", linkCacheHits="+control(db,LEDGER_PREFIX+"link:cache")+", bundlePhysical="+bundlePhysical+", catalogPhysical="+control(db,LEDGER_PREFIX+"route:catalog:physical")+", itemPhysical="+control(db,LEDGER_PREFIX+"route:item:physical")+", http200="+control(db,LEDGER_PREFIX+"http:200")+", http403="+control(db,LEDGER_PREFIX+"http403")+", http429="+control(db,LEDGER_PREFIX+"http429")+", linkedStart="+startLinked+", linkedNow="+linkedNow+", activeLinkedDelta="+activeDelta+", resolvedLinks="+resolvedLinks+", linkRequestsPerNewLink="+ratio+", last="+controlText(db,LEDGER_PREFIX+"last");
+            return "build="+LEDGER_BUILD+", ageMs="+(startAt<=0?-1:Math.max(0L,now-startAt))+", physical="+physical+", cacheHits="+cache+", linkPhysical="+linkPhysical+", linkCacheHits="+control(db,LEDGER_PREFIX+"link:cache")+", bundlePhysical="+bundlePhysical+", catalogPhysical="+control(db,LEDGER_PREFIX+"route:catalog:physical")+", itemPhysical="+control(db,LEDGER_PREFIX+"route:item:physical")+", http200="+control(db,LEDGER_PREFIX+"http:200")+", http403="+control(db,LEDGER_PREFIX+"http403")+", http429="+control(db,LEDGER_PREFIX+"http429")+", linkedStart="+startLinked+", linkedNow="+linkedNow+", activeLinkedDelta="+activeDelta+", resolvedLinks="+resolvedLinks+", linkRequestsPerNewLink="+ratio+", photoMatcher={build=photo-cache-reuse-v1;cacheHits="+control(db,LEDGER_PREFIX+"photo:cache")+";downloadAttempts="+control(db,LEDGER_PREFIX+"photo:download")+";httpResponses="+control(db,LEDGER_PREFIX+"photo:http")+";http403="+control(db,LEDGER_PREFIX+"photo:http:403")+";http429="+control(db,LEDGER_PREFIX+"photo:http:429")+";errors="+control(db,LEDGER_PREFIX+"photo:error")+";scope=matcher-only;separateFromPageBudget=true}, last="+controlText(db,LEDGER_PREFIX+"last");
         }catch(Throwable t){return "error="+t.getClass().getSimpleName();}
         finally{try{h.close();}catch(Throwable ignored){}}
     }

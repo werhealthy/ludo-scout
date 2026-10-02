@@ -25,19 +25,31 @@ public final class VintedPhotoMatcher {
         File observed=ThumbnailStore.fileFor(context,signature);
         if(!observed.exists()||observed.length()<2048)return Double.NaN;
         Bitmap a=decodeFile(observed,420,520);if(a==null)return Double.NaN;
+        // Exact source only: different crops/sizes may have different hashes.
+        String source=candidateImageUrl.replace("&amp;","&");
+        Long cached=null;
+        try{cached=VintedPhotoHashCache.lookupExact(context,source);}catch(Throwable ignored){}
+        if(cached!=null){
+            try{
+                double sim=VisualCoverMatcher.similarity(VisualCoverMatcher.queryHashes64(a),cached);
+                VintedPublicSession.recordPhotoMatcherEvent(context,"cache",0);
+                return sim;
+            }finally{if(!a.isRecycled())a.recycle();}
+        }
         Bitmap b=null;HttpURLConnection c=null;InputStream in=null;
         try{
-            c=(HttpURLConnection)new URL(candidateImageUrl.replace("&amp;","&")).openConnection();
+            c=(HttpURLConnection)new URL(source).openConnection();
             c.setConnectTimeout(4500);c.setReadTimeout(6500);c.setInstanceFollowRedirects(true);
             c.setRequestProperty("User-Agent","Mozilla/5.0 Android LudoScout/5.11");
-            int code=c.getResponseCode();if(code<200||code>=400)return Double.NaN;
+            VintedPublicSession.recordPhotoMatcherEvent(context,"download",0);
+            int code=c.getResponseCode();VintedPublicSession.recordPhotoMatcherEvent(context,"http",code);if(code<200||code>=400)return Double.NaN;
             in=c.getInputStream();b=decodeStream(in,420,520);if(b==null)return Double.NaN;
             double sim=VisualCoverMatcher.similarity(a,b);
             // Test 8: this image was already downloaded by the normal resolver. Persist only its
             // perceptual hash so other observations can reuse the visual evidence with zero extra HTTP.
-            try{VintedPhotoHashCache.record(context,candidateImageUrl,b);}catch(Throwable ignored){}
+            try{VintedPhotoHashCache.record(context,source,b);}catch(Throwable ignored){}
             return sim;
-        }catch(Throwable ignored){return Double.NaN;}
+        }catch(Throwable ignored){VintedPublicSession.recordPhotoMatcherEvent(context,"error",0);return Double.NaN;}
         finally{try{if(in!=null)in.close();}catch(Exception ignored){}if(c!=null)c.disconnect();if(a!=null&&!a.isRecycled())a.recycle();if(b!=null&&!b.isRecycled())b.recycle();}
     }
 
