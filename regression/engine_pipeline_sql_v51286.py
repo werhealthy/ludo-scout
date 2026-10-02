@@ -27,7 +27,7 @@ else:
         sql,items,active=subprocess.check_output(['java','-cp',temp,'it.vintedaffari.app.PrintPipeline'],text=True).split('\n---QUERY---\n')
 db=sqlite3.connect(':memory:')
 db.executescript('''
-CREATE TABLE observations(signature TEXT,observed_at INTEGER,display_name TEXT,game_name TEXT,vinted_title TEXT);
+CREATE TABLE observations(id INTEGER PRIMARY KEY,signature TEXT,observed_at INTEGER,display_name TEXT,game_name TEXT,vinted_title TEXT,analysis_status TEXT DEFAULT 'pending',verification_state TEXT DEFAULT 'PENDING_ANALYSIS');
 CREATE TABLE games(id INTEGER PRIMARY KEY,bgg_id TEXT,match_state TEXT,rating REAL,database_visible INTEGER);
 CREATE TABLE market_listings(id INTEGER PRIMARY KEY,game_id INTEGER,legacy_signature TEXT,temp_fingerprint TEXT,lifecycle TEXT,enrichment_state TEXT,manual_review_required INTEGER,match_state TEXT,vinted_item_id TEXT,vinted_url TEXT);
 CREATE TABLE deals(signature TEXT,verification_state TEXT,lifecycle TEXT,listing_type TEXT,tier TEXT,rating REAL,bgg_id TEXT,vinted_item_id TEXT,vinted_url TEXT,benchmark_cents INTEGER DEFAULT 2000,total_cents INTEGER DEFAULT 1000,discount REAL DEFAULT 50);
@@ -120,3 +120,58 @@ add('same',201,'201',7,'MATCHED','CORE_COMPLETE',True)
 add('same',202,'201',7,'MATCHED','CORE_COMPLETE',True)
 assert sum(counts().values())==1,'shared legacy signature inflated identity'
 print('PASS shared legacy signature deduplicates canonical game')
+# Classifier rejection is a completed exclusion, never executable recognition work.
+for table in ['observations','games','market_listings','deals','processing_jobs']:db.execute('DELETE FROM '+table)
+add('classifier-blocked',state='BLOCKED_CLASSIFIER')
+add('local-pending')
+assert counts()=={0:1},('classifier-blocked listing advertised as recognition work',counts())
+# Raw blocked/completed sightings cannot resurrect an older pending observation.
+db.execute("INSERT INTO observations(signature,observed_at) VALUES('raw-blocked',90)")
+db.execute("INSERT INTO observations(signature,observed_at,verification_state) VALUES('raw-blocked',100,'BLOCKED_CLASSIFIER')")
+db.execute("INSERT INTO observations(signature,observed_at) VALUES('raw-done',100)")
+db.execute("INSERT INTO observations(signature,observed_at,analysis_status,verification_state) VALUES('raw-done',100,'matched','OK')")
+assert counts()=={0:1},('terminal raw observations advertised as recognition work',counts())
+print('PASS terminal classifier/raw exclusions preserve executable local analysis')
+
+# Queue membership describes durable pending work or pending local analysis, not phase stock.
+def queued_counts():
+    import re
+    expression=re.search(r'static String queuedCounts\(\)\{return (.*?);\}',source.read_text())
+    assert expression is not None,'production queue membership query is missing'
+    if '--source-eval' in sys.argv:
+        query=literal(ast.parse('('+expression.group(1)+')',mode='eval').body)
+    else:
+        with tempfile.TemporaryDirectory() as temp:
+            runner=pathlib.Path(temp)/'PrintQueue.java'
+            runner.write_text('package it.vintedaffari.app; public class PrintQueue {public static void main(String[] args){System.out.print(EnginePipelineSql.queuedCounts());}}')
+            subprocess.run(['javac','-d',temp,str(source),str(runner)],check=True)
+            query=subprocess.check_output(['java','-cp',temp,'it.vintedaffari.app.PrintQueue'],text=True)
+    return dict(db.execute(query,('0','200')))
+assert queued_counts()=={0:1}
+# A process death between raw observation and canonical intake leaves no executable row.
+db.execute("INSERT INTO observations(signature,observed_at) VALUES('raw-orphan',100)")
+assert counts()=={0:2},'raw pending evidence disappeared'
+assert queued_counts()=={0:1},'raw-only pending observation invented an executable queue'
+for table in ['observations','games','market_listings','deals','processing_jobs']:db.execute('DELETE FROM '+table)
+price=add('price-missing',301,'301',7,'MATCHED','CORE_COMPLETE',True)
+db.execute("UPDATE deals SET benchmark_cents=NULL,discount=NULL WHERE signature='price-missing'")
+assert counts()=={3:1} and queued_counts()=={},'missing pricing invented a pending job'
+pending=add('vinted-pending',302,'302',7,'MATCHED','PENDING_ENRICHMENT',True)
+db.execute("INSERT INTO processing_jobs(listing_id,game_id,job_type,source,state) VALUES(?,302,'VINTED_ENRICHMENT','AUTO','PENDING')",(pending,))
+assert counts()=={3:2} and queued_counts()=={3:1}
+db.execute("UPDATE processing_jobs SET state='PROCESSING'")
+assert queued_counts()=={},'processing work counted a second time as waiting'
+db.execute("UPDATE processing_jobs SET state='FAILED_RETRYABLE'")
+assert queued_counts()=={3:1},'durable retry work disappeared from queue'
+db.execute("UPDATE processing_jobs SET job_type='VINTED_DEEP_ENRICHMENT'")
+assert queued_counts()=={},'optional deep metadata advertised as core queue'
+db.execute("UPDATE processing_jobs SET source='MANUAL_RECOVERY'")
+assert queued_counts()=={3:1},'explicit manual recovery disappeared from core queue'
+print('PASS phase stock versus local/durable/retry queue, live work and optional deep exclusion')
+
+# The BGG local identity matcher also owns canonical work outside durable jobs.
+add('bgg-local',303,gs='BGG_MATCH_REQUIRED',state='ANALYZED')
+assert queued_counts()=={1:1,3:1},'canonical BGG local matching lost its executable queue'
+db.execute("UPDATE games SET bgg_id='303' WHERE id=303")
+assert queued_counts()=={3:1},'BGG-required marker with an existing identity invented matching work'
+print('PASS canonical BGG local matcher membership matches its real selector')

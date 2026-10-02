@@ -1,5 +1,13 @@
 # Ludo Scout — Changelog
 
+## 5.12.150 — Contatori Motore coerenti (2026-10-02)
+
+- Gli annunci bloccati dal classificatore non restano più tra quelli da riconoscere.
+- La coda indica analisi locali e attività persistenti pendenti, separatamente dagli elementi con dati incompleti.
+- Diagnostica delle stesse fasi mostrate sullo schermo; pronti per gioco distinti dai singoli annunci completi.
+- Nessun reset, migrazione, modifica ai filtri, alle soglie prezzo o alle richieste Vinted.
+
+
 ## 5.12.83 — Salute della misura Motore (2026-09-30)
 
 - La diagnostica distingue i tentativi di campionamento riusciti da quelli falliti e mostra solo la classe dell’errore, senza messaggi o dati degli annunci.
