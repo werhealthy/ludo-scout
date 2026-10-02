@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Frontend — feedback121 e scaletta UX ampliata, 2026-10-02 10:43 Europe/Rome
+Utente considera Home fatta, ma chiede revisione sistemica di Motore, schede prodotto/relazione annuncio-gioco-Libreria, Catalogo/annunci/giochi/bundle, ruoloLudo, Libreria, wizard e azioni secondarie/micro-interazioni. Scaletta unica aggiornata a7gruppi sostanziosi (backend separato5); precedente3 era troppo aggregato e non rappresentava questo nuovo scope. Feature consegnate conservate; implementato/testato non significa accettatoUX.
+Feedback121 respinge outline e rimozione loghi: pulsanti pieni con fondo uguale al fondo dell’assetVinted/BGG e loghi ripristinati, colori da verificare sugli asset. Cerchio deve percorrere l’inverso in dimensione/riempimento insieme al contenuto, diventando invisibile solo a fine ritorno;121 azzeraDrawable subito e anima solo il contenuto.
+Registrate richieste: padding/densità/tabs delle schede; aggiungere “gioco” alla ricerca tutorialYouTube; centralitàbundle, browserannunci primario e databasecompleto; auditLudo distinto daHome con tracking/prezzoobiettivo come ipotesi; Libreria e wizard; consolidamento azioni ridondanti e checkA/B con alternative sicure. Unificazione schede, nuovi tab/ruoloLudo/tracking non approvati automaticamente: serve analisi attuale e proposta.
+Questo checkpoint è documentale: nessuna nuovaAPK, codice/fix o auditUX completo eseguiti. Distribuzione121 e proveCI restano registrate sotto, ma gesto/pulsanti non accettati. Prova fotoMarraCash ancora aperta. Backend120 e prioritàriduzione richieste/blocchiVinted restano separati, non modificati da questo aggiornamento.
+Unico prossimo passo frontend: correzione gesto inverso+pulsanti con loghi nel gruppoSchede; quindi riprendere Motore nella direzione concordata. Fonte operativa:docs/specs/2026-09-30-ui-refinement.md.
+
+
 ## Frontend — scheda prodotto, gesto e diagnosi foto 5.12.121
 Feedback telefono119 del2026-10-02: Home/lingue generalmenteOK, scheda prodotto non accettata; dispersione visiva, loghi rettangolari, testi ridondanti, cerchio troppo grande e contenuto fermo. Passaggio proposto approvato con «Vai» alle10:10Europe/Rome.
 Annuncio: titolo/categorie/segnale/prezzo riuniti in una superficie compatta, Foto dell’annuncio e nota ordinaria foto in memoria rimossi. Barra persistente continuaBG e pulsanti stesso sfondo con bordo/arrow condivisi e nomi Vinted/BGG; niente bitmap rettangolari nei soli pulsanti persistenti. Artwork/foto reali, prezzi/dati/preferiti/azioni conservati. Font grandi mantengono stack.
