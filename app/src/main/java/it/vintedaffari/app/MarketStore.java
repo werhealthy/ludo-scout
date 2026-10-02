@@ -45,6 +45,12 @@ public final class MarketStore {
     public static final String FAILED_PERMANENT = "FAILED_PERMANENT";
     public static final String COMPLETE = "COMPLETE";
     private static final String TAG = "LudoPipeline";
+    private static final String RESET_LISTING_EVIDENCE_SQL =
+            "SELECT COALESCE(lifecycle,'UNKNOWN_STATE'),COUNT(*),SUM(CASE WHEN vinted_url IS NULL OR vinted_url='' THEN 1 ELSE 0 END) FROM market_listings GROUP BY COALESCE(lifecycle,'UNKNOWN_STATE') ORDER BY 1";
+    private static final String RESET_OBSERVATION_EVIDENCE_SQL =
+            "SELECT COUNT(*),MIN(observed_at),MAX(observed_at),SUM(CASE WHEN observed_at>=CAST(? AS INTEGER) AND observed_at<=CAST(? AS INTEGER) THEN 1 ELSE 0 END) FROM observations";
+    private static final String RESET_MARKER_EVIDENCE_SQL =
+            "SELECT value,updated_at,text_value FROM queue_controls WHERE name='diag:fresh_start_reset' LIMIT 1";
     private static final String VINTED_MISSING_BREAKDOWN_SQL =
             "SELECT COUNT(*),"+
             "SUM(CASE WHEN stage='notBggQualified' THEN 1 ELSE 0 END),"+
@@ -2983,6 +2989,25 @@ public final class MarketStore {
         return "scope=activeRun;unit=listings;limit=8;count="+n+"; "+(out.length()==0?"none":out.toString());
     }
 
+    /** Historical SQLite evidence only; absence is not proof that a reset never ran. */
+    public String engineResetEvidence(){
+        SQLiteDatabase db=helper.getReadableDatabase();long now=System.currentTimeMillis();StringBuilder out=new StringBuilder("build=reset-evidence-v1;source=sqlite;scope=allStored;atomic=false");
+        try(Cursor c=db.rawQuery(RESET_MARKER_EVIDENCE_SQL,null)){
+            if(c.moveToFirst())out.append(";resetRecord=PRESENT;recordedAt=").append(c.getLong(1)).append(";mixedOperationCount=").append(c.getLong(0)).append(";summary=").append(safe(c.getString(2)));
+            else out.append(";resetRecord=ABSENT;absenceDoesNotExcludeReset=true");
+        }catch(Exception e){out.append(";resetRecord=READ_ERROR;markerError=").append(e.getClass().getSimpleName());}
+        out.append(";listings={");int groups=0;
+        try(Cursor c=db.rawQuery(RESET_LISTING_EVIDENCE_SQL,null)){
+            while(c.moveToNext()){if(groups++>0)out.append("|");out.append(safe(c.getString(0))).append(":total=").append(c.getLong(1)).append(",missingUrl=").append(c.getLong(2));}
+            if(groups==0)out.append("empty");
+        }catch(Exception e){out.append("READ_ERROR:").append(e.getClass().getSimpleName());}
+        out.append("};observations={since24h=").append(now-24L*60L*60_000L).append(";until=").append(now);
+        try(Cursor c=db.rawQuery(RESET_OBSERVATION_EVIDENCE_SQL,new String[]{String.valueOf(now-24L*60L*60_000L),String.valueOf(now)})){
+            if(c.moveToFirst())out.append(";total=").append(c.getLong(0)).append(";oldestAt=").append(c.isNull(1)?"none":String.valueOf(c.getLong(1))).append(";newestAt=").append(c.isNull(2)?"none":String.valueOf(c.getLong(2))).append(";last24h=").append(c.getLong(3));
+        }catch(Exception e){out.append(";state=READ_ERROR;error=").append(e.getClass().getSimpleName());}
+        return out.append("}").toString();
+    }
+
     /** Current-run local holds are observations, not missing remote jobs. No cause is inferred. */
     public String engineLocalOnlySummary(){
         DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return "state=NONE";
@@ -3548,6 +3573,7 @@ public final class MarketStore {
     private static String safe(String s){return s==null?"":(s.length()>600?s.substring(0,600):s);}
     private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Long)v.put(k,(Long)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
+
 
 
 

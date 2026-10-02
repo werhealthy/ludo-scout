@@ -73,6 +73,9 @@ jobs:
       - name: Run Home media recovery behavior regression
         run: python3 regression/home_media_v512119.py
 
+      - name: Run read-only startup reset evidence regression
+        run: python3 regression/engine_reset_evidence.py
+
       - name: Run engine diagnostic local-only SQLite regression
         run: python3 regression/engine_diagnostic_local_only.py
 
@@ -303,6 +306,7 @@ jobs:
             --app "$FIREBASE_APP_ID" \
             --testers "$FIREBASE_TESTERS" \
             --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+
 
 
 
