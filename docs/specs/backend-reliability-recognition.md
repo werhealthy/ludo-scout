@@ -7,6 +7,14 @@ Le modifiche vanno mantenute piccole, misurabili e reversibili. Nessun miglioram
 
 ## Priorità operative
 
+### 5.12.128 — scope diagnostico LOCAL_ONLY consegnato, 2026-10-02
+
+Il checkpoint 5.12.124 mostrava `coreRemaining=2` ma 7 righe in `engineCoreRemaining`. Audit dei writer e dei contatori: `LOCAL_ONLY` è un hold locale intenzionale e viene già escluso da `DealDatabase.engineRangeCounts()`; `DEFERRED_LINK` ha già promozione bounded sotto gate Vinted. Il difetto dimostrato era quindi di osservabilità, non la prova di job persi.
+
+PR145 ha allineato il riepilogo alla verità del run, aggiunto `engineLocalOnly` scoped e separato `localOnly` da `eligible` nel breakdown globale. Regressione SQLite esegue i SQL di produzione e verifica esclusività/riconciliazione. Nessuna modifica a queue writer, soglie, pacing, budget, retry, schema o rete.
+
+Verifica: Android beta146/run37000757503/job110817671805 success; signer previsto confermato; Firebase release `5.12.128-engine-diagnostic-scope (1000146)` caricata e distribuita ai tester. Il prossimo dato necessario è una sola diagnostica completa dalla 5.12.128 senza nuove scansioni/richieste forzate, per isolare gli eventuali blocker remoti reali prima di qualsiasi intervento sullo scheduling. Backend resta 5 gruppi; frontend 7 aree.
+
 ## Checkpoint backend — ricerca Motore, 2026-10-02 12:51 Europe/Rome
 
 Richiesta utente: conservare la ricerca come know-how e rimandare ogni nuova indagine/implementazione alla prossima chat. Report originale: [docs/research/ludo-scout-engine-report-2026-10-02.md](docs/research/ludo-scout-engine-report-2026-10-02.md). È un audit storico riferito principalmente a 5.12.41: ipotesi, percorsi e raccomandazioni vanno riconfermati sull'ultimo beta. PROJECT/AGENTS/STATE già esistono; non ricrearli. Citazioni filecite/search del report appartengono alla sessione originale e non sono prove navigabili nel repository.
