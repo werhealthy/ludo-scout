@@ -71,7 +71,9 @@ assert 'refreshHost.setRoomSwipeHandler' in ui
 assert 'petView.setExplorer(true)' in ui and 'ludoFireplaceBackground()' in ui
 assert 'Avvia nuove ricerche · test' not in ui
 assert 'https://www.vinted.it/catalog?search_text=catan' not in ui
-print("PASS Ludo composition: library route bridges to Casa, actual collection reuse, both selector tabs, themed scenes and real search")
+print("PASS Ludo composition: preserved library route, real collection, three selector tabs and themed scenes")
+import runpy
+runpy.run_path(str(root/"regression/ludo_monthly_overview.py"))
 
 def activity_method(signature):
  start=ui.index(signature);brace=ui.index("{",start);depth=0
@@ -125,3 +127,21 @@ with tempfile.TemporaryDirectory() as tmp:
  subprocess.run(["javac","-d",tmp,str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"LudoSearchDraftRegression"],check=True)
 assert 'search.setText(ludoSearchQuery)' in ui and '.putString("search",ludoSearchDraft())' in ui
+
+month_harness=r'''package it.vintedaffari.app;
+import java.time.*;
+public class LudoMonthBoundaryRegression {
+ static void check(long now,long want){if(LudoMonthlyOverview.monthStart(now)!=want)throw new AssertionError("Europe/Rome calendar month");}
+ public static void main(String[] args){
+  check(Instant.parse("2026-10-01T00:05:00Z").toEpochMilli(),Instant.parse("2026-09-30T22:00:00Z").toEpochMilli());
+  check(Instant.parse("2026-10-31T23:30:00Z").toEpochMilli(),Instant.parse("2026-10-31T23:00:00Z").toEpochMilli());
+  check(Instant.parse("2026-03-31T23:30:00Z").toEpochMilli(),Instant.parse("2026-03-31T22:00:00Z").toEpochMilli());
+  LudoRoomState restored=new LudoRoomState("hunts",110,220,330);
+  if(restored.position("hunts")!=220||restored.switchTo("home",240)!=330||restored.switchTo("explore",350)!=110||restored.switchTo("hunts",130)!=240)throw new AssertionError("all room positions must survive persistence");
+  System.out.println("PASS calendar month in Europe/Rome across DST and all three restored room positions");
+ }
+}'''
+with tempfile.TemporaryDirectory() as tmp:
+ p=Path(tmp)/"LudoMonthBoundaryRegression.java";p.write_text(month_harness)
+ subprocess.run(["javac","-d",tmp,str(room_source),str(root/"app/src/main/java/it/vintedaffari/app/LudoMonthlyOverview.java"),str(p)],check=True)
+ subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.LudoMonthBoundaryRegression"],check=True)
