@@ -744,8 +744,8 @@ public final class MarketStore {
                     ContentValues history=new ContentValues();history.put("listing_id",id);history.put("observed_at",now);history.put("price_cents",price);put(history,"protected_price_cents",protectedPrice);history.put("source","browser-public-capture");db.insertOrThrow("price_observations",null,history);
                     // Same transaction/database as the canonical row. ID signatures do not collapse
                     // different sellers' cards even when title and price happen to be identical.
-                    helper.recordSighting(card,classified,now);
                 }
+                helper.recordSighting(card,classified,now);
                 syncBrowserDeal(db,id);
             }
             db.setTransactionSuccessful();return id;

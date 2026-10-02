@@ -1,5 +1,13 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Backend147 — intake browser collegato al Motore, in verifica
+
+Autorizzazione utente: risolvere e distribuire direttamente nel Tester. PR190 porta la cattura passiva dal solo report/memoria al database: snapshot durevole per ID esatto, annunci/osservazioni con prezzo EUR reale e wake dell’unico owner radar di analisi locale, indipendente da scan opt-in. Snapshot senza prezzo restano snapshot, senza prezzo zero. Sigla stabile per ID, aggiornamento conservativo degli ID già noti e protezione hidden/sold/manual review; callback vecchi non sovrascrivono prezzo totale, brand, condizione o testo nuovi. Ricatture identiche deduplicate dalla finestra persistente esistente; ricatture dopo la finestra diventano nuove osservazioni. Nessun nuovo schema o owner runtime.
+
+Provenienza browser durevole impedisce job Vinted automatici per metadata assenti; richieste esplicite manuali/Cacce restano autorizzate. Conservati BGG, soglie, prezzi, filtri e dati personali. Browser: rimossi Catan/Azul e righe di pulsanti equivalenti, ricerca esplicita e filtri nel menu, contatore salvati ed errore persistente visibile. Scritture su worker, batch già accettati drenati alla chiusura, retry bridge solo dopo fallimento del salvataggio; dati relativi alla pagina corrente distinti dalle catture precedenti.
+
+Verifiche locali: 40/40 test browser passivi; SQLite intake e metodi Java reali di intake/pending/freshness con SQLite reale, sparse price, stesso titolo con ID diversi, duplicati, prezzo aggiornato, manual hold, lifecycle, URL non fidati e ricattura successiva. Fixture con confini Android e JSON controllati: ricostruzione helper, non restart Android reale. Review indipendente: corretti freshness totale/brand/condizione, manual hold e retry one-shot. Suite Android completa/build/firma/distribuzione da registrare dopo esito reale. Accettazione telefono e confronto performance restano pendenti; backend5/frontend7 aperti.
+
 ## Backend — reset automatico disattivato139, verificato e distribuito
 
 Approvazione esplicita utente «Vai» del2026-10-02 17:22Europe/Rome. PR169 rimuove soltanto applyFreshStart dall'entry point EngineStartupMaintenance.run: l'obsoleto reset5.12.1 non è più invocato automaticamente in presenza di flag assente/false/obsoleto. Helper legacy, metodo MarketStore, registro SQLite e dati attuali conservati; altre manutenzioni e ordine invariati. Nessun ripristino dello storico cancellato, riattivazione massiva di job, schema, filtro, rete o intake browser. MainActivity/DealDatabase/MarketStore non modificati dal backend. Browser rimane sperimentale, catalogWrites0; questa release non rende analizzabili i campioni catturati.
@@ -331,3 +339,4 @@ Prova prevista dopo distribuzione verificata: A iniziale; scansione ON2min/OFF, 
 
 ### Consegna esperimento browser132 — 2026-10-02
 Approvato15:05Europe/Rome, implementatoPR151, CI402 e beta151 verdi; Firebase132(1000151) firmata/upload/distribuita. SEARCHON/VIEWOFF+snapshot/BUNDLEON diretta; limiti e ACK confermati, lifecycle/token protetti, nessun catalogwriter/HTTP proprio. Rete reale/provider/payload/pubblicazione/copertura seller richiedono prova telefono; nessun successo completo del nuovo motore o filtroowned/lingua dichiarato. Specifica/piano con checklist e prove in docs/plans/2026-10-02-vinted-browser-experiment.md; prossimopasso solo report telefono.
+
