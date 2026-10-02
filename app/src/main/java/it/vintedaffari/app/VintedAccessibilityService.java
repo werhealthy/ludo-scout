@@ -129,6 +129,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private static final String MAINTENANCE_TASK="maintenance:missing-data";
     private final Runnable maintenancePump=new Runnable(){@Override public void run(){if(!manualMetadataRefresh)return;sweepCompletedQueuedTargets();if(TextUtils.isEmpty(manualRefreshTargetSignature))startNextManualRefreshTarget();updateMaintenanceTask();enrichBacklog();resolveBacklog();sweepCompletedQueuedTargets();maybeFinishCurrentManualTarget();if(manualMetadataRefresh)handler.postDelayed(this,1500L);}};
     private final BroadcastReceiver retryReceiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){
+        if(i!=null&&BrowserCapturePolicy.READY_ACTION.equals(i.getAction())){continuePersistentAnalysis();return;}
         if(i!=null&&OperationCenter.REFRESH_MISSING.equals(i.getAction())){
             final String requestedSignature=i.getStringExtra("signature");
             final String requestedTask=i.getStringExtra("task_id");
@@ -208,7 +209,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             int reset=bundleDatabase.resetRetryableDiagnostics();bundleDatabase.resetPipelineCounters();
             pipelinePrefs.edit().putInt("bundlePipelineGeneration",4).putInt("bundlePipelineResetRows",reset).apply();
         }
-        IntentFilter retryFilter=new IntentFilter(OperationCenter.RETRY);retryFilter.addAction(OperationCenter.REFRESH_MISSING);if(Build.VERSION.SDK_INT>=33)registerReceiver(retryReceiver,retryFilter,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(retryReceiver,retryFilter);retryRegistered=true;
+        IntentFilter retryFilter=new IntentFilter(OperationCenter.RETRY);retryFilter.addAction(OperationCenter.REFRESH_MISSING);retryFilter.addAction(BrowserCapturePolicy.READY_ACTION);if(Build.VERSION.SDK_INT>=33)registerReceiver(retryReceiver,retryFilter,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(retryReceiver,retryFilter);retryRegistered=true;
         diag().edit()
                 .putBoolean("serviceConnected", true)
                 .putLong("serviceConnectedAt", System.currentTimeMillis())
@@ -637,7 +638,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     ListingClassifier.Result analyzedListing=ListingClassifier.classify(card);
                     if(analyzedListing.type==ListingClassifier.Type.NON_GAME){
                         DealRecord wrong=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
-                        if(wrong!=null){database.exclude(wrong,"Classificato automaticamente come non gioco da tavolo");if(marketStore!=null)marketStore.setLegacyListingUserHidden(wrong.signature,true);}
+                        if(wrong!=null&&card.capturedSignature.isEmpty()){database.exclude(wrong,"Classificato automaticamente come non gioco da tavolo");if(marketStore!=null)marketStore.setLegacyListingUserHidden(wrong.signature,true);}
                         quarantined++;radarCounters.add("analysisQuarantined",1);continue;
                     }
                     // An unresolved title is no longer automatically turned into human BGG work.
@@ -647,7 +648,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
                         if(gate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
-                            if(noisy!=null)database.exclude(noisy,"Scarto automatico pre-BGG: "+gate.reason);
+                            if(noisy!=null&&card.capturedSignature.isEmpty())database.exclude(noisy,"Scarto automatico pre-BGG: "+gate.reason);
                             if(marketStore!=null)marketStore.quarantineUnresolvedObservation(card,gate.reason,t);
                             SharedPreferences pp=diag();pp.edit().putLong("bggAutoQuarantined",pp.getLong("bggAutoQuarantined",0)+1).putString("lastBggAutoQuarantine",card.title+" · "+gate.reason).apply();
                             quarantined++;radarCounters.add("analysisQuarantined",1);continue;
@@ -660,7 +661,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,analyzedListing,ga,collisionRisk);
                         if(matchedGate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
-                            if(noisy!=null)database.exclude(noisy,"Scarto automatico post-match: "+matchedGate.reason);
+                            if(noisy!=null&&card.capturedSignature.isEmpty())database.exclude(noisy,"Scarto automatico post-match: "+matchedGate.reason);
                             if(marketStore!=null)marketStore.quarantineCollisionObservation(card,matchedGate.reason,t);
                             SharedPreferences pp=diag();pp.edit().putLong("matchedCollisionQuarantined",pp.getLong("matchedCollisionQuarantined",0)+1).putString("lastMatchedCollision",card.title+" · "+matchedGate.reason).apply();
                             quarantined++;radarCounters.add("analysisQuarantined",1);continue;
@@ -668,13 +669,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     }
                     // Safe mode: the embedded BGG used-price reference remains authoritative.
                     // Vinted observations are still stored for history/audit but never reprice this analysis.
-                    database.record(card, ga, analyzedListing, t);
-                    if(marketStore!=null)marketStore.applyAnalysis(card,ga,analyzedListing,t);
-                    committed++;radarCounters.add("analysisCommitted",1);
                     boolean huntCandidate=ga!=null&&"matched".equals(ga.status)&&!TextUtils.isEmpty(ga.bggId)
                             &&HuntDatabase.wantsCandidate(getApplicationContext(),ga.bggId,ga.totalCents);
-                    if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);
-                    DealRecord stored=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
+                    if(!card.capturedSignature.isEmpty()){if(marketStore==null||!marketStore.commitBrowserAnalysis(card,ga,analyzedListing,t,huntCandidate))continue;}
+                    else{database.record(card, ga, analyzedListing, t);
+                    if(marketStore!=null)marketStore.applyAnalysis(card,ga,analyzedListing,t);if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);}
+                    committed++;radarCounters.add("analysisCommitted",1);
+                    DealRecord stored=card.capturedSignature.isEmpty()?database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0)):database.findBySignature(card.capturedSignature);
                     String[] sellerHint=sellerHints.get(DealDatabase.signature(card));
                     if(stored!=null&&sellerHint!=null&&sellerHint.length>0&&!TextUtils.isEmpty(sellerHint[0])){
                         database.applySellerHint(stored.signature,sellerHint[0],sellerHint.length>1?sellerHint[1]:null);
@@ -1833,5 +1834,6 @@ public final class VintedAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+
 
 

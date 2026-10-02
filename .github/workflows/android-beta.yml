@@ -44,6 +44,11 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Verify durable browser engine intake
+        run: |
+          python3 regression/browser_engine_intake.py
+          python3 regression/browser_engine_boundary.py
+
       - name: Verify startup never invokes destructive legacy reset
         run: python3 regression/startup_reset_disabled.py
 
@@ -312,6 +317,7 @@ jobs:
             --app "$FIREBASE_APP_ID" \
             --testers "$FIREBASE_TESTERS" \
             --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+
 
 
 
