@@ -1880,6 +1880,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private TextView detailSecondaryAction(String label){TextView v=text(label,13,CYAN,Typeface.BOLD);v.setGravity(Gravity.CENTER);v.setBackground(round(SURFACE2,14,0,0));return v;}
     private void showDetailActions(DealRecord d,Dialog detail,boolean missingNow,MarketStore.Job refreshJob){
         Dialog menu=bottomSheet("Azioni annuncio");LinearLayout box=menu.findViewById(SHEET_ID);addInterestActions(box,menu,d,true);
+        if(!TextUtils.isEmpty(d.vintedUrl)){TextView browser=menuAction("Apri nel browser Vinted",TEXT);browser.setOnClickListener(v->{menu.dismiss();openVintedBrowserExperiment(d.vintedUrl,"VIEW",d.sellerId);});box.addView(browser);}
         if(missingNow){TextView refresh=menuAction(refreshJob==null?"Aggiorna dati":"Dai priorità ai dati",CYAN);refresh.setOnClickListener(v->{menu.dismiss();requestDealRefresh(d);});box.addView(refresh);}
         TextView photos=menuAction("Controlla foto",TEXT);photos.setOnClickListener(v->{menu.dismiss();showListingPhotoDiagnostics(d);});box.addView(photos);
         TextView edit=menuAction("Modifica dati",TEXT);edit.setOnClickListener(v->{menu.dismiss();editListingInfo(d,detail);});box.addView(edit);
