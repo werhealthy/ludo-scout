@@ -33,20 +33,20 @@ checks=[
      "linkedDealTagStrip(d,game)" in detail),
     ("listing detail does not duplicate game identity card",
      "entityLinkCard(game)" not in detail and
-     'text("Scheda gioco",14,TEXT,Typeface.BOLD)' in detail and
-     "openGameDetailOverlay(game.id)" in detail),
+     "installPullToGame(sc,pullHint,game.id,dialog)" in detail and
+     "prepareGameTransition(dialog,game.id,pullHint)" in detail),
     ("listing detail removes market history",
      '"Contesto prezzo"' not in detail and
      "localVintedReferenceStats" not in detail and
      '"Annunci di questo gioco"' not in detail),
     ("listing detail keeps distinct signals",
-     'productRatingRow(d.rating,scoreLabel(d)' in detail and
-     "productLanguagePanel(d.languageCode" in detail and
-     "productRatingRow(d.rating" in detail and "openBgg(d.bggId)" in detail and
+     'productQuickFacts(d.rating' in detail and
+     "d.languageCode==null" in detail and
+     "productProviderAction" in detail and "openBgg(d.bggId)" in detail and
      "publicationText(d,12,Typeface.NORMAL)" in detail),
     ("listing can transition to game by overscroll",
      "installPullToGame(sc,pullHint,game.id,dialog)" in detail and
-     '"Rilascia per aprire il gioco"' in ui),
+     '"Rilascia per aprire la scheda gioco"' in ui),
     ("game detail opens directly without catalog routing",
      "uiDataIo.execute" in overlay and
      'tab="database"' not in overlay and

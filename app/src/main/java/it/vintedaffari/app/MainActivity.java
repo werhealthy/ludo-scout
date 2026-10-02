@@ -797,18 +797,43 @@ private void applyDiscoverChrome(){
         TextView placeholder=text("Copertina non disponibile",12,MUTED,Typeface.NORMAL);placeholder.setGravity(Gravity.CENTER);stage.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(this);image.setVisibility(View.INVISIBLE);stage.addView(image,new FrameLayout.LayoutParams(dp(1),dp(1)));
         setProductArtwork(image,placeholder,bggId,url,"product:"+bggId+":"+url,()->{Drawable drawable=image.getDrawable();if(drawable instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,physicalScene?null:featuredPedestal);placeholder.setVisibility(View.GONE);}}});return stage;
     }
-    private int productMediaHeight(){int width=getResources().getDisplayMetrics().widthPixels-dp(40);return Math.max(dp(144),Math.min(dp(208),Math.round(width*.62f)));}
+    private int productMediaHeight(){int width=getResources().getDisplayMetrics().widthPixels-dp(40);return Math.max(dp(180),Math.min(dp(272),Math.round(width*.78f)));}
 
     /** Centered icon + label group, using the same pill/type/ripple grammar as app primary actions. */
     private Button productPrimaryButton(String label,String glyph,int color,Runnable action){
         Button b=button(label,color);b.setGravity(Gravity.CENTER);b.setPadding(dp(24),dp(12),dp(24),dp(12));b.setMinimumWidth(dp(64));
         b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(40,0,0,0)),round(color,999,0,0),null));
         Drawable icon=iconDrawable(glyph,BG,18);icon.setBounds(0,0,dp(18),dp(18));
+        android.text.SpannableString content=new android.text.SpannableString(label+"  \uFFFC");
+        content.setSpan(new android.text.style.ImageSpan(icon,android.text.style.ImageSpan.ALIGN_BOTTOM),content.length()-1,content.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        b.setText(content);b.setContentDescription(label);b.setOnClickListener(v->action.run());return b;
+    }
+    private Button productProviderAction(String label,int logo,int color,Runnable action){
+        Button b=button(label,color);b.setGravity(Gravity.CENTER);b.setPadding(dp(12),dp(12),dp(12),dp(12));
+        Drawable icon=getDrawable(logo);icon.setBounds(0,0,dp(24),dp(24));
         android.text.SpannableString content=new android.text.SpannableString("\uFFFC  "+label);
         content.setSpan(new android.text.style.ImageSpan(icon,android.text.style.ImageSpan.ALIGN_BOTTOM),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         b.setText(content);b.setContentDescription(label);b.setOnClickListener(v->action.run());return b;
     }
-
+    private View productQuickFacts(Double rating,Integer minPlayers,Integer maxPlayers,Integer minutes,Double weight,String language,Runnable ratingAction,Runnable languageAction){
+        String players=minPlayers==null?"—":minPlayers+(maxPlayers!=null&&!maxPlayers.equals(minPlayers)?"–"+maxPlayers:"");
+        String[] values={rating==null?"—":String.format(Locale.ITALY,"%.1f",rating),players,minutes==null?"—":minutes+" min",language==null?(weight==null?"—":String.format(Locale.ITALY,"%.1f/5",weight)):HomePresentation.editionName(language)};
+        String[] labels={"BGG","Giocatori","Durata",language==null?"Complessità":HomePresentation.dependenceLabel(language)};
+        String[] icons={LudoIcons.STAR,"\uf500",LudoIcons.CLOCK,language==null?LudoIcons.GEAR:"\uf1ab"};
+        int columns=getResources().getConfiguration().fontScale>1.5f?1:getResources().getConfiguration().fontScale>1.15f?2:4;
+        LinearLayout grid=new LinearLayout(this);grid.setOrientation(LinearLayout.VERTICAL);
+        for(int start=0;start<4;start+=columns){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);
+            for(int i=start;i<Math.min(start+columns,4);i++){final int index=i;LinearLayout cell=new LinearLayout(this);cell.setOrientation(LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);cell.setPadding(dp(4),dp(10),dp(4),dp(10));cell.setMinimumHeight(dp(72));
+                cell.addView(appIcon(icons[i],18,i==0?YELLOW:CYAN),new LinearLayout.LayoutParams(dp(24),dp(24)));
+                TextView value=text(values[i],15,TEXT,Typeface.BOLD);value.setGravity(Gravity.CENTER);cell.addView(value,new LinearLayout.LayoutParams(-1,-2));
+                TextView label=text(labels[i],11,MUTED,Typeface.NORMAL);label.setGravity(Gravity.CENTER);label.setPadding(0,dp(4),0,0);cell.addView(label,new LinearLayout.LayoutParams(-1,-2));
+                cell.setContentDescription((i==3&&language!=null?"Lingua, ":"")+labels[i]+": "+("—".equals(values[i])?"dato non disponibile":values[i]));cell.setFocusable(true);
+                if(i==0&&ratingAction!=null)cell.setOnClickListener(v->ratingAction.run());else if(i==3&&language!=null&&languageAction!=null)cell.setOnClickListener(v->languageAction.run());
+                for(int child=0;child<cell.getChildCount();child++)cell.getChildAt(child).setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+                row.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
+            }grid.addView(row,new LinearLayout.LayoutParams(-1,-2));
+        }return grid;
+    }
     private void addProductSection(LinearLayout host,View view,int gap){
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(gap);host.addView(view,lp);
     }
@@ -1076,31 +1101,44 @@ private void renderDatabase(){
 
     private void renderDatabaseDetailInto(LinearLayout host,GameRecord g,Runnable backAction){renderDatabaseDetailInto(host,g,backAction,null);}
     private void renderDatabaseDetailInto(LinearLayout host,GameRecord g,Runnable backAction,GameDetailData snapshot){
-        LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);TextView back=appIcon(LudoIcons.CHEVRON_LEFT,24,TEXT);back.setGravity(Gravity.CENTER);back.setOnClickListener(v->backAction.run());toolbar.addView(back,new LinearLayout.LayoutParams(dp(44),dp(52)));toolbar.addView(text("Gioco",17,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));TextView help=roundIconButton("?",CYAN);help.setContentDescription("Correggi associazione BGG");help.setOnClickListener(v->chooseManualBggMatch(g));toolbar.addView(gameFavoriteButton(g.bggId,g.name),new LinearLayout.LayoutParams(dp(48),dp(48)));toolbar.addView(help,new LinearLayout.LayoutParams(dp(48),dp(48)));TextView more=roundIconButton("⋯",TEXT);more.setContentDescription("Altre azioni del gioco");more.setOnClickListener(v->{DealRecord preference=new DealRecord();preference.bggId=g.bggId;preference.gameName=g.name;preference.signature="game:"+g.bggId;showProductActions(preference,false);});toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));host.addView(toolbar);
+        LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);TextView back=appIcon(LudoIcons.CHEVRON_LEFT,24,TEXT);back.setGravity(Gravity.CENTER);back.setOnClickListener(v->backAction.run());toolbar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));toolbar.addView(text("Gioco",17,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));TextView help=roundIconButton(LudoIcons.INFO,CYAN,true);help.setContentDescription("Correggi associazione BGG");help.setOnClickListener(v->chooseManualBggMatch(g));toolbar.addView(gameFavoriteButton(g.bggId,g.name),new LinearLayout.LayoutParams(dp(48),dp(48)));toolbar.addView(help,new LinearLayout.LayoutParams(dp(48),dp(48)));TextView more=roundIconButton(LudoIcons.ELLIPSIS_VERTICAL,TEXT,true);more.setContentDescription("Altre azioni del gioco");more.setOnClickListener(v->{DealRecord preference=new DealRecord();preference.bggId=g.bggId;preference.gameName=g.name;preference.signature="game:"+g.bggId;showProductActions(preference,false);});toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));host.addView(toolbar);
 
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(0,dp(8),0,dp(8));hero.addView(productBoxArtwork(g.bggId,TextUtils.isEmpty(g.imageUrl)?g.thumbnailUrl:g.imageUrl,g.name),new LinearLayout.LayoutParams(-1,productMediaHeight()));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(0,dp(12),0,0);TextView name=text(g.name,26,TEXT,Typeface.BOLD);name.setMaxLines(3);copy.addView(name);
-        Integer composite=snapshot==null?gameQualityScore(g):snapshot.quality;copy.addView(productRatingRow(g.rating,composite==null?"":String.format(Locale.ITALY,"%.1f",composite/10.0),()->{if(!TextUtils.isEmpty(g.bggId))openBgg(g.bggId);},()->{if(composite!=null)showGameScoreInfo(g,composite);}));
-        String rawMeta=(g.year==null?"Anno n/d":String.valueOf(g.year))+(g.rank==null||g.rank<=0?"":" · #"+g.rank+" BGG");TextView meta=text(rawMeta,12,MUTED,Typeface.NORMAL);meta.setPadding(0,dp(7),0,0);copy.addView(meta);
-        
-        if(!TextUtils.isEmpty(g.bggId)){View bgg=providerLinkCard(R.drawable.provider_bgg_logo,"BoardGameGeek","Apri scheda",BGG_BG,false);bgg.setOnClickListener(v->openBgg(g.bggId));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=dp(12);copy.addView(bgg,bp);}hero.addView(copy,new LinearLayout.LayoutParams(-1,-2));host.addView(hero);
 
-        addProductSection(host,productFacts(g.minPlayers,g.maxPlayers,g.playtime,g.minAge,g.weight),12);
-        LinearLayout taxonomy=new LinearLayout(this);taxonomy.setOrientation(LinearLayout.VERTICAL);addLinkedMetaSection(taxonomy,"Categorie",g.categories,10);addLinkedMetaSection(taxonomy,"Meccaniche",g.mechanics,12);if(taxonomy.getChildCount()>0)host.addView(detailDisclosure("Categorie e meccaniche",taxonomy));
-        String summary=italianGameSummary(g);if(!TextUtils.isEmpty(summary)){TextView section=text("In breve",19,TEXT,Typeface.BOLD);TextView desc=text(summary,14,MUTED,Typeface.NORMAL);desc.setLineSpacing(0,1.14f);host.addView(detailDisclosure("Descrizione del gioco",desc));}
-        LinearLayout creators=new LinearLayout(this);creators.setOrientation(LinearLayout.VERTICAL);if(!TextUtils.isEmpty(g.designers))addLinkedMetaSection(creators,"Designer",g.designers,6);if(!TextUtils.isEmpty(g.publishers))addLinkedMetaSection(creators,"Editori",g.publishers,6);if(creators.getChildCount()>0)host.addView(detailDisclosure("Autori ed editori",creators));
+        addProductSection(host,productBoxArtwork(g.bggId,TextUtils.isEmpty(g.imageUrl)?g.thumbnailUrl:g.imageUrl,g.name),8);View scene=host.getChildAt(host.getChildCount()-1);scene.setLayoutParams(new LinearLayout.LayoutParams(-1,productMediaHeight()));
+        TextView name=text(g.name,26,TEXT,Typeface.BOLD);name.setMaxLines(3);addProductSection(host,name,12);
+        View tags=linkedDealTagStrip(null,g);if(tags!=null)addProductSection(host,tags,4);
+        addProductSection(host,productQuickFacts(g.rating,g.minPlayers,g.maxPlayers,g.playtime,g.weight,null,()->{if(!TextUtils.isEmpty(g.bggId))openBgg(g.bggId);},null),8);
+        if(!TextUtils.isEmpty(g.bggId)){View bgg=providerLinkCard(R.drawable.provider_bgg_logo,"BoardGameGeek","Scheda originale",BGG_BG,false);bgg.setOnClickListener(v->openBgg(g.bggId));addProductSection(host,bgg,8);}
+        LinearLayout panorama=new LinearLayout(this),market=new LinearLayout(this),discover=new LinearLayout(this);panorama.setOrientation(LinearLayout.VERTICAL);market.setOrientation(LinearLayout.VERTICAL);discover.setOrientation(LinearLayout.VERTICAL);
+        String rawMeta=(g.year==null?"Anno n/d":String.valueOf(g.year))+(g.rank==null||g.rank<=0?"":" · #"+g.rank+" BGG");addProductSection(panorama,text(rawMeta,12,MUTED,Typeface.NORMAL),12);
+        String description=cleanBggDescription(g.description);if(!TextUtils.isEmpty(description)){TextView desc=text(description,14,MUTED,Typeface.NORMAL);desc.setLineSpacing(0,1.14f);addProductSection(panorama,desc,12);}
+        LinearLayout mechanics=new LinearLayout(this);mechanics.setOrientation(LinearLayout.VERTICAL);addLinkedMetaSection(mechanics,"Meccaniche",g.mechanics,12);if(mechanics.getChildCount()>0)panorama.addView(detailDisclosure("Meccaniche",mechanics));
+        LinearLayout creators=new LinearLayout(this);creators.setOrientation(LinearLayout.VERTICAL);if(!TextUtils.isEmpty(g.designers))addLinkedMetaSection(creators,"Designer",g.designers,6);if(!TextUtils.isEmpty(g.publishers))addLinkedMetaSection(creators,"Editori",g.publishers,6);if(creators.getChildCount()>0)panorama.addView(detailDisclosure("Autori ed editori",creators));
+        Integer composite=snapshot==null?gameQualityScore(g):snapshot.quality;if(composite!=null){TextView quality=text("Ludo Score · "+String.format(Locale.ITALY,"%.1f",composite/10.0)+"  ·  Come si calcola",13,MUTED,Typeface.NORMAL);quality.setMinHeight(dp(48));quality.setGravity(Gravity.CENTER_VERTICAL);quality.setOnClickListener(v->showGameScoreInfo(g,composite));addProductSection(panorama,quality,8);}
+        View tutorial=providerLinkCard(android.R.drawable.ic_media_play,"Tutorial in italiano","Cerca su YouTube",SURFACE2,false);((ImageView)((ViewGroup)tutorial).getChildAt(0)).setImageDrawable(iconDrawable("\uf04b",RED,24));tutorial.setOnClickListener(v->openProductResource("https://www.youtube.com/results?search_query="+Uri.encode((g.name==null?"":g.name)+" tutorial ITA")));addProductSection(discover,tutorial,12);
+        if(!TextUtils.isEmpty(g.bggId)){View rules=providerLinkCard(R.drawable.provider_bgg_logo,"Regolamenti su BGG","Controlla lingua italiana e autore del file",BGG_BG,false);rules.setOnClickListener(v->openProductResource("https://boardgamegeek.com/boardgame/"+g.bggId+"/files"));addProductSection(discover,rules,8);}
+        List<GameRecord> similar=snapshot==null?similarGames(g,8):snapshot.similar;if(!similar.isEmpty()){TextView st=text("Giochi simili",20,TEXT,Typeface.BOLD);st.setPadding(0,dp(30),0,dp(10));discover.addView(st);TextView ss=text("Dal database Ludo, in base a categorie e meccaniche condivise.",12,MUTED,Typeface.NORMAL);ss.setPadding(0,0,0,dp(10));discover.addView(ss);HorizontalScrollView sh=new HorizontalScrollView(this);sh.setHorizontalScrollBarEnabled(false);LinearLayout row=new LinearLayout(this);row.setPadding(0,0,dp(16),dp(4));for(GameRecord x:similar)row.addView(similarGameCard(x));sh.addView(row);discover.addView(sh);}
 
-        List<GameRecord> similar=snapshot==null?similarGames(g,8):snapshot.similar;if(!similar.isEmpty()){TextView st=text("Giochi simili",20,TEXT,Typeface.BOLD);st.setPadding(0,dp(30),0,dp(10));host.addView(st);TextView ss=text("Dal database Ludo, in base a categorie e meccaniche condivise.",12,MUTED,Typeface.NORMAL);ss.setPadding(0,0,0,dp(10));host.addView(ss);HorizontalScrollView sh=new HorizontalScrollView(this);sh.setHorizontalScrollBarEnabled(false);LinearLayout row=new LinearLayout(this);row.setPadding(0,0,dp(16),dp(4));for(GameRecord x:similar)row.addView(similarGameCard(x));sh.addView(row);host.addView(sh);}
+        TextView pricesTitle=text("Mercato",21,TEXT,Typeface.BOLD);pricesTitle.setPadding(0,dp(30),0,dp(10));market.addView(pricesTitle);Integer bggUsed=snapshot==null?(TextUtils.isEmpty(g.bggId)?null:bggSearch.localMarketReferenceCents(g.bggId)):snapshot.bggUsed;Integer bggNew=snapshot==null?(TextUtils.isEmpty(g.bggId)?null:bggSearch.localNewMarketCents(g.bggId)):snapshot.bggNew;MarketStore.BggMarketStats bggOnline=snapshot==null?(TextUtils.isEmpty(g.bggId)?new MarketStore.BggMarketStats(0,null,null,0):marketStore.bggMarketStats(g.bggId)):snapshot.bggOnline;MarketStore.MarketReferenceStats vintedMarket=snapshot==null?(TextUtils.isEmpty(g.bggId)?new MarketStore.MarketReferenceStats(0,null,null):marketStore.localVintedReferenceStats(g.bggId,null,marketStore.marketLanguagePolicyForGame(g.id))):snapshot.vintedMarket;Integer typicalVinted=vintedMarket.count>=3?vintedMarket.typicalCents:null;LinearLayout stats=new LinearLayout(this);stats.setWeightSum(2);stats.addView(marketStat("Storico Vinted",priceOrDash(typicalVinted)),new LinearLayout.LayoutParams(0,dp(88),1));LinearLayout.LayoutParams histLp=new LinearLayout.LayoutParams(0,dp(88),1);histLp.leftMargin=dp(8);stats.addView(marketStat("Min osservato",priceOrDash(vintedMarket.minCents)),histLp);market.addView(stats);TextView safeMode=text("I prezzi Vinted restano storico osservato. Per ora non decidono se un annuncio è conveniente.",12,MUTED,Typeface.NORMAL);market.addView(detailDisclosure("Come leggere questi prezzi",safeMode));LinearLayout stats2=new LinearLayout(this);stats2.setWeightSum(2);stats2.setPadding(0,dp(8),0,0);Integer currentBgg=bggOnline.fresh(System.currentTimeMillis())&&bggOnline.count>0?bggOnline.typicalCents:bggUsed;stats2.addView(marketStat("Usato BGG",priceOrDash(currentBgg)),new LinearLayout.LayoutParams(0,dp(88),1));LinearLayout.LayoutParams newLp=new LinearLayout.LayoutParams(0,dp(88),1);newLp.leftMargin=dp(8);stats2.addView(marketStat("Nuovo BGG",priceOrDash(bggNew)),newLp);market.addView(stats2);
+        View compare=providerLinkCard(R.drawable.provider_vinted_logo,"Vinted","Confronta prezzi",VINTED_BG,true);compare.setOnClickListener(v->compareOnVinted(g));LinearLayout.LayoutParams cmp=new LinearLayout.LayoutParams(-1,dp(62));cmp.topMargin=dp(12);market.addView(compare,cmp);
+        TextView hist=text(g.observationCount+" osservazioni · "+g.listingCount+" annunci incontrati",12,MUTED,Typeface.NORMAL);hist.setPadding(0,dp(10),0,0);market.addView(hist);
+        List<MarketStore.PricePoint> series=snapshot==null?marketStore.priceHistory(g.id,90):snapshot.series;if(series.size()>=2){TextView chartTitle=text("Storico prezzi",17,TEXT,Typeface.BOLD);chartTitle.setPadding(0,dp(20),0,dp(8));market.addView(chartTitle);PriceHistoryView graph=new PriceHistoryView(this,series);graph.setBackground(round(SURFACE,18,1,OUTLINE));market.addView(graph,new LinearLayout.LayoutParams(-1,dp(180)));}
 
-        TextView pricesTitle=text("Mercato",21,TEXT,Typeface.BOLD);pricesTitle.setPadding(0,dp(30),0,dp(10));host.addView(pricesTitle);Integer bggUsed=snapshot==null?(TextUtils.isEmpty(g.bggId)?null:bggSearch.localMarketReferenceCents(g.bggId)):snapshot.bggUsed;Integer bggNew=snapshot==null?(TextUtils.isEmpty(g.bggId)?null:bggSearch.localNewMarketCents(g.bggId)):snapshot.bggNew;MarketStore.BggMarketStats bggOnline=snapshot==null?(TextUtils.isEmpty(g.bggId)?new MarketStore.BggMarketStats(0,null,null,0):marketStore.bggMarketStats(g.bggId)):snapshot.bggOnline;MarketStore.MarketReferenceStats vintedMarket=snapshot==null?(TextUtils.isEmpty(g.bggId)?new MarketStore.MarketReferenceStats(0,null,null):marketStore.localVintedReferenceStats(g.bggId,null,marketStore.marketLanguagePolicyForGame(g.id))):snapshot.vintedMarket;Integer typicalVinted=vintedMarket.count>=3?vintedMarket.typicalCents:null;LinearLayout stats=new LinearLayout(this);stats.setWeightSum(2);stats.addView(marketStat("Storico Vinted",priceOrDash(typicalVinted)),new LinearLayout.LayoutParams(0,dp(88),1));LinearLayout.LayoutParams histLp=new LinearLayout.LayoutParams(0,dp(88),1);histLp.leftMargin=dp(8);stats.addView(marketStat("Min osservato",priceOrDash(vintedMarket.minCents)),histLp);host.addView(stats);TextView safeMode=text("I prezzi Vinted restano storico osservato. Per ora non decidono se un annuncio è conveniente.",12,MUTED,Typeface.NORMAL);host.addView(detailDisclosure("Come leggere questi prezzi",safeMode));LinearLayout stats2=new LinearLayout(this);stats2.setWeightSum(2);stats2.setPadding(0,dp(8),0,0);Integer currentBgg=bggOnline.fresh(System.currentTimeMillis())&&bggOnline.count>0?bggOnline.typicalCents:bggUsed;stats2.addView(marketStat("Usato BGG",priceOrDash(currentBgg)),new LinearLayout.LayoutParams(0,dp(88),1));LinearLayout.LayoutParams newLp=new LinearLayout.LayoutParams(0,dp(88),1);newLp.leftMargin=dp(8);stats2.addView(marketStat("Nuovo BGG",priceOrDash(bggNew)),newLp);host.addView(stats2);
-        View compare=providerLinkCard(R.drawable.provider_vinted_logo,"Vinted","Confronta prezzi",VINTED_BG,true);compare.setOnClickListener(v->compareOnVinted(g));LinearLayout.LayoutParams cmp=new LinearLayout.LayoutParams(-1,dp(62));cmp.topMargin=dp(12);host.addView(compare,cmp);
-        TextView hist=text(g.observationCount+" osservazioni · "+g.listingCount+" annunci incontrati",12,MUTED,Typeface.NORMAL);hist.setPadding(0,dp(10),0,0);host.addView(hist);
-        List<MarketStore.PricePoint> series=snapshot==null?marketStore.priceHistory(g.id,90):snapshot.series;if(series.size()>=2){TextView chartTitle=text("Storico prezzi",17,TEXT,Typeface.BOLD);chartTitle.setPadding(0,dp(20),0,dp(8));host.addView(chartTitle);PriceHistoryView graph=new PriceHistoryView(this,series);graph.setBackground(round(SURFACE,18,1,OUTLINE));host.addView(graph,new LinearLayout.LayoutParams(-1,dp(180)));}
-
-        List<MarketListingRecord> active=snapshot==null?marketStore.listingsForGame(g.id,true,80):snapshot.active;LinearLayout listHead=new LinearLayout(this);listHead.setGravity(Gravity.CENTER_VERTICAL);listHead.setPadding(0,dp(30),0,dp(10));listHead.addView(text("Annunci di questo gioco",20,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));listHead.addView(text(active.size()+" attivi",12,MUTED,Typeface.NORMAL));host.addView(listHead);
-        if(active.isEmpty()){LinearLayout empty=verticalCard();empty.setPadding(dp(16),dp(16),dp(16),dp(16));empty.addView(text("Nessun annuncio attivo osservato",16,TEXT,Typeface.BOLD));empty.addView(text("La scheda gioco resta disponibile con storico, tag e giochi simili.",13,MUTED,Typeface.NORMAL));host.addView(empty);}else for(MarketListingRecord l:active)host.addView(snapshot==null?marketListingCard(g,l):marketListingCard(g,l,snapshot.listingScores.get(l)));
+        List<MarketListingRecord> active=snapshot==null?marketStore.listingsForGame(g.id,true,80):snapshot.active;LinearLayout listHead=new LinearLayout(this);listHead.setGravity(Gravity.CENTER_VERTICAL);listHead.setPadding(0,dp(30),0,dp(10));listHead.addView(text("Annunci di questo gioco",20,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));listHead.addView(text(active.size()+" attivi",12,MUTED,Typeface.NORMAL));market.addView(listHead);
+        if(active.isEmpty()){LinearLayout empty=verticalCard();empty.setPadding(dp(16),dp(16),dp(16),dp(16));empty.addView(text("Nessun annuncio attivo osservato",16,TEXT,Typeface.BOLD));empty.addView(text("La scheda gioco resta disponibile con storico, tag e giochi simili.",13,MUTED,Typeface.NORMAL));market.addView(empty);}else for(MarketListingRecord l:active)market.addView(snapshot==null?marketListingCard(g,l):marketListingCard(g,l,snapshot.listingScores.get(l)));
+        addProductTabs(host,new String[]{"Panoramica","Mercato","Scopri"},new LinearLayout[]{panorama,market,discover});
     }
-
-
+    private void openProductResource(String url){
+        persistTransientUiSession();try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(android.content.ActivityNotFoundException unavailable){Toast.makeText(this,"Nessuna app disponibile per aprire il collegamento",Toast.LENGTH_SHORT).show();}
+    }
+    private void addProductTabs(LinearLayout host,String[] labels,LinearLayout[] sections){
+        LinearLayout tabs=new LinearLayout(this);tabs.setPadding(0,dp(16),0,dp(8));tabs.setOrientation(getResources().getConfiguration().fontScale>1.3f?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);TextView[] controls=new TextView[labels.length];
+        for(int i=0;i<labels.length;i++){final int selected=i;TextView control=text(labels[i],14,i==0?TEXT:MUTED,Typeface.BOLD);control.setGravity(Gravity.CENTER);control.setMinHeight(dp(48));control.setPadding(dp(8),dp(8),dp(8),dp(8));control.setSelected(i==0);control.setBackground(round(i==0?SURFACE2:BG,12,1,i==0?CYAN:OUTLINE));control.setContentDescription(labels[i]+(i==0?", selezionato":""));controls[i]=control;
+            control.setOnClickListener(v->{for(int k=0;k<sections.length;k++){sections[k].setVisibility(k==selected?View.VISIBLE:View.GONE);controls[k].setSelected(k==selected);controls[k].setTextColor(k==selected?TEXT:MUTED);controls[k].setBackground(round(k==selected?SURFACE2:BG,12,1,k==selected?CYAN:OUTLINE));controls[k].setContentDescription(labels[k]+(k==selected?", selezionato":""));}});
+            LinearLayout.LayoutParams lp=tabs.getOrientation()==LinearLayout.VERTICAL?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);if(i>0){lp.leftMargin=tabs.getOrientation()==LinearLayout.VERTICAL?0:dp(6);lp.topMargin=tabs.getOrientation()==LinearLayout.VERTICAL?dp(6):0;}tabs.addView(control,lp);
+        }
+        host.addView(tabs,new LinearLayout.LayoutParams(-1,-2));for(int i=0;i<sections.length;i++){sections[i].setVisibility(i==0?View.VISIBLE:View.GONE);host.addView(sections[i],new LinearLayout.LayoutParams(-1,-2));}
+    }
     private void openGameDetailOverlay(long gameId){
         if(gameId<=0)return;if(activeGameOverlay!=null&&activeGameOverlay.isShowing())activeGameOverlay.dismiss();Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);activeGameOverlay=dialog;ScrollView sc=new ScrollView(this);sc.setBackground(productPageBackground());LinearLayout host=new LinearLayout(this);host.setOrientation(LinearLayout.VERTICAL);host.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(host);
         LinearLayout loading=new LinearLayout(this);loading.setGravity(Gravity.CENTER_VERTICAL);ProgressBar p=new ProgressBar(this);loading.addView(p,new LinearLayout.LayoutParams(dp(28),dp(28)));TextView t=text("Apro il gioco…",14,MUTED,Typeface.BOLD);t.setPadding(dp(12),0,0,0);loading.addView(t);host.addView(loading,new LinearLayout.LayoutParams(-1,dp(72)));
@@ -1561,7 +1599,9 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView more=appIcon(LudoIcons.ELLIPSIS_VERTICAL,18,TEXT);more.setGravity(Gravity.CENTER);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
 
         FrameLayout hero=new FrameLayout(this);hero.addView(dealProductArtwork(d),new FrameLayout.LayoutParams(-1,-1));LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,productMediaHeight());hlp.topMargin=dp(8);box.addView(hero,hlp);
+        View photos=listingPhotoThumbnails(d);if(photos!=null){addProductSection(box,text("Foto dell’annuncio",13,MUTED,Typeface.NORMAL),8);LinearLayout.LayoutParams photosParams=new LinearLayout.LayoutParams(-1,dp(72));photosParams.topMargin=dp(8);box.addView(photos,photosParams);}
         TextView title=text(name(d),26,TEXT,Typeface.BOLD);title.setMaxLines(3);title.setEllipsize(TextUtils.TruncateAt.END);addProductSection(box,title,12);
+        LinearLayout productTags=new LinearLayout(this);productTags.setOrientation(LinearLayout.VERTICAL);box.addView(productTags,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout signalRow=new LinearLayout(this);signalRow.setGravity(Gravity.CENTER_VERTICAL);boolean large=getResources().getConfiguration().fontScale>1.2f;signalRow.setOrientation(large?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         TextView decision=text(DealEvaluator.evaluate(d).label,12,dealAccent(d),Typeface.BOLD);decision.setMaxLines(2);signalRow.addView(decision,large?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));signalRow.addView(publicationText(d,12,Typeface.NORMAL));addProductSection(box,signalRow,8);
 
@@ -1569,20 +1609,19 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView price=text(total(d),32,TEXT,Typeface.BOLD);moneyRow.addView(price,large?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
         TextView savingBadge=discoverDiscountBadge(d,12);if(savingBadge!=null){LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-2,-2);sp.leftMargin=large?0:dp(12);sp.topMargin=large?dp(6):0;moneyRow.addView(savingBadge,sp);}addProductSection(box,moneyRow,12);
         if(d.offerCents!=null){TextView offer=text("Offerta "+money(d.offerCents),12,MUTED,Typeface.NORMAL);addProductSection(box,offer,4);}
-        boolean hasVinted=!TextUtils.isEmpty(d.vintedUrl);Button vintedLink=productPrimaryButton(hasVinted?"Apri su Vinted":"Collega annuncio",LudoIcons.ARROW_RIGHT,LIME,()->{if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);});addProductSection(box,vintedLink,12);
+        boolean hasVinted=!TextUtils.isEmpty(d.vintedUrl);
+        LinearLayout actionBar=new LinearLayout(this);boolean stackedActions=getResources().getConfiguration().fontScale>1.2f;actionBar.setOrientation(stackedActions?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);actionBar.setPadding(dp(20),dp(8),dp(20),dp(12));actionBar.setBackgroundColor(BG);
+        Button vintedLink=productProviderAction(hasVinted?"Apri Vinted":"Collega annuncio",R.drawable.provider_vinted_logo,LIME,()->{if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);});
+        actionBar.addView(vintedLink,stackedActions?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
+        if(!TextUtils.isEmpty(d.bggId)){Button bggLink=productProviderAction("BGG",R.drawable.provider_bgg_logo,SURFACE2,()->openBgg(d.bggId));LinearLayout.LayoutParams bp=stackedActions?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(-2,-2);bp.leftMargin=stackedActions?0:dp(8);bp.topMargin=stackedActions?dp(8):0;actionBar.addView(bggLink,bp);}
 
-        View photos=listingPhotoThumbnails(d);if(photos!=null){addProductSection(box,text("Foto dell’annuncio",13,MUTED,Typeface.NORMAL),20);LinearLayout.LayoutParams photosParams=new LinearLayout.LayoutParams(-1,dp(72));photosParams.topMargin=dp(8);box.addView(photos,photosParams);}
+
+
         LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);box.addView(productInfo,new LinearLayout.LayoutParams(-1,-2));
         Runnable updateProductInfo=()->{decision.setText(DealEvaluator.evaluate(d).label);decision.setTextColor(dealAccent(d));productInfo.removeAllViews();
-        productInfo.addView(productRatingRow(d.rating,scoreLabel(d),()->{if(!TextUtils.isEmpty(d.bggId))openBgg(d.bggId);},()->showLudoScoreInfo(d)));
-        productInfo.addView(productLanguagePanel(d.languageCode,()->editListingInfo(d,dialog)));
-        addProductSection(productInfo,productFacts(d.minPlayers!=null?d.minPlayers:game==null?null:game.minPlayers,d.maxPlayers!=null?d.maxPlayers:game==null?null:game.maxPlayers,d.playtime!=null?d.playtime:game==null?null:game.playtime,game==null?null:game.minAge,d.weight!=null?d.weight:game==null?null:game.weight),12);
-        View tags=linkedDealTagStrip(d,game);if(tags!=null)productInfo.addView(detailDisclosure("Categorie",tags));
-        if(game!=null){
-            TextView gameLink=text("Scheda gioco",14,TEXT,Typeface.BOLD);gameLink.setGravity(Gravity.CENTER_VERTICAL);gameLink.setMinHeight(dp(48));gameLink.setCompoundDrawablesWithIntrinsicBounds(iconDrawable(LudoIcons.BOOK_OPEN,CYAN,18),null,iconDrawable(LudoIcons.CHEVRON_RIGHT,MUTED,14),null);gameLink.setCompoundDrawablePadding(dp(8));
-            gameLink.setContentDescription("Apri la scheda del gioco "+game.name);gameLink.setOnClickListener(v->openGameDetailOverlay(game.id));addProductSection(productInfo,gameLink,8);
-            String description=italianGameSummary(game);if(!TextUtils.isEmpty(description)){TextView desc=text(description,14,MUTED,Typeface.NORMAL);desc.setLineSpacing(0,1.15f);productInfo.addView(detailDisclosure("Descrizione del gioco",desc));}
-        }
+        productTags.removeAllViews();View tags=linkedDealTagStrip(d,game);if(tags!=null)productTags.addView(tags);
+        addProductSection(productInfo,productQuickFacts(d.rating,d.minPlayers!=null?d.minPlayers:game==null?null:game.minPlayers,d.maxPlayers!=null?d.maxPlayers:game==null?null:game.maxPlayers,d.playtime!=null?d.playtime:game==null?null:game.playtime,d.weight,d.languageCode==null?"":d.languageCode,()->{if(!TextUtils.isEmpty(d.bggId))openBgg(d.bggId);},()->editListingInfo(d,dialog)),12);
+        if(game!=null){String description=cleanBggDescription(game.description);if(!TextUtils.isEmpty(description)){TextView desc=text(description,14,MUTED,Typeface.NORMAL);desc.setLineSpacing(0,1.15f);productInfo.addView(detailDisclosure("Descrizione BGG",desc));}}
 
         };updateProductInfo.run();
 
@@ -1598,7 +1637,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
 
         if(game!=null){TextView pullHint=text("La scheda gioco si sta preparando",12,MUTED,Typeface.BOLD);pullHint.setGravity(Gravity.CENTER_VERTICAL);pullHint.setMinHeight(dp(56));GamePullProgress progress=new GamePullProgress();progress.setBounds(0,0,dp(32),dp(32));pullHint.setCompoundDrawables(progress,null,null,null);pullHint.setCompoundDrawablePadding(dp(12));LinearLayout.LayoutParams php=new LinearLayout.LayoutParams(-1,-2);php.topMargin=dp(16);box.addView(pullHint,php);installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));}
 
-        sc.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);box.setPadding(dp(20)+safe.left,dp(16)+safe.top,dp(20)+safe.right,dp(24)+safe.bottom);return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(sc);sc.requestApplyInsets();dialog.show();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
+        LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(sc,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(24));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
     }
 
     private void finishListingDetail(Dialog dialog,Dialog parent,String parentSignature){
@@ -1624,19 +1663,24 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private static final class GamePullGesture {
         private float anchor,progress;private boolean touching,anchored;
         void down(float y,boolean atBottom){touching=true;anchored=atBottom;anchor=y;progress=0;}
-        float move(float y,boolean atBottom,float distance){if(!touching)return 0;if(!atBottom){anchored=false;progress=0;return 0;}if(!anchored){anchor=y;anchored=true;progress=0;return 0;}progress=Math.max(0,Math.min(1,(anchor-y)/distance));return progress;}
+        float move(float y,boolean atBottom,float distance){if(!touching||!anchored)return 0;if(!atBottom){anchored=false;progress=0;return 0;}float travel=Math.max(0,(anchor-y)/Math.max(1,distance));progress=Math.min(1,travel*travel);return progress;}
         boolean release(float y,float distance,boolean ready){boolean complete=touching&&anchored&&progress>=1&&anchor-y>=distance&&ready;cancel();return complete;}
         void cancel(){touching=false;anchored=false;progress=0;}
     }
     private void installPullToGame(ScrollView sc,TextView hint,long gameId,Dialog detail){
         GamePullGesture gesture=new GamePullGesture();
+        hint.setFocusable(true);hint.setAccessibilityDelegate(new View.AccessibilityDelegate(){
+            @Override public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);if(readyGameTransition(detail,gameId)){info.addAction(new android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,"Apri scheda gioco"));info.setClickable(true);}}
+            @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK&&readyGameTransition(detail,gameId)){showPreparedGameTransition(detail,gameId);return true;}return super.performAccessibilityAction(host,action,args);}
+        });
+        hint.setOnKeyListener((view,key,event)->{if(key!=KeyEvent.KEYCODE_ENTER&&key!=KeyEvent.KEYCODE_DPAD_CENTER)return false;if(event.getAction()==KeyEvent.ACTION_UP){if(readyGameTransition(detail,gameId))showPreparedGameTransition(detail,gameId);else hint.performClick();}return true;});
         sc.setOnTouchListener((v,e)->{
             int action=e.getActionMasked();boolean ready=readyGameTransition(detail,gameId);
             boolean bottom=!sc.canScrollVertically(1);
             if(action==android.view.MotionEvent.ACTION_CANCEL||e.getPointerCount()!=1||!detail.isShowing()){gesture.cancel();updateGamePullHint(hint,0,ready);return false;}
             if(action==android.view.MotionEvent.ACTION_DOWN){gesture.down(e.getY(),bottom);updateGamePullHint(hint,0,ready);}
-            else if(action==android.view.MotionEvent.ACTION_MOVE){float progress=gesture.move(e.getY(),bottom,dp(72f));updateGamePullHint(hint,ready?progress:0,ready);}
-            else if(action==android.view.MotionEvent.ACTION_UP){boolean go=gesture.release(e.getY(),dp(72f),ready&&bottom);updateGamePullHint(hint,0,ready);if(go)showPreparedGameTransition(detail,gameId);}
+            else if(action==android.view.MotionEvent.ACTION_MOVE){float progress=gesture.move(e.getY(),bottom,dp(220f));updateGamePullHint(hint,ready?progress:0,ready);}
+            else if(action==android.view.MotionEvent.ACTION_UP){boolean go=gesture.release(e.getY(),dp(220f),ready&&bottom);updateGamePullHint(hint,0,ready);if(go)showPreparedGameTransition(detail,gameId);}
             return false;
         });
     }
@@ -1650,19 +1694,23 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     }
     private void updateGamePullHint(TextView hint,float progress,boolean ready){
         Drawable[] drawables=hint.getCompoundDrawables();if(drawables[0] instanceof GamePullProgress)((GamePullProgress)drawables[0]).setProgress(progress);
-        String label=!ready?"La scheda gioco si sta preparando":progress>=1?"Rilascia per aprire il gioco":progress>0?"Continua per aprire il gioco":"Continua verso l’alto per aprire il gioco";
+        String label=!ready?(hint.isClickable()?"Preparazione non riuscita · tocca per riprovare":"La scheda gioco si sta preparando"):progress>=1?"Rilascia per aprire la scheda gioco":progress>0?"Continua · apri scheda gioco":"Da qui, scorri ancora per aprire la scheda gioco";
         if(!label.contentEquals(hint.getText()))hint.setText(label);
         hint.setAlpha(ready?1f:.65f);hint.setContentDescription(label+(progress>0?" · "+Math.round(progress*100)+"%":""));
     }
     private static final class PreparedGameOverlay {final long gameId;Dialog dialog;PreparedGameOverlay(long id){gameId=id;}}
     private final Map<Dialog,PreparedGameOverlay> preparedGameOverlays=new HashMap<>();
     private boolean readyGameTransition(Dialog source,long gameId){PreparedGameOverlay ready=preparedGameOverlays.get(source);return !isFinishing()&&!isDestroyed()&&source.isShowing()&&activeDetailDialog==source&&(activeGameOverlay==null||!activeGameOverlay.isShowing())&&ready!=null&&ready.gameId==gameId&&ready.dialog!=null;}
-    private void showPreparedGameTransition(Dialog source,long gameId){if(!readyGameTransition(source,gameId))return;PreparedGameOverlay ready=preparedGameOverlays.get(source);Dialog target=ready.dialog;ready.dialog=null;activeGameOverlay=target;showGameOverlayWindow(target);}
+    private void showPreparedGameTransition(Dialog source,long gameId){
+        if(!readyGameTransition(source,gameId))return;PreparedGameOverlay ready=preparedGameOverlays.get(source);Dialog target=ready.dialog;ready.dialog=null;activeGameOverlay=target;showGameOverlayWindow(target);
+        Window window=target.getWindow();if(window!=null){View decor=window.getDecorView();decor.announceForAccessibility("Scheda gioco");if(ValueAnimator.areAnimatorsEnabled()){decor.setAlpha(0f);decor.setTranslationY(dp(32));decor.animate().alpha(1f).translationY(0f).setDuration(260).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();}}
+    }
     private void prepareGameTransition(Dialog source,long gameId,TextView hint){
         if(isFinishing()||isDestroyed()||!source.isShowing())return;
+        hint.setOnClickListener(null);hint.setClickable(false);updateGamePullHint(hint,0,false);
         PreparedGameOverlay request=new PreparedGameOverlay(gameId);preparedGameOverlays.put(source,request);
         uiDataIo.execute(()->{GameRecord game=null;GameDetailData data=null;try{game=marketStore.gameStats(gameId);if(game!=null)data=loadGameDetailData(game);}catch(RuntimeException ignored){}final GameRecord g=game;final GameDetailData snapshot=data;
-            runOnUiThread(()->{if(isFinishing()||isDestroyed()||!source.isShowing()||preparedGameOverlays.get(source)!=request)return;if(g==null||snapshot==null){hint.setText("Usa Scheda gioco per aprire il gioco");return;}request.dialog=buildPreparedGameOverlay(g,snapshot,()->prepareGameTransition(source,gameId,hint));updateGamePullHint(hint,0,true);});
+            runOnUiThread(()->{if(isFinishing()||isDestroyed()||!source.isShowing()||preparedGameOverlays.get(source)!=request)return;if(g==null||snapshot==null){hint.setOnClickListener(v->prepareGameTransition(source,gameId,hint));updateGamePullHint(hint,0,false);return;}request.dialog=buildPreparedGameOverlay(g,snapshot,()->prepareGameTransition(source,gameId,hint));updateGamePullHint(hint,0,true);});
         });
     }
     private Dialog buildPreparedGameOverlay(GameRecord game,GameDetailData snapshot,Runnable onClosed){

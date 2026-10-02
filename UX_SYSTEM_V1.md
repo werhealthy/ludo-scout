@@ -175,3 +175,12 @@ Listing hierarchy: toolbar → compact144–208dp3D cover → title26sp → quie
 Game detail reuses compact media, scores and icon/value facts. Taxonomy, creators and description use progressive disclosure; real market prices/history/listings remain intact.
 BGG enrichment rebuilds visible product sections, preserves caching/data writes, and checks dialog lifecycle before updating UI. Errors keep prior data and expose quiet status. Cover overrides/favorites retain their existing identity/attach lifecycle.
 Device acceptance required: hierarchy/first viewport, long labels and large type, glyph rendering/touch/TalkBack,3D podium proportions, real photo opening, link/game/pull flow and refresh during detail.
+
+## Approved product navigation refinement — 5.12.117
+User approved the proposed listing/media/navigation group with “Vai” on 2026-10-02.
+- Listing: slightly larger integrated scene, actual listing thumbnails immediately below, title and visible category tags, compact BGG rating/players/duration/language facts. Age is omitted here; Ludo explanation remains secondary.
+- Footer: persistent primary Vinted action and secondary BGG action, using existing brand logos and respecting safe insets; vertically stack at large font sizes.
+- Show a genuine stored BGG description when available. Do not label a generated taxonomy/creator summary as a description.
+- Game: shared scene/facts, Panoramica/Mercato/Scopri tabs; preserve real pricing/history/listings/similar data and scoring explanations. YouTube links open an explicit ITA tutorial search; BGG files are a resource directory, not a promise of a verified Italian PDF.
+- Gesture: a new touch must start at the bottom. Ordinary reading scroll cannot arm the transition. Longer pull with progressive resistance; release only after completion. Provide an accessibility/keyboard equivalent and recovery when preparation fails, with a short reduced-motion-aware transition.
+- Gallery: measure page widths before layout and retain the selected index across initial layout and size changes; UI verification on a real device remains required.
