@@ -32,11 +32,12 @@ public class EngineOverviewPresentationRegression {
   eq("Elaborazione in corso",status(true,false,9,0,1,false,true,0));
   for(int phase=0;phase<5;phase++)for(int mask=0;mask<32;mask++){
    boolean active=EngineOverviewPresentation.activePhase(mask,phase,false,false,0,100);
-   if(active!=((mask&(1<<phase))!=0))throw new AssertionError("inactive phase animated");
+   if(active!=(phase<4&&(mask&(1<<phase))!=0))throw new AssertionError("inactive phase animated");
   }
   if(EngineOverviewPresentation.activePhase(8,3,false,false,200,100))throw new AssertionError("wait animated");
   if(EngineOverviewPresentation.activePhase(8,3,false,true,0,100))throw new AssertionError("Vinted pause animated");
   if(EngineOverviewPresentation.activePhase(2,1,true,false,0,100))throw new AssertionError("BGG pause animated");
+  eq("Scroll elaborato",status(true,true,16,0,0,false,false,0));
   eq("Da riconoscere",EngineOverviewPresentation.phaseLabel(0));eq("Pronti",EngineOverviewPresentation.phaseLabel(4));
   System.out.println("PASS production overview status, mixed-lane pause and 160 activity masks");
  }
