@@ -48,7 +48,7 @@ public class LudoHuntsUiRegression {
  static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
  public static void main(String[] args){
   LudoHuntsUiRegression n=new LudoHuntsUiRegression();n.prefs.saved.addAll(Arrays.asList("123","456","999"));n.marketStore.games.put("123",game("123","Z"));n.marketStore.games.put("456",game("456","A"));LinearLayout host=new LinearLayout(n);
-  n.loadLudoHunts(host);check(n.marketStore.reads==0,"database work must stay off immediate UI");n.drain();List<String> rows=tags(host);
+  n.loadLudoHunts(host);check(n.marketStore.reads==0,"database work must stay off immediate UI");n.rooms.recordScroll(n.scroll.y);check(n.rooms.position("hunts")==800,"loading placeholder must not overwrite the saved deep Cacce position");n.rooms.switchTo("home",n.scroll.y);n.drain();check(n.rooms.position("hunts")==800&&n.scroll.y==0,"abandoning loading Cacce preserves saved room position");n.rooms.switchTo("hunts",0);n.loadLudoHunts(host);n.drain();List<String> rows=tags(host);
   check(rows.indexOf("game:456")<rows.indexOf("game:123")&&rows.contains("favorite:999"),"canonical games sort and missing favorite identity remains accessible");
   check(n.scroll.y==800,"deep Cacce position must restore after asynchronous grid layout");
   n.prefs.saved.clear();n.prefs.saved.add("123");n.loadLudoHunts(host);n.prefs.saved.clear();n.prefs.saved.add("456");n.drain();rows=tags(host);check(rows.contains("game:456")&&!rows.contains("game:123"),"stale favorite snapshot cannot win");
