@@ -1,5 +1,21 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Backend149 — Pronti coerenti, avanzamento reale e browser leggibile
+
+Il “Si”22:38:44 approva la direzione del feedback22:33 e supersede lo stato “da approvare” dell'audit sottostante. Distribuita **5.12.149-engine-progress (1000172)**, localCode198. Frontend148 preservato.
+
+Pronti seleziona un unico annuncio coerente per identità BGG: fase, firma, gioco e prezzo appartengono allo stesso candidato, con spareggio stabile anche per firme legacy condivise. Servono tutti i precedenti controlli di identità/link/core/rating/job e benchmark/totale positivi con discount presente. Benchmark o confronto assente resta in Verifica annuncio; zero e sconti negativi sono validi, non vengono inventati né esclusi. La lista espone la percentuale sotto/pari/sopra il riferimento BGG tramite il calcolo prezzo esistente. Nessuna modifica schema, Catalogo o soglia rating.
+
+I cerchi mostrano il totale reale di ciascuna fase; attività e coda sono separate. Heartbeat locale radar su worker persistente, rinnovo4s, finestra di freschezza10s e firme limitate allo scroll corrente: nessuna attività globale/stantia inventata. Snapshot nuovi animano il cambio del conteggio, anello rotante solo durante attività comprovata; lifecycle, focus, pausa e animazioni disabilitate rispettati. Poll2s durante lavoro,10s inattivo. Nessuna percentuale di completamento finta.
+
+Browser: header chiudi/titolo/menu, due azioni separate, paginazione e stato su riga propria. Margini16dp, separazione8dp, target48dp, azioni min56dp con altezza adattiva e padding16/12dp applicato dopo il background. Dialogo ricerca con padding16dp. Ricerca ufficiale Android/Material documentata nell'audit; nessuna nuova dipendenza o illustrazione necessaria.
+
+PR196 HEAD1c6d576860a68621c6955ff987c6dbb5f0e523a2; validation483/run37063126591/job111024305676 success con suite regressioni, unit pricing, compile Java e APK di review. Fixture SQL reale RED→GREEN per rappresentante incoerente, pricing mancante, zero/negativo e doppio game_id legacy; harness JVM per heartbeat locale/freschezza/scope e consumo snapshot. Review indipendente ha segnalato il doppio candidato legacy, corretto prima del merge; nessun Important residuo. Merge64e6d452c25a66a60e27a44123c5860172169eaf.
+
+Android beta172/run37063605999/job111025869012 success: firma APK confermata20:58:26.1663153Z con SHA256 C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710; upload release1000172 confermato20:59:12.0781162Z; distribuzione ai tester/gruppi confermata separatamente20:59:12.5168421Z.
+
+Restano da verificare sul telefono: sconto noto e benchmark assente, stesso gioco con annunci completi/incompleti, analisi locale senza job remoto, coda/pausa, animazioni e viewport stretto/font200%. CI e source review non provano pixel, TalkBack o prestazioni Android reali. Installare senza cancellare dati. Backend5/frontend7 gruppi aperti invariati; nessun gruppo chiuso per la sola distribuzione.
+
 ## Feedback22:33 — velocità percepita migliorata, Pronti/sconti, avanzamento e browser
 
 L'utente riferisce che il Motore ora sembra veloce: feedback qualitativo sul telefono, non misura comparativa né accettazione dell'intero workstream. Segnala sconti assenti in “Finiti”, cerchi sempre0 senza movimento percepibile e browser ancora bocciato per testi ai bordi/padding. Chiede ricerca online e considera illustrazioni. Feedback consolidato nei gruppi Motore/browser già aperti; backend5/frontend7 invariati. Nessuna nuova APK in questo audit.
