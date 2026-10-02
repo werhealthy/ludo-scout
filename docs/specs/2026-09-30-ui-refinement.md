@@ -1,5 +1,21 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback19:37 — scaffali verticali, scheda leggera e stanze Ludo
+
+Utente apprezza142 ma corregge scroll: scaffali successivi verticali, numero dipendente dalla collezione e capacità viewport, nessun rail orizzontale. Con font grande ridurre scatole per ripiano; tutti i giochi ricercati nello stesso ordine. Root principalmente posseduti; Venduti come archivio secondario accessibile nel menu, non tab pari alla collezione. Storico venduti/rating/prezzi/memoria conservati.
+
+Scheda141 non accettata nello screenshot MilleFiori: voto/acquisto sono box troppo pesanti. Cinque cuori personali sempre visibili e selezionabili direttamente; interpretazione proposta: stato non valutato con cinque vuoti e invito discreto, senza grande “Da valutare”/bottone duplicato. Voto per copia/LibraryDatabase distinto dal cuore Preferiti BGG in toolbar. Conservare0 e null distinti, legacy7=3.5su5 e mezzi cuori finché non modificato; evitare tap che azzeri ambiguamente. Pattern proposto: tap sul cuoreN impostaNsu5 tramite write guard; “Rimuovi voto” e voto0 restano nel menu. Non convertire/ripulire rating memorizzati.
+
+Acquisto/saving in riepilogo minimale del linguaggio Catalogo, senza box narrativo grande; prezzo reale principale, risparmio/calcolo/provenienza/dettagli bundle progressivi. Colore locale discreto, non nuova classificazione rarità. BGG barra fissa sul fondo con safe insets; contenuto scrollabile sopra, gesto intenzionale dal fondo verso scheda gioco come Annuncio. Audit: installPullToGame dipende da preparedGameTransitions e identità canonical long; Libreria conserva bggId e non garantisce record canonical. Riutilizzare preparazione/gesture solo con identità reale disponibile, fallback BGG reale e stato indisponibile; nessun gioco inventato/scrittura per rendere la destinazione esistente.
+
+Archivio Sold: prezzo vendita e differenza monetaria fra vendita registrata e costo d'acquisto registrato. Etichetta chiara, null non trattato comezero e nessun margine netto completo inventato quando mancano costi. Negativo resta visibile. Nessuna nuova tabella/schema o decisione pricing. Attuale PurchaseMath e salePriceCents restano fonte.
+
+Idea Ludo+Libreria esplicitamente esplorativa, NON decisione di rimuovere tab/navigation: stanze/scenari orizzontali, Esplorazione con Ludo esploratore/ricerca nuovi giochi e Casa con Ludo/camino/scaffali. Coerenza semantica: orizzontale per cambiare stanza, verticale per vedere gli scaffali dentro Casa. Ipotesi di Libreria come stanza Ludo da presentare come composizione concreta prima di cambiare navigazione e generare/sostituire asset. Ricerca e funzione attuale Preferiti/Gusti/Cacce/memoria da preservare. Non fingere tracking/arrivi/prezzi obiettivo già implementati.
+
+Audit read-only di source corrente: libraryShelves due rail142, libraryPersonalRatingCard box141, openLibraryDetail provider nel contenuto e nessun pull; installPullToGame pronto esistente legato a canonical/preload. Screenshot osservato dalla conversazione; nessuna accettazione della scheda141, solo apprezzamento ripiani con cambi richiesti. Questo checkpoint non cambia codice/APK. Motore resta standby. Feedback consolidato nei gruppi2/4/5/7, frontend7/backend5.
+Unico prossimo gruppo: rifinitura Libreria/scheda secondo questo feedback, definendo la composizione delle stanze come proposta separata prima di modificare la navigazione.
+
+
 ## Feedback18:44 approvato18:53 — Libreria scatolata a due ripiani142
 
 Utente ribadisce riuso prodotto approvato, adattato a voto personale/prezzo acquisto/risparmio, e richiede Libreria skeuomorfica su due ripiani. “Vai”18:53 approva: root a due rail orizzontali, tutte le copie filtrate ripartite ceil(N/2)/resto nell'ordine reale; scatole e ombre BGG reali senza piedistallo, sfondo unico del ripiano con bordo/luci/ombra. Nessun riquadro individuale. Ogni scatola apre scheda141, già componente prodotto con dati personali e conferme. Ricerca/Owned/Sold/wizard/voto/storico invariati. Tile larghe con font grande, azione accessibile completa, decoder locale320x480 e offset rail conservati nel refresh/reset su nuovo scope/query.
