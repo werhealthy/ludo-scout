@@ -16,8 +16,8 @@ android {
         // Local builds keep the source baseline. CI supplies a monotonic build number
         // via LUDO_VERSION_CODE so every distributed beta can update the previous one.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
-        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 195
-        versionName '5.12.146-ludo-rooms'
+        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 196
+        versionName '5.12.147-browser-engine-intake'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')
@@ -70,4 +70,5 @@ dependencies { implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
 
 // Origin-scoped message bridge and document-start script for the passive browser experiment.
 dependencies { implementation 'androidx.webkit:webkit:1.12.1' }
+
 
