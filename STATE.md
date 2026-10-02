@@ -1,5 +1,24 @@
 # Ludo Scout — Current state
 
+## Frontend148 — Ludo immersivo, panoramica mensile e Cacce preferiti
+
+Il feedback21:47 e “Vai”21:52 approvano tre ambienti immersivi: Esplorazione/Cacce/Libreria, a tutta larghezza e sfumati nella pagina. Riutilizzate illustrazioni originali Ludo e ambienti foresta/taverna/Casa, più grandi; eliminate scritte decorative sovrapposte. Selettore accessibile e swipe orizzontale, contenuti verticali. Esplorazione non mostra più suggerimenti sui singoli giochi: numeri grandi per giochi distinti trovati nel mese e quanti hanno voto BGG >6; CTA principale “Trova nuovi giochi” apre la ricerca Vinted nel browser esistente con query opzionale conservata.
+
+Panoramica in sola lettura da market_listings/games, mese calendario Europe/Rome e identità BGG deduplicate. Annunci locali osservati nel periodo, non corpus importato né intero mercato; visibilità/match/lifecycle validi, voto mancante non inventato, >6 strettamente. Lettura asincrona con caricamento/errore distinti da zero e retry. Cacce riusa preferiti reali, griglia di copertine grandi/annunci attivi/cuore contestuale; identità mancanti restano accessibili e rimovibili. Vecchi target Cacce e Gusti restano nel menu secondario. Libreria riusa integralmente collezione e componenti144: scaffali verticali, schede, rating, acquisti/vendite, aggiunta e archivio secondario. Memoria Ludo conservata anche senza suggerimenti visibili; nessuna collezione duplicata.
+
+Scroll indipendenti delle tre stanze e testo ricerca in ludo_rooms_v1; vecchio home resta Libreria. Revisione indipendente ha trovato un caso di perdita huntsY uscendo dal placeholder prima del completamento IO: protezione transitoria LudoRoomState fino al ripristino dopo layout corrente. recordScroll/switchTo conservano la posizione durante loading; richieste obsolete/host staccato/stanza cambiata/errori non la sovrascrivono. Empty corrente rilascia protezione. Loader reale verificato con confini IO/UI controllati.
+
+PR189 HEAD984641b81e7ab299ce76477f4792f87aa0a8b463; validation482/run37059605618/job111012719621 success: regressioni complete, SQL mensile/DST/Rome, stanze/swipe/restoration, loader Cacce reale con preferiti obsoleti/missing/cambio stanza/loading/host staccato, unit Android/pricing, compile Java e review APK. Test iniziale rosso sul salto Cacce a due stanze (run37057063316); fixture SQL locale rossa per panoramica assente, poi verde. Race loading riprodotta rossa run37058962130/job111010528282, poi verde sul fix. Una fixture mancava getScrollY dopo la correzione: adapter corretto mantenendo asserzioni; final CI verde. Source review senza Important residui dopo fix; pixel, TalkBack e restart Android reale non verificati.
+
+Riallineamento beta backend147 e suo checkpoint tramite PR191/193; behind_by=0 prima del merge. Nessuna modifica frontend a schema/backend/soglie/filtri/pricing/dipendenze o nuove acquisizioni; UI Motore standby. Conflitto soltanto nell'identità release concorrente: finale148/localCode197, logica backend147 conservata.
+
+Merge PR189 c0f34f69373b6a6a35b80973e49b3e8cf2755c55. Beta171/run37060164150/job111014579690 success, 5.12.148-ludo-immersive(1000171). Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato20:25:34.6660115Z; upload Firebase2026-10-02T20:26:24.7335163Z e distribuzione ai tester20:26:25.1402766Z confermati separatamente.
+
+Accettazione telefono pendente: tre scene/Ludo più grande, panoramica e CTA Vinted, griglia cuori e schede Cacce, scaffali e azioni Libreria, font grande, swipe versus scroll, posizioni su Back/riapertura e cambio stanza durante caricamento. Questa consegna non dichiara accettazione visiva, frame-time o restart Android reale. Test backend147 sul telefono e sue diagnostiche restano pendenti come nella sezione dedicata sotto.
+
+Frontend7/backend5 aperti. Unico prossimo gruppo frontend raccomandato dopo verifica visiva: Catalogo unificato + Bundle/Esplora secondo decisione20:00. Il feedback Ludo/Libreria rientra nel gruppo già aperto; non duplicare job consegnati.
+
+
 ## Backend147 — cattura browser → Motore distribuita nel Tester
 
 PR190 collega gli annunci catturati dal browser al database e all’analisi locale dell’owner radar esistente, anche con scan opt-in OFF. ID esatti, snapshot senza prezzo conservati senza inventare valori, aggiornamenti dello stesso annuncio e osservazioni successive con dedupe persistente. Hidden/sold/manual review conservati; risultati vecchi non sovrascrivono prezzo totale, brand, condizione o testo nuovi. Metadata Vinted assenti non generano richieste automatiche. Nessun reset, schema o cambiamento di soglie/pricing/filtri/dati personali. Rimossi shortcut arbitrari Catan/Azul; ricerca esplicita e filtri nel menu, contatore salvati ed errore salvataggio visibile. Worker drena batch accettati alla chiusura e bridge riprova salvataggi falliti.
