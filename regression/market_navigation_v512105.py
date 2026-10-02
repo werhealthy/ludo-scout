@@ -59,7 +59,9 @@ public class MarketNavigationRegression extends ScreenBase {
     }
     void persistTransientUiSession(){}
  void openLudoHome(){tab="companion";}
- void prepareLudoNavigation(String value){}
+ int roomPositionRecords,roomEntries;
+    void recordLudoRoomPosition(){if("companion".equals(tab))roomPositionRecords++;}
+    void prepareLudoNavigation(String value){if("companion".equals(value)&&!"companion".equals(tab))roomEntries++;}
     void renderNav(){}
     void updateActivityIndicator(){}
     void requestEngineOverviewSnapshot(){}
@@ -158,9 +160,10 @@ public class MarketNavigationRegression extends ScreenBase {
             n.engineSection=section;n.onBackPressed();equal("overview",n.engineSection,"Work list Back");
         }
     }
+    static void roomBackUsesNavigationHooks(){MarketNavigationRegression n=new MarketNavigationRegression();n.tab="companion";n.scroll.y=640;n.tabHistory.push("discover");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomPositionRecords,"Back records room before leaving");equal(640,n.tabScrollPositions.get("companion"),"Back stores room scroll");n.tab="catalog";n.tabHistory.push("companion");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomEntries,"Back prepares room before entering");equal(640,n.scroll.y,"Back restores room scroll");}
     public static void main(String[] args){
         int failed=0;
-        Runnable[] tests={MarketNavigationRegression::retainsSiblingPositions,MarketNavigationRegression::motorBackFollowsHistoryHierarchy,
+        Runnable[] tests={MarketNavigationRegression::roomBackUsesNavigationHooks,MarketNavigationRegression::retainsSiblingPositions,MarketNavigationRegression::motorBackFollowsHistoryHierarchy,
             MarketNavigationRegression::retainsIndependentSearchAndFilters,
             MarketNavigationRegression::returnsFromBundleToSource,
             MarketNavigationRegression::staleTabRestoreDoesNotMoveAnotherView,
