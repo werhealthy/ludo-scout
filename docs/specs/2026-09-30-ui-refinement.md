@@ -26,6 +26,13 @@ Puntini Hero geometrici centrati (font ellissi138 rifiutato), stessa superficie3
 PR172/CI425 e beta161 superati; firma/upload/distribuzione tester distinti verificati, release140(1000161), evidenze in STATE. Accettazione telefono pendente. Nessun intake browser/reset/schema/rete/soglia/filtro modificato. Requisiti consolidati nel gruppo1Motore, nessuna chiusura dell'area. Prossimo gruppo frontend: percorso contestuale risoluzione/ritorno job, coordinato con ingresso dati backend; frontend7/backend5 aperti.
 
 
+## Proposta18:20 approvata18:25 — Libreria prodotto141 consegnata
+
+“Vai” approva composizione coerente col prodotto e progressività azioni. Libreria ora toolbar48dp/cuore/menu, artwork/fatti/linea/titolo senza truncation; stato edizione/acquisto e voto0–5 distinti dal BGG. Vendita solo Sold con null/zero/data/motivo/azione prezzo. Rank/categorie/Ludo nel disclosure; modifica acquisto, segna venduto/ripristina e elimina confermato nel menu, callback/async/single-flight/restoreY/insets preservati. Nessuna riscrittura dati/schema/relazione canonical inventata; provider BGG esterno reale. Tutorial query aggiunge “gioco”.
+PR176/CI430 e beta162 verificati; firma/upload/distribuzione tester distinti, release141(1000162), evidenze in STATE. Test esegue vero helper menu con confini simulati, non telefono; accettazione visiva/azioni sul telefono pendente. Annuncio/Home conservati e Motore standby per blocchi backend. Gruppo2 parzialmente implementato, non chiuso; foto MarraCash e relazione comune tecnica restano aperte. Frontend7/backend5.
+Unico prossimo gruppo attivo raccomandato:3 Catalogo, audit annunci/giochi/bundle, mantenendo tabs/navigazione105 già approvate.
+
+
 ## Priorità18:20 — Motore in standby; gruppo2 Schede prodotto attivo
 
 Utente chiede di fermare il lavoro frontend sul Motore per blocchi backend e passare allo step successivo. Standby del workstream UI, non comando di pausa delle code nell'app; requisiti aperti e consegna140 restano conservati. Non riprendere percorso risoluzione/storico/numeri finché il blocco non è superato o l'utente lo riattiva. Unico gruppo frontend attivo raccomandato:2 Schede prodotto e loro relazione. Frontend7/backend5 aperti; nessun gruppo chiuso.
@@ -134,7 +141,7 @@ Home considerata fatta dall’utente: conservarne la baseline approvata; non ria
 
 Accessibilità, testo grande, safe insets/tastiera, Back, annullamento e animazioni sono criteri trasversali di tutti i gruppi, non un unico job che possa chiudere intere aree.
 L’analisi UX deve ricostruire prima oggetti, relazioni, ingressi/uscite e azioni del codice attuale, poi proporre le alternative e far approvare le decisioni importanti. Nessun nuovo assetto di tab, ruoloLudo, tracking, schema o comportamento è approvato dalla sola richiesta di analisi.
-Unico prossimo passo frontend attivo dal18:20: gruppo2, composizione e relazione schede prodotto/Libreria secondo audit iniziale. Motore in standby per blocchi backend; requisiti e verifica telefono restano aperti. Non avviare tutti i redesign insieme.
+Unico prossimo gruppo frontend attivo dopo141:3 Catalogo, audit di relazione annunci/giochi e visibilità bundle mantenendo navigazione105. Verifica Libreria141 pendente, gruppo2 non chiuso. Motore in standby per blocchi backend; requisiti e verifica telefono restano aperti. Non avviare tutti i redesign insieme.
 
 ## Frontend — Motore overview e gesto dal basso 5.12.124, 2026-10-02 11:42 Europe/Rome
 
