@@ -53,7 +53,8 @@ for index, (eligible, job_state, listing_state, job_error, listing_error) in enu
         )
 
 row = db.execute(sql).fetchone()
-expected = (10, 1, 9, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+expected = (10, 1, 9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
 assert row == expected, f"expected={expected} actual={row}"
-assert row[2] == sum(row[3:]), f"eligible outcomes do not reconcile: {row}"
+assert row[2] == sum(row[3:12]), f"eligible outcomes do not reconcile: {row}"
 print("PASS Vinted missing-link outcomes are exclusive and reconcile to total")
+

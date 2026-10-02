@@ -1594,6 +1594,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String waitingState=firstWaiting==null?"NONE":(engineRun!=null&&firstWaiting.startAt<engineRun.startAt?"DEFERRED":"WAITING");
         String engineWaitingSummary=firstWaiting==null?"state=NONE":("state="+waitingState+";start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";etaMs="+DealDatabase.engineEtaMs(firstWaiting)+";coreWork="+firstWaiting.coreWorkListings+";corePending="+firstWaiting.corePendingListings+";coreRemaining="+firstWaiting.coreRemainingListings+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";held="+firstWaiting.heldListings+";analysisPending="+firstWaiting.analysisPendingListings);
         String engineCoreRemainingSummary=marketDiag.engineCoreRemainingSummary();
+        String engineLocalOnlySummary=marketDiag.engineLocalOnlySummary();
         MarketStore.RuntimeStatus a11yIntakeStatus=marketDiag.diagnosticState("a11y_intake");
         DealDatabase.ObservationSession latestCapture=db.latestObservationSession();
         String latestCaptureSummary=latestCapture==null?"state=NONE":"start="+latestCapture.startAt+";end="+latestCapture.endAt+";observations="+latestCapture.observations+";uniqueSignatures="+latestCapture.uniqueListings+";qualifiedListings="+latestCapture.validListings+";bgg="+latestCapture.bggMatchedListings+";vinted="+latestCapture.vintedLinkedListings+";ready="+latestCapture.completeListings+";held="+latestCapture.heldListings;
@@ -1725,6 +1726,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineLatestCapture={"+latestCaptureSummary+"}\n"+
                 "engineCaptureFunnel={"+captureFunnel+"}\n"+
                 "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
+                "engineLocalOnly={"+engineLocalOnlySummary+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
                 "enginePerformance={"+enginePerformanceSummary+"}\n"+
@@ -1828,3 +1830,4 @@ public final class VintedAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+

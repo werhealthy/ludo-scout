@@ -48,7 +48,7 @@ public final class MarketStore {
     private static final String VINTED_MISSING_BREAKDOWN_SQL =
             "SELECT COUNT(*),"+
             "SUM(CASE WHEN stage='notBggQualified' THEN 1 ELSE 0 END),"+
-            "SUM(CASE WHEN stage<>'notBggQualified' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage NOT IN ('notBggQualified','localOnly') THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN stage='queued' THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN stage='awaitingAttempt' THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN stage='noCandidate' THEN 1 ELSE 0 END),"+
@@ -57,9 +57,11 @@ public final class MarketStore {
             "SUM(CASE WHEN stage='unavailable' THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN stage='throttled' THEN 1 ELSE 0 END),"+
             "SUM(CASE WHEN stage='verificationFailed' THEN 1 ELSE 0 END),"+
-            "SUM(CASE WHEN stage='other' THEN 1 ELSE 0 END) FROM ("+
+            "SUM(CASE WHEN stage='other' THEN 1 ELSE 0 END),"+
+            "SUM(CASE WHEN stage='localOnly' THEN 1 ELSE 0 END) FROM ("+
             "SELECT CASE "+
             "WHEN g.id IS NULL OR g.bgg_id IS NULL OR g.bgg_id='' OR COALESCE(g.match_state,'')<>'MATCHED' OR g.rating IS NULL OR g.rating<6.0 OR COALESCE(g.database_visible,0)<>1 THEN 'notBggQualified' "+
+            "WHEN l.enrichment_state='LOCAL_ONLY' THEN 'localOnly' "+
             "WHEN COALESCE(j.state,'') IN ('PENDING','PROCESSING') THEN 'queued' "+
             "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%429%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%403%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%cooldown%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%limitato temporaneamente%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%budget pubblico%' THEN 'throttled' "+
             "WHEN LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%nessun annuncio compatibile%' OR LOWER(COALESCE(NULLIF(j.last_error,''),l.last_error,'')) LIKE '%nessun candidato%' THEN 'noCandidate' "+
@@ -2972,20 +2974,27 @@ public final class MarketStore {
                 "FROM market_listings l JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) LEFT JOIN processing_jobs j ON j.id=(SELECT jj.id FROM processing_jobs jj WHERE jj.listing_id=l.id AND jj.job_type=? ORDER BY jj.updated_at DESC,jj.id DESC LIMIT 1) "+
                 "WHERE l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=? AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
                 "AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) "+
-                "AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(l.enrichment_state,'')<>'NEEDS_REVIEW' AND COALESCE(l.match_state,'')<>'BGG_VARIANT_REVIEW' "+
+                "AND COALESCE(l.manual_review_required,0)=0 AND l.enrichment_state NOT IN ('NEEDS_REVIEW','LOCAL_ONLY','AUTO_EXCLUDED','AUTO_FILTERED') AND l.match_state<>'BGG_VARIANT_REVIEW' "+
                 "AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') "+
                 "AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='') ORDER BY l.last_seen ASC LIMIT 8";
         try(Cursor x=db.rawQuery(sql,new String[]{JOB_VINTED,String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(run.startAt),String.valueOf(run.endAt)})){
             while(x.moveToNext()){if(n++>0)out.append(" | ");out.append("#").append(x.getLong(0)).append(" ").append(safe(x.getString(1))).append(" [").append(x.getString(2)).append(";attempt=").append(x.getInt(3)).append(";job=").append(x.getString(4)).append(";type=").append(safe(x.getString(6))).append(";source=").append(safe(x.getString(7))).append(";nextAttemptInMs=").append(Math.max(0L,x.getLong(8)-System.currentTimeMillis()));String err=x.getString(5);if(!TextUtils.isEmpty(err))out.append(";why=").append(safe(err));out.append("]");}
         }
-        return "count="+n+"; "+(out.length()==0?"none":out.toString());
+        return "scope=activeRun;unit=listings;limit=8;count="+n+"; "+(out.length()==0?"none":out.toString());
+    }
+
+    /** Current-run local holds are observations, not missing remote jobs. No cause is inferred. */
+    public String engineLocalOnlySummary(){
+        DealDatabase.ObservationSession run=helper.activeObservationSession();if(run==null)return "state=NONE";
+        String sql="SELECT COUNT(*) FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' AND l.enrichment_state='LOCAL_ONLY' AND g.database_visible=1 AND g.rating>=? AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='') AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?)";
+        try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(run.startAt),String.valueOf(run.endAt)})){return "scope=activeRun;unit=listings;count="+(c.moveToFirst()?c.getInt(0):0);}
     }
 
     public int missingVintedCoreCount(){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND (vinted_url IS NULL OR vinted_url='')",null)){return c.moveToFirst()?c.getInt(0):0;}}
     public String vintedMissingBreakdown(){
         try(Cursor c=helper.getReadableDatabase().rawQuery(VINTED_MISSING_BREAKDOWN_SQL,null)){
             if(!c.moveToFirst())return"total=0";
-            return "total="+c.getInt(0)+"; notBggQualified="+c.getInt(1)+"; eligible="+c.getInt(2)+"; queued="+c.getInt(3)+"; awaitingAttempt="+c.getInt(4)+"; noCandidate="+c.getInt(5)+"; ambiguous="+c.getInt(6)+"; weakMatch="+c.getInt(7)+"; unavailable="+c.getInt(8)+"; throttled="+c.getInt(9)+"; verificationFailed="+c.getInt(10)+"; other="+c.getInt(11);
+            return "total="+c.getInt(0)+"; notBggQualified="+c.getInt(1)+"; eligible="+c.getInt(2)+"; queued="+c.getInt(3)+"; awaitingAttempt="+c.getInt(4)+"; noCandidate="+c.getInt(5)+"; ambiguous="+c.getInt(6)+"; weakMatch="+c.getInt(7)+"; unavailable="+c.getInt(8)+"; throttled="+c.getInt(9)+"; verificationFailed="+c.getInt(10)+"; other="+c.getInt(11)+"; localOnly="+c.getInt(12)+"; scope=globalActiveMissingUrl;unit=listings";
         }
     }
     public String catalogVisibilityBreakdown(){
@@ -3539,5 +3548,6 @@ public final class MarketStore {
     private static String safe(String s){return s==null?"":(s.length()>600?s.substring(0,600):s);}
     private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Long)v.put(k,(Long)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
+
 
 
