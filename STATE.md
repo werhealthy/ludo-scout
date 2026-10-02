@@ -1,5 +1,28 @@
 # Ludo Scout — Current state
 
+## Frontend — Motore aperto e gesto reversibile 5.12.125–126, 2026-10-02
+
+Feedback124: pulsanti provider accettati, gesto inverso e Motore non accettati. Utente approva la nuova struttura con «Vai» alle12:13Europe/Rome. Non chiude Motore né Schede.
+
+Implementazione PR139: stato unico con icona al centro della ruota, senza card esterna né paragrafo didascalico; code/aiuto diventano righe allineate senza box annidati. Fasi0–3 mostrano voci attive separatamente dalle altre in coda; Pronti mostra disponibilità dello scroll. Busy conta identità raggruppate nella fase con job PROCESSING, non numero di job o throughput. Pausa/attesa impediscono il movimento delle corsie remote; campionamento circa10s. Lettura activeCounts riusa EnginePipelineSql.grouped e gli stessi filtri, su worker. Nessuna modifica ai writer/schema/rete/soglie/backend123. Minor noto: stock/busy sono letture separate, possono divergere temporaneamente durante scritture concorrenti; coda negativa clampata a0.
+Cronologia dal fondo con lo stesso gesto, equivalente nel menu/TalkBack/tastiera. Refresh superiore conservato, overlay senza slot nel contenuto, cleanup/lifecycle e defer del render durante il gesto. Font grandi/schermi stretti usano righe aperte; niente clipping imposto ai testi.
+
+Gesto: superata la soglia nativa touch-slop al primo progresso positivo controlla la sequenza fino al rilascio, annulla lo scroll nativo concorrente e il target figlio. Osserva DOWN prima del dispatch ai figli cliccabili tramite EndPullScrollView. MOVE inverso rende direttamente il progresso, incluso zero; release/cancel rientra180ms. Su viewport corto la presa del gesto inferiore azzera il trascinamento del refresh superiore. Annuncio e Motore condividono lo stesso handler. Riempimenti/loghi/pulsanti124 accettati preservati.
+
+Storico completamenti NON implementato: processing_jobs conserva lo stato corrente mutabile, updated_at cambia anche per riaperture/archiviazioni, COMPLETE include rinvii/scarti. Non è una fonte affidabile per i passaggi di oggi. Serve un contratto dati/eventi duraturi coordinato con backend prima di mostrare un numero; il limite compare soltanto nel menu informativo, non come zero fittizio. Questo requisito approvato resta aperto dentro Motore.
+
+Verifiche: RED CI372(36994837313)/job110799071985 riproduce progresso0 anziché0.5 al ritorno con scroll nativo; RED CI374(36996326107)/job110803761180 riproduce DOWN perso sui figli; RED CI375(36996510323)/job110804361987 riproduce traslazione superiore22.5 non ripristinata. SQLite active-counts RED su stock{0:1,1:2,3:1}, poi GREEN con busy{0:1,1:1,3:1}; identità condivisa deduplicata e lavoro concluso escluso da live, senza promuoverlo aPronti senza gates. Final headd05fdf5df66964d20a893b847b4321f7988aec45 supera CI376(36996833308), job110805368829: regressioni complete/JVM/SQLite/Androidunit/compile/APK. Review indipendente individua2Important, entrambi riprodotti e corretti RED→GREEN con suite finale verde; niente Critical. Locale syntax/SQLite e2625casi limiti geometrici passati. Harness Android deterministici, nessun telefono/emulatore e nessuna promessa identica aChatGPT in pixel/frame.
+PR139 integrata, merged0f05487a613e42cfc5f9318cf1e9f12e5c027e6.
+
+Distribuzione verificata:125 Android beta143/run36997125778/job110806296618, Firebase upload2026-10-02T10:48:09.6653046Z e distribuzione tester10:48:10.6206009Z. Finale126-pull-touch-slop (1000144), Android beta144/run36998381016/job110810212469 completato success; certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato. Firebase upload2026-10-02T11:01:20.6880177Z, distribuzione tester/gruppi distinta11:01:21.1393815Z (13:01Europe/Rome).
+
+Follow-up PR140: preserva i tap con piccoli movimenti involontari sui figli cliccabili usando ViewConfiguration.getScaledTouchSlop prima della presa del gesto; dopo la presa non riapplica la soglia, quindi il ritorno attraversa zero senza scatti. RED CI377(36997656836)/job110807975775 riproduce tap perso; GREEN CI379(36997877743)/job110808652070 su head2ece6b30389241c972843d26f27586af5afa2a80, regressioni complete/unit/compile/APK. Review indipendente senza blocchi. Merge0920154006cb172b379188b9f4ea68002e641785 conserva il checkpoint backend documentale4519515644b10521428a013aa7a935c91ff3a344; rispetto alla base testata cambia soltanto documentazione backend.
+
+Prova telefono: trascinamento avanti→indietro senza staccare il dito, anche iniziando su una riga cliccabile, poi rilascio parziale/completo; Motore con testo grande e apertura cronologia dal fondo/menu; pagina corta con inversione refresh superiore→gesto inferiore. Non richiede nuove scansioni/richieste Vinted per verificare la UI. Foto404 item9883428968 resta aperta nel gruppoSchede, non modificata qui.
+Frontend7aree aperte, backend separato5. Prossimo gruppo: Motore, rendere disponibile lo storico delle conclusioni con unità/periodo/fonte affidabili, poi percorso contestuale di risoluzione e ritorno ai job. Prima verificare sul telefono la126; non considerarla accettata dalla sola CI.
+
+
+
 ## Checkpoint backend — ricerca Motore, 2026-10-02 12:51 Europe/Rome
 
 Richiesta utente: conservare la ricerca come know-how e rimandare ogni nuova indagine/implementazione alla prossima chat. Report originale: [docs/research/ludo-scout-engine-report-2026-10-02.md](docs/research/ludo-scout-engine-report-2026-10-02.md). È un audit storico riferito principalmente a 5.12.41: ipotesi, percorsi e raccomandazioni vanno riconfermati sull'ultimo beta. PROJECT/AGENTS/STATE già esistono; non ricrearli. Citazioni filecite/search del report appartengono alla sessione originale e non sono prove navigabili nel repository.
