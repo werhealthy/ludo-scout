@@ -1,5 +1,13 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback140 — screenshot e diagnostica18:19Europe/Rome
+
+UI browser rifiutata: header troppo alto/affollato e file di pulsanti senza gerarchia. Eliminare Catan/Azul e qualsiasi suggerimento di giochi preimpostato. Categoria Giochi da tavolo nel contesto filtri; solo chip dei filtri selezionati. Eventuali ricerche salvate dall'utente nel pannello, nessuna fila automatica di titoli.
+
+Screenshot browser18:12 mostra0acquisiti; diagnostica successiva pageObserved156/acquiredUnique96/price96: istanti e contatori diversi, non156annunci persistiti. catalogWrites0, observations totali0, engineLatestCaptureNONE/IDLE confermano writer ancora assente140. Motore vuoto e1attività globale coerenti con1PENDING VINTED_DEEP distinta dalla ricerca. REMOTE_LIMIT riguarda lavoro remoto residuo, non l'intake assente; ledger180richieste tuttebundle/item e2HTTP403. Non aumentare rete o aggirare il backoff.
+
+La140 consegna frontend Hero/movimento, non il milestone browser→Motore. PR173 contiene contratto approvato e piano scritto, nessuna implementazione/APK di questa feature. Non presentare progettazione come implementazione. Feedback recepito nel contratto/Task5, backend5/frontend7 invariati.
+
 ## Feedback139 — prossima consegna completa browser e intake
 
 Richiesta esplicita: interrompere le consegne di micro-fix, allineare la ricerca Vinted browser al design system reale del Catalogo e collegare tutti gli annunci validati al Motore con lavoro reale. Nessuna accettazione visiva del browser135/139.
