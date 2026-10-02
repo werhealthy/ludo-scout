@@ -31,7 +31,7 @@ checks=[
     ("discover stays selective","tier IN ('hot','good','offer')" in db),
     ("catalog can retain fair and insufficient","'fair','insufficient','hunt'" in db),
     ("bundle prospect uses central evaluator","DealEvaluator.isBundleProspect" in ui and "DealEvaluator.bundleProspectScore" in ui),
-    ("bundle experiment carries explicit seller without legacy capture side effects",\'openVintedBrowserExperiment(d.vintedUrl,"BUNDLE",d.sellerId)\' in ui and "BundleExploration.begin(this,d)" not in ui and "BundleExploration.current(this)" in radar),
+    ("bundle experiment carries explicit seller without legacy capture side effects",'openVintedBrowserExperiment(d.vintedUrl,"BUNDLE",d.sellerId)' in ui and "BundleExploration.begin(this,d)" not in ui and "BundleExploration.current(this)" in radar),
     ("unknown bundle shipping is not shown as exact","Totale da verificare" in ui and 'bundleMetric("RISPARMIO","n/d"' in ui),
     ("bundle shipping scenario stays explicitly estimated","plan.shippingEstimated=true" in ui),
     ("offer target is solved from all-in total","maxItemForTotal" in evaluator and "cut<=.15" in evaluator),
