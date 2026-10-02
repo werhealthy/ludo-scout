@@ -29,7 +29,7 @@ checks=[
      "row.addView(info,new LinearLayout.LayoutParams(0,-2,1))" in catalog and
      "LinearLayout c=verticalCard()" not in catalog),
     ("Library keeps collection rows search and history scope",
-     "body.addView(libraryRow(g))" in library and
+     "body.addView(libraryShelves(shown))" in library and
      "body.addView(librarySummaryCard(owned))" not in library and
      "librarySearchBar()" in library and
      "libraryScopeTabs(owned.size(),sold.size())" in library),
