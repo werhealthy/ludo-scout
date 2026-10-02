@@ -5,12 +5,12 @@ const vm=require('node:vm');
 const path=require('node:path');
 const file=path.join(__dirname,'../app/src/main/assets/browser/vinted-capture.js');
 const script=fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
-const sleep=()=>new Promise(r=>setTimeout(r,35));
+const sleep=()=>new Promise(r=>setTimeout(r,350));
 function fixture({enabled=true,seller='',cards=[],scripts=[]}={}){
  const messages=[];const requests=[];let payload={items:[]};let response;
  class Xhr{constructor(){this.listeners={};this.responseType='';this.responseText='';this.status=200;}open(method,url){this.url=url;}addEventListener(name,cb){(this.listeners[name]??=[]).push(cb);}send(){requests.push(this.url);this.responseURL=this.url;this.responseText=JSON.stringify(payload);for(const cb of this.listeners.load??[])cb.call(this);}}
  const document={readyState:'complete',querySelectorAll(selector){if(selector==='script[type="application/ld+json"],script#__NEXT_DATA__')return scripts;return cards;},addEventListener(){}};
- const window={location:{href:'https://www.vinted.it/catalog?search_text=catan',origin:'https://www.vinted.it'},document,__LudoCaptureInitial:{enabled,expectedSeller:seller},LudoCapture:{postMessage(s){messages.push(JSON.parse(s));}},XMLHttpRequest:Xhr,fetch(...args){requests.push(args);response=new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}});return Promise.resolve(response);},MutationObserver:class{constructor(cb){this.cb=cb;}observe(){}},TextDecoder,URL,TextEncoder,setTimeout,clearTimeout};window.window=window;
+ const window={location:{href:'https://www.vinted.it/catalog?search_text=catan',origin:'https://www.vinted.it'},document,__LudoCaptureInitial:{enabled,expectedSeller:seller},LudoCapture:{postMessage(s){messages.push(JSON.parse(s));setTimeout(()=>window.LudoCapture.onmessage?.({data:"ready"}),0);}},XMLHttpRequest:Xhr,fetch(...args){requests.push(args);response=new Response(JSON.stringify(payload),{headers:{'Content-Type':'application/json'}});return Promise.resolve(response);},MutationObserver:class{constructor(cb){this.cb=cb;}observe(){}},TextDecoder,URL,TextEncoder,setTimeout,clearTimeout};window.window=window;
  const ctx=vm.createContext(window);vm.runInContext(script,ctx);
  return {window,messages,requests,ctx,setPayload(p){payload=p;},response(){return response;},items(){return messages.flatMap(m=>m.items);},async fetch(p,url='https://www.vinted.it/api/v2/catalog/items'){payload=p;return await window.fetch(url);}};
 }
@@ -34,3 +34,7 @@ test('cross-origin response and non-json pages do not become items',async()=>{co
 test('DOM refresh cannot downgrade richer JSON title and provenance',async()=>{const card={getAttribute(n){return n==='href'?'/items/10-card':null;},textContent:'Different accessibility label',querySelector(){return {getAttribute(n){return n==='alt'?'Generic photo label':null;}};}};const f=fixture({cards:[card]});await sleep();await f.fetch({items:[item()]});await sleep();f.window.LudoCaptureControl.captureNow();await sleep();assert.equal(f.items().at(-1)?.title,'Catan');assert.equal(f.items().at(-1)?.source,'json');});
 test('private current page prevents capture even for a catalog response',async()=>{const f=fixture();f.window.location.href='https://www.vinted.it/inbox';await f.fetch({items:[item()]});await sleep();assert.equal(f.messages.length,0);});
 test('unsafe and conflicting item links are not normalized',async()=>{const f=fixture();await f.fetch({items:[{...item(),url:'https://www.vinted.it/items/11-x'},{...item(12),url:'https://evil.example/items/12'}]});await sleep();assert.equal(f.items().length,0);});
+
+test('resume reoffers cached records when a native pause discarded delivery',async()=>{const f=fixture();await f.fetch({items:[item()]});await sleep();f.messages.length=0;f.window.LudoCaptureControl.setEnabled(false);f.window.LudoCaptureControl.setEnabled(true);await sleep();assert.equal(f.items().length,1);assert.equal(f.requests.length,1);});
+
+test("rich batches split by byte budget without losing items",async()=>{const f=fixture();await f.fetch({items:Array.from({length:32},(_,i)=>({...item(i+1),description:"x".repeat(2000),photos:Array.from({length:10},()=>({url:"https://images1.vinted.net/"+"x".repeat(300)}))}))});await sleep();assert.equal(f.items().length,32);assert.ok(f.messages.length>1);assert.ok(f.messages.every(m=>Buffer.byteLength(JSON.stringify(m))<=128*1024));});
