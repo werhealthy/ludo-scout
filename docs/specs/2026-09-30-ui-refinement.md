@@ -1,5 +1,9 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback16:32 — classifica, colore e annuncio in evidenza
+
+Rimuovere superficie dall’area artwork della classifica Home (conservare card e scatola); aumentare sfondo prodotto58% al centro/30% intermedio, stessa palette discountAccent e layout accettato. Bug riproponibilità: firma legacy include titolo/brand/prezzo; può cambiare pur restando identico l’ID Vinted. Esclusione sessione ora usa ID annuncio quando noto, fallback firma con promozione dell’ID dopo enrichment; ID diversi non vengono confusi anche con firma uguale. Annulla e chiusura app conservati; non è un filtro permanente per gioco BGG. Test unitari dedicati per cambio prezzo/titolo, enrichment, altri annunci e undo. Implementazione136 in verifica; accettazione telefono pendente. Prossimo gruppo dopo questo polish: Motore, scope e percorsi dei job con diagnostica attuale. Frontend7/backend5 aperti.
+
 ## Feedback approvato16:06 — chiusura polish prodotto e avvio Motore
 
 Layout133 accettato dall'utente: conservarlo. Sfondo e glow devono seguire esattamente la palette del tag percentuale di sconto, condivisa tramite discountAccent, non la label Offertona; senza sconto positivo usare neutro. Cerchio azioni pieno48dp e glyph24dp, ratio1:2 anche quando un chiamante usa un pulsante più piccolo; eliminare inset7dp che restringeva la superficie. Area favorita48dp conservata, preferiti/semantica/fontAwesome invariati. Rimuovere ingresso testuale BrowserTest dalla scheda annuncio, senza cambiare gli altri ingressi browser. Implementato PR158, accesso VIEW conservato nel menu tre puntini senza testo BrowserTest sulla pagina. CI405 e CI406(PR159 correzione del test350ms) superate; beta155/firma/upload/distribuzione distinti verificati, release134(1000155). Colore/pulsanti134 da verificare sul telefono, dettagli in STATE. Fonti Material: developer.android.com/reference/kotlin/androidx/compose/material3/IconButton.composable (24dp/48dp).
