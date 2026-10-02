@@ -2,7 +2,7 @@
 
 ## Feedback attuale — azioni coerenti e colore offerta
 
-Like della Home accanto alle altre azioni, stessa area48dp e superficie con inset7dp; padding comune per azioni circolari senza imporre dimensioni identiche alle card. Scheda annuncio: eliminare titolo Vinted finale indesiderato; riepilogo titolo/offerta/prezzo senza box, barra lingua/voto/giocatori/durata con superficie propria. Sfumatura leggera dietro artwork delle offerte Home/podio e dettaglio annuncio, ricavata da dealAccent esistente; nessuna nuova classificazione o colore inventato per giochi senza annuncio. Implementazione su frontend/rarity-action-polish, verifiche automatiche e telefono pendenti. Frontend7/backend5 aperti.
+Like della Home accanto alle altre azioni, stessa area48dp e superficie con inset7dp; padding comune per azioni circolari senza imporre dimensioni identiche alle card. Scheda annuncio: eliminare titolo Vinted finale indesiderato; riepilogo titolo/offerta/prezzo senza box, barra lingua/voto/giocatori/durata con superficie propria. Sfumatura leggera dietro artwork delle offerte Home/podio e dettaglio annuncio, ricavata da dealAccent esistente; nessuna nuova classificazione o colore inventato per giochi senza annuncio. Implementato PR152/153 anche nel Catalogo: regressioni/test Android/compile/APK verificati; versione5.12.131(1000150), beta150 con firma/upload Firebase/distribuzione distinti verificati. Dettagli in STATE; accettazione visiva telefono pendente. Frontend7/backend5 aperti.
 
 
 ## Feedback backend 2026-10-02 14:57 — browser e suggerimenti affidabili

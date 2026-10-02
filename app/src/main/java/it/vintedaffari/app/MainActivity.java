@@ -581,7 +581,7 @@ private void applyDiscoverChrome(){
     private View discoverBggCover(DealRecord d,int width,int height,float radius){return discoverBggCover(d,width,height,radius,false);}
 
     private View discoverBggCover(DealRecord d,int width,int height,float radius,boolean fit){
-        FrameLayout picture=new FrameLayout(this);picture.setBackground(round(DISCOVER_SURFACE,radius,0,0));picture.setClipToOutline(true);
+        FrameLayout picture=new FrameLayout(this);picture.setBackground(!TextUtils.isEmpty(d.signature)&&!d.signature.startsWith("game:")?dealArtworkTint(d):round(DISCOVER_SURFACE,radius,0,0));picture.setClipToOutline(true);
         TextView placeholder=discoverTextWeight(coverPlaceholder(d),9,DISCOVER_MUTED,700);placeholder.setGravity(Gravity.CENTER);placeholder.setPadding(dp(4),dp(4),dp(4),dp(4));picture.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
         ImageView image=new ImageView(this);image.setScaleType(fit?ImageView.ScaleType.FIT_CENTER:ImageView.ScaleType.CENTER_CROP);picture.addView(image,new FrameLayout.LayoutParams(-1,-1));setDiscoverBggArtwork(image,placeholder,d);
         picture.setLayoutParams(new LinearLayout.LayoutParams(width,height));return picture;
