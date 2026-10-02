@@ -11,7 +11,7 @@ emulator -list-avds
 mkdir -p "$RUNNER_TEMP/ludo-browser-emulator"
 emulator -avd ludo-browser-tests -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/ludo-browser-emulator/emulator.log" 2>&1 &
 emulator_pid=$!
-trap 'adb logcat -d -b crash || true; adb logcat -d -s AndroidRuntime:V ActivityManager:E TestRunner:V Instrumentation:V || true; tail -80 "$RUNNER_TEMP/ludo-browser-emulator/emulator.log"; adb emu kill || true' EXIT
+trap 'adb logcat -d -b crash || true; adb logcat -d | rg -i "FATAL|crash|exception|instrumentation|testRunner|classnotfound|noclassdef" | tail -100 || true; tail -80 "$RUNNER_TEMP/ludo-browser-emulator/emulator.log"; adb emu kill || true' EXIT
 sleep 5
 if ! kill -0 "$emulator_pid" 2>/dev/null; then
   echo 'Emulator process exited before ADB became available'
@@ -27,4 +27,8 @@ adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
 chmod +x gradlew
+./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -r -e class it.vintedaffari.app.BrowserCaptureStoreTest it.vintedaffari.app.test/android.test.InstrumentationTestRunner
 ./gradlew --no-daemon :app:connectedDebugAndroidTest
