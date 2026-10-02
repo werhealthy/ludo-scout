@@ -48,7 +48,7 @@ public final class MarketStore {
     private static final String RESET_LISTING_EVIDENCE_SQL =
             "SELECT COALESCE(lifecycle,'UNKNOWN_STATE'),COUNT(*),SUM(CASE WHEN vinted_url IS NULL OR vinted_url='' THEN 1 ELSE 0 END) FROM market_listings GROUP BY COALESCE(lifecycle,'UNKNOWN_STATE') ORDER BY 1";
     private static final String RESET_OBSERVATION_EVIDENCE_SQL =
-            "SELECT COUNT(*),MIN(observed_at),MAX(observed_at),SUM(CASE WHEN observed_at>=CAST(? AS INTEGER) THEN 1 ELSE 0 END) FROM observations";
+            "SELECT COUNT(*),MIN(observed_at),MAX(observed_at),SUM(CASE WHEN observed_at>=CAST(? AS INTEGER) AND observed_at<=CAST(? AS INTEGER) THEN 1 ELSE 0 END) FROM observations";
     private static final String RESET_MARKER_EVIDENCE_SQL =
             "SELECT value,updated_at,text_value FROM queue_controls WHERE name='diag:fresh_start_reset' LIMIT 1";
     private static final String VINTED_MISSING_BREAKDOWN_SQL =
@@ -3001,8 +3001,8 @@ public final class MarketStore {
             while(c.moveToNext()){if(groups++>0)out.append("|");out.append(safe(c.getString(0))).append(":total=").append(c.getLong(1)).append(",missingUrl=").append(c.getLong(2));}
             if(groups==0)out.append("empty");
         }catch(Exception e){out.append("READ_ERROR:").append(e.getClass().getSimpleName());}
-        out.append("};observations={since24h=").append(now-24L*60L*60_000L);
-        try(Cursor c=db.rawQuery(RESET_OBSERVATION_EVIDENCE_SQL,new String[]{String.valueOf(now-24L*60L*60_000L)})){
+        out.append("};observations={since24h=").append(now-24L*60L*60_000L).append(";until=").append(now);
+        try(Cursor c=db.rawQuery(RESET_OBSERVATION_EVIDENCE_SQL,new String[]{String.valueOf(now-24L*60L*60_000L),String.valueOf(now)})){
             if(c.moveToFirst())out.append(";total=").append(c.getLong(0)).append(";oldestAt=").append(c.isNull(1)?"none":String.valueOf(c.getLong(1))).append(";newestAt=").append(c.isNull(2)?"none":String.valueOf(c.getLong(2))).append(";last24h=").append(c.getLong(3));
         }catch(Exception e){out.append(";state=READ_ERROR;error=").append(e.getClass().getSimpleName());}
         return out.append("}").toString();

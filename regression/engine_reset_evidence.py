@@ -14,15 +14,15 @@ observation_sql=sql('RESET_OBSERVATION_EVIDENCE_SQL')
 db=sqlite3.connect(':memory:')
 db.executescript('''CREATE TABLE market_listings(lifecycle TEXT,vinted_url TEXT); CREATE TABLE observations(observed_at INTEGER);
 INSERT INTO market_listings VALUES('ACTIVE','https://vinted.it/items/1'),('ACTIVE',''),('RESET_LEGACY',NULL),('RESET_LEGACY',''),('AUTO_FILTERED',NULL),(NULL,NULL);
-INSERT INTO observations VALUES(99),(100),(200),(200);
+INSERT INTO observations VALUES(99),(100),(200),(200),(201);
 ''')
 before=db.total_changes
 rows=db.execute(listing_sql).fetchall()
 assert rows==[('ACTIVE',2,1),('AUTO_FILTERED',1,1),('RESET_LEGACY',2,2),('UNKNOWN_STATE',1,1)],rows
-assert db.execute(observation_sql,('100',)).fetchone()==(4,99,200,3)
+assert db.execute(observation_sql,('100','200')).fetchone()==(5,99,201,3)
 assert db.total_changes==before, 'diagnostics must not write'
 db.execute('DELETE FROM observations')
-assert db.execute(observation_sql,('100',)).fetchone()==(0,None,None,None)
+assert db.execute(observation_sql,('100','200')).fetchone()==(0,None,None,None)
 db.execute('DELETE FROM market_listings')
 assert db.execute(listing_sql).fetchall()==[]
 print('PASS reset evidence: retained/archived/missing URL, inclusive observation bounds, empty DB, read-only')
