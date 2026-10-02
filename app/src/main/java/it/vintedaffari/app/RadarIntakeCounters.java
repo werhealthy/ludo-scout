@@ -25,7 +25,7 @@ final class RadarIntakeCounters {
     synchronized long get(String key){return values.getOrDefault(key,0L);}
     synchronized boolean ready(){return ready;}
     synchronized String metadata(){return "source=radar-owner-file;counterEpoch="+epoch+";counterReady="+ready+";counterError="+error+";flushWindowMs=2000;freshnessSchema=1;eventSource="+sources.get("eventAt")+";scanSource="+sources.get("scanAt")+";analysisSource="+sources.get("localAnalysisLastBatchAt");}
-    synchronized void recordEvent(long at,int type){recordLast(LAST_GROUPS[0],at,type);}
+    synchronized void recordEvent(long at,int type){add("vintedEvents",1L);recordLast(LAST_GROUPS[0],at,type);}
     synchronized void recordScan(long at,int count){recordLast(LAST_GROUPS[1],at,count);}
     synchronized void recordAnalysis(long at,int count){recordLast(LAST_GROUPS[2],at,count);}
     private void recordLast(String[] group,long at,long value){
@@ -43,13 +43,13 @@ final class RadarIntakeCounters {
         synchronized(this){
             if(ready)return;
             epoch=number(disk.getProperty("epoch"),now);if(epoch<=0)epoch=now;
-            for(String key:KEYS){long baseline=Math.max(number(disk.getProperty(key),0L),Math.max(0L,seed.getOrDefault(key,0L)));long delta=values.get(key);values.put(key,delta>Long.MAX_VALUE-baseline?Long.MAX_VALUE:baseline+delta);}
+            for(String key:KEYS){long stored=number(disk.getProperty(key),-1L);long baseline=stored>=0?stored:Math.max(0L,seed.getOrDefault(key,0L));long delta=values.get(key);values.put(key,delta>Long.MAX_VALUE-baseline?Long.MAX_VALUE:baseline+delta);}
             for(String[] group:LAST_GROUPS){
-                long diskAt=number(disk.getProperty(group[0]),0L),seedAt=Math.max(0L,seed.getOrDefault(group[0],0L));
-                long chosen=Math.max(diskAt,seedAt);
+                long diskAt=number(disk.getProperty(group[0]),-1L),seedAt=Math.max(0L,seed.getOrDefault(group[0],0L));
+                boolean fromDisk=diskAt>=0;long chosen=fromDisk?diskAt:seedAt;
                 // A new callback can arrive while initialization is doing disk/SQLite reads.
                 if(chosen>values.get(group[0])){
-                    boolean fromDisk=diskAt>=seedAt;values.put(group[0],chosen);
+                    values.put(group[0],chosen);
                     values.put(group[1],fromDisk?number(disk.getProperty(group[1]),0L):Math.max(0L,seed.getOrDefault(group[1],0L)));
                     sources.put(group[0],fromDisk?safeSource(disk.getProperty(group[0]+"Source")):"sqlite-migration-unverified");
                 }
@@ -71,6 +71,6 @@ final class RadarIntakeCounters {
         }catch(IOException e){synchronized(this){error=e.getClass().getSimpleName();}}
         }
     }
-    private static long number(String s,long fallback){try{return Math.max(0L,Long.parseLong(s));}catch(Exception e){return fallback;}}
+    private static long number(String s,long fallback){try{long value=Long.parseLong(s);return value>=0?value:fallback;}catch(Exception e){return fallback;}}
     private static String safeSource(String s){return "live-owner".equals(s)||"sqlite-migration-unverified".equals(s)?s:"unknown";}
 }

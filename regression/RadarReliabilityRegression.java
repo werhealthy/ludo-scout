@@ -28,6 +28,9 @@ public final class RadarReliabilityRegression {
         check(liveReload.get("scanAt")==140&&liveReload.get("lastCardsParsed")==0,"empty scan not preserved");
         check(liveReload.get("localAnalysisLastBatchAt")==150&&liveReload.get("localAnalysisLastBatchSize")==5,"live analysis pair not persisted");
         check(liveReload.diagnosticPayload().contains("analysisSource=live-owner"),"live provenance lost");
+        freshness.put("eventAt",999L);freshness.put("eventType",2048L);
+        RadarIntakeCounters seedAhead=new RadarIntakeCounters();seedAhead.initialize(freshFile,freshness,500);
+        check(seedAhead.get("eventAt")==130&&seedAhead.get("eventType")==64,"unverified higher seed replaced owner freshness");
         RadarIntakeCounters initializing=new RadarIntakeCounters();initializing.recordEvent(1000,16);initializing.initialize(freshFile,freshness,1100);
         check(initializing.get("eventAt")==1000&&initializing.get("eventType")==16,"initialization rolled back a live callback");
         File dir=Files.createTempDirectory("radar-test").toFile(),file=new File(dir,"intake.properties");

@@ -94,7 +94,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private volatile boolean radarDestroyed=false;
     private boolean analysisSelectionInFlight=false;
     private final AtomicBoolean a11yDiagnosticFlushQueued=new AtomicBoolean(false);
-    private volatile String pendingA11yDiagnosticSnapshot=null;
+    private final java.util.concurrent.atomic.AtomicReference<String> pendingA11yDiagnosticSnapshot=new java.util.concurrent.atomic.AtomicReference<>();
     private long lastA11yDiagnosticPublishAt=0L;
     private boolean a11yDiagnosticPublishScheduled=false;
     private volatile boolean marketJobInFlight=false;
@@ -282,11 +282,12 @@ public final class VintedAccessibilityService extends AccessibilityService {
 
         long eventNow=System.currentTimeMillis();radarCounters.recordEvent(eventNow,event.getEventType());pendingVintedEventDiag++;
         if(lastVintedEventDiagFlushAt==0L||eventNow-lastVintedEventDiagFlushAt>=2_000L||pendingVintedEventDiag>=64L){
-            SharedPreferences p=diag();long delta=pendingVintedEventDiag;pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
-            long eventTotal=radarCounters.add("vintedEvents",delta);int eventType=event.getEventType();
+            SharedPreferences p=diag();pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
+            long eventTotal=radarCounters.get("vintedEvents");int eventType=event.getEventType();
             p.edit().putLong("vintedEvents",eventTotal).putLong("lastEventAt",eventNow).putInt("lastEventType",eventType).apply();
-            publishA11yDiagnosticSnapshot();
         }
+        // Publish is coalesced and schedules one delayed snapshot for a quiet event tail.
+        publishA11yDiagnosticSnapshot();
 
         int type = event.getEventType();lastVintedEventAt=eventNow;
         if (type == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
@@ -331,7 +332,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void queueA11yDiagnosticSnapshot(String snapshot) {
-        pendingA11yDiagnosticSnapshot=snapshot;
+        pendingA11yDiagnosticSnapshot.set(snapshot);
         scheduleA11yDiagnosticFlush();
     }
 
@@ -341,15 +342,14 @@ public final class VintedAccessibilityService extends AccessibilityService {
             diagnosticIo.execute(()->{
                 try{
                     String snapshot;
-                    while((snapshot=pendingA11yDiagnosticSnapshot)!=null){
-                        pendingA11yDiagnosticSnapshot=null;
+                    while((snapshot=pendingA11yDiagnosticSnapshot.getAndSet(null))!=null){
                         radarCounters.persist(radarCounterFile());
                         try{MarketStore store=marketStore;if(store!=null)store.setDiagnosticState("a11y_intake",parseLongField(snapshot,"vintedEvents",0L),snapshot);}
                         catch(Throwable t){Log.w(TAG,"Accessibility telemetry write skipped",t);}
                     }
                 }finally{
                     a11yDiagnosticFlushQueued.set(false);
-                    if(pendingA11yDiagnosticSnapshot!=null)scheduleA11yDiagnosticFlush();
+                    if(pendingA11yDiagnosticSnapshot.get()!=null)scheduleA11yDiagnosticFlush();
                 }
             });
         }catch(RuntimeException rejected){a11yDiagnosticFlushQueued.set(false);}
@@ -1803,7 +1803,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     @Override public void onInterrupt() { }
 
     @Override public void onDestroy() {
-        if(pendingVintedEventDiag>0L){radarCounters.add("vintedEvents",pendingVintedEventDiag);pendingVintedEventDiag=0L;}
+        pendingVintedEventDiag=0L;
         radarDestroyed=true;
         setScanEnabled(false);hideScanOverlay();
         handler.removeCallbacksAndMessages(null);
