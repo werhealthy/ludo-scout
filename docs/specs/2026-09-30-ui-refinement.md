@@ -1,6 +1,16 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
-## Scaletta operativa unica — aggiornata 2026-10-02, 10:43 Europe/Rome
+## Intervento approvato 2026-10-02 12:13 — Motore aperto e gesto reversibile
+
+Il feedback124 accetta definitivamente i pulsanti con loghi/riempimenti: conservarli. Rifiuta lo scatto inverso, il doppio stato e la densità di card della overview. «Vai» approva la struttura proposta: ruota direttamente sulla pagina, stato unico con icona al centro, code/aiuto come righe compatte allineate, cronologia dal fondo con alternativa nel menu e accessibile.
+Il gesto deve seguire il dito anche al ritorno, compreso lo zero; soltanto release/cancel usa un rientro graduale. Deve iniziare anche sui figli cliccabili, preservarne i tap e convivere col refresh superiore quando la pagina entra nel viewport. Nessuno spazio fisso per l’indicatore e nessuna promessa di equivalenza pixel/frame aChatGPT.
+
+125–126 implementano questa UI e distingue voci attive da consistenza in coda, lasciando Pronti come disponibilità dello scroll. Unità: identità raggruppate dalla query corrente; non numero di job né tutto il Catalogo. Pausa/attesa e campionamento circa10s espliciti nel menu informativo. Test e build automatici verificati; accettazione telefono pendente.
+**Il requisito «concluse nel periodo» resta aperto:** la tabella job è mutabile e COMPLETE comprende anche archiviazioni/rinvii; nessun delta di stock è throughput. Non mostrare zero o “25oggi” senza una fonte affidabile di eventi conclusi. Prossimo lavoro Motore: definire con backend unità, periodo, esiti e registrazione duratura necessaria; eventuali writer/schema vanno decisi esplicitamente. Non chiudere il gruppo dopo il solo alleggerimento UI. Dettagli di PR/CI/distribuzione nel checkpoint STATE.md.
+
+
+
+## Scaletta operativa unica — aggiornata 2026-10-02, dopo la consegna 126
 
 Questo file è la fonte unica per le cose da fare. Leggerlo all'inizio di ogni sessione insieme a `AGENTS.md` e `STATE.md`. Le priorità qui sotto prevalgono sulle vecchie indicazioni di “prossimo step” nella cronologia. Aggiornare questi gruppi senza duplicare i lavori già consegnati.
 
@@ -18,7 +28,7 @@ Home considerata fatta dall’utente: conservarne la baseline approvata; non ria
 
 Accessibilità, testo grande, safe insets/tastiera, Back, annullamento e animazioni sono criteri trasversali di tutti i gruppi, non un unico job che possa chiudere intere aree.
 L’analisi UX deve ricostruire prima oggetti, relazioni, ingressi/uscite e azioni del codice attuale, poi proporre le alternative e far approvare le decisioni importanti. Nessun nuovo assetto di tab, ruoloLudo, tracking, schema o comportamento è approvato dalla sola richiesta di analisi.
-Unico prossimo passo frontend: Motore, percorso contestuale di risoluzione e ritorno ai job nella stessa posizione. Overview numeri/periodo/attività e gesto dal basso consegnati nella124; verifica telefono aperta, aree Motore/Schede non chiuse. Non avviare tutti i redesign insieme.
+Unico prossimo passo frontend: Motore, definire la fonte affidabile dello storico delle conclusioni per periodo con il backend; resta poi il percorso contestuale di risoluzione e ritorno ai job nella stessa posizione. Overview numeri/periodo/attività e gesto dal basso consegnati nella124; verifica telefono aperta, aree Motore/Schede non chiuse. Non avviare tutti i redesign insieme.
 
 ## Frontend — Motore overview e gesto dal basso 5.12.124, 2026-10-02 11:42 Europe/Rome
 
