@@ -812,8 +812,8 @@ private void applyDiscoverChrome(){
     private Button productProviderAction(String label,int logo,int color,Runnable action){
         // Match the opaque background of each original logo so its square blends into the button.
         int fill=logo==R.drawable.provider_vinted_logo?Color.rgb(1,119,131):Color.rgb(68,63,100);
-        Button b=button(label,fill);b.setIncludeFontPadding(false);b.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);b.setTextColor(Color.WHITE);b.setGravity(Gravity.CENTER);b.setPadding(dp(16),dp(12),dp(16),dp(12));
-        b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(35,255,255,255)),round(fill,16,0,0),null));
+        Button b=button(label,fill);b.setMinHeight(dp(56));b.setIncludeFontPadding(false);b.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);b.setTextColor(Color.WHITE);b.setGravity(Gravity.CENTER);b.setPadding(dp(16),dp(12),dp(16),dp(12));
+        b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(35,255,255,255)),round(fill,999,0,0),null));
         Drawable icon=getResources().getDrawable(logo,getTheme()).mutate();icon.setBounds(0,0,dp(24),dp(24));
         android.text.SpannableString content=new android.text.SpannableString("\uFFFC  "+label);
         content.setSpan(new CenteredProviderSpan(icon),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -831,6 +831,9 @@ private void applyDiscoverChrome(){
     }
 
     private View productQuickFacts(Double rating,Integer minPlayers,Integer maxPlayers,Integer minutes,Double weight,String language,Runnable ratingAction,Runnable languageAction){
+        return productQuickFacts(rating,minPlayers,maxPlayers,minutes,weight,language,false,ratingAction,languageAction);
+    }
+    private View productQuickFacts(Double rating,Integer minPlayers,Integer maxPlayers,Integer minutes,Double weight,String language,boolean compact,Runnable ratingAction,Runnable languageAction){
         String players=minPlayers==null?"—":minPlayers+(maxPlayers!=null&&!maxPlayers.equals(minPlayers)?"–"+maxPlayers:"");
         String[] values={rating==null?"—":String.format(Locale.ITALY,"%.1f",rating),players,minutes==null?"—":minutes+" min",language==null?(weight==null?"—":String.format(Locale.ITALY,"%.1f/5",weight)):HomePresentation.editionName(language)};
         String[] labels={"BGG","Giocatori","Durata",language==null?"Complessità":HomePresentation.dependenceLabel(language)};
@@ -838,10 +841,10 @@ private void applyDiscoverChrome(){
         int columns=getResources().getConfiguration().fontScale>1.5f?1:getResources().getConfiguration().fontScale>1.15f?2:4;
         LinearLayout grid=new LinearLayout(this);grid.setOrientation(LinearLayout.VERTICAL);
         for(int start=0;start<4;start+=columns){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);
-            for(int i=start;i<Math.min(start+columns,4);i++){final int index=i;LinearLayout cell=new LinearLayout(this);cell.setOrientation(LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);cell.setPadding(dp(4),dp(10),dp(4),dp(10));cell.setMinimumHeight(dp(72));
-                String flag=i==3&&language!=null?HomePresentation.editionFlag(language):"";TextView emblem=flag.isEmpty()?appIcon(icons[i],18,i==0?YELLOW:CYAN):text(flag,19,TEXT,Typeface.NORMAL);emblem.setGravity(Gravity.CENTER);cell.addView(emblem,new LinearLayout.LayoutParams(dp(28),dp(28)));
-                TextView value=text(values[i],15,TEXT,Typeface.BOLD);value.setGravity(Gravity.CENTER);cell.addView(value,new LinearLayout.LayoutParams(-1,-2));
-                TextView label=text(labels[i],11,MUTED,Typeface.NORMAL);label.setGravity(Gravity.CENTER);label.setPadding(0,dp(4),0,0);cell.addView(label,new LinearLayout.LayoutParams(-1,-2));
+            for(int i=start;i<Math.min(start+columns,4);i++){final int index=i;LinearLayout cell=new LinearLayout(this);cell.setOrientation(compact?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);cell.setPadding(dp(4),dp(compact?6:10),dp(4),dp(compact?6:10));cell.setMinimumHeight(dp(compact?48:72));
+                String flag=i==3&&language!=null?HomePresentation.editionFlag(language):"";TextView emblem=flag.isEmpty()?appIcon(icons[i],compact?14:18,i==0?YELLOW:CYAN):text(flag,compact?16:19,TEXT,Typeface.NORMAL);emblem.setGravity(Gravity.CENTER);cell.addView(emblem,new LinearLayout.LayoutParams(dp(compact?20:28),dp(compact?24:28)));
+                TextView value=text(values[i],compact?12:15,TEXT,Typeface.BOLD);value.setGravity(Gravity.CENTER);value.setPadding(dp(compact?4:0),0,0,0);cell.addView(value,compact?new LinearLayout.LayoutParams(0,-2,1):new LinearLayout.LayoutParams(-1,-2));
+                TextView label=text(labels[i],11,MUTED,Typeface.NORMAL);label.setGravity(Gravity.CENTER);label.setPadding(0,dp(4),0,0);if(!compact)cell.addView(label,new LinearLayout.LayoutParams(-1,-2));
                 cell.setContentDescription((i==3&&language!=null?"Lingua, ":"")+labels[i]+": "+("—".equals(values[i])?"dato non disponibile":values[i]));cell.setFocusable(true);
                 if(i==0&&ratingAction!=null)cell.setOnClickListener(v->ratingAction.run());else if(i==3&&language!=null&&languageAction!=null)cell.setOnClickListener(v->languageAction.run());
                 for(int child=0;child<cell.getChildCount();child++)cell.getChildAt(child).setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -1612,6 +1615,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         toolbar.addView(text("Annuncio",16,MUTED,Typeface.NORMAL),new LinearLayout.LayoutParams(0,-2,1));
         toolbar.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));
         TextView more=appIcon(LudoIcons.ELLIPSIS_VERTICAL,18,TEXT);more.setGravity(Gravity.CENTER);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
+        LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);addProductSection(box,productInfo,8);
 
         FrameLayout hero=new FrameLayout(this);hero.addView(dealProductArtwork(d),new FrameLayout.LayoutParams(-1,-1));LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,productMediaHeight());hlp.topMargin=dp(8);box.addView(hero,hlp);
         View photos=listingPhotoThumbnails(d);if(photos!=null){LinearLayout.LayoutParams photosParams=new LinearLayout.LayoutParams(-1,dp(72));photosParams.topMargin=dp(8);box.addView(photos,photosParams);}
@@ -1633,11 +1637,10 @@ private void openDetail(DealRecord d){openDetail(d,false);}
 
 
 
-        LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);addProductSection(box,productInfo,4);
         Runnable updateProductInfo=()->{decision.setText(DealEvaluator.evaluate(d).label);decision.setTextColor(dealAccent(d));productInfo.removeAllViews();
         productTags.removeAllViews();View tags=linkedDealTagStrip(d,game);if(tags!=null)productTags.addView(tags);
-        addProductSection(productInfo,productQuickFacts(d.rating,d.minPlayers!=null?d.minPlayers:game==null?null:game.minPlayers,d.maxPlayers!=null?d.maxPlayers:game==null?null:game.maxPlayers,d.playtime!=null?d.playtime:game==null?null:game.playtime,d.weight,d.languageCode==null?"":d.languageCode,()->{if(!TextUtils.isEmpty(d.bggId))openBgg(d.bggId);},()->editListingInfo(d,dialog)),12);
-        if(game!=null){String description=cleanBggDescription(game.description);if(!TextUtils.isEmpty(description)){TextView desc=text(description,14,MUTED,Typeface.NORMAL);desc.setLineSpacing(0,1.15f);productInfo.addView(detailDisclosure("Descrizione BGG",desc));}}
+        addProductSection(productInfo,productQuickFacts(d.rating,d.minPlayers!=null?d.minPlayers:game==null?null:game.minPlayers,d.maxPlayers!=null?d.maxPlayers:game==null?null:game.maxPlayers,d.playtime!=null?d.playtime:game==null?null:game.playtime,d.weight,d.languageCode==null?"":d.languageCode,true,()->{if(!TextUtils.isEmpty(d.bggId))openBgg(d.bggId);},()->editListingInfo(d,dialog)),0);
+        
 
         };updateProductInfo.run();
 
@@ -2417,14 +2420,14 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if(snapshot.loadedAt<engineEnteredAt||now-snapshot.loadedAt>30_000L)requestEngineOverviewSnapshot();
         body.addView(enginePipelineCard(snapshot));
         if(snapshot.waitingRuns>0||snapshot.intakeCount>0){LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(-1,-2);qp.topMargin=dp(16);body.addView(engineIntakeCard(snapshot),qp);}
-        if(snapshot.recoveryCount>0){LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(8);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
+        {LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(16);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
         installEngineHistoryPull();
 
         uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,10_000L);
     }
 
     private String engineScopeLabel(DealDatabase.ObservationSession scope){
-        if(scope==null)return "Nessuno scroll acquisito";
+        if(scope==null)return "Nessuno scroll nel periodo corrente";
         String start=new java.text.SimpleDateFormat("d MMM · HH:mm",Locale.ITALY).format(new java.util.Date(scope.startAt));
         String end=new java.text.SimpleDateFormat("d MMM · HH:mm",Locale.ITALY).format(new java.util.Date(scope.endAt));return start+" – "+end;
     }
@@ -2490,9 +2493,9 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         int[] colors={DISCOVER_LAVENDER,DISCOVER_PINK,DISCOVER_MINT,DISCOVER_YELLOW,Color.rgb(85,155,243)};String title=EngineOverviewPresentation.phaseLabel(phase);boolean ready=phase==4,active=!ready&&enginePhaseIsActive(snapshot,phase);int live=active?snapshot.livePhases[phase]:0;int number=ready?snapshot.phases[phase]:live;
         LinearLayout node=new LinearLayout(this);node.setOrientation(row?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);node.setBaselineAligned(false);node.setGravity(Gravity.CENTER);node.setPadding(dp(8),dp(6),dp(8),dp(6));if(!row)node.setBackground(round(SURFACE,999,1,colors[phase]));else node.setMinimumHeight(dp(64));
         TextView name=text(title,row?16:11,TEXT,Typeface.NORMAL);name.setGravity(row?Gravity.CENTER_VERTICAL:Gravity.CENTER);if(row)node.addView(name,new LinearLayout.LayoutParams(0,-2,1));else node.addView(name,new LinearLayout.LayoutParams(-1,-2));
-        LinearLayout numbers=new LinearLayout(this);numbers.setOrientation(LinearLayout.VERTICAL);numbers.setGravity(Gravity.CENTER);TextView count=text(String.valueOf(number),row?22:23,colors[phase],Typeface.BOLD);count.setGravity(Gravity.CENTER);numbers.addView(count);TextView caption=text(ready?"disponibili":"attive",10,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);numbers.addView(caption);
-        if(!ready){int waiting=Math.max(0,snapshot.phases[phase]-live);TextView queued=text(waiting+" in coda",10,MUTED,Typeface.NORMAL);queued.setGravity(Gravity.CENTER);numbers.addView(queued);}
-        node.addView(numbers,row?new LinearLayout.LayoutParams(dp(88),-2):new LinearLayout.LayoutParams(-1,-2));animateEngineCount(count,count,number,number,active);node.setContentDescription(title+": "+number+(ready?" disponibili": " voci attive, "+Math.max(0,snapshot.phases[phase]-live)+" in coda")+". Apri la fase.");return node;
+        LinearLayout numbers=new LinearLayout(this);numbers.setOrientation(LinearLayout.VERTICAL);numbers.setGravity(Gravity.CENTER);TextView count=text(snapshot.pipelineRun==null?"—":String.valueOf(number),row?22:23,colors[phase],Typeface.BOLD);count.setGravity(Gravity.CENTER);numbers.addView(count);TextView caption=text(ready?"disponibili":"attive",10,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);numbers.addView(caption);
+        if(!ready){int waiting=Math.max(0,snapshot.phases[phase]-live);TextView queued=text(snapshot.pipelineRun==null?"— in coda":waiting+" in coda",10,MUTED,Typeface.NORMAL);queued.setGravity(Gravity.CENTER);numbers.addView(queued);}
+        node.addView(numbers,row?new LinearLayout.LayoutParams(dp(88),-2):new LinearLayout.LayoutParams(-1,-2));if(snapshot.pipelineRun!=null)animateEngineCount(count,count,number,number,active);node.setContentDescription(snapshot.pipelineRun==null?title+": nessuno scroll nel periodo corrente.":title+": "+number+(ready?" disponibili": " voci attive, "+Math.max(0,snapshot.phases[phase]-live)+" in coda")+". Apri la fase.");return node;
     }
     private void animateEngineCount(TextView count,View node,int old,int current,boolean active){
         count.setText(String.valueOf(current));
@@ -2579,7 +2582,8 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
     private View engineAttentionCard(int count){
-        View row=engineQueueRow("\uf06a","Serve il tuo aiuto · "+count,ORANGE,()->{engineSection="review";render();});row.setContentDescription("Serve il tuo aiuto. "+count+" elementi richiedono una scelta.");return row;
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(12),dp(8),dp(12),dp(8));card.setBackground(round(SURFACE,22,1,count>0?ORANGE:OUTLINE));
+        View row=engineQueueRow("\uf06a",count>0?"Serve il tuo aiuto · "+count:"Richieste manuali · nessuna",count>0?ORANGE:MUTED,()->{engineSection="review";render();});row.setContentDescription(count>0?"Serve il tuo aiuto. "+count+" elementi richiedono una scelta.":"Nessuna richiesta manuale. Apri le richieste.");card.addView(row);return card;
     }
 
     private View engineWorkQueueCard(DealDatabase.ObservationSession active,List<DealDatabase.ObservationSession> unfinished){

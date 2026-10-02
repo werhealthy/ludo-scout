@@ -38,9 +38,9 @@ checks = [
      "risultati pronti" in components and
      "da questo scroll" in components and
      "nel Catalogo" not in components),
-    ("human attention is a separate conditional inbox",
-     "if(snapshot.recoveryCount>0)" in overview and
-     'engineQueueRow("\\uf06a","Serve il tuo aiuto'  in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and
+    ("human attention retains a visible direct inbox",
+     "engineAttentionCard(snapshot.recoveryCount)" in overview and
+     "Richieste manuali · nessuna" in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and
      'engineSection="review"' in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")]),
     ("unfinished scrolls use user-facing waiting states",
      "Altri scroll" in components and "Riprenderà" in components and "In attesa" in components),
