@@ -1509,18 +1509,18 @@ private void showFilterSheet(){
         loadLudoHunts(host);
     }
     private void loadLudoHunts(LinearLayout host){
-        int request=++ludoHuntsRequest;final int restoreY=ludoRoomState().position(LudoRoomState.HUNTS);Set<String> saved=new TreeSet<>(gamePreferences().favorites());
+        int request=++ludoHuntsRequest;ludoRoomState().beginHuntsRestore();final int restoreY=ludoRoomState().position(LudoRoomState.HUNTS);Set<String> saved=new TreeSet<>(gamePreferences().favorites());
         uiDataIo.execute(()->{List<GameRecord> games=new ArrayList<>();Set<String> missing=new TreeSet<>(saved);String failure=null;
             try{for(String id:saved){GameRecord game=marketStore.gameStatsByBggId(id);if(game!=null){games.add(game);missing.remove(id);}}games.sort((a,b)->String.CASE_INSENSITIVE_ORDER.compare(a.name==null?"":a.name,b.name==null?"":b.name));}catch(RuntimeException e){failure="Non riesco a leggere le tue cacce.";}
             final String error=failure;runOnUiThread(()->{if(isDestroyed()||!"companion".equals(tab)||!LudoRoomState.HUNTS.equals(ludoRoomState().room())||request!=ludoHuntsRequest||host.getParent()==null)return;if(!saved.equals(gamePreferences().favorites())){loadLudoHunts(host);return;}host.removeAllViews();
                 if(error!=null){host.addView(text(error,16,MUTED,Typeface.NORMAL));TextView retry=secondaryTextAction("Riprova");retry.setMinHeight(dp(48));retry.setOnClickListener(v->loadLudoHunts(host));host.addView(retry);return;}
                 host.addView(text(saved.size()+" giochi nei preferiti",15,MUTED,Typeface.BOLD));
-                if(saved.isEmpty()){TextView empty=text("La tua prossima caccia comincia con un cuore.",22,TEXT,Typeface.BOLD);empty.setPadding(0,dp(14),0,dp(18));host.addView(empty);Button explore=button("Trova nuovi giochi",VINTED_BG);explore.setTextColor(TEXT);explore.setOnClickListener(v->switchLudoRoom(LudoRoomState.EXPLORE));host.addView(explore);return;}
+                if(saved.isEmpty()){TextView empty=text("La tua prossima caccia comincia con un cuore.",22,TEXT,Typeface.BOLD);empty.setPadding(0,dp(14),0,dp(18));host.addView(empty);Button explore=button("Trova nuovi giochi",VINTED_BG);explore.setTextColor(TEXT);explore.setOnClickListener(v->switchLudoRoom(LudoRoomState.EXPLORE));host.addView(explore);host.post(()->{if(scroll!=null&&request==ludoHuntsRequest&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room())&&host.getParent()!=null){ludoRoomState().finishHuntsRestore();ludoRoomState().recordScroll(scroll.getScrollY());}});return;}
                 int columns=getResources().getConfiguration().fontScale>1.25f||getResources().getDisplayMetrics().widthPixels<dp(340)?1:2;LinearLayout row=null;
                 for(GameRecord game:games){if(row==null||row.getChildCount()==columns){row=new LinearLayout(this);row.setGravity(Gravity.TOP);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(14);host.addView(row,rp);}LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,1);if(row.getChildCount()>0)cp.leftMargin=dp(12);row.addView(ludoHuntCard(game),cp);}
                 if(row!=null&&row.getChildCount()<columns)row.addView(new Space(this),new LinearLayout.LayoutParams(0,1,1));
                 for(String id:missing){LinearLayout unavailable=new LinearLayout(this);unavailable.setGravity(Gravity.CENTER_VERTICAL);TextView label=text("Gioco BGG #"+id+" · dati non disponibili",14,MUTED,Typeface.NORMAL);unavailable.addView(label,new LinearLayout.LayoutParams(0,-2,1));unavailable.addView(gameFavoriteButton(id,"BGG #"+id),new LinearLayout.LayoutParams(dp(48),dp(48)));host.addView(unavailable);}
-                host.post(()->{if(scroll!=null&&request==ludoHuntsRequest&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room())&&host.getParent()!=null)scroll.scrollTo(0,restoreY);});
+                host.post(()->{if(scroll!=null&&request==ludoHuntsRequest&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room())&&host.getParent()!=null){scroll.scrollTo(0,restoreY);ludoRoomState().finishHuntsRestore();}});
             });
         });
     }
