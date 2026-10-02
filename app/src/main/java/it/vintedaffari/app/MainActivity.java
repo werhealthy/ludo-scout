@@ -696,7 +696,7 @@ private void applyDiscoverChrome(){
     }
 
     private FrameLayout rankedBoxArtwork(DealRecord d){
-        FrameLayout stage=new FrameLayout(this);stage.setBackground(dealArtworkTint(d));FeaturedBoxView box=new FeaturedBoxView(true,true);stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
+        FrameLayout stage=new FrameLayout(this);FeaturedBoxView box=new FeaturedBoxView(true,true);stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
         TextView placeholder=discoverTextWeight(coverPlaceholder(d),12,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);stage.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
         ImageView source=new ImageView(this);source.setVisibility(View.INVISIBLE);stage.addView(source,new FrameLayout.LayoutParams(dp(1),dp(1)));
         setProductArtwork(source,placeholder,d.bggId,d.bggImageUrl,"ranked:"+d.signature+":"+d.bggId,()->{Drawable art=source.getDrawable();if(art instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)art).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,null);placeholder.setVisibility(View.GONE);}}});return stage;
@@ -886,7 +886,7 @@ private void applyDiscoverChrome(){
     private int offerBackgroundColor(int accent,float amount){return Color.rgb(Math.round(Color.red(BG)*(1-amount)+Color.red(accent)*amount),Math.round(Color.green(BG)*(1-amount)+Color.green(accent)*amount),Math.round(Color.blue(BG)*(1-amount)+Color.blue(accent)*amount));}
     private Drawable productPageBackground(DealRecord d){final int accent=discountAccent(d);return new Drawable(){
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        @Override protected void onBoundsChange(Rect bounds){paint.setShader(new RadialGradient(bounds.centerX(),bounds.top+dp(180),Math.max(dp(430),bounds.width()*.95f),new int[]{offerBackgroundColor(accent,.34f),offerBackgroundColor(accent,.16f),BG},new float[]{0,.55f,1},Shader.TileMode.CLAMP));}
+        @Override protected void onBoundsChange(Rect bounds){paint.setShader(new RadialGradient(bounds.centerX(),bounds.top+dp(180),Math.max(dp(430),bounds.width()*.95f),new int[]{offerBackgroundColor(accent,.58f),offerBackgroundColor(accent,.30f),BG},new float[]{0,.55f,1},Shader.TileMode.CLAMP));}
         @Override public void draw(Canvas canvas){canvas.drawRect(getBounds(),paint);}
         @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
         @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
@@ -1009,7 +1009,7 @@ private void applyDiscoverChrome(){
 
     private DealRecord bestStrongOffer(List<DealRecord> deals){
         DealRecord best=null;double score=-1e9;
-        for(DealRecord d:deals){if(featuredDismissals.excludes(d.signature)||!HomeDiscoveryPolicy.offerEligible(d.languageCode)||!personalDealEligible(d))continue;DealEvaluator.Evaluation e=DealEvaluator.evaluate(d);if(!e.discoverable())continue;double value=homeScore(d)+(ageMinutes(d)<=30?7:0);if(value>score){score=value;best=d;}}
+        for(DealRecord d:deals){if(featuredDismissals.excludes(d.signature,d.vintedItemId)||!HomeDiscoveryPolicy.offerEligible(d.languageCode)||!personalDealEligible(d))continue;DealEvaluator.Evaluation e=DealEvaluator.evaluate(d);if(!e.discoverable())continue;double value=homeScore(d)+(ageMinutes(d)<=30?7:0);if(value>score){score=value;best=d;}}
         return best;
     }
 
@@ -1857,7 +1857,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private void addInterestActions(LinearLayout box,Dialog menu,DealRecord d,boolean listing){
         if(CoverOverrideStore.key(d.bggId)==null)return;SharedPreferences prefs=getSharedPreferences("ludo_home_interest_v2",MODE_PRIVATE);String key=HomeDiscoveryPolicy.key(d.bggId,d.signature);boolean interested=prefs.getInt(key,0)>0;
         TextView yes=menuAction(interested?"✓ Mi interessa · rimuovi":"Mi interessa",CYAN);yes.setContentDescription(interested?"Rimuovi interesse dai consigli. I Preferiti non cambiano":"Mi interessa: migliora i consigli. I Preferiti non cambiano");yes.setOnClickListener(v->{menu.dismiss();setHomeInterest(d,prefs.getInt(key,0)>0?0:1,true);Toast.makeText(this,"Interesse aggiornato per i consigli",Toast.LENGTH_SHORT).show();});box.addView(yes);
-        if(listing&&!TextUtils.isEmpty(d.signature)&&!d.signature.startsWith("game:")){TextView no=menuAction("Non mi interessa",TEXT);no.setContentDescription("Rimuovi solo questo annuncio dall’evidenza fino alla chiusura dell’app");no.setOnClickListener(v->{menu.dismiss();featuredDismissals.dismiss(d.signature,name(d));scheduleRender(0);Toast.makeText(this,"Rimosso solo dall’evidenza. Annulla dalla Home",Toast.LENGTH_LONG).show();});box.addView(no);}
+        if(listing&&!TextUtils.isEmpty(d.signature)&&!d.signature.startsWith("game:")){TextView no=menuAction("Non mi interessa",TEXT);no.setContentDescription("Rimuovi solo questo annuncio dall’evidenza fino alla chiusura dell’app");no.setOnClickListener(v->{menu.dismiss();featuredDismissals.dismiss(d.signature,d.vintedItemId,name(d));scheduleRender(0);Toast.makeText(this,"Rimosso solo dall’evidenza. Annulla dalla Home",Toast.LENGTH_LONG).show();});box.addView(no);}
         TextView explanation=text("Interesse per i consigli; il cuore salva nei Preferiti."+(listing?" L’esclusione vale solo per l’evidenza, fino alla chiusura dell’app.":""),12,MUTED,Typeface.NORMAL);explanation.setPadding(0,dp(4),0,dp(12));box.addView(explanation);
     }
     private void showProductActions(DealRecord d,boolean listing){Dialog menu=bottomSheet("Azioni gioco");LinearLayout box=menu.findViewById(SHEET_ID);addInterestActions(box,menu,d,listing);addCoverAdvancedAction(box,menu,d);menu.show();}
