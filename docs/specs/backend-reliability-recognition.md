@@ -8,7 +8,7 @@ Review indipendente: corretti jobPROCESSING in pausa/pacing etichettati incomple
 
 Fix: esclusione terminal classifier e raw ultimo stato, conteggio read-only della coda locale/durevole con stesso scope/dedupe delle fasi, dati incompleti separati dalla coda. Completamento visuale controlla anche coda scoped; grouping/ownership conservati. Diagnostica enginePipeline distingue ready identities da core-complete listings. Nessun reset/schema/filtri/soglie/pricing/rete modificati.
 
-RED locale SQLite blocked listing:phase0=2 invece1; poi GREEN con classificatore/raw/latest/tie. RED CI484/run37069372312/job111044895511 per nuove API presentazione assenti. GREEN completo, review e consegna150 da registrare in STATE. Non dichiarare equivalenza3 pronti/8 core-complete senza DB reale.
+RED locale SQLite blocked listing:phase0=2 invece1; poi GREEN con classificatore/raw/latest/tie. RED CI484/run37069372312/job111044895511 per nuove API presentazione assenti. GREEN finale CI493/run37070766614/job111049406156 e beta173/run37071180015/job111050737400 SUCCESS; firma/upload/distribuzione150 confermati e registrati in STATE. Review indipendente: due Important corretti con regressioni RED→GREEN. Non dichiarare equivalenza3 pronti/8 core-complete senza DB reale.
 
 Prova dopo build distribuita: riaprire stesso scroll senza nuova acquisizione;19 blocchi non devono restare da riconoscere,in coda deve concordare con enginePipeline.queued, dati prezzo mancanti restano visibili come incompleti. Poi1pagina nuova, screenshot+diagnostica subito e dopo2minuti.5 backend/7 frontend aperti, nessun gruppo chiuso dalla sola CI.
 

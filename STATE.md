@@ -1,5 +1,27 @@
 # Ludo Scout — Current state
 
+## Backend150 — code reali e stati Motore coerenti, distribuita
+
+Utente «Risolvi»23:46Europe/Rome autorizza la correzione del report149. Distribuita **5.12.150-engine-state-truth (1000173)**, localCode199. Frontend148 e browser149 preservati.
+
+Causa riprodotta nel SQL reale: ACTIVE/BLOCKED_CLASSIFIER senza game_id entrava nella fase0 e ogni stock inattivo era etichettato in coda. I19 CLASSIFIER_BLOCKED del report non erano19 analisi pendenti. BGG/link0 sono occupazione corrente, non throughput cumulativo;12 annunci qualificati avevano già entrambe le identità. La finestra di raggruppamento di3min permette engineRunACTIVE anche con contenuto già elaborato: grouping/ownership non cambiati.
+
+EnginePipelineSql esclude i blocchi del classificatore e i raw terminali/ultima osservazione, preservando pending reali. Stock, attività e coda scoped distinguono identità di gioco e annunci: coda richiede canonical PENDING_ANALYSIS, BGG_MATCH_REQUIRED senza ID o jobPENDING/FAILED_RETRYABLE. PROCESSING non è coda; deep opzionale escluso e manual recovery conservato. Raw orphan dopo interruzione tra due writer resta evidenza incompleta, senza executor/coda inventati. Nessun recupero massivo introdotto. Heartbeat locale rimuove soltanto firme queued/non-busy realmente in analisi e fresche nello scroll, senza doppia sottrazione. Pause/pacing conservano l’attività osservata anche quando l’animazione è fermata.
+
+MainActivity consuma queuedPhases: dati incompleti senza job non sono in coda; completamento visuale controlla lavoro scoped e attività corrente. Pronti conserva rappresentante coerente e pricing149; zero/negativo restano validi. Diagnostica enginePipeline espone scope/unità/order, stock/queued/jobActive/localActive e ready per identità distinti da coreCompleteListings. Non equiparare i3 pronti UI agli8 annunci core-complete senza le righe reali del telefono.
+
+PR198 HEAD0d7ac069ba1680bdd4bc63bb700136059541bdd9; merge5e3c842f9e85fdbdb5531f6e70b0d287d63ab959. Beta immutato rispetto al basebf2bc508 prima del merge; behind_by0. Condivisi MainActivity.java, DealDatabase.java, VintedAccessibilityService.java; query/helper, regressioni e release/docs aggiornati. Nessun reset, migrazione/schema, dipendenza, filtro/soglia/pricing/matching o richiesta di rete modificati.
+
+Verifiche: RED locale SQLite blocked→phase0=2 invece1, raw orphan→coda ineseguibile e local BGG selector escluso; GREEN SQL reale con latest/tie, trust/readiness, rappresentanti/dedupe, pricing assente/zero/negativo, jobretry/live/deep/manual. RED Java CI484/run37069372312/job111044895511 su API assenti e CI490/run37070354797/job111048094688 su pausaPROCESSING («attive» invece «in pausa»). Review indipendente:2Important (pausaPROCESSING e raw orphan), entrambi corretti con regressioni; nessun Critical. Harness esegue metodo reale enginePipelineWaitingCounts con soli confiniDB sostituiti e policyheartbeat reale: freschezza, scope, queued/busy, nessuna mutazione/doppia sottrazione.
+
+GREEN finale CI493/run37070766614/job111049406156 SUCCESS su HEAD: suite regressioni completa, unit Android/pricing, Java compile e reviewAPK. Android beta173/run37071180015/job111050737400 SUCCESS con suite/unit/build firmata: certificatoAPK confermato2026-10-02T22:16:27.0573681Z, SHA256 C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710. Firebase upload5.12.150(1000173) confermato22:17:28.6782366Z e distribuzione ai tester/gruppi confermata separatamente22:17:29.1580094Z (2026-10-03 00:17Europe/Rome). Release6ktugmt6r27d8.
+
+Resta la prova sul telefono: aggiornare senza cancellare dati, riaprire stesso scroll; blocchi non devono restare in coda, dati prezzo mancanti devono restare incompleti senza job inventati. Catturare1pagina nuova e inviare screenshot+diagnostica subito e dopo2minuti; verificare enginePipeline, pausa/pacing e font grande. CI/fixture/source review non provano pixel, prestazioni Android o consistenza delle righe reali del DB del telefono.
+
+Backend5/frontend7 gruppi aperti invariati; nessun gruppo chiuso dalla sola CI. Unico prossimo passo backend: verifica150 sul telefono e confronto diagnostica/schermata.
+
+
+
 ## Backend149 — Pronti coerenti, avanzamento reale e browser leggibile
 
 Il “Si”22:38:44 approva la direzione del feedback22:33 e supersede lo stato “da approvare” dell'audit sottostante. Distribuita **5.12.149-engine-progress (1000172)**, localCode198. Frontend148 preservato.
