@@ -363,7 +363,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         try(Cursor c=getReadableDatabase().rawQuery(ObservationFunnelSql.rows(),new String[]{String.valueOf(clampEngineStart(startAt)),String.valueOf(endAt)})){
             while(c.moveToNext()){String reason=c.getString(1);buckets.put(reason,buckets.getOrDefault(reason,0)+1);unique++;}
         }
-        StringBuilder out=new StringBuilder("build=capture-funnel-v1;unit=observed-signature;view=current-state;excludesPreObservationNonGames=true;start="+startAt+";end="+endAt+";unique="+unique);
+        StringBuilder out=new StringBuilder("build=capture-funnel-v2;unit=observed-signature;view=current-state;excludesPreObservationNonGames=true;start="+startAt+";end="+endAt+";unique="+unique);
         for(Map.Entry<String,Integer> e:buckets.entrySet())out.append(';').append(e.getKey()).append('=').append(e.getValue());return out.toString();
     }
 

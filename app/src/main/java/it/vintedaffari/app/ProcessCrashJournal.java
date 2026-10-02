@@ -88,7 +88,7 @@ public final class ProcessCrashJournal {
 
     /** Android exit history is UID-wide and can include WebView sandbox processes. Product stability
      * only cares about Ludo's default/:ui/:radar processes. In addition to the engine epoch, keep a
-     * current-install boundary from PACKAGE_UPDATED so a just-installed beta can be judged directly. */
+     * current-install boundary from PackageInfo.lastUpdateTime; exit history can truncate on reboot. */
     public static String systemExitSummary(Context context,long since){
         if(Build.VERSION.SDK_INT<30)return "build=system-exit-v4;unsupportedApi="+Build.VERSION.SDK_INT;
         try{
@@ -99,7 +99,12 @@ public final class ProcessCrashJournal {
                 String pn=e.getProcessName();if(TextUtils.isEmpty(pn)||!(pn.equals(pkg)||pn.startsWith(pkg+":")))continue;
                 if(e.getReason()==ApplicationExitInfo.REASON_PACKAGE_UPDATED)installBoundary=Math.max(installBoundary,e.getTimestamp());
             }
-            long currentBoundary=installBoundary>0?installBoundary:Math.max(0L,since);
+            long exitHistoryBoundary=installBoundary,packageUpdatedAt=0L;String packageBoundaryError="";
+            try{packageUpdatedAt=Math.max(0L,context.getPackageManager().getPackageInfo(pkg,0).lastUpdateTime);}
+            catch(Exception unavailable){packageBoundaryError=unavailable.getClass().getSimpleName();}
+            String boundarySource=packageUpdatedAt>0?"package-last-update":exitHistoryBoundary>0?"exit-history-fallback":"engine-epoch-fallback";
+            long currentBoundary=packageUpdatedAt>0?packageUpdatedAt:exitHistoryBoundary>0?exitHistoryBoundary:Math.max(0L,since);
+            installBoundary=currentBoundary;
             long now=System.currentTimeMillis(),day=24L*60L*60_000L,latestAt=0;int crash24=0,anr24=0,memory24=0,resource24=0,other24=0,crashSince=0,anrSince=0,memorySince=0,resourceSince=0,otherSince=0,crashInstall=0,anrInstall=0,memoryInstall=0,resourceInstall=0,otherInstall=0;
             long latestPss=0,latestRss=0;int latestImportance=0,latestStatus=0;String process="",reason="",description="";StringBuilder recent=new StringBuilder();int recentCount=0;
             if(exits!=null)for(ApplicationExitInfo e:exits){
@@ -126,7 +131,7 @@ public final class ProcessCrashJournal {
                 if(at>latestAt){latestAt=at;process=pn;reason=reasonName(why);description=e.getDescription();latestPss=e.getPss();latestRss=e.getRss();latestImportance=e.getImportance();latestStatus=e.getStatus();}
                 if(recentCount<6){if(recent.length()>0)recent.append("|");recent.append(at).append(",").append(clean(pn)).append(",").append(reasonName(why)).append(",pss=").append(e.getPss()).append(",rss=").append(e.getRss());recentCount++;}
             }
-            return "build=system-exit-v4;since="+Math.max(0L,since)+";installBoundary="+installBoundary+";latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
+            return "build=system-exit-v4;since="+Math.max(0L,since)+";installBoundary="+installBoundary+";boundarySource="+boundarySource+";app="+BuildConfig.VERSION_NAME+";exitHistoryBoundary="+exitHistoryBoundary+";packageBoundaryError="+packageBoundaryError+";latestAt="+latestAt+";latestProcess="+clean(process)+";latestReason="+reason+";latestDescription="+clean(description)+
                     ";latestPssKb="+latestPss+";latestRssKb="+latestRss+";latestImportance="+latestImportance+";latestStatus="+latestStatus+
                     ";crashAfterInstall="+crashInstall+";anrAfterInstall="+anrInstall+";memoryAfterInstall="+memoryInstall+";resourceAfterInstall="+resourceInstall+";otherAfterInstall="+otherInstall+
                     ";crashSince="+crashSince+";anrSince="+anrSince+";memorySince="+memorySince+";resourceSince="+resourceSince+";otherSince="+otherSince+
