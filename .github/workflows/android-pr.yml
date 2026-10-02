@@ -66,6 +66,9 @@ jobs:
       - name: Run Library async save behavior regression
         run: python3 regression/library_write_ui_v512107.py
 
+      - name: Run Home media recovery behavior regression
+        run: python3 regression/home_media_v512119.py
+
       - name: Run product gesture behavior regression
         run: python3 regression/product_gesture_v512106.py
 
