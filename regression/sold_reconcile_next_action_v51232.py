@@ -59,6 +59,7 @@ checks=[
      "DealDatabase.engineContentSettled(run)" in queue),
     ("core blocker diagnostic mirrors held/review exclusions",
      "LEFT JOIN deals d" in core_summary and
+     "NOT IN ('NEEDS_REVIEW','LOCAL_ONLY')" in core_summary and
      "BGG_VARIANT_REVIEW" in core_summary and
      "MATCH_UNCERTAIN" in core_summary and
      "PRICE_ANOMALY" in core_summary),
