@@ -1,5 +1,20 @@
 # Ludo Scout — Current state
 
+## Frontend144 — Libreria verticale e scheda personale leggera
+
+Il “Vai”20:04 autorizza la rifinitura del feedback19:37. PR181 implementa ripiani successivi verticali, senza rail orizzontali: capacità dal viewport reale e font scale, ordine e tutti i risultati conservati. Stessa scatola/geometry/piano ombre già consegnati142; nessun nuovo asset necessario. Ricerca conservata; Venduti è archivio secondario nel menu root, con ritorno alla collezione nello stesso menu.
+
+La scheda personale mantiene media/facts/titolo del prodotto, sostituendo i grandi box voto/acquisto. Cinque cuori sempre visibili; tapN salva N*2 su LibraryDatabase con la write guard asincrona esistente e ripristino posizione. Mezzi cuori legacy, zero e non valutato restano distinti. Voto0 e rimozione disponibili tramite “Gestisci il voto” nel menu prodotto; Preferiti BGG toolbar resta indipendente. Prezzo/saving compatti e piatti, provenienza/fee/spedizione/bundle/riferimento nei dettagli progressivi. Venduti mostrano ricavo e “Differenza vendita/acquisto” sul costo registrato PurchaseMath: null non diventa zero, valori negativi e zero preservati; non chiamato utile netto.
+
+BGG è nel footer fisso con safe insets; contenuto scorre sopra. Preparazione canonica e dati scheda gioco eseguiti su uiDataIo, nessun GameRecord inventato. End-pull riusa gesture/progress/preload esistenti solo con gioco canonico reale; se assente compare lo stato locale indisponibile e rimane BGG esterno. Revisione finale ha individuato che il gate preesistente richiedeva un'origine Annuncio: PR183 registra gli open Library dialog come origini ammesse, rimuovendole alla chiusura, preservando guardie su identità/visibilità/target pronto/overlay duplicato. Il test ora esegue il vero readyGameTransition, non uno stub permissivo. La143 viene superseduta dalla144 per questo comportamento.
+
+Verifiche: PR181 validation450 run37046105634/job110967822286 success, HEAD f217067271e5d2702f7a840c609ed9fac624ddd3; merge d704e5b4592e75676c5727b9dc16d2c94a8c976a. PR183 validation452 run37046829999/job110970223506 success, HEAD 1e1f404ac7f3bcc787cd0a689f26596302f714ef; merge ce9d0b6793afd18e7a7f5c6ede0e11b374408c83. Regressioni eseguibili su capacità viewport/font e partizione ordinata, null/zero/mezzi cuori, differenze vendita, single-flight/salvataggio diretto/scroll, gate reale Library+Annuncio e origini chiuse/errate/consumate; suite esistente, pricing unit tests, compile e review APK passati. Beta167 run37047351120/job110971953796 success: versione5.12.144-library-refinement (1000167), certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato; 2026-10-02T18:30:50.7616710Z ✔  uploaded new release 5.12.144-library-refinement (1000167) successfully!; 2026-10-02T18:30:51.2492246Z ✔  distributed to testers/groups successfully.
+
+Accettazione visiva sul telefono pendente: ripiani con molti giochi e font grande; cinque cuori vuoti/mezzi e persistenza voto; BGG fisso con gesture navigation; end-pull intenzionale su canonical e fallback senza canonical; archivio e differenza negativa/zero/sconosciuta. Nessuna modifica a schema, soglie, filtri, rete, preferiti, memoria Ludo o code backend. Motore UI resta standby.
+
+Stanze Ludo Casa/Esplorazione restano proposta, non rimozione del tab Libreria. Frontend7/backend5 aperti: il gruppo trasversale non è chiuso dalla sola consegna automatica. Unico prossimo gruppo raccomandato: composizione concreta Catalogo unificato + Bundle/Esplora secondo decisione20:00 già registrata; conservare le verifiche telefono144 pendenti.
+
+
 ## Decisione UX 20:00 — Catalogo unificato e Bundle
 
 Approvato il nuovo modello informativo del Catalogo. Il Catalogo resta centrato sugli annunci Vinted e perde la separazione primaria `Annunci | Giochi`: una ricerca che corrisponde a un gioco mostra prima l'entità Gioco e poi gli annunci correlati. La scheda Gioco resta disponibile dalla ricerca e dal gesto Annuncio→Gioco già deciso, perché raccoglie dati aggregati/storici e contenuti che appartengono al gioco, non al singolo annuncio.
