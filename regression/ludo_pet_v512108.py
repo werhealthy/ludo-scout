@@ -100,3 +100,23 @@ with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)/"LudoRoomBridgeRegression.java";p.write_text(bridge)
  subprocess.run(["javac","-d",tmp,str(room_source),str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.LudoRoomBridgeRegression"],check=True)
+
+draft_harness=r'''
+public class LudoSearchDraftRegression {
+ String ludoSearchQuery="Azul";Input ludoSearchInput;
+ static class Input {String value;Input(String s){value=s;}String getText(){return value;}}
+ __DRAFT__
+ public static void main(String[] args){
+  LudoSearchDraftRegression n=new LudoSearchDraftRegression();
+  if(!"Azul".equals(n.ludoSearchDraft()))throw new AssertionError("restored text lost");
+  n.ludoSearchInput=new Input("Mille Fiori");n.ludoSearchQuery=n.ludoSearchDraft();n.ludoSearchInput=null;
+  if(!"Mille Fiori".equals(n.ludoSearchDraft()))throw new AssertionError("live text lost during view rebuild");
+  n.ludoSearchInput=new Input("");if(!n.ludoSearchDraft().isEmpty())throw new AssertionError("cleared query reused old text");
+  System.out.println("PASS actual search draft: restored, live/rebuilt and explicitly cleared text");
+ }
+}'''.replace("__DRAFT__",activity_method("private String ludoSearchDraft("))
+with tempfile.TemporaryDirectory() as tmp:
+ p=Path(tmp)/"LudoSearchDraftRegression.java";p.write_text(draft_harness)
+ subprocess.run(["javac","-d",tmp,str(p)],check=True)
+ subprocess.run(["java","-cp",tmp,"LudoSearchDraftRegression"],check=True)
+assert 'search.setText(ludoSearchQuery)' in ui and '.putString("search",ludoSearchDraft())' in ui
