@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — browser sperimentale132, implementazione approvata
+
+Approvazione «Si»15:05Europe/Rome. PR151 implementa SEARCH ON, VIEW OFF con Cattura one-shot e apertura diretta BUNDLE ON. WebView non esportata :ui, origini/frame verificati, limiti500ID/32item/128KiB, massimo4 letture contemporanee; batch confermati dal bridge e snapshot manuale congelato. Nessuna scrittura catalogo o nuova richiesta del capturer; cookie nel profilo UI WebView separato, nessun accesso al contenuto. Fonte pubblicazione esplicita e seller soltanto da dati espliciti. Report sanitizzato persistito, campioni pubblici soltanto in memoria. Nessun servizio a pagamento.
+
+Fixture Node24/24 locali; review indipendente ha individuato e portato a correggere perdita batch, memoria, URL non-item, snapshot mobile e ACK obsoleti. CI Android399 in corso; compilazione/distribuzione e prova sito su telefono non ancora dichiarate. Frontend131 preservato nel merge, nuova versione132. Intake produzione, filtri owned/lingua e copertura data/seller reali restano pendenti. Backend5/frontend7 aperti.
+
 ## Frontend — rifinitura azioni e sfumature 5.12.131
 
 PR152 frontend/rarity-action-polish: like Home accanto a overflow; area48dp e superficie interna con7dp di spazio come azioni circolari comuni. Overflow scheda annuncio usa helper comune. Titolo Vinted finale rimosso dalla presentazione, dati conservati; riquadro spostato dal riepilogo alla barra lingua/voto/giocatori/durata sotto le foto. Gradient verticale8.6% da dealAccent esistente dietro scatole offerte Home/podio, dettaglio e artwork condiviso; nessuna classificazione aggiunta a giochi senza annuncio. File condiviso MainActivity.java solo UI, versione e scaletta aggiornate. Nessun cambio dati/schema/filtri/backend/rete.

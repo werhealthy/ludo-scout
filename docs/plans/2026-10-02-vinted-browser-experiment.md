@@ -42,7 +42,7 @@
 - [x] Implementare policy pura Java e Activity non esportata :ui; nessun addJavascriptInterface. Controllare DOCUMENT_START_SCRIPT e WEB_MESSAGE_LISTENER prima di loadUrl; se indisponibili navigazione senza acquisizione e stato esplicito. Aggiungere WebKit1.12.1 senza altre variazioni dipendenze/SDK; se incompatibile CI fermare, non cambiare stack.
 - [x] Configurare JS/DOM storage del sito, first-party cookies gestiti da WebView senza accesso native al contenuto, third-party cookies OFF, accesso file/content OFF, mixed content OFF, SafeBrowsing ON; debug WebView OFF. Renderer crash gestito con stato errore e ricarica soltanto richiesta dall'utente.
 - [x] Barra accessibile pausa/riprendi/Cattura/risultati diagnostici/chiudi; SEARCH ON, VIEW OFF, BUNDLE ON; validare JSON/schema/limiti e mantenere counters su executor, pubblicare snapshot UI senza lavoro pesante nel callback. Campioni ignoti non serializzati su disco. Back usa history poi termina; terminazione distrugge WebView e registry.
-- [x] Eseguire unit policy e CI Android compile/APK: GREEN; review wiring bridge/no writer e sottoprocessi WebView.
+- [ ] Eseguire unit policy e CI Android compile/APK: GREEN; review wiring bridge/no writer e sottoprocessi WebView.
 - [x] Commit feat: secure Vinted browser experiment.
 
 ### Task3: Entrate UX e diagnostica verificabile
