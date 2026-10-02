@@ -20,6 +20,7 @@ public final class BrowserAnalysisCommitter {
    ContentValues link=new ContentValues();link.put("listing_id",listingId);db.update("browser_candidates",link,"item_id=?",new String[]{claim.itemId});
    String state,reason="";
    if(market.browserProtected(db,listingId)){state="FILTERED";reason="Annuncio archiviato o escluso: osservazione conservata";}
+   else if(matched&&heldGame(db,analysis.bggId)){state="FILTERED";reason="Gioco escluso o già in verifica: dati osservati conservati";helper.recordBrowserFiltered(db,card,listing,claim.candidate.observedAt,signature,reason);market.browserFiltered(db,listingId,reason,now);}
    else if(listing.type==ListingClassifier.Type.NON_GAME||gate.action==BoardGameIntakeGate.Action.QUARANTINE){state="FILTERED";reason=gate.reason;helper.recordBrowserFiltered(db,card,listing,claim.candidate.observedAt,signature,reason);market.browserFiltered(db,listingId,reason,now);}
    else{
     helper.recordAnalysis(db,card,analysis,listing,claim.candidate.observedAt,signature);
@@ -36,4 +37,5 @@ public final class BrowserAnalysisCommitter {
    boolean done=captures.complete(db,claim,state,reason,now);if(!done)throw new IllegalStateException("Lease cambiata durante il commit");db.setTransactionSuccessful();return true;
   }finally{db.endTransaction();}
  }
+ private static boolean heldGame(SQLiteDatabase db,String bggId){try(Cursor c=db.rawQuery("SELECT 1 FROM games WHERE bgg_id=? AND (database_visible=0 OR match_state IN ('BGG_MATCH_REVIEW','AUTO_QUARANTINED','EPOCH_ARCHIVED_REVIEW')) LIMIT 1",new String[]{bggId})){return c.moveToFirst();}}
 }
