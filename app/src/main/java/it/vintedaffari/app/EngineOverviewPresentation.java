@@ -16,8 +16,18 @@ final class EngineOverviewPresentation {
         return labels[phase];
     }
     static boolean activePhase(int mask,int phase,boolean bggPaused,boolean vintedPaused,long waitUntil,long now) {
-        return (mask&(1<<phase))!=0 && !(phase==1&&bggPaused)
+        return phase>=0&&phase<4&&(mask&(1<<phase))!=0 && !(phase==1&&bggPaused)
                 && !(phase==3&&(vintedPaused||waitUntil>now));
+    }
+    static String phaseState(int phase,int total,boolean active,boolean bggPaused,boolean vintedPaused,long waitUntil,long now) {
+        if(phase==4)return "disponibili";
+        if(active)return "attive";
+        if(total>0&&((phase==1&&bggPaused)||(phase==3&&vintedPaused)))return "in pausa";
+        if(total>0&&phase==3&&waitUntil>now)return "in attesa";
+        return "attive";
+    }
+    static boolean motionAllowed(boolean active,boolean resumed,boolean focused,boolean overview,boolean attached,boolean shown,boolean enabled) {
+        return active&&resumed&&focused&&overview&&attached&&shown&&enabled;
     }
     static String status(boolean hasScope,boolean settled,int mask,int bgg,int vinted,
                          boolean bggPaused,boolean vintedPaused,long waitUntil,long now) {
