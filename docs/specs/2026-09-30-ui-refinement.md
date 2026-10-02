@@ -1,5 +1,8 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback browser 15:56 — proposta circoscritta
+Toolbar Vinted coerente con colori/tipografia/icone/capsule Ludo; chiudi e pausa/cattura, diagnostica nel menu, frecce pagine con indicatore/caricamento e nessun avanzamento autonomo. Chip ricerche salvate e ordinamento, categoria giochi da tavolo mantenuta, prezzo crescente+minimo variabile1€. Report132 dimostra500DOM ma0prezzi e nessun intakeMotore: migliorare prima estrazione/prepagina, non equiparare ID a schede pronte. Design in chat da approvare, nessun codice/nuovaAPK in questo checkpoint. Dettagli backend spec; frontend7/backend5 aperti.
+
 ## Feedback approvato 2026-10-02 — scheda compatta e colore visibile
 
 Tre miniature52dp verticali accanto alla scatola, ultimo overlay+N per foto aggiuntive con galleria completa conservata. Barra informazioni senza riquadro, linea sottile e stesso margine del titolo. Alone radiale visibile del colore dealAccent esistente al posto del gradiente rettangolare troppo delicato; sfondo annuncio colorato e superfici locali traslucide senza cambiare design system globale o fill/loghi provider. Stessi contenuti, azioni, preferiti, gesto e dati; non aggiungere né eliminare informazioni. Browser backend132 preservato. Implementazione133 su frontend/product-gallery-glow; verifiche CI/distribuzione/telefono pendenti. Frontend7/backend5 aperti.
