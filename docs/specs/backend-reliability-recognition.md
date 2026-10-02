@@ -4,6 +4,8 @@
 
 Utente «Risolvi»23:46 autorizza correzione circoscritta. Diagnostica149:788 firme,19 CLASSIFIER_BLOCKED,12 BGG/URL qualificati,analysisPending0/coreRemaining0,8 core-complete listings; UI19 da riconoscere,5 verifica,3 pronti. Zeri BGG/link sono occupazione corrente, non throughput cumulativo. Codice EnginePipelineSql ammetteva BLOCKED_CLASSIFIER senza gioco nella fase0; phaseState etichettava ogni stock inattivo come coda. engineRunACTIVE entro3min dall’ultima osservazione riflette il raggruppamento, non prova worker attivo.
 
+Review indipendente: corretti jobPROCESSING in pausa/pacing etichettati incompleti e raw-orphan senza executor etichettati in coda. Gli orphan restano evidenza di fase, senza coda inventata; nessun recupero dati automatico introdotto.
+
 Fix: esclusione terminal classifier e raw ultimo stato, conteggio read-only della coda locale/durevole con stesso scope/dedupe delle fasi, dati incompleti separati dalla coda. Completamento visuale controlla anche coda scoped; grouping/ownership conservati. Diagnostica enginePipeline distingue ready identities da core-complete listings. Nessun reset/schema/filtri/soglie/pricing/rete modificati.
 
 RED locale SQLite blocked listing:phase0=2 invece1; poi GREEN con classificatore/raw/latest/tie. RED CI484/run37069372312/job111044895511 per nuove API presentazione assenti. GREEN completo, review e consegna150 da registrare in STATE. Non dichiarare equivalenza3 pronti/8 core-complete senza DB reale.

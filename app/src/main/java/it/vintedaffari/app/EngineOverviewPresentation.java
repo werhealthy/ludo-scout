@@ -28,11 +28,11 @@ final class EngineOverviewPresentation {
     }
     static String phaseState(int phase,int total,int queued,boolean active,boolean bggPaused,boolean vintedPaused,long waitUntil,long now) {
         if(phase==4)return "disponibili";
-        if(active)return "attive";
         if(total<=0)return "nessun elemento";
-        if(queued<=0)return "dati incompleti";
+        if(queued<=0&&!active)return "dati incompleti";
         if((phase==1&&bggPaused)||(phase==3&&vintedPaused))return "in pausa";
         if(phase==3&&waitUntil>now)return "in attesa";
+        if(active)return "attive";
         return "in coda";
     }
     static boolean contentSettled(boolean backendSettled,int[] queued) {

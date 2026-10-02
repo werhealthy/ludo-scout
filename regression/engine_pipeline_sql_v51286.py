@@ -148,6 +148,10 @@ def queued_counts():
             query=subprocess.check_output(['java','-cp',temp,'it.vintedaffari.app.PrintQueue'],text=True)
     return dict(db.execute(query,('0','200')))
 assert queued_counts()=={0:1}
+# A process death between raw observation and canonical intake leaves no executable row.
+db.execute("INSERT INTO observations(signature,observed_at) VALUES('raw-orphan',100)")
+assert counts()=={0:2},'raw pending evidence disappeared'
+assert queued_counts()=={0:1},'raw-only pending observation invented an executable queue'
 for table in ['observations','games','market_listings','deals','processing_jobs']:db.execute('DELETE FROM '+table)
 price=add('price-missing',301,'301',7,'MATCHED','CORE_COMPLETE',True)
 db.execute("UPDATE deals SET benchmark_cents=NULL,discount=NULL WHERE signature='price-missing'")
