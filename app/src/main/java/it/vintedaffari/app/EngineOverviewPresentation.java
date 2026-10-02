@@ -3,6 +3,9 @@ package it.vintedaffari.app;
 /** Presentation only: never decides queue ownership or changes pipeline eligibility. */
 final class EngineOverviewPresentation {
     private EngineOverviewPresentation() {}
+    static boolean showResearchEmpty(boolean hasScope,int waitingRuns,int intakeCount) {
+        return !hasScope&&waitingRuns==0&&intakeCount==0;
+    }
     static String backSection(String section,boolean hasDay) {
         if("run".equals(section)&&hasDay)return "day";
         if("day".equals(section))return "history";
