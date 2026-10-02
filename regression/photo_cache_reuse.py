@@ -16,7 +16,7 @@ STUBS = {
 'android/graphics/BitmapFactory.java': '''package android.graphics; public class BitmapFactory {public static Bitmap fixture;public static class Options{public boolean inJustDecodeBounds;public int outWidth,outHeight,inSampleSize;public Bitmap.Config inPreferredConfig;}public static Bitmap decodeFile(String f){return copy();}public static Bitmap decodeFile(String f,Options o){return decode(o);}public static Bitmap decodeByteArray(byte[] b,int s,int n,Options o){return decode(o);}static Bitmap decode(Options o){if(o.inJustDecodeBounds){o.outWidth=fixture.w;o.outHeight=fixture.h;return null;}return copy();}static Bitmap copy(){Bitmap b=new Bitmap(fixture.w,fixture.h);System.arraycopy(fixture.p,0,b.p,0,b.p.length);return b;}}''',
 'it/vintedaffari/app/ThumbnailStore.java': '''package it.vintedaffari.app;import java.io.File;import android.content.Context; public class ThumbnailStore{public static File observed;public static File fileFor(Context c,String s){return observed;}}''',
 'it/vintedaffari/app/VintedPhotoHashCache.java': '''package it.vintedaffari.app;import java.util.*;import android.content.Context;import android.graphics.Bitmap;public class VintedPhotoHashCache{public static final Map<String,Long> hashes=new HashMap<>();public static boolean broken;public static Long lookupExact(Context c,String url){if(broken)throw new IllegalStateException();return hashes.get(url);}public static void record(Context c,String url,Bitmap b){hashes.put(url,VisualCoverMatcher.dHash64(b));}}''',
-'it/vintedaffari/app/VintedPublicSession.java': '''package it.vintedaffari.app;import android.content.Context;public class VintedPublicSession{public static void recordPhotoMatcherEvent(Context c,String event,int code){}}''',
+'it/vintedaffari/app/VintedPublicSession.java': '''package it.vintedaffari.app;import android.content.Context;public class VintedPublicSession{public static final java.util.Map<String,Integer> events=new java.util.HashMap<>();public static void recordPhotoMatcherEvent(Context c,String event,int code){events.merge(event,1,Integer::sum);}}''',
 'it/vintedaffari/app/PhotoCacheRegression.java': '''package it.vintedaffari.app;
 import android.content.Context;import android.graphics.*;import java.io.*;import java.net.*;
 public class PhotoCacheRegression {
@@ -24,17 +24,19 @@ public class PhotoCacheRegression {
  public static void main(String[] args)throws Exception{
   URL.setURLStreamHandlerFactory(protocol->"https".equals(protocol)?new URLStreamHandler(){protected URLConnection openConnection(URL u){downloads++;return new HttpURLConnection(u){public void connect(){}public void disconnect(){}public boolean usingProxy(){return false;}public int getResponseCode()throws IOException{if(ioFailure)throw new IOException();return code;}public InputStream getInputStream(){return new ByteArrayInputStream(new byte[]{1,2});}};}}:null);
   Context c=new Context();File f=File.createTempFile("observed", ".png");try(FileOutputStream out=new FileOutputStream(f)){out.write(new byte[3000]);}ThumbnailStore.observed=f;
-  Bitmap b=new Bitmap(32,40);for(int y=0;y<40;y++)for(int x=0;x<32;x++)b.p[y*32+x]=((x*7+y*3)&255)*0x010101;BitmapFactory.fixture=b;
+  Bitmap b=new Bitmap(32,40);for(int y=0;y<40;y++)for(int x=0;x<32;x++)b.p[y*32+x]=(255-x*7)*0x010101;BitmapFactory.fixture=b;
   String url="https://images1.vinted.net/photo/f800/image.jpg?sig=one";
   double first=VintedPhotoMatcher.similarity(c,"s",url);check(first==1.0,"literal identical-frame score must be 1");check(downloads==1,"first photo downloads once");
   double cached=VintedPhotoMatcher.similarity(c,"s",url);check(cached==first,"cache preserves score");check(downloads==1,"cached exact photo must not download again");
-  VintedPhotoHashCache.hashes.put(url,0L);double zero=VintedPhotoMatcher.similarity(c,"s",url);check(!Double.isNaN(zero)&&downloads==1,"zero hash is valid, not missing");
+  VintedPhotoHashCache.hashes.put(url,0L);double zero=VintedPhotoMatcher.similarity(c,"s",url);check(zero==0.0&&downloads==1,"zero hash is valid, not missing");
   VintedPhotoMatcher.similarity(c,"s",url.replace("f800","f300"));check(downloads==2,"different crop URL must download");
   VintedPhotoHashCache.broken=true;VintedPhotoMatcher.similarity(c,"s",url);check(downloads==3,"cache read error falls back to download");VintedPhotoHashCache.broken=false;
   code=403;check(Double.isNaN(VintedPhotoMatcher.similarity(c,"s",url+"x")),"403 returns no evidence");check(downloads==4,"403 gets no retry");
   ioFailure=true;check(Double.isNaN(VintedPhotoMatcher.similarity(c,"s",url+"y")),"I/O failure returns no evidence");check(downloads==5,"I/O failure gets no retry");
   f.delete();check(Double.isNaN(VintedPhotoMatcher.similarity(c,"s",url)),"missing observed photo yields no evidence");check(downloads==5,"missing observation performs no HTTP");
-  for(int i=0;i<100;i++){long h=0x91ac3257L*i;check(VisualCoverMatcher.similarity(VisualCoverMatcher.queryHashes64(b),h)>=0,"hash score bounded");}
+  check(VintedPublicSession.events.get("cache")==2,"matcher emits two cache hits");check(VintedPublicSession.events.get("download")==5,"matcher emits five attempts");check(VintedPublicSession.events.get("http")==4,"matcher counts responses separately from I/O errors");
+  check(VisualCoverMatcher.similarity(new long[]{0L},1L)==0.984375,"one bit distance literal score");
+  for(int i=0;i<100;i++){Bitmap cover=new Bitmap(31,37);for(int y=0;y<37;y++)for(int x=0;x<31;x++)cover.p[y*31+x]=((x*13+y*17+i*23)&255)*0x010101;double bitmapScore=VisualCoverMatcher.similarity(b,cover);double hashScore=VisualCoverMatcher.similarity(VisualCoverMatcher.queryHashes64(b),VisualCoverMatcher.dHash64(cover));check(bitmapScore==hashScore,"cache and bitmap scores must agree");}
   System.out.println("Photo cache reuse behavior passed");
  }
 }'''
@@ -51,3 +53,26 @@ with tempfile.TemporaryDirectory() as temp:
     sources += [str(PKG / 'VintedPhotoMatcher.java'), str(PKG / 'VisualCoverMatcher.java')]
     subprocess.run(['javac', '-d', str(build), *sources], check=True)
     subprocess.run(['java', '-cp', str(build), 'it.vintedaffari.app.PhotoCacheRegression'], check=True)
+
+# Execute the exact production lookup SQL with SQLite, including malformed rows.
+# Removing any URL/type/time predicate must fail this fixture.
+import re, sqlite3
+cache_source = (PKG / 'VintedPhotoHashCache.java').read_text()
+method = cache_source.split('public static Long lookupExact(', 1)[1].split('public static Long lookup(', 1)[0]
+suffix = re.search(r'"SELECT hash64 FROM "\\+TABLE\\+"([^"]+)"', method).group(1)
+sql = 'SELECT hash64 FROM vinted_photo_hash_cache_v1' + suffix
+db = sqlite3.connect(':memory:')
+db.execute('CREATE TABLE vinted_photo_hash_cache_v1(photo_key TEXT PRIMARY KEY,image_url TEXT,hash64 INTEGER,last_at INTEGER)')
+now = 1_000_000_000
+args = ('photo', 'https://image/f800.jpg?a=1&b=2', str(now-86_400_000), str(now))
+def row(url, value, at):
+    db.execute('DELETE FROM vinted_photo_hash_cache_v1')
+    db.execute('INSERT INTO vinted_photo_hash_cache_v1 VALUES(?,?,?,?)', ('photo',url,value,at))
+    return db.execute(sql,args).fetchone()
+assert row('https://image/f800.jpg?a=1&amp;b=2', 0, now) == (0,)
+assert row('https://image/f800.jpg?a=1&b=2', -1, now) == (-1,)
+assert row('https://image/f300.jpg?a=1&b=2', 7, now) is None
+assert row('https://image/f800.jpg?a=1&b=2', 'broken', now) is None
+assert row('https://image/f800.jpg?a=1&b=2', 7, now-86_400_001) is None
+assert row('https://image/f800.jpg?a=1&b=2', 7, now+1) is None
+print('Exact photo cache SQLite fixtures passed')
