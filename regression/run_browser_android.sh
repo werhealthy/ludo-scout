@@ -5,7 +5,13 @@ sdkmanager --install 'system-images;android-35;google_apis;x86_64'
 printf 'no\n' | avdmanager create avd -n ludo-browser-tests -k 'system-images;android-35;google_apis;x86_64' --force
 mkdir -p "$RUNNER_TEMP/ludo-browser-emulator"
 emulator -avd ludo-browser-tests -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/ludo-browser-emulator/emulator.log" 2>&1 &
-trap 'adb emu kill || true' EXIT
+emulator_pid=$!
+trap 'tail -80 "$RUNNER_TEMP/ludo-browser-emulator/emulator.log"; adb emu kill || true' EXIT
+sleep 5
+if ! kill -0 "$emulator_pid" 2>/dev/null; then
+  echo 'Emulator process exited before ADB became available'
+  exit 1
+fi
 timeout 180 adb wait-for-device
 for attempt in $(seq 1 120); do
   if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then break; fi
