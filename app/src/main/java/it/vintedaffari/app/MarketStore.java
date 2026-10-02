@@ -2439,6 +2439,9 @@ public final class MarketStore {
         try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS'",null)){return c.moveToFirst()?c.getInt(0):0;}
     }
 
+    public int jobsOutsideBrowserCount(long captureId){try(Cursor c=helper.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM processing_jobs j WHERE "+BrowserCaptureSql.OTHER_JOB_WHERE,new String[]{String.valueOf(captureId)})){c.moveToFirst();return c.getInt(0);}}
+    public List<Job> jobsOutsideBrowser(long captureId,int limit){List<Job> rows=new ArrayList<>();String sql="SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source,COALESCE(b.title,l.vinted_title,g.canonical_name,'') AS label FROM processing_jobs j LEFT JOIN market_listings l ON l.id=j.listing_id LEFT JOIN games g ON g.id=j.game_id LEFT JOIN browser_candidates b ON j.job_key='browser_analysis:'||b.item_id WHERE "+BrowserCaptureSql.OTHER_JOB_WHERE+" ORDER BY j.updated_at DESC,j.id DESC LIMIT ?";try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(captureId),String.valueOf(Math.max(1,Math.min(80,limit)))})){while(c.moveToNext())rows.add(readJob(c));}return rows;}
+
     public List<Job> recentJobs(int limit) {
         List<Job> out=new ArrayList<>();
         String sql="SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source,"+

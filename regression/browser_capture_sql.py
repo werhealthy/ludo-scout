@@ -69,6 +69,18 @@ class BrowserSqlTest(unittest.TestCase):
         self.assertEqual([r[5] for r in rows],[1,1])
         self.assertEqual([r[6] for r in rows],[1,1])
 
+    def test_other_jobs_exclude_current_capture_but_keep_older_work(self):
+        self.assertIn('OTHER_JOB_WHERE',self.sql,'other-job count and list lack a shared scoped predicate')
+        self.db.execute("CREATE TABLE processing_jobs(id INTEGER,job_key TEXT,state TEXT,listing_id INTEGER,game_id INTEGER)")
+        self.db.execute("CREATE TABLE market_listings(id INTEGER,game_id INTEGER)")
+        self.db.execute("INSERT INTO browser_candidates(item_id,url,title,revision,observed_at,state) VALUES('101','https://www.vinted.it/items/101','Azul',1,10,'QUEUED')")
+        self.db.execute(self.sql['UPSERT_MEMBERSHIP'],(1,'101',1,10,10,1,'{}'))
+        self.db.execute("INSERT INTO processing_jobs VALUES(1,'browser_analysis:101','PENDING',NULL,NULL)")
+        self.db.execute("INSERT INTO processing_jobs VALUES(2,'vinted_deep:old','PENDING',12,NULL)")
+        self.db.execute("INSERT INTO processing_jobs VALUES(3,'browser_analysis:102','PENDING',NULL,NULL)")
+        result=self.db.execute("SELECT j.id FROM processing_jobs j WHERE "+self.sql['OTHER_JOB_WHERE'],(1,)).fetchall()
+        self.assertEqual(result,[(2,),(3,)])
+
     def test_stale_completion_cannot_finish_new_revision_or_lease(self):
         self.assertIn('COMPLETE_CURRENT',self.sql,'revision guard missing')
         self.db.execute("INSERT INTO browser_candidates(item_id,url,title,price_cents,revision,observed_at,state,lease_started_at) VALUES('101','https://www.vinted.it/items/101','Azul',1000,2,10,'ANALYZING',30)")
