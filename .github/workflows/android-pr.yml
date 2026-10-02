@@ -43,6 +43,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Verify startup never invokes destructive legacy reset
+        run: python3 regression/startup_reset_disabled.py
+
       - name: Run Vinted photo cache reuse behavior
         run: python3 regression/photo_cache_reuse.py
 
