@@ -44,6 +44,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Verify Ludo daily journey and exploration
+        run: python3 regression/ludo_exploration.py
+
       - name: Verify durable browser engine intake
         run: |
           python3 regression/browser_engine_intake.py

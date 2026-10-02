@@ -1,0 +1,13 @@
+# Ludo: esplorazione, bilancio e controllo
+
+Richiesta01:40Europe/Rome: unire Ludo e Motore, vedere risultati giornalieri e variazioni della ricerca anche se i controlli sono istantanei; esplorare Vinted per query/ordine/prezzo, con random, frecce e filtri. Autorizzata implementazione e beta nel percorso esistente.
+
+Ludo/Esplorazione contiene ricerca e bilancio giornaliero, mantenendo scene, Cacce, Libreria e panorama mensile151. Accessi legacy al Motore aprono questa stanza; dettagli, inbox e storico restano raggiungibili. Uscire dalla ricerca Vinted riporta a Ludo e aggiorna il bilancio.
+
+Cinque cerchi: Acquisiti, BGG, Collegati, Verificati, Pronti. Unità annunci distinti della giornata calendario Europe/Rome, canonical listing ID quando noto e firma quando non disponibile. Ogni annuncio può contribuire a più controlli completati: i numeri non si sommano. BGG richiede match fidato/rating>=6; link richiede identità esatta; verificati richiede core valido; pronti include gate prezzo già esistenti. Una sola query/snapshot mantiene coerenti i numeri. Scarti e sospesi consultabili per motivo; lavoro live rimane separato. Nessun ritardo artificiale del backend.
+
+Baseline giornaliera salvata prima di aprire una nuova esplorazione; freccia verde/rossa mostra differenza reale rispetto a questa baseline, con testo e segno (non solo colore). Baseline assente, giorno diverso o run precedente: delta non disponibile, mai zero inventato. La variazione è dell'esplorazione browser, che può contenere più query; non viene chiamata throughput del singolo worker. Una diminuzione è una rettifica del risultato corrente, non un conteggio di errori. I totali sono il bilancio degli annunci osservati oggi secondo i controlli attuali, non un log storico di eventi di job. Spiegazione presente nella UI.
+
+Browser: azione principale Nuova esplorazione; preset dieci pagine per rilevanza/novità e tetti prezzo1/2/5€, ricerca nome e intervallo personalizzato. Sorprendimi usa titoli reali del catalogo BGG locale e combina ordine/prezzo. Navigazione soltanto su gesto, una pagina alla volta, frecce1..10. Pausa/play e cattura one-shot secondari con icone, stessa forma e48dp; label accessibili aggiornate. Stato query/pagina/cattura esplicito; nessuna promessa di avere scaricato tutte le pagine o tutti gli articoli.
+
+Nessun reset/migrazione/schema/dipendenza/servizio a pagamento. Filtri di riconoscimento/pricing, browser capture ACK/lifecycle/backoff e sicurezza invariati. Gruppi frontend7/backend5 consolidati: questa consegna sostituisce occupazione dei cerchi e separazione Ludo/Motore, non apre backlog duplicati. Verifica telefono richiesta dopo CI/firma/upload/distribuzione.
