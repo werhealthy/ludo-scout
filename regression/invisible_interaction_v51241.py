@@ -69,7 +69,7 @@ checks=[
      "getSystemWindowInsetTop()" in panel and
      "getSystemWindowInsetBottom()" in panel),
     ("catalog metadata is not serialized into one sentence",
-     "languageCompact(d.languageCode)" in catalog and
+     "discoverLanguageIndicator(d)" in catalog and
      "publicationText(d,11,Typeface.NORMAL)" in catalog and
      'languageShort(d.languageCode)+" · "+publicationDisplay(d)' not in catalog),
     ("Library action is contextual",
@@ -83,3 +83,4 @@ failed=[name for name,ok in checks if not ok]
 if failed:
     raise SystemExit("Invisible interaction regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} invisible-interaction guards")
+
