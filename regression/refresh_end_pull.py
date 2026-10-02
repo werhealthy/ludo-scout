@@ -48,3 +48,35 @@ with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp);(p/'android/view').mkdir(parents=True);(p/'android/view/MotionEvent.java').write_text(motion);(p/'RefreshEndPullRegression.java').write_text(harness)
  subprocess.run(['javac','-d',tmp]+[str(x) for x in p.rglob('*.java')],check=True)
  subprocess.run(['java','-cp',tmp,'RefreshEndPullRegression'],check=True)
+
+# Exercise the actual horizontal adapter without disturbing vertical refresh/end pull.
+room_adapter=r'''
+import java.util.function.*;
+public class RoomSwipeAdapterRegression {
+ static class MotionEvent {static final int ACTION_DOWN=0,ACTION_UP=1,ACTION_MOVE=2,ACTION_CANCEL=3;int action,pointers=1;float x,y;MotionEvent(int a,float xx,float yy){action=a;x=xx;y=yy;}int getActionMasked(){return action;}int getPointerCount(){return pointers;}float getX(){return x;}float getY(){return y;}}
+ static class ViewConfiguration {static ViewConfiguration get(Object c){return new ViewConfiguration();}int getScaledTouchSlop(){return 8;}}
+ static class Base {public boolean onInterceptTouchEvent(MotionEvent e){return false;}public boolean onTouchEvent(MotionEvent e){return false;}}
+ static class Host extends Base {
+  final LudoRoomSwipe roomSwipe=new LudoRoomSwipe();BooleanSupplier roomSwipeEnabled;IntConsumer roomSwipeAction;boolean refreshing;int cancelled;
+  Object getContext(){return this;}int dp(float f){return Math.round(f);}void cancelRefreshGesture(){cancelled++;}
+  __ACTUAL_ADAPTER__
+ }
+ static void check(boolean ok,String label){if(!ok)throw new AssertionError(label);}
+ static MotionEvent event(int a,float x,float y){return new MotionEvent(a,x,y);}
+ public static void main(String[] args){
+  Host h=new Host();int[] direction={0},count={0};h.setRoomSwipeHandler(()->true,d->{direction[0]=d;count[0]++;});
+  h.onInterceptTouchEvent(event(0,200,200));check(!h.onInterceptTouchEvent(event(2,199,290)),"vertical intercepted");check(h.cancelled==0,"vertical refresh cancelled");
+  h.onInterceptTouchEvent(event(0,200,200));check(h.onInterceptTouchEvent(event(2,150,201)),"horizontal not claimed");check(h.cancelled==1,"old refresh gesture not cancelled");check(h.onTouchEvent(event(1,100,201))&&count[0]==1&&direction[0]==1,"left swipe adapter");
+  h.onInterceptTouchEvent(event(0,200,200));h.onInterceptTouchEvent(event(2,160,200));h.onTouchEvent(event(1,160,200));check(count[0]==1,"short switched room");
+  h.onInterceptTouchEvent(event(0,200,200));h.onInterceptTouchEvent(event(2,150,200));h.onTouchEvent(event(3,100,200));check(count[0]==1,"cancel switched room");
+  h.onInterceptTouchEvent(event(0,200,200));h.onInterceptTouchEvent(event(2,150,200));MotionEvent multi=event(2,100,200);multi.pointers=2;h.onTouchEvent(multi);h.onTouchEvent(event(1,80,200));check(count[0]==1,"multipointer switched room");
+  h.roomSwipeEnabled=()->false;h.onInterceptTouchEvent(event(0,200,200));check(!h.onInterceptTouchEvent(event(2,100,200)),"other page intercepted");
+  h.roomSwipeEnabled=()->true;h.refreshing=true;h.onInterceptTouchEvent(event(0,200,200));check(!h.onInterceptTouchEvent(event(2,100,200)),"active refresh intercepted");
+  System.out.println("PASS actual room swipe adapter: vertical untouched, horizontal cancellation, callback direction, short/cancel/multipointer/disabled/refresh guards");
+ }
+}'''.replace("__ACTUAL_ADAPTER__","\n".join(method(s) for s in ["public void setRoomSwipeHandler(","@Override public boolean onInterceptTouchEvent(","@Override public boolean onTouchEvent("]))
+room_java=(root/"app/src/main/java/it/vintedaffari/app/LudoRoomSwipe.java").read_text().replace("package it.vintedaffari.app;","")
+with tempfile.TemporaryDirectory() as temp:
+ p=Path(temp);(p/"LudoRoomSwipe.java").write_text(room_java);(p/"RoomSwipeAdapterRegression.java").write_text(room_adapter)
+ subprocess.run(["javac","-d",temp,str(p/"LudoRoomSwipe.java"),str(p/"RoomSwipeAdapterRegression.java")],check=True)
+ subprocess.run(["java","-cp",temp,"RoomSwipeAdapterRegression"],check=True)

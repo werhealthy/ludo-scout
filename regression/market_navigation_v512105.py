@@ -58,6 +58,8 @@ public class MarketNavigationRegression extends ScreenBase {
         void flush(){while(!delayed.isEmpty())delayed.remove().run();}
     }
     void persistTransientUiSession(){}
+ void openLudoHome(){tab="companion";}
+ void prepareLudoNavigation(String value){}
     void renderNav(){}
     void updateActivityIndicator(){}
     void requestEngineOverviewSnapshot(){}

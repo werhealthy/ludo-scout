@@ -34,10 +34,11 @@ checks=[
      "librarySearchBar()" in library and
      "showLibraryArchiveMenu(sold.size())" in library and
      "libraryScopeTabs(" not in library),
-    ("Ludo has explicit Per me Cacce Profilo spaces",
-     'addCompanionTab(tabs,"Per me","for_you")' in companion and
-     'addCompanionTab(tabs,"Cacce","hunts")' in companion and
-     'addCompanionTab(tabs,"Profilo","profile")' in companion),
+    ("Ludo uses Esplorazione and Casa with existing collection and pet spaces",
+     'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui and
+     'addLudoRoomTab(tabs,"Casa",LudoRoomState.HOME)' in ui and
+     'renderLudoHomeScene();renderLibrary();return;' in companion and
+     'openPetSpace(true)' in companion and 'openPetSpace(false)' in companion),
     ("Ludo root page no longer exposes a back affordance",
      'TextView back=text("‹"' not in ui[ui.index("private View companionHeader"):ui.index("private boolean hasGreatDeal")]),
     ("Hunt rows are horizontal",
