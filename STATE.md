@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — proposta browser passivo e vincolo zero servizi a pagamento, 2026-10-02
+
+Feedback utente14:40Europe/Rome: preferisce nuove ricerche avviate dalla sezione Ludo, vuole ridurre realmente richieste e migliorare bundle, nessuna tecnologia a pagamento. Audit read-only su beta266594cfa5a05d06f6b3c77aeb8f753f4994c260: URL presente evita ricerca ma resolveExistingMetadata continua a chiamare verifyPublicItem; seller/data mancanti possono generare VINTED_DEEP. VintedCard/recordSighting non portano ID esatto; necessario intake arricchito. BundlePlanner riusa stesso sellerID localmente; SellerBundleScanner deep riprova pagine item, senza catalogo esposto nel report. Specifica proposta e criteri del test nel backlog backend sezione “Proposta B2 — browser Vinted passivo”, non decisione di sostituzione o implementazione.
+Report129 ricevuto conferma diag:fresh_start_reset1790938327666 (12:52:07.666Europe/Rome), jobs1488/observations3269/listings534 archiviati; osservazioni totali0. La causa di perdita/staleness flag resta non dimostrata; il reset automatico non è stato disabilitato dalla129. Utente accetta nuova baseline, nessuna nuova cancellazione autorizzata.
+Browser sperimentale previsto senza login/writer produzione; zero nuove richieste capture, origine/frame/payload verificati; dati mancanti senza riempimento automatico remoto nel futuro intake. Bundle da annunci acquisiti, copertura profilo parziale finché non navigata; nessun totale finale/sconto inventato. AndroidX WebKit non è dipendenza diretta attuale, scelta compatibile da approvare; nessun servizio a pagamento. Sito/payload/provider e fluidità non ancora provati su dispositivo, nessun codice/APK/test eseguito in questo checkpoint documentale.
+Unico prossimo passo backend: revisione specifica proposta del test, poi piano e prototipo sperimentale. Frontend130 preservato, backend5/frontend7 aperti; proposta dentroB2 senza nuovo gruppo.
+
+
 ## Frontend — proporzioni scheda annuncio e Home 5.12.130, 2026-10-02
 
 Feedback14:22Europe/Rome implementato in PR149 frontend/product-home-proportions. Barra lingua/voto/giocatori/durata ora sotto miniature Vinted e prima del riepilogo. Riquadro titolo gioco/offerta/prezzo conservato; titolo Vinted distinto ripristinato sotto sulla pagina senza ulteriore box, duplicato identico omesso. Titolo gioco max2righe. Altezza artwork annuncio calcolata dal viewport reale sopra azioni provider meno il contenuto misurato, con minimo180dp se serve scroll: testo a capo/foto/stati riducono lo spazio disponibile. Aggiornamento post-layout soltanto quando cambia l'altezza; gesto126 e loghi/riempimenti/capsule127 conservati.
