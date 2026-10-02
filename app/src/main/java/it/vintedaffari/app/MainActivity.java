@@ -616,8 +616,8 @@ private void applyDiscoverChrome(){
 
     private View languageIndicators(String value){
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,dp(5),0,dp(5));String flag=HomePresentation.editionFlag(value),code=HomePresentation.languageLabel(value).split(" · ")[0];
-        if(!flag.isEmpty()){TextView emblem=text(flag,17,TEXT,Typeface.NORMAL);row.addView(emblem,new LinearLayout.LayoutParams(dp(25),dp(26)));}else row.addView(appIcon("\uf1ab",13,MUTED),new LinearLayout.LayoutParams(dp(22),dp(26)));
-        row.addView(text("?".equals(code)?"n.d.":code,11,TEXT,Typeface.BOLD));boolean independent=HomePresentation.matchesDependence(value,"IND"),dependent=HomePresentation.matchesDependence(value,"DEP");TextView lock=appIcon(independent?"\uf3c1":dependent?"\uf023":LudoIcons.INFO,12,independent?TEAL:dependent?TEXT:MUTED);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(24),dp(26));ip.leftMargin=dp(3);row.addView(lock,ip);row.setContentDescription("Edizione: "+HomePresentation.editionName(value)+". "+HomePresentation.dependenceLabel(value)+". Tocca per informazioni");return row;
+        if(!flag.isEmpty()){TextView emblem=text(flag,17,TEXT,Typeface.NORMAL);emblem.setMinWidth(dp(25));row.addView(emblem,new LinearLayout.LayoutParams(-2,-2));}else row.addView(appIcon("\uf1ab",13,MUTED),new LinearLayout.LayoutParams(dp(22),-2));
+        row.addView(text("?".equals(code)?"n.d.":code,11,TEXT,Typeface.BOLD));boolean independent=HomePresentation.matchesDependence(value,"IND"),dependent=HomePresentation.matchesDependence(value,"DEP");TextView lock=appIcon(independent?"\uf3c1":dependent?"\uf023":LudoIcons.INFO,12,independent?TEAL:dependent?TEXT:MUTED);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(24),-2);ip.leftMargin=dp(3);row.addView(lock,ip);row.setContentDescription("Edizione: "+HomePresentation.editionName(value)+". "+HomePresentation.dependenceLabel(value)+". Tocca per informazioni");return row;
     }
     private View discoverLanguageIndicator(DealRecord d){View row=languageIndicators(d.languageCode);row.setMinimumHeight(dp(48));row.setOnClickListener(v->showLanguageHelp());return row;}
 
@@ -2083,7 +2083,7 @@ private void loadFirstRemote(ImageView im,List<String> urls,Runnable ok){loadFir
             TextView pending=appIcon(LudoIcons.CAMERA,18,MUTED);pending.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);tile.addView(pending,new FrameLayout.LayoutParams(-1,-1));
             Object request=new Object();image.setTag(request);
             if(item.startsWith("file:"))galleryNet.execute(()->{Bitmap bitmap=decodeLocalBitmap(new File(item.substring(5)),160,160);runOnUiThread(()->{if(image.getTag()!=request||isFinishing()||isDestroyed())return;if(bitmap!=null){image.setImageBitmap(bitmap);pending.setVisibility(View.GONE);}});});
-            else loadImageOn(galleryNet,image,Collections.singletonList(item),()->pending.setVisibility(View.GONE),null);
+            else loadImageOn(galleryNet,image,gallerySources(d,item),()->pending.setVisibility(View.GONE),null);
             tile.setForeground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(65,255,255,255)),null,round(Color.WHITE,10,0,0)));tile.setOnClickListener(v->{int index=galleryItems(d).indexOf(item);showGallery(d,index>=0?index:galleryIndex);});
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(64),dp(64));if(row.getChildCount()>0)lp.leftMargin=dp(8);row.addView(tile,lp);
         }
@@ -2118,8 +2118,8 @@ private void loadFirstRemote(ImageView im,List<String> urls,Runnable ok){loadFir
     private void loadImageOn(ExecutorService executor,ImageView im,List<String> urls,Runnable ok,Runnable fail){
         Object request=new Object();im.setTag(request);executor.execute(()->{
             boolean gallery=executor==galleryNet;
-            if(gallery)for(String u:urls){if(im.getTag()!=request)return;Bitmap cached=imageCache.get(u);if(cached!=null){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("galleryLastHttp",0).putString("galleryLastResult","cache").apply();runOnUiThread(()->{if(im.getTag()==request){im.setImageBitmap(cached);if(ok!=null)ok.run();}});return;}}
-            if(gallery)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("galleryLastHttp",0).putString("galleryLastResult","loading").putInt("galleryKnownSources",urls.size()).apply();
+            if(gallery)for(String u:urls){if(im.getTag()!=request)return;Bitmap cached=imageCache.get(u);if(cached!=null){getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("galleryLastHttp",0).putInt("galleryAttempts",0).putInt("galleryKnownSources",urls.size()).putString("galleryLastHost","").putString("galleryLastResult","cache").apply();runOnUiThread(()->{if(im.getTag()==request){im.setImageBitmap(cached);if(ok!=null)ok.run();}});return;}}
+            if(gallery)getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("galleryLastHttp",0).putInt("galleryAttempts",0).putString("galleryLastHost","").putString("galleryLastResult","loading").putInt("galleryKnownSources",urls.size()).apply();
             int attempt=0;
             for(String u:urls){
                 if(im.getTag()!=request)return;attempt++;Bitmap cached=imageCache.get(u);if(cached!=null){runOnUiThread(()->{if(im.getTag()==request){im.setImageBitmap(cached);if(ok!=null)ok.run();}});return;}
@@ -2186,7 +2186,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         action.setEnabled(false);action.setText("Preparazione diagnostica…");
         diagnosticIo.execute(()->{
             String report=null,error="";
-            try{report=VintedAccessibilityService.diagnostics(getApplicationContext());}
+            try{report=VintedAccessibilityService.diagnostics(getApplicationContext());SharedPreferences media=getSharedPreferences("va_v3_diag",MODE_PRIVATE);report+="\n"+"galleryMediaLastEvent=result:"+media.getString("galleryLastResult","unknown")+"; attempts:"+media.getInt("galleryAttempts",0)+"; knownSources:"+media.getInt("galleryKnownSources",0)+"\n";}
             catch(Exception t){error=t.getClass().getSimpleName();}
             final String ready=report,failed=error;
             runOnUiThread(()->{
