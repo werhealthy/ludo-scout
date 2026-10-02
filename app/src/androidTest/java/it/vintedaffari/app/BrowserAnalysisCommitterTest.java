@@ -6,7 +6,7 @@ import org.json.JSONObject;
 import java.util.*;
 public class BrowserAnalysisCommitterTest extends AndroidTestCase {
  private DealDatabase db;private BrowserCaptureStore captures;private MarketStore market;private BrowserAnalysisCommitter committer;
- protected void setUp()throws Exception{super.setUp();getContext().deleteDatabase("vinted_affari.db");db=new DealDatabase(getContext());captures=new BrowserCaptureStore(db);market=new MarketStore(getContext(),db);committer=new BrowserAnalysisCommitter(db,market,captures);}
+ protected void setUp()throws Exception{super.setUp();setContext(new BrowserTestContext(getContext(),getClass().getSimpleName()));getContext().deleteDatabase("vinted_affari.db");db=new DealDatabase(getContext());captures=new BrowserCaptureStore(db);market=new MarketStore(getContext(),db);committer=new BrowserAnalysisCommitter(db,market,captures);}
  protected void tearDown()throws Exception{db.close();getContext().deleteDatabase("vinted_affari.db");super.tearDown();}
  private BrowserCandidate card(String id,int price,long at){return new BrowserCandidate(id,"https://www.vinted.it/items/"+id,"Azul gioco da tavolo",price,null,Collections.emptyMap(),Collections.emptyMap(),at);}
  private GameAnalysis analysis()throws Exception{return GameAnalysis.fromJson(new JSONObject().put("status","matched").put("game",new JSONObject().put("bggId","230802").put("name","Azul").put("averageRating",7.8)).put("deal",new JSONObject().put("totalCents",1600).put("benchmarkCents",2500).put("tier","good")));}

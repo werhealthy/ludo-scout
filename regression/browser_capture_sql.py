@@ -37,6 +37,27 @@ class BrowserSqlTest(unittest.TestCase):
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM browser_capture_items').fetchone()[0],2)
         self.assertEqual(self.db.execute('SELECT MAX(last_observed_at) FROM browser_capture_items').fetchone()[0],20)
 
+    def test_job_lease_is_part_of_production_current_guard(self):
+        source=(ROOT/'app/src/main/java/it/vintedaffari/app/BrowserCaptureStore.java').read_text()
+        body=source.split('public boolean isCurrent(',1)[1].split('public boolean complete(',1)[0]
+        query=json.loads(re.search(r'rawQuery\(("(?:\\.|[^"\\])*")',body).group(1))
+        self.db.execute("CREATE TABLE processing_jobs(id INTEGER PRIMARY KEY, job_type TEXT, state TEXT, processing_started_at INTEGER)")
+        self.db.execute("INSERT INTO processing_jobs VALUES(8,'BROWSER_ANALYSIS','PROCESSING',30)")
+        self.db.execute("INSERT INTO browser_candidates(item_id,url,title,revision,claimed_revision,observed_at,state,lease_started_at) VALUES('101','https://www.vinted.it/items/101','Azul',2,2,10,'ANALYZING',30)")
+        args=('101','2','2','30','8','30')[:query.count('?')]
+        self.assertIsNotNone(self.db.execute(query,args).fetchone())
+        self.db.execute("UPDATE processing_jobs SET state='PENDING',processing_started_at=0 WHERE id=8")
+        self.assertIsNone(self.db.execute(query,args).fetchone(),'a revoked processing-job lease must invalidate an old result')
+
+    def test_generic_startup_recovery_preserves_local_owner(self):
+        source=(ROOT/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text()
+        body=source.split('if(ageMs==Long.MAX_VALUE) helper.getWritableDatabase().update(',1)[1].split('else helper.',1)[0]
+        query=json.loads(re.search(r', v, ("(?:\\.|[^"\\])*")',body).group(1))
+        self.db.execute("CREATE TABLE processing_jobs(id INTEGER PRIMARY KEY, job_type TEXT, state TEXT, updated_at INTEGER)")
+        self.db.execute("INSERT INTO processing_jobs VALUES(8,'BROWSER_ANALYSIS','PROCESSING',30)")
+        self.db.execute("UPDATE processing_jobs SET state='FAILED_RETRYABLE' WHERE "+query,('PROCESSING',))
+        self.assertEqual(self.db.execute("SELECT state FROM processing_jobs WHERE id=8").fetchone()[0],'PROCESSING')
+
     def test_stale_completion_cannot_finish_new_revision_or_lease(self):
         self.assertIn('COMPLETE_CURRENT',self.sql,'revision guard missing')
         self.db.execute("INSERT INTO browser_candidates(item_id,url,title,price_cents,revision,observed_at,state,lease_started_at) VALUES('101','https://www.vinted.it/items/101','Azul',1000,2,10,'ANALYZING',30)")

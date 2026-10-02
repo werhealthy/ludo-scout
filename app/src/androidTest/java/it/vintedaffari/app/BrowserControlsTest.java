@@ -1,0 +1,15 @@
+package it.vintedaffari.app;
+import android.test.InstrumentationTestCase;
+import android.content.Intent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+public class BrowserControlsTest extends InstrumentationTestCase {
+ private BrowserControlsTestActivity activity;
+ protected void setUp()throws Exception{super.setUp();Intent intent=new Intent(getInstrumentation().getTargetContext(),BrowserControlsTestActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(BrowserControlsTestActivity)getInstrumentation().startActivitySync(intent);getInstrumentation().waitForIdleSync();}
+ protected void tearDown()throws Exception{getInstrumentation().runOnMainSync(()->activity.finish());super.tearDown();}
+ private View find(View view,String description){if(description.equals(String.valueOf(view.getContentDescription())))return view;if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++){View hit=find(((ViewGroup)view).getChildAt(i),description);if(hit!=null)return hit;}return null;}
+ private String texts(View view){String out=view instanceof TextView?((TextView)view).getText().toString():"";if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++)out+="\n"+texts(((ViewGroup)view).getChildAt(i));return out;}
+ public void testNoPresetGamesAndDistinctNavigationTargets(){View root=activity.controls.view();assertFalse(texts(root).contains("Catan"));assertFalse(texts(root).contains("Azul"));assertNotNull(find(root,"Pagina precedente"));assertNotNull(find(root,"Pagina successiva"));assertNotNull(find(root,"Apri Motore"));View next=find(root,"Pagina successiva");assertTrue(next.getMeasuredWidth()>=48*activity.getResources().getDisplayMetrics().density);getInstrumentation().runOnMainSync(()->next.performClick());assertEquals(1,activity.navigationCount);assertTrue(activity.navigated.contains("page=3"));assertTrue(activity.navigated.contains("brand_ids%5B%5D=12"));assertTrue(activity.navigated.contains("price_to=30"));}
+ public void testNarrowLargeFontLayoutHasNoOverflow(){getInstrumentation().runOnMainSync(()->{android.content.res.Configuration config=new android.content.res.Configuration(activity.getResources().getConfiguration());config.fontScale=1.5f;activity.getResources().updateConfiguration(config,activity.getResources().getDisplayMetrics());View root=activity.controls.view();int width=Math.round(320*activity.getResources().getDisplayMetrics().density);root.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,width,root.getMeasuredHeight());assertTrue(find(root,"Pagina successiva").getRight()<=width);assertTrue(find(root,"Pagina precedente").getLeft()>=0);});}
+}

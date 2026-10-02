@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.*;
 /** The real runner and SQLite leases, with a controlled runtime boundary for timeout/race tests. */
 public class BrowserLocalRunnerTest extends AndroidTestCase {
  private DealDatabase db;private BrowserCaptureStore store;private MarketStore market;private ExecutorService executor;
- protected void setUp()throws Exception{super.setUp();getContext().deleteDatabase("vinted_affari.db");db=new DealDatabase(getContext());store=new BrowserCaptureStore(db);market=new MarketStore(getContext(),db);executor=Executors.newSingleThreadExecutor();}
+ protected void setUp()throws Exception{super.setUp();setContext(new BrowserTestContext(getContext(),getClass().getSimpleName()));getContext().deleteDatabase("vinted_affari.db");db=new DealDatabase(getContext());store=new BrowserCaptureStore(db);market=new MarketStore(getContext(),db);executor=Executors.newSingleThreadExecutor();}
  protected void tearDown()throws Exception{executor.shutdownNow();executor.awaitTermination(3,TimeUnit.SECONDS);db.close();getContext().deleteDatabase("vinted_affari.db");super.tearDown();}
  private long capture(int count){long id=store.beginCapture("https://www.vinted.it/catalog",10);List<BrowserCandidate> rows=new ArrayList<>();for(int i=0;i<count;i++)rows.add(new BrowserCandidate(String.valueOf(101+i),"https://www.vinted.it/items/"+(101+i),"Azul gioco da tavolo",1000,null,Collections.emptyMap(),Collections.emptyMap(),10));store.commit(id,1,rows,10);return id;}
  private static class Runtime implements BrowserAnalysisRunner.Runtime {

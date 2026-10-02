@@ -1055,8 +1055,8 @@ public final class MarketStore {
         v.put("next_attempt_at", now);
         v.put("updated_at", now);
         v.put("last_error", "process restart");
-        if(ageMs==Long.MAX_VALUE) helper.getWritableDatabase().update("processing_jobs", v, "state=?", new String[]{PROCESSING});
-        else helper.getWritableDatabase().update("processing_jobs", v, "state=? AND updated_at<?", new String[]{PROCESSING,String.valueOf(cutoff)});
+        if(ageMs==Long.MAX_VALUE) helper.getWritableDatabase().update("processing_jobs", v, "state=? AND job_type<>'BROWSER_ANALYSIS'", new String[]{PROCESSING});
+        else helper.getWritableDatabase().update("processing_jobs", v, "state=? AND updated_at<? AND job_type<>'BROWSER_ANALYSIS'", new String[]{PROCESSING,String.valueOf(cutoff)});
     }
 
     public Job claimNextVintedJob(long now) {
