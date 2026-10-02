@@ -11,6 +11,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class RadarReliabilityRegression {
     static void check(boolean ok,String msg){if(!ok)throw new AssertionError(msg);}
     public static void main(String[] args)throws Exception{
+        // A stale preferences snapshot must not roll back timestamp/value pairs on restart.
+        File freshDir=Files.createTempDirectory("radar-fresh-test").toFile(),freshFile=new File(freshDir,"intake.properties");
+        Map<String,Long> freshness=new HashMap<>();freshness.put("eventAt",100L);freshness.put("eventType",32L);freshness.put("scanAt",110L);freshness.put("lastCardsParsed",4L);freshness.put("localAnalysisLastBatchAt",120L);freshness.put("localAnalysisLastBatchSize",1L);
+        RadarIntakeCounters fresh=new RadarIntakeCounters();fresh.initialize(freshFile,freshness,200);fresh.persist(freshFile);
+        freshness.put("eventAt",90L);freshness.put("eventType",2048L);freshness.put("localAnalysisLastBatchAt",80L);freshness.put("localAnalysisLastBatchSize",6L);
+        RadarIntakeCounters freshRestart=new RadarIntakeCounters();freshRestart.initialize(freshFile,freshness,300);
+        check(freshRestart.get("eventAt")==100&&freshRestart.get("eventType")==32,"restart lost event timestamp/type pair");
+        check(freshRestart.get("localAnalysisLastBatchAt")==120&&freshRestart.get("localAnalysisLastBatchSize")==1,"restart lost analysis timestamp/size pair");
+        check(freshRestart.get("scanAt")==110&&freshRestart.get("lastCardsParsed")==4,"restart lost scan timestamp/card count pair");
         File dir=Files.createTempDirectory("radar-test").toFile(),file=new File(dir,"intake.properties");
         Map<String,Long> seed=new HashMap<>();seed.put("cardsParsedTotal",14248L);
         RadarIntakeCounters first=new RadarIntakeCounters();first.add("cardsParsedTotal",3);first.initialize(file,seed,1000);check(first.get("cardsParsedTotal")==14251,"events during initialization lost");first.persist(file);

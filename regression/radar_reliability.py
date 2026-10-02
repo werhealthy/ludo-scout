@@ -15,7 +15,7 @@ sql=json.loads(re.search(r'static String rows\(\)\s*\{\s*return (".*");',sqlsrc.
 c=sqlite3.connect(':memory:')
 c.executescript('CREATE TABLE observations(signature TEXT,observed_at INTEGER);CREATE TABLE market_listings(id INTEGER,temp_fingerprint TEXT,legacy_signature TEXT,lifecycle TEXT,enrichment_state TEXT,game_id INTEGER);CREATE TABLE games(id INTEGER,match_state TEXT,bgg_id TEXT,rating REAL,database_visible INTEGER);')
 c.executemany('INSERT INTO games VALUES(?,?,?,?,?)',[(1,'MATCHED','10',7,1),(2,'MATCHED','20',5,1),(3,'MATCHED','30',None,1),(4,'MATCHED','40',8,0),(5,'BGG_MATCH_REVIEW','',8,1),(6,None,'60',8,1)])
-states=[('a','ACTIVE','BLOCKED_CLASSIFIER',None,'CLASSIFIER_BLOCKED'),('b','ACTIVE','AUTO_FILTERED',None,'AUTO_FILTERED'),('c','ACTIVE','PENDING_ANALYSIS',None,'ANALYSIS_PENDING'),('d','SOLD','COMPLETE',1,'INACTIVE'),('e','ACTIVE','COMPLETE',2,'BELOW_RATING'),('f','ACTIVE','COMPLETE',3,'RATING_PENDING'),('g','ACTIVE','COMPLETE',4,'GAME_HIDDEN'),('h','ACTIVE','COMPLETE',5,'BGG_UNRESOLVED'),('i','ACTIVE','COMPLETE',1,'BGG_QUALIFIED'),('j','ACTIVE','COMPLETE',None,'GAME_MISSING')]
+states=[('a','ACTIVE','BLOCKED_CLASSIFIER',None,'CLASSIFIER_BLOCKED'),('b','ACTIVE','AUTO_FILTERED',None,'AUTO_FILTERED'),('c','ACTIVE','PENDING_ANALYSIS',None,'ANALYSIS_PENDING'),('d','SOLD','COMPLETE',1,'INACTIVE_SOLD'),('e','ACTIVE','COMPLETE',2,'BELOW_RATING'),('f','ACTIVE','COMPLETE',3,'RATING_PENDING'),('g','ACTIVE','COMPLETE',4,'GAME_HIDDEN'),('h','ACTIVE','COMPLETE',5,'BGG_UNRESOLVED'),('i','ACTIVE','COMPLETE',1,'BGG_QUALIFIED'),('j','ACTIVE','COMPLETE',None,'GAME_MISSING')]
 for n,(sig,life,state,game,reason) in enumerate(states,1):
  c.execute('INSERT INTO market_listings VALUES(?,?,?,?,?,?)',(n,sig,sig,life,state,game))
  c.execute('INSERT INTO observations VALUES(?,?)',(sig,100))
@@ -25,6 +25,12 @@ c.execute("INSERT INTO observations VALUES('outside',99)")
 rows=list(c.execute(sql,('100','101')))
 assert {r[0]:r[1] for r in rows}==dict((s[0],s[4]) for s in states)|{'raw':'NO_CANONICAL'},rows
 assert len(rows)==11,'Repeated observations must not inflate signature counts'
+# Lifecycle exclusions were previously swallowed by INACTIVE before their cause was examined.
+for n,(life,state,want) in enumerate([('AUTO_FILTERED','AUTO_FILTERED','AUTO_FILTERED'),('AUTO_FILTERED','AUTO_EXCLUDED','AUTO_EXCLUDED'),('USER_HIDDEN','COMPLETE','INACTIVE_USER_HIDDEN'),('REMOVED','REMOVED','INACTIVE_REMOVED'),('UNKNOWN','HISTORICAL_PARTIAL','INACTIVE_UNKNOWN'),(None,'COMPLETE','INACTIVE_UNKNOWN'),('FUTURE_STATE','COMPLETE','INACTIVE_OTHER')],20):
+ sig='cause'+str(n)
+ c.execute('INSERT INTO market_listings VALUES(?,?,?,?,?,?)',(n,sig,sig,life,state,1))
+ c.execute('INSERT INTO observations VALUES(?,?)',(sig,100))
+ assert dict(c.execute(sql,('100','101')))[sig]==want,(life,state,want)
 # legacy_signature wins; temp fingerprint is fallback only when legacy is absent.
 c.execute("UPDATE market_listings SET legacy_signature='',temp_fingerprint='j' WHERE id=10")
 assert dict(c.execute(sql,('100','101')))['j']=='GAME_MISSING'
