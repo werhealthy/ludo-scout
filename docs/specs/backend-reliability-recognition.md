@@ -7,6 +7,19 @@ Le modifiche vanno mantenute piccole, misurabili e reversibili. Nessun miglioram
 
 ## Priorità operative
 
+## Checkpoint backend — ricerca Motore, 2026-10-02 12:51 Europe/Rome
+
+Richiesta utente: conservare la ricerca come know-how e rimandare ogni nuova indagine/implementazione alla prossima chat. Report originale: [docs/research/ludo-scout-engine-report-2026-10-02.md](docs/research/ludo-scout-engine-report-2026-10-02.md). È un audit storico riferito principalmente a 5.12.41: ipotesi, percorsi e raccomandazioni vanno riconfermati sull'ultimo beta. PROJECT/AGENTS/STATE già esistono; non ricrearli. Citazioni filecite/search del report appartengono alla sessione originale e non sono prove navigabili nel repository.
+
+Diagnostica ricevuta: 5.12.124-motore-overview; non equivale alla versione più recente sul branch. Run ACTIVE da circa27h, corePending2, waitingRuns5; REMOTE_LIMIT con49/60 richieste locali. missingLink482, eligible233, queued19, awaitingAttempt102, other107. engineCoreRemaining elenca7 righe,5 LOCAL_ONLY senza job e2 PENDING_ENRICHMENT: non confrontare direttamente questo ambito con coreRemaining2 del run attivo. Anche i diversi contatori possono avere ambiti/epoche differenti. Zero crash/ANR dopo installazione124 nel log; vecchio SQLiteBusy storico, B1 non chiuso. Galleria3/5 HTTP404. photoMatcher tutti zero non prova mancato funzionamento né miglioramento.
+
+Unico prossimo passo: nella nuova chat backend, audit read-only del percorso annuncio BGG qualificato → stato LOCAL_ONLY/DEFERRED_LINK → creazione/riprogrammazione job, ricostruendo ambiti, criteri e motivi per cui annunci idonei restano senza job. LOCAL_ONLY può essere intenzionale: non dichiarare bug prima della verifica. Poi proporre una correzione piccola solo se la causa è dimostrata. Non aumentare budget/frequenza né ignorare backoff.
+
+Know-how da rivalutare dopo questa check: matcher Java BGG già indicizzato; possibile costo JS nel fallback refusi byWord; descrizione solo come evidenza conservativa di variante/conflitto; riuso snapshot/cache prima di rete; corpus casi reali e metriche per stadio senza duplicare telemetria esistente. Nessuna di queste proposte è approvazione di cambio soglie/schema/architettura.
+
+Checkpoint solo documentale: nessun codice/runtime, test Android, build, APK o prova telefono nuova. Base Git letta: beta d0f05487a613e42cfc5f9318cf1e9f12e5c027e6. Stato e verifiche frontend/backend precedenti preservati; frontend7 aree/backend5 gruppi, nessuno chiuso.
+
+
 ## Backend — B2 riuso foto 5.12.123 consegnata, 2026-10-02
 Fix autorizzata «Vai», branch backend/photo-cache-reuse, PR134. Matcher normale legge la firma dHash già salvata prima di HTTP: solo URL esatta (normalizzazione &amp;), hash SQLite integer e last_at entro24h/non futuro. La chiave PhotoIdentity da sola non basta: crop/taglie/URLfirmate diverse possono produrre hash diversi. Miss/errore/tabellaassente/scaduto/corrotto mantengono il percorso precedente; lettura senza ensure/DDL. Algoritmo VisualCoverMatcher e soglie invariati, nessuna nuova rete o cambio schema/budget/pausa/retry. Una sola riga perphoto_key resta: crop alternati possono produrre miss sicuri; nessuna cache completa o singleflight aggiunta.
 Ledger SQLite esistente espone photoMatcher separato dai contatori pagine: cacheHits/downloadAttempts/httpResponses/http403/http429/errors; scope matcher-only. Non include tutte le immagini UI né tutte le richieste fisiche dei redirect; errors conta eccezioni del percorso, non tutti i possibili decode null. Misure best-effort come ledger esistente; transazioni brevi sul worker, overhead sul telefono non misurato. Epoch inizializzata dentro transazione prima del primo evento, altrimenti la lettura diagnostica cancellava i primi contatori.

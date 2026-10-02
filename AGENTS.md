@@ -6,7 +6,8 @@ Prima di qualsiasi lavoro significativo, a ogni nuova chat o ripresa:
 1. Leggi questo `AGENTS.md`.
 2. Leggi `STATE.md` per stato reale, ultima consegna, verifiche e lavoro aperto.
 3. Leggi `docs/specs/2026-09-30-ui-refinement.md`: è la scaletta unica delle attività e delle priorità. La sezione operativa iniziale prevale sulla cronologia successiva.
-4. Ispeziona il codice pertinente prima di intervenire.
+4. Per il backend leggi `docs/specs/backend-reliability-recognition.md` e, per il Motore, `docs/research/ludo-scout-engine-report-2026-10-02.md`. La ricerca è storica: riconferma le ipotesi sul codice attuale e segui la priorità registrata in STATE, senza adottare automaticamente il suo ordine A–E.
+5. Ispeziona il codice pertinente prima di intervenire.
 
 Non chiedere all'utente di ricopiare la scaletta o la conversazione quando il repository è accessibile. Se questi file non sono accessibili, segnala il limite senza inventare lo stato.
 
