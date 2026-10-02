@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — verità diagnostica Motore 5.12.128, 2026-10-02 13:28 Europe/Rome
+
+Audit del checkpoint 5.12.124 concluso: il disallineamento `engineRun.coreRemaining=2` contro 7 righe in `engineCoreRemaining` non dimostrava 5 job persi. Le 5 righe `LOCAL_ONLY` sono hold locali intenzionalmente esclusi dal conteggio autorevole del run; il riepilogo diagnostico le presentava invece come lavoro remoto residuo. Il percorso `DEFERRED_LINK` dispone già di promozione bounded e rispetto dei gate Vinted; nessun aumento di budget/frequenza, bypass backoff, cambio soglie, queue writer o schema è stato necessario.
+
+PR145 `backend/engine-diagnostic-scope` integrata in `beta`, merge `dac4da1cf82352e8fbeb2e49d3e470e7093e0eee`, versione `5.12.128-engine-diagnostic-scope`. `engineCoreRemaining` ora esclude hold locali/review/auto-filtered, `engineLocalOnly` espone separatamente il conteggio dello stesso run e `vintedMissingBreakdown` separa `localOnly` dagli esiti remoti eleggibili. Aggiunta regressione SQLite sul SQL di produzione; CI beta146/run37000757503/job110817671805 completata success, inclusi regressioni, unit test, build e verifica firma. Signer SHA256 atteso `C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710` confermato. Firebase: upload release `5.12.128-engine-diagnostic-scope (1000146)` riuscito 2026-10-02T11:28:05.5857629Z; distribuzione tester/gruppi riuscita 2026-10-02T11:28:06.1511281Z.
+
+Prova telefono richiesta: aggiornare senza cancellare dati e inviare una sola diagnostica completa, senza nuovo scroll e senza forzare richieste Vinted. Verificare che `engineCoreRemaining` non contenga più `LOCAL_ONLY`, che `engineLocalOnly` sia separato e che il breakdown globale mostri `localOnly` fuori da `eligible`. Poi seguire soltanto gli eventuali veri blocker remoti rimasti (nel dump precedente erano 2 `PENDING_ENRICHMENT`) prima di modificare scheduling o rete. Frontend 7 aree aperte; backend 5 gruppi aperti, nessuno chiuso da questo sottopasso.
+
 ## Frontend — scheda annuncio compatta e Motore verificabile, 2026-10-02
 
 Feedback utente13:03Europe/Rome:125–126 troppo vuota; riquadro richieste manuali era utile; screenshot mostra Nessuno scroll acquisito e tutti0. Il grande numero colorato conta identità attive con job PROCESSING osservato, il piccolo numero è il resto attuale della fase in coda; nessuno è storico dei passaggi. Pronti è disponibilità dello scroll. Storico conclusioni resta aperto.
