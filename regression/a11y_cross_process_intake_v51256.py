@@ -4,6 +4,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 service = (root / "app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
+counter = (root / "app/src/main/java/it/vintedaffari/app/RadarIntakeCounters.java").read_text(encoding="utf-8")
 market = (root / "app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")
 
 event_start = service.index("@Override public void onAccessibilityEvent")
@@ -29,7 +30,7 @@ checks = [
     ("telemetry writes are coalesced instead of accumulating", "a11yDiagnosticFlushQueued.compareAndSet(false,true)" in snapshot_writer and "pendingA11yDiagnosticSnapshot" in snapshot_writer),
     ("snapshot writes are time-throttled during rapid scroll events", "A11Y_DIAGNOSTIC_MIN_WRITE_MS=2_000L" in service and "a11yDiagnosticPublishScheduled" in snapshot_writer),
     ("the existing SQLite diagnostics channel is used", 'setDiagnosticState("a11y_intake"' in snapshot_writer and "SharedPreferences are process-local caches" in market),
-    ("the snapshot includes event, parse and analysis freshness", all(k in snapshot_writer for k in ("eventAt=", "cardsParsedTotal=", "analysisBatches=", "localAnalysisLastBatchAt="))),
+    ("the snapshot includes event, parse and analysis freshness", "radarCounters.diagnosticPayload()" in snapshot_writer and all(k in counter for k in ("eventAt", "cardsParsedTotal", "analysisBatches", "localAnalysisLastBatchAt"))),
     ("completed Accessibility parses publish updated counters", scan_publish > scan_counter_write),
     ("completed local analyses publish their completion time after background persistence", "radarPersistence.submit" in analysis_callback and "publishA11yDiagnosticSnapshot();" in analysis_persistence and "localAnalysisLastBatchAt" in analysis_persistence),
     ("debug reads intake telemetry from SQLite", 'diagnosticState("a11y_intake")' in diagnostics),

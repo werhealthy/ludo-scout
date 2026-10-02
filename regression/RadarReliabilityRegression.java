@@ -11,11 +11,33 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class RadarReliabilityRegression {
     static void check(boolean ok,String msg){if(!ok)throw new AssertionError(msg);}
     public static void main(String[] args)throws Exception{
+        // A stale preferences snapshot must not roll back timestamp/value pairs on restart.
+        File freshDir=Files.createTempDirectory("radar-fresh-test").toFile(),freshFile=new File(freshDir,"intake.properties");
+        Map<String,Long> freshness=new HashMap<>();freshness.put("eventAt",100L);freshness.put("eventType",32L);freshness.put("scanAt",110L);freshness.put("lastCardsParsed",4L);freshness.put("localAnalysisLastBatchAt",120L);freshness.put("localAnalysisLastBatchSize",1L);
+        RadarIntakeCounters fresh=new RadarIntakeCounters();fresh.initialize(freshFile,freshness,200);fresh.persist(freshFile);
+        freshness.put("eventAt",90L);freshness.put("eventType",2048L);freshness.put("localAnalysisLastBatchAt",80L);freshness.put("localAnalysisLastBatchSize",6L);
+        RadarIntakeCounters freshRestart=new RadarIntakeCounters();freshRestart.initialize(freshFile,freshness,300);
+        check(freshRestart.get("eventAt")==100&&freshRestart.get("eventType")==32,"restart lost event timestamp/type pair");
+        check(freshRestart.get("localAnalysisLastBatchAt")==120&&freshRestart.get("localAnalysisLastBatchSize")==1,"restart lost analysis timestamp/size pair");
+        check(freshRestart.get("scanAt")==110&&freshRestart.get("lastCardsParsed")==4,"restart lost scan timestamp/card count pair");
+        freshRestart.recordEvent(130,64);freshRestart.recordEvent(125,2048);
+        check(freshRestart.get("vintedEvents")==2,"quiet event tail not counted in owner memory");
+        freshRestart.recordScan(140,0);freshRestart.recordAnalysis(150,5);freshRestart.persist(freshFile);
+        RadarIntakeCounters liveReload=new RadarIntakeCounters();liveReload.initialize(freshFile,freshness,400);
+        check(liveReload.get("eventAt")==130&&liveReload.get("eventType")==64,"older callback overwrote event pair");
+        check(liveReload.get("scanAt")==140&&liveReload.get("lastCardsParsed")==0,"empty scan not preserved");
+        check(liveReload.get("localAnalysisLastBatchAt")==150&&liveReload.get("localAnalysisLastBatchSize")==5,"live analysis pair not persisted");
+        check(liveReload.diagnosticPayload().contains("analysisSource=live-owner"),"live provenance lost");
+        freshness.put("eventAt",999L);freshness.put("eventType",2048L);
+        RadarIntakeCounters seedAhead=new RadarIntakeCounters();seedAhead.initialize(freshFile,freshness,500);
+        check(seedAhead.get("eventAt")==130&&seedAhead.get("eventType")==64,"unverified higher seed replaced owner freshness");
+        RadarIntakeCounters initializing=new RadarIntakeCounters();initializing.recordEvent(1000,16);initializing.initialize(freshFile,freshness,1100);
+        check(initializing.get("eventAt")==1000&&initializing.get("eventType")==16,"initialization rolled back a live callback");
         File dir=Files.createTempDirectory("radar-test").toFile(),file=new File(dir,"intake.properties");
         Map<String,Long> seed=new HashMap<>();seed.put("cardsParsedTotal",14248L);
         RadarIntakeCounters first=new RadarIntakeCounters();first.add("cardsParsedTotal",3);first.initialize(file,seed,1000);check(first.get("cardsParsedTotal")==14251,"events during initialization lost");first.persist(file);
         seed.put("cardsParsedTotal",14019L);RadarIntakeCounters restart=new RadarIntakeCounters();restart.add("cardsParsedTotal",7);restart.initialize(file,seed,2000);check(restart.get("cardsParsedTotal")==14258,"stale prefs rolled back counters");check(restart.metadata().contains("counterEpoch=1000"),"epoch lost");restart.persist(file);
-        seed.put("cardsParsedTotal",15000L);RadarIntakeCounters higher=new RadarIntakeCounters();higher.initialize(file,seed,3000);check(higher.get("cardsParsedTotal")==15000,"authoritative migration floor ignored");
+        seed.put("cardsParsedTotal",15000L);RadarIntakeCounters higher=new RadarIntakeCounters();higher.initialize(file,seed,3000);check(higher.get("cardsParsedTotal")==14258,"stale higher migration seed replaced owner file");
         higher.add("analysisCommitted",2);check(higher.get("analysesStored")==0&&higher.get("analysisCommitted")==2,"attempts confused with commits");
         Files.writeString(file.toPath(),"cardsParsedTotal=bad\nepoch=bad\n");RadarIntakeCounters corrupt=new RadarIntakeCounters();corrupt.initialize(file,seed,4000);check(corrupt.get("cardsParsedTotal")==15000,"corrupt file rejected valid seed");
         RadarPersistence lane=new RadarPersistence();CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1),finished=new CountDownLatch(1);AtomicInteger order=new AtomicInteger();String caller=Thread.currentThread().getName();
