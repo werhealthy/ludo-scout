@@ -8,9 +8,11 @@ Use the current single radar analysis owner. Browser capture saves by exact ID i
 - [x] Add ID-preserving adapter and durable snapshot/intake queries; test repeated IDs, distinct same-title IDs, sparse metadata, price changes and protected lifecycle states.
 - [x] Wake existing runtime and preserve captured identity through pending selection, analysis and Catalog metadata; guard automatic remote work by durable provenance.
 - [x] Connect browser capture outside main thread and retain accepted writes at close; simplify native controls using current design assets.
-- [ ] Run existing regressions and Android validation on dedicated backend branch; review shared files, refresh beta base, merge verified PR.
-- [ ] Verify signed beta, expected certificate, Firebase upload and tester distribution; update STATE and workstream backlog with actual evidence and phone test limits.
+- [x] Run existing regressions and Android validation on dedicated backend branch; review shared files, refresh beta base, merge verified PR.
+- [x] Verify signed beta, expected certificate, Firebase upload and tester distribution; update STATE and workstream backlog with actual evidence and phone test limits.
 
 Review focus: capture with missing price/currency; two sellers with identical title/price; repeated DOM plus richer JSON; page changes/close while writes are queued; scan opt-in OFF/runtime startup. Device performance and visual approval remain phone checks, not CI claims.
 
 Review: protected-price/brand/condition freshness and manual hold race corrected; real SQLite fixture also verifies numeric parameter affinity and later unchanged sightings. Native bridge reports retry on failed writes, including final one-shot packets. Boundary fixture recreates helpers against real SQLite with controlled Android/JSON boundaries; it does not prove real Android process restart or phone rendering.
+
+Delivery evidence: PR190 validation473/run37058109459 success; beta170/run37058482176 success. Expected signing digest verified. Firebase upload20:10:36Z and tester distribution20:10:37Z confirmed for5.12.147-browser-engine-intake(1000170). Phone acceptance remains pending.

@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend147 — cattura browser → Motore distribuita nel Tester
+
+PR190 collega gli annunci catturati dal browser al database e all’analisi locale dell’owner radar esistente, anche con scan opt-in OFF. ID esatti, snapshot senza prezzo conservati senza inventare valori, aggiornamenti dello stesso annuncio e osservazioni successive con dedupe persistente. Hidden/sold/manual review conservati; risultati vecchi non sovrascrivono prezzo totale, brand, condizione o testo nuovi. Metadata Vinted assenti non generano richieste automatiche. Nessun reset, schema o cambiamento di soglie/pricing/filtri/dati personali. Rimossi shortcut arbitrari Catan/Azul; ricerca esplicita e filtri nel menu, contatore salvati ed errore salvataggio visibile. Worker drena batch accettati alla chiusura e bridge riprova salvataggi falliti.
+
+PR190 HEAD037bf9e5db18539ac5d4a812579ff70695d952f2; validation473/run37058109459/job111007698521 success: regressioni complete, 40/40 browser, unit Android incluse policy capture, compile Java e review APK. Merge f4d9c85792c0498d875f126d09ce93bd5c3a2623. Beta170/run37058482176/job111008936735 success: build5.12.147-browser-engine-intake(1000170), certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato. Firebase upload2026-10-02T20:10:36.6336288Z e distribuzione ai tester20:10:37.0683054Z confermati separatamente. LocalCode196.
+
+Test nuovi: SQL reale e metodi Java reali per intake/pending/freshness, ID distinti con stesso titolo/prezzo, sparse price, duplicati, aggiornamenti, ricattura successiva, lifecycle/manual hold e URL non fidati. Review indipendente ha corretto freshness totale/brand/condizione, manual hold e retry one-shot. Fixture Android/JSON controllata e ricostruzione helper su SQLite: non prova restart reale Android né prestazioni/resa telefono.
+
+Prova telefono pendente: installare147 senza cancellare dati, catturare1–2pagine e tornare al Motore; inviare diagnostica subito e dopo1–2minuti. Confrontare catalogWrites/intakeError, osservazioni e stato Motore; verificare persistenza dopo chiusura/riapertura e assenza di nuovo reset. Campi seller/pubblicazione/lingua possono restare sconosciuti, dipendono dalla pagina pubblica. Backend5/frontend7 aperti, nessun gruppo chiuso per la sola CI. UI Motore rimane standby; unico prossimo passo backend: verificare il percorso reale sul telefono.
+
 ## Frontend146 — Ludo Esplorazione/Casa e Libreria integrata
 
 “Vai”20:41 approva la composizione proposta. Ludo ha selettore accessibile Esplorazione/Casa e swipe orizzontale intenzionale; il contenuto resta verticale. Casa riusa la LibraryDatabase e i componenti144: ricerca collezione, wizard/aggiunta, scatole sugli scaffali, scheda personale e archivio Venduti secondario. La barra primaria ora è Home/Catalogo/Ludo; vecchi navigate("library"), tab ripristinati, foto e draft arrivano a Casa. Nessuna collezione duplicata. Ludo in Casa è vicino al camino; in Esplorazione ha costume esploratore e sfondo foresta. Riutilizzati asset esistenti e renderer vettoriale, senza nuove dipendenze o servizi.
@@ -791,3 +801,4 @@ PR100 Android validation passed all regressions and Java compilation. Signed bet
 Latest user diagnostic on v87 reports five post-install UI crashes and one ANR; SQLiteDatabaseLockedException; busy_timeout8000ms; Activity snapshot load5751ms; Vinted PROCESSING lease around94min; queue heartbeat around95min; eight runnable Vinted jobs; current scroll active over five hours. Root cause of queue stalling and lock contention is not yet established. This Home step does not fix those crashes/ANR or claim to unblock the queue.
 
 L'elenco operativo attuale è il backlog prioritario consolidato in testa a questo file e in docs/specs/2026-09-30-ui-refinement.md. Le vecchie indicazioni su selector Catalogo, faccione Ludo e prossimi step sono superate dalle consegne e dal feedback2026-10-01.
+
