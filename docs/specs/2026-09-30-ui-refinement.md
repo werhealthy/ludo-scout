@@ -26,6 +26,13 @@ Puntini Hero geometrici centrati (font ellissi138 rifiutato), stessa superficie3
 PR172/CI425 e beta161 superati; firma/upload/distribuzione tester distinti verificati, release140(1000161), evidenze in STATE. Accettazione telefono pendente. Nessun intake browser/reset/schema/rete/soglia/filtro modificato. Requisiti consolidati nel gruppo1Motore, nessuna chiusura dell'area. Prossimo gruppo frontend: percorso contestuale risoluzione/ritorno job, coordinato con ingresso dati backend; frontend7/backend5 aperti.
 
 
+## Feedback18:44 approvato18:53 — Libreria scatolata a due ripiani142
+
+Utente ribadisce riuso prodotto approvato, adattato a voto personale/prezzo acquisto/risparmio, e richiede Libreria skeuomorfica su due ripiani. “Vai”18:53 approva: root a due rail orizzontali, tutte le copie filtrate ripartite ceil(N/2)/resto nell'ordine reale; scatole e ombre BGG reali senza piedistallo, sfondo unico del ripiano con bordo/luci/ombra. Nessun riquadro individuale. Ogni scatola apre scheda141, già componente prodotto con dati personali e conferme. Ricerca/Owned/Sold/wizard/voto/storico invariati. Tile larghe con font grande, azione accessibile completa, decoder locale320x480 e offset rail conservati nel refresh/reset su nuovo scope/query.
+PR178/CI438 e beta163 verificati; firma/upload/distribuzione distinti, release142(1000163), evidenze e limiti in STATE. Harness reale partition0/1/2/3/4/9/100/101 e offset passa; non prova disegno/appoggio/frame/RAM/dispatch sul telefono. Gruppi2/5 parzialmente implementati, verifica telefono pendente; foto MarraCash/relazione tecnica ancora aperte. Motore standby; frontend7/backend5.
+Unico prossimo gruppo raccomandato: verifica visiva Libreria142 prima dell'audit Catalogo/bundle. Questo feedback supersede il precedente avanzamento automatico al Catalogo.
+
+
 ## Proposta18:20 approvata18:25 — Libreria prodotto141 consegnata
 
 “Vai” approva composizione coerente col prodotto e progressività azioni. Libreria ora toolbar48dp/cuore/menu, artwork/fatti/linea/titolo senza truncation; stato edizione/acquisto e voto0–5 distinti dal BGG. Vendita solo Sold con null/zero/data/motivo/azione prezzo. Rank/categorie/Ludo nel disclosure; modifica acquisto, segna venduto/ripristina e elimina confermato nel menu, callback/async/single-flight/restoreY/insets preservati. Nessuna riscrittura dati/schema/relazione canonical inventata; provider BGG esterno reale. Tutorial query aggiunge “gioco”.
@@ -141,7 +148,7 @@ Home considerata fatta dall’utente: conservarne la baseline approvata; non ria
 
 Accessibilità, testo grande, safe insets/tastiera, Back, annullamento e animazioni sono criteri trasversali di tutti i gruppi, non un unico job che possa chiudere intere aree.
 L’analisi UX deve ricostruire prima oggetti, relazioni, ingressi/uscite e azioni del codice attuale, poi proporre le alternative e far approvare le decisioni importanti. Nessun nuovo assetto di tab, ruoloLudo, tracking, schema o comportamento è approvato dalla sola richiesta di analisi.
-Unico prossimo gruppo frontend attivo dopo141:3 Catalogo, audit di relazione annunci/giochi e visibilità bundle mantenendo navigazione105. Verifica Libreria141 pendente, gruppo2 non chiuso. Motore in standby per blocchi backend; requisiti e verifica telefono restano aperti. Non avviare tutti i redesign insieme.
+Unico prossimo passo frontend dopo142: verifica visiva Libreria a due ripiani e scheda prodotto contestualizzata, quindi gruppo3 Catalogo/bundle mantenendo navigazione105. Gruppi2/5 non chiusi. Motore in standby per blocchi backend; requisiti e verifica telefono restano aperti. Non avviare tutti i redesign insieme.
 
 ## Frontend — Motore overview e gesto dal basso 5.12.124, 2026-10-02 11:42 Europe/Rome
 
