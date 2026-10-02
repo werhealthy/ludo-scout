@@ -1545,7 +1545,7 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     }
     private String playerLabel(LibraryGame g){if(g.minPlayers==null&&g.maxPlayers==null)return"";if(g.minPlayers!=null&&g.maxPlayers!=null)return g.minPlayers.equals(g.maxPlayers)?String.valueOf(g.minPlayers):g.minPlayers+"–"+g.maxPlayers;return String.valueOf(g.minPlayers!=null?g.minPlayers:g.maxPlayers);}
     private String shortCategories(String raw){if(TextUtils.isEmpty(raw))return"";String clean=raw.replace("[","").replace("]","").replace("\"","").replace("|",",");String[] p=clean.split(",");StringBuilder out=new StringBuilder();for(String x:p){x=x.trim();if(x.isEmpty())continue;if(out.length()>0)out.append(" · ");out.append(x);if(out.length()>55)break;}return out.toString();}
-    private static String libraryPersonalRatingLabel(Integer value){return value==null?"Da valutare":String.format(Locale.ITALY,"★ %.1f /5",value/2.0);}
+    private static String libraryPersonalRatingLabel(Integer value){return value==null?"Da valutare":String.format(Locale.ITALY,"♥ %.1f /5",value/2.0);}
     private static Integer librarySalePrice(String raw){
         String value=raw==null?"":raw.trim();if(value.isEmpty())return null;
         if(!value.matches("[0-9]+([.,][0-9]{1,2})?"))throw new IllegalArgumentException("Importo non valido");
@@ -1568,15 +1568,33 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
         save.setOnClickListener(v->{Integer cents;try{cents=librarySalePrice(value.getText().toString());}catch(IllegalArgumentException error){value.setError("Inserisci un importo valido, con massimo due decimali");return;}String why=markSold&&reason.getSelectedItemPosition()>0?reasons[reason.getSelectedItemPosition()]:null;saveLibraryChange(g,()->{if(markSold)libraryDb.markSold(g.bggId,why,cents);else if(!libraryDb.setSalePrice(g.bggId,cents))throw new IllegalStateException("Gioco non venduto");},sheet,parent,save);});
         TextView cancel=menuAction("Annulla",MUTED);cancel.setGravity(Gravity.CENTER);cancel.setOnClickListener(v->sheet.dismiss());box.addView(cancel);sheet.show();
     }
+    private static float libraryHeartFill(Integer rating,int heart){return rating==null?0f:Math.max(0f,Math.min(1f,(rating-(heart-1)*2)/2f));}
     private View libraryPersonalRatingCard(LibraryGame g,Dialog parent){
-        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(14),dp(12),dp(14),dp(12));card.setBackground(round(SURFACE,16,1,OUTLINE));card.addView(text("Il tuo gusto",12,MUTED,Typeface.BOLD));TextView score=text(libraryPersonalRatingLabel(g.personalRating),22,g.personalRating==null?MUTED:PINK,Typeface.BOLD);score.setPadding(0,dp(4),0,dp(8));card.addView(score);TextView edit=detailSecondaryAction(g.personalRating==null?"Valuta il gioco":"Modifica il voto");edit.setMinHeight(dp(48));edit.setOnClickListener(v->rateLibraryGame(g,parent));card.addView(edit,new LinearLayout.LayoutParams(-1,-2));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(12);card.setLayoutParams(lp);return card;
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(0,dp(16),0,dp(8));
+        card.addView(text("Il tuo voto · "+libraryPersonalRatingLabel(g.personalRating),12,MUTED,Typeface.NORMAL));
+        LinearLayout hearts=new LinearLayout(this);hearts.setGravity(Gravity.CENTER_VERTICAL);
+        for(int n=1;n<=5;n++){
+            final int value=n*2;float fill=libraryHeartFill(g.personalRating,n);ImageView heart=new ImageView(this);heart.setImageDrawable(libraryRatingHeart(fill));heart.setPadding(dp(10),dp(10),dp(10),dp(10));heart.setFocusable(true);heart.setSelected(fill>0);heart.setBackground(round(Color.argb(22,255,255,255),14,0,0));
+            heart.setContentDescription("Il tuo voto: "+n+" cuori su 5"+(fill==1f?", selezionato":fill>0?", mezzo cuore":""));
+            heart.setOnClickListener(v->saveLibraryChange(g,()->libraryDb.setPersonalRating(g.bggId,value),parent,parent,hearts));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);if(n>1)lp.leftMargin=dp(8);hearts.addView(heart,lp);
+        }
+        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=dp(8);card.addView(hearts,hp);return card;
+    }
+    private Drawable libraryRatingHeart(float fill){
+        return new Drawable(){
+            final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);float x,y;
+            @Override protected void onBoundsChange(Rect b){paint.setTextSize(Math.min(b.width(),b.height())*.9f);paint.setTypeface(LudoIcons.regular(MainActivity.this));paint.setTextAlign(Paint.Align.CENTER);Paint.FontMetrics fm=paint.getFontMetrics();x=b.exactCenterX();y=b.exactCenterY()-(fm.ascent+fm.descent)/2;}
+            public void draw(Canvas canvas){Rect b=getBounds();paint.setTypeface(LudoIcons.regular(MainActivity.this));paint.setColor(MUTED);canvas.drawText(LudoIcons.HEART,x,y,paint);if(fill>0){int save=canvas.save();canvas.clipRect(b.left,b.top,b.left+b.width()*fill,b.bottom);paint.setTypeface(LudoIcons.solid(MainActivity.this));paint.setColor(PINK);canvas.drawText(LudoIcons.HEART,x,y,paint);canvas.restoreToCount(save);}}
+            public void setAlpha(int alpha){paint.setAlpha(alpha);}public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+        };
     }
     private ImageView libraryCover(LibraryGame g){
         ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);image.setImageResource(R.drawable.ludo_value_book);String key="library-cover:"+g.bggId+":"+g.imageUrl;image.setTag(key);galleryNet.execute(()->{File file=TextUtils.isEmpty(g.bggId)?null:ArtworkStore.displayFile(this,g.bggId);Bitmap bitmap=file!=null&&file.exists()?decodeLocalBitmap(file,240,320):null;runOnUiThread(()->{if(isDestroyed()||isFinishing()||!java.util.Objects.equals(key,image.getTag()))return;if(bitmap!=null)image.setImageBitmap(bitmap);else if(!TextUtils.isEmpty(g.imageUrl))loadRemote(image,g.imageUrl);});});return image;
     }
     private void rateLibraryGame(LibraryGame g,Dialog parent){
-        Dialog sheet=bottomSheet("Il tuo voto");LinearLayout box=sheet.findViewById(SHEET_ID);box.addView(text(g.name,18,TEXT,Typeface.BOLD));TextView current=text(libraryPersonalRatingLabel(g.personalRating),22,PINK,Typeface.BOLD);current.setPadding(0,dp(10),0,dp(10));box.addView(current);box.addView(text("Da zero a cinque stelle. Un voto già presente mantiene anche le mezze stelle.",13,MUTED,Typeface.NORMAL));
-        for(int start=0;start<6;start+=3){LinearLayout row=new LinearLayout(this);for(int n=start;n<start+3;n++){final int stored=n*2;TextView option=text(n+" ★",17,g.personalRating!=null&&g.personalRating==stored?BG:TEXT,Typeface.BOLD);option.setGravity(Gravity.CENTER);option.setMinHeight(dp(48));option.setBackground(round(g.personalRating!=null&&g.personalRating==stored?LIME:SURFACE2,12,0,0));option.setSelected(g.personalRating!=null&&g.personalRating==stored);option.setContentDescription(n+" stelle su 5");option.setOnClickListener(v->saveLibraryChange(g,()->libraryDb.setPersonalRating(g.bggId,stored),sheet,parent,row));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(n>start)lp.leftMargin=dp(8);row.addView(option,lp);}LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(10);box.addView(row,rp);}
+        Dialog sheet=bottomSheet("Il tuo voto");LinearLayout box=sheet.findViewById(SHEET_ID);box.addView(text(g.name,18,TEXT,Typeface.BOLD));TextView current=text(libraryPersonalRatingLabel(g.personalRating),22,PINK,Typeface.BOLD);current.setPadding(0,dp(10),0,dp(10));box.addView(current);box.addView(text("Da zero a cinque cuori. Un voto già presente mantiene anche i mezzi cuori.",13,MUTED,Typeface.NORMAL));
+        for(int start=0;start<6;start+=3){LinearLayout row=new LinearLayout(this);for(int n=start;n<start+3;n++){final int stored=n*2;TextView option=text(n+" ♥",17,g.personalRating!=null&&g.personalRating==stored?BG:TEXT,Typeface.BOLD);option.setGravity(Gravity.CENTER);option.setMinHeight(dp(48));option.setBackground(round(g.personalRating!=null&&g.personalRating==stored?LIME:SURFACE2,12,0,0));option.setSelected(g.personalRating!=null&&g.personalRating==stored);option.setContentDescription(n+" cuori su 5");option.setOnClickListener(v->saveLibraryChange(g,()->libraryDb.setPersonalRating(g.bggId,stored),sheet,parent,row));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(n>start)lp.leftMargin=dp(8);row.addView(option,lp);}LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(10);box.addView(row,rp);}
         TextView clear=menuAction("Rimuovi il voto",MUTED);clear.setGravity(Gravity.CENTER);clear.setOnClickListener(v->saveLibraryChange(g,()->libraryDb.setPersonalRating(g.bggId,null),sheet,parent,box));box.addView(clear);sheet.show();
     }
     private void markLibraryGameSold(LibraryGame g,Dialog parent){editLibrarySale(g,parent,true);}
@@ -1584,7 +1602,7 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     private void openLibraryDetail(LibraryGame g){openLibraryDetail(g,0);}
     private void openLibraryDetail(LibraryGame g,int restoreY){
         enrichLibraryBggIfNeeded(g);
-        Dialog d=new Dialog(this,android.R.style.Theme_Material_NoActionBar);ScrollView sc=new ScrollView(this);sc.setId(SHEET_ID+110);sc.setBackground(productPageBackground());LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(box);
+        Dialog d=new Dialog(this,android.R.style.Theme_Material_NoActionBar);ScrollView sc=new EndPullScrollView(this);sc.setId(SHEET_ID+110);sc.setBackground(productPageBackground());LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(box);
         LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);
         TextView back=appIcon(LudoIcons.CHEVRON_LEFT,22,TEXT);back.setGravity(Gravity.CENTER);back.setContentDescription("Torna alla Libreria");back.setOnClickListener(v->d.dismiss());head.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
         head.addView(text("Il tuo gioco",16,MUTED,Typeface.NORMAL),new LinearLayout.LayoutParams(0,-2,1));
@@ -1598,34 +1616,61 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
         String edition=TextUtils.isEmpty(g.editionLabel)?"Edizione non specificata":g.editionLabel;TextView editionText=text(edition,14,MUTED,Typeface.NORMAL);addProductSection(box,editionText,8);
         box.addView(libraryPersonalRatingCard(g,d));
 
-        String purchaseQuality=libraryPurchaseQuality(g);Integer total=g.paidCents==null?null:PurchaseMath.total(g.paidCents,g.shippingCents,g.feeCents);if(total==null)total=g.paidCents;Integer market=libraryMarketReference(g);
-        LinearLayout purchase=verticalCard();purchase.setPadding(dp(16),dp(14),dp(16),dp(14));purchase.addView(text("Il tuo acquisto",13,MUTED,Typeface.BOLD));
-        TextView paid=text(total==null?"Prezzo non inserito":money(total),26,total==null?MUTED:LIME,Typeface.BOLD);addProductSection(purchase,paid,6);
-        if(!TextUtils.isEmpty(purchaseQuality))addProductSection(purchase,text(purchaseQuality,13,TEXT,Typeface.NORMAL),4);
-        if(market!=null&&market>0&&total!=null){int delta=Math.round((market-total)*100f/market);addProductSection(purchase,text("Riferimento mercato "+money(market)+" · "+(delta>=0?"hai risparmiato circa "+delta+"%":"circa "+Math.abs(delta)+"% sopra il riferimento"),13,delta>=0?TEAL:ORANGE,Typeface.NORMAL),8);}
-        if(g.acquiredAt!=null)addProductSection(purchase,text(new SimpleDateFormat("dd/MM/yyyy",Locale.ITALY).format(new Date(g.acquiredAt)),12,MUTED,Typeface.NORMAL),6);
-        if(!TextUtils.isEmpty(g.source))addProductSection(purchase,text("Comprato su "+g.source,13,MUTED,Typeface.NORMAL),6);
-        if(g.bundlePurchase)addProductSection(purchase,text(TextUtils.isEmpty(g.bundleLabel)?"Acquisto in bundle":g.bundleLabel,13,PINK,Typeface.NORMAL),6);
-        if(g.bundlePurchase&&g.bundleTotalCents!=null)addProductSection(purchase,text("Totale bundle "+money(g.bundleTotalCents),13,MUTED,Typeface.NORMAL),4);
-        addProductSection(box,purchase,12);
+        Integer total=libraryAcquisitionTotal(g);Integer market=libraryMarketReference(g);
+        LinearLayout purchase=new LinearLayout(this);purchase.setOrientation(LinearLayout.VERTICAL);purchase.setPadding(0,dp(12),0,dp(8));
+        purchase.addView(text("Acquistato a",12,MUTED,Typeface.NORMAL));LinearLayout priceRow=new LinearLayout(this);priceRow.setGravity(Gravity.CENTER_VERTICAL);
+        priceRow.addView(text(total==null?"Prezzo non inserito":money(total),24,total==null?MUTED:TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));
+        if(market!=null&&market>0&&total!=null){int delta=Math.round((market-total)*100f/market);TextView saving=text((delta>=0?"−":"+")+Math.abs(delta)+"%",16,delta>=0?TEAL:ORANGE,Typeface.BOLD);saving.setContentDescription(delta>=0?"Risparmio stimato "+delta+" per cento rispetto al mercato":Math.abs(delta)+" per cento sopra il riferimento di mercato");priceRow.addView(saving);}
+        purchase.addView(priceRow);addProductSection(box,purchase,4);
+        LinearLayout purchaseDetails=new LinearLayout(this);purchaseDetails.setOrientation(LinearLayout.VERTICAL);
+        String quality=libraryPurchaseQuality(g);if(!TextUtils.isEmpty(quality))purchaseDetails.addView(text(quality,13,TEXT,Typeface.NORMAL));
+        if(market!=null&&market>0)addProductSection(purchaseDetails,text("Riferimento mercato · "+money(market),13,MUTED,Typeface.NORMAL),6);
+        if(g.shippingCents!=null)addProductSection(purchaseDetails,text("Spedizione · "+money(g.shippingCents),13,MUTED,Typeface.NORMAL),6);
+        if(g.feeCents!=null)addProductSection(purchaseDetails,text("Commissioni · "+money(g.feeCents)+(g.feeEstimated?" (stimate)":""),13,MUTED,Typeface.NORMAL),6);
+        if(g.acquiredAt!=null)addProductSection(purchaseDetails,text(new SimpleDateFormat("dd/MM/yyyy",Locale.ITALY).format(new Date(g.acquiredAt)),12,MUTED,Typeface.NORMAL),6);
+        if(!TextUtils.isEmpty(g.source))addProductSection(purchaseDetails,text("Comprato su "+g.source,13,MUTED,Typeface.NORMAL),6);
+        if(g.bundlePurchase)addProductSection(purchaseDetails,text(TextUtils.isEmpty(g.bundleLabel)?"Acquisto in bundle":g.bundleLabel,13,PINK,Typeface.NORMAL),6);
+        if(g.bundlePurchase&&g.bundleTotalCents!=null)addProductSection(purchaseDetails,text("Totale bundle · "+money(g.bundleTotalCents),13,MUTED,Typeface.NORMAL),4);
+        if(purchaseDetails.getChildCount()>0)addProductSection(box,detailDisclosure("Dettagli dell’acquisto",purchaseDetails),4);
         if("sold".equals(g.collectionState)){
-            LinearLayout sale=verticalCard();sale.setPadding(dp(16),dp(14),dp(16),dp(14));sale.addView(text("La tua vendita",13,MUTED,Typeface.BOLD));addProductSection(sale,text(g.salePriceCents==null?"Prezzo da inserire":money(g.salePriceCents),24,ORANGE,Typeface.BOLD),6);
+            LinearLayout sale=new LinearLayout(this);sale.setOrientation(LinearLayout.VERTICAL);sale.setPadding(0,dp(12),0,dp(8));sale.addView(text("Venduto a",12,MUTED,Typeface.NORMAL));addProductSection(sale,text(g.salePriceCents==null?"Prezzo da inserire":money(g.salePriceCents),24,ORANGE,Typeface.BOLD),4);
+            Long margin=librarySaleDifference(g.salePriceCents,total);addProductSection(sale,text(margin==null?"Differenza non disponibile":("Differenza vendita/acquisto · "+(margin>0?"+":"")+String.format(Locale.ITALY,"%.2f €",margin/100.0)),13,margin==null?MUTED:margin>=0?TEAL:ORANGE,Typeface.NORMAL),6);
             if(g.soldAt!=null)addProductSection(sale,text(new SimpleDateFormat("dd/MM/yyyy",Locale.ITALY).format(new Date(g.soldAt)),12,MUTED,Typeface.NORMAL),6);
             if(!TextUtils.isEmpty(g.soldReason))addProductSection(sale,text(g.soldReason,13,MUTED,Typeface.NORMAL),6);
-            TextView priceAction=detailSecondaryAction(g.salePriceCents==null?"Aggiungi prezzo di vendita":"Modifica prezzo di vendita");priceAction.setMinHeight(dp(48));priceAction.setOnClickListener(v->editLibrarySale(g,d,false));addProductSection(sale,priceAction,8);addProductSection(box,sale,12);
+            TextView priceAction=detailSecondaryAction(g.salePriceCents==null?"Aggiungi prezzo di vendita":"Modifica prezzo di vendita");priceAction.setMinHeight(dp(48));priceAction.setOnClickListener(v->editLibrarySale(g,d,false));addProductSection(sale,priceAction,8);addProductSection(box,sale,8);
         }
         LinearLayout metadata=new LinearLayout(this);metadata.setOrientation(LinearLayout.VERTICAL);
         if(g.rank!=null)metadata.addView(text("#"+g.rank+" BGG",14,TEXT,Typeface.NORMAL));
         String cats=shortCategories(g.categories);if(!cats.isEmpty())addProductSection(metadata,text(cats,13,TEXT,Typeface.NORMAL),6);
         Double score=libraryLudoScore(g);if(score!=null)addProductSection(metadata,text("Ludo Score · "+String.format(Locale.ITALY,"%.1f",score),13,MUTED,Typeface.NORMAL),6);
         if(metadata.getChildCount()>0)addProductSection(box,detailDisclosure("Altri dati del gioco",metadata),12);
-        if(!TextUtils.isEmpty(g.bggId)){
-            Button bgg=productProviderAction("BGG",R.drawable.provider_bgg_logo,SURFACE2,()->openBgg(g.bggId));bgg.setContentDescription("Apri la scheda originale su BoardGameGeek");addProductSection(box,bgg,16);
-        }
-        sc.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);box.setPadding(dp(20)+safe.left,dp(16)+safe.top,dp(20)+safe.right,dp(24)+safe.bottom);return insets;});d.setContentView(sc);d.show();sc.requestApplyInsets();sc.post(()->sc.scrollTo(0,restoreY));Window w=d.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
+        FrameLayout scrollStage=new FrameLayout(this);scrollStage.setClipChildren(true);scrollStage.addView(sc,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout footer=new LinearLayout(this);footer.setOrientation(LinearLayout.VERTICAL);footer.setPadding(dp(20),dp(10),dp(20),dp(12));footer.setBackgroundColor(Color.argb(110,18,15,29));
+        if(!TextUtils.isEmpty(g.bggId)){Button bgg=productProviderAction("BGG",R.drawable.provider_bgg_logo,SURFACE2,()->openBgg(g.bggId));bgg.setContentDescription("Apri la scheda originale su BoardGameGeek");footer.addView(bgg,new LinearLayout.LayoutParams(-1,dp(52)));}
+        LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(scrollStage,new LinearLayout.LayoutParams(-1,0,1));page.addView(footer,new LinearLayout.LayoutParams(-1,-2));
+        page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(24));return insets;});
+        d.setOnDismissListener(v->{PreparedGameOverlay pending=preparedGameOverlays.remove(d);if(pending!=null&&pending.dialog!=null)pending.dialog.dismiss();});
+        d.setContentView(page);d.show();page.requestApplyInsets();sc.post(()->sc.scrollTo(0,restoreY));prepareLibraryGameTransition(g,d,sc,scrollStage,box);Window w=d.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
+
+    }
+    private static Long librarySaleDifference(Integer sale,Integer acquisition){return sale==null||acquisition==null?null:(long)sale-acquisition;}
+    private Integer libraryAcquisitionTotal(LibraryGame g){if(g.paidCents==null)return null;Integer total=PurchaseMath.total(g.paidCents,g.shippingCents,g.feeCents);return total==null?g.paidCents:total;}
+    private void prepareLibraryGameTransition(LibraryGame g,Dialog source,ScrollView sc,FrameLayout stage,LinearLayout content){
+        if(TextUtils.isEmpty(g.bggId))return;
+        uiDataIo.execute(()->{GameRecord game=null;GameDetailData data=null;try{game=marketStore.gameStatsByBggId(g.bggId);if(game!=null)data=loadGameDetailData(game);}catch(RuntimeException ignored){}final GameRecord canonical=game;final GameDetailData snapshot=data;
+            runOnUiThread(()->{if(isFinishing()||isDestroyed()||!source.isShowing())return;
+                if(canonical==null||snapshot==null){TextView unavailable=text("Scheda gioco locale non disponibile · consulta BGG",12,MUTED,Typeface.NORMAL);addProductSection(content,unavailable,12);return;}
+                int height=dp(96);TextView hint=text("",12,MUTED,Typeface.NORMAL);hint.setGravity(Gravity.CENTER);hint.setAlpha(0f);hint.setTranslationY(height);
+                GamePullProgress progress=new GamePullProgress();progress.content=content;progress.revealDistance=height;progress.indicatorTravel=height-dp(32);progress.setBounds(0,0,dp(44),dp(44));hint.setCompoundDrawables(null,progress,null,null);hint.setCompoundDrawablePadding(dp(6));
+                hint.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){}public void onViewDetachedFromWindow(View v){progress.cancelReturn();renderGamePullHint(hint,0,false);}});
+                PreparedGameOverlay ready=new PreparedGameOverlay(canonical.id);ready.dialog=buildPreparedGameOverlay(canonical,snapshot,()->prepareGameTransition(source,canonical.id,hint));preparedGameOverlays.put(source,ready);
+                stage.addView(hint,new FrameLayout.LayoutParams(-1,height,Gravity.BOTTOM));installPullToGame(sc,hint,canonical.id,source);updateGamePullHint(hint,0,true);
+            });
+        });
     }
     private void showLibraryProductActions(LibraryGame g,Dialog parent){
         Dialog menu=bottomSheet("Il tuo gioco");LinearLayout box=menu.findViewById(SHEET_ID);
+        TextView rating=menuAction("Gestisci il voto",PINK);rating.setOnClickListener(v->{menu.dismiss();rateLibraryGame(g,parent);});box.addView(rating);
         if(!"sold".equals(g.collectionState)){
             TextView edit=menuAction("Modifica acquisto",TEXT);edit.setOnClickListener(v->{menu.dismiss();parent.dismiss();BggSearchClient.Game game=new BggSearchClient.Game();game.id=g.bggId;game.name=g.name;game.imageUrl=g.imageUrl;game.rating=g.rating;game.rank=g.rank;game.voters=g.voters;game.qualityScore=g.qualityScore;game.weight=g.weight;game.playtime=g.playtime;game.minPlayers=g.minPlayers;game.maxPlayers=g.maxPlayers;game.categories=g.categories;game.editionId=g.editionId;game.editionName=g.editionLabel;purchaseSource(game);});box.addView(edit);
         }
@@ -1639,11 +1684,11 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     // ---------- LIBRERIA ----------
     private void renderLibrary(){
         List<LibraryGame> allGames=libraryDb.all();prepareLibraryRenderCaches(allGames);backfillLibraryBgg(allGames);List<LibraryGame> owned=new ArrayList<>(),sold=new ArrayList<>();for(LibraryGame g:allGames){if("sold".equals(g.collectionState))sold.add(g);else owned.add(g);}
-        LinearLayout h=new LinearLayout(this);h.setGravity(Gravity.CENTER_VERTICAL);h.setPadding(0,dp(12),0,dp(12));LinearLayout title=new LinearLayout(this);title.setOrientation(LinearLayout.VERTICAL);title.addView(text("Libreria",30,TEXT,Typeface.BOLD));h.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView add=iconBadge(LudoIcons.PLUS,LIME);add.setTextColor(BG);add.setContentDescription("Aggiungi gioco alla Libreria");add.setOnClickListener(v->addLibraryGame());h.addView(add,new LinearLayout.LayoutParams(dp(48),dp(48)));body.addView(h);
+        LinearLayout h=new LinearLayout(this);h.setGravity(Gravity.CENTER_VERTICAL);h.setPadding(0,dp(12),0,dp(12));LinearLayout title=new LinearLayout(this);title.setOrientation(LinearLayout.VERTICAL);title.addView(text("sold".equals(libraryScope)?"Giochi venduti":"Libreria",30,TEXT,Typeface.BOLD));h.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView add=iconBadge(LudoIcons.PLUS,LIME);add.setTextColor(BG);add.setContentDescription("Aggiungi gioco alla Libreria");add.setOnClickListener(v->addLibraryGame());h.addView(add,new LinearLayout.LayoutParams(dp(48),dp(48)));TextView archive=productIconButton(LudoIcons.ELLIPSIS_VERTICAL,TEXT);archive.setContentDescription("Menu Libreria e archivio venduti");archive.setOnClickListener(v->showLibraryArchiveMenu(sold.size()));LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(dp(48),dp(48));ap.leftMargin=dp(8);h.addView(archive,ap);body.addView(h);
         for(LibrarySearchJob job:new ArrayList<>(librarySearchJobs))body.addView(librarySearchJobCard(job));
         if(allGames.isEmpty()){body.addView(emptyState("La tua tana è vuota","Aggiungi i giochi che possiedi: da qui Ludo impara cosa ti piace.",R.drawable.ludo_value_book));return;}
         
-        body.addView(librarySearchBar(),new LinearLayout.LayoutParams(-1,dp(54)));body.addView(libraryScopeTabs(owned.size(),sold.size()),new LinearLayout.LayoutParams(-1,dp(52)));
+        body.addView(librarySearchBar(),new LinearLayout.LayoutParams(-1,dp(54)));
         List<LibraryGame> shown=new ArrayList<>("sold".equals(libraryScope)?sold:owned);if(!libraryQuery.trim().isEmpty()){String q=libraryQuery.trim().toLowerCase(Locale.ROOT);shown.removeIf(g->g==null||TextUtils.isEmpty(g.name)||!g.name.toLowerCase(Locale.ROOT).contains(q));}
         TextView section=text(("sold".equals(libraryScope)?"Venduti":"Collezione")+" · "+shown.size(),15,MUTED,Typeface.BOLD);section.setPadding(0,dp(12),0,dp(9));body.addView(section);
         if(shown.isEmpty()){LinearLayout e=verticalCard();e.setPadding(dp(16),dp(14),dp(16),dp(14));e.addView(text(libraryQuery.trim().isEmpty()?"Niente qui per ora":"Nessun gioco corrisponde alla ricerca",15,MUTED,Typeface.BOLD));body.addView(e);return;}
@@ -1656,37 +1701,47 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     }
     private View libraryMetric(String value,String label){LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER);box.setBackground(round(SURFACE2,15,0,0));TextView v=text(value,18,TEXT,Typeface.BOLD);v.setGravity(Gravity.CENTER);box.addView(v);TextView l=text(label,10,MUTED,Typeface.BOLD);l.setGravity(Gravity.CENTER);box.addView(l);return box;}
     private View librarySearchBar(){LinearLayout box=new LinearLayout(this);box.setGravity(Gravity.CENTER_VERTICAL);box.setPadding(dp(14),0,dp(8),0);box.setBackground(round(SURFACE2,18,1,OUTLINE));TextView icon=appIcon(LudoIcons.SEARCH,14,MUTED);box.addView(icon,new LinearLayout.LayoutParams(dp(32),dp(32)));EditText q=new EditText(this);q.setSingleLine(true);q.setHint("Cerca nella tua collezione");q.setHintTextColor(MUTED);q.setTextColor(TEXT);q.setTextSize(15);q.setText(libraryQuery);q.setBackgroundColor(Color.TRANSPARENT);q.setPadding(dp(6),0,dp(4),0);q.setOnEditorActionListener((v,a,e)->{libraryQuery=v.getText().toString();render();return true;});box.addView(q,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,14,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(TextUtils.isEmpty(libraryQuery)?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{libraryQuery="";render();});box.addView(clear,new LinearLayout.LayoutParams(dp(36),dp(36)));return box;}
-    private View libraryScopeTabs(int owned,int sold){LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(SURFACE2,16,1,OUTLINE));addLibraryScopeTab(tabs,"Collezione · "+owned,"owned");addLibraryScopeTab(tabs,"Venduti · "+sold,"sold");return tabs;}
-    private void addLibraryScopeTab(LinearLayout tabs,String label,String value){boolean on=value.equals(libraryScope);TextView t=text(label,13,on?TEXT:MUTED,Typeface.BOLD);t.setGravity(Gravity.CENTER);t.setBackground(round(on?LIME:Color.TRANSPARENT,12,0,0));t.setOnClickListener(v->{libraryScope=value;render();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(4);tabs.addView(t,lp);}
-
-    private String libraryShelfPositionKey="";private final int[] libraryShelfPositions={0,0};
-    private View libraryShelves(List<LibraryGame> games){
-        String key=libraryScope+"|"+libraryQuery;if(!key.equals(libraryShelfPositionKey)){libraryShelfPositionKey=key;libraryShelfPositions[0]=libraryShelfPositions[1]=0;}
-        LinearLayout shelves=new LinearLayout(this);shelves.setOrientation(LinearLayout.VERTICAL);
-        int split=(games.size()+1)/2;
-        shelves.addView(libraryShelf(games,0,split,0));
-        LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(-1,-2);second.topMargin=dp(20);shelves.addView(libraryShelf(games,split,games.size(),1),second);
-        return shelves;
+    private void showLibraryArchiveMenu(int soldCount){
+        Dialog menu=bottomSheet("Libreria");LinearLayout box=menu.findViewById(SHEET_ID);
+        TextView scope=menuAction("sold".equals(libraryScope)?"Torna alla collezione":"Giochi venduti · "+soldCount,TEXT);
+        scope.setOnClickListener(v->{menu.dismiss();libraryScope="sold".equals(libraryScope)?"owned":"sold";render();});box.addView(scope);menu.show();
     }
-    private View libraryShelf(List<LibraryGame> games,int start,int end,int shelf){
-        HorizontalScrollView rail=new HorizontalScrollView(this);rail.setHorizontalScrollBarEnabled(true);rail.setFillViewport(true);rail.setClipToPadding(false);
+
+    private static int libraryShelfCapacity(int availableDp,float fontScale){
+        int minimum=fontScale>1.3f?140:100;
+        return Math.max(1,(Math.max(0,availableDp-20)+12)/(minimum+12));
+    }
+    private View libraryShelves(List<LibraryGame> games){
+        LinearLayout shelves=new LinearLayout(this);shelves.setOrientation(LinearLayout.VERTICAL);
+        int available=getResources().getDisplayMetrics().widthPixels-dp(40);
+        final int[] capacity={libraryShelfCapacity(Math.round(available/getResources().getDisplayMetrics().density),getResources().getConfiguration().fontScale)};
+        fillLibraryShelves(shelves,games,capacity[0]);
+        shelves.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{
+            if(r<=l)return;int next=libraryShelfCapacity(Math.round((r-l)/getResources().getDisplayMetrics().density),getResources().getConfiguration().fontScale);
+            if(next!=capacity[0]){capacity[0]=next;fillLibraryShelves(shelves,games,next);}
+        });return shelves;
+    }
+    private void fillLibraryShelves(LinearLayout shelves,List<LibraryGame> games,int capacity){
+        shelves.removeAllViews();
+        for(int start=0;start<games.size();start+=capacity){
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);if(start>0)lp.topMargin=dp(20);
+            shelves.addView(libraryShelf(games,start,Math.min(games.size(),start+capacity),capacity),lp);
+        }
+    }
+    private View libraryShelf(List<LibraryGame> games,int start,int end,int capacity){
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);row.setPadding(dp(10),0,dp(10),dp(12));row.setMinimumHeight(dp(232));row.setBackground(libraryShelfBackdrop());
         for(int i=start;i<end;i++){
             LibraryGame g=games.get(i);LinearLayout tile=new LinearLayout(this);tile.setOrientation(LinearLayout.VERTICAL);tile.setGravity(Gravity.CENTER_HORIZONTAL);
-            int width=getResources().getConfiguration().fontScale>1.3f?156:116;
             tile.addView(libraryShelfBox(g),new LinearLayout.LayoutParams(-1,dp(164)));
             TextView name=text(g.name,13,TEXT,Typeface.BOLD);name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);name.setPadding(dp(4),dp(20),dp(4),0);tile.addView(name,new LinearLayout.LayoutParams(-1,-2));
             TextView vote=text(libraryPersonalRatingLabel(g.personalRating),12,g.personalRating==null?MUTED:PINK,Typeface.NORMAL);vote.setGravity(Gravity.CENTER);vote.setPadding(dp(4),dp(6),dp(4),0);tile.addView(vote,new LinearLayout.LayoutParams(-1,-2));
             if("sold".equals(g.collectionState)){TextView sale=text(g.salePriceCents==null?"Venduto":"Venduto · "+money(g.salePriceCents),12,ORANGE,Typeface.NORMAL);sale.setGravity(Gravity.CENTER);sale.setPadding(0,dp(4),0,0);tile.addView(sale,new LinearLayout.LayoutParams(-1,-2));}
             tile.setFocusable(true);tile.setContentDescription(g.name+". Il tuo voto: "+libraryPersonalRatingLabel(g.personalRating)+("sold".equals(g.collectionState)?". Venduto":"")+". Apri il tuo gioco.");
             for(int child=0;child<tile.getChildCount();child++)tile.getChildAt(child).setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-            tile.setOnClickListener(v->openLibraryDetail(g));LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(dp(width),-2);tp.rightMargin=dp(12);row.addView(tile,tp);
+            tile.setOnClickListener(v->openLibraryDetail(g));LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);if(i>start)tp.leftMargin=dp(12);row.addView(tile,tp);
         }
-        rail.addView(row,new HorizontalScrollView.LayoutParams(-2,-2));
-        final String key=libraryShelfPositionKey;final int savedX=libraryShelfPositions[shelf];final boolean[] restored={false};
-        rail.setOnScrollChangeListener((view,x,y,oldX,oldY)->{if(restored[0]&&key.equals(libraryShelfPositionKey))libraryShelfPositions[shelf]=x;});
-        rail.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{if(!restored[0]&&r>l){restored[0]=true;rail.scrollTo(savedX,0);}});
-        return rail;
+        for(int i=end-start;i<capacity;i++){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,1,1);lp.leftMargin=dp(12);row.addView(new Space(this),lp);}
+        return row;
     }
     private FrameLayout libraryShelfBox(LibraryGame g){
         FrameLayout stage=new FrameLayout(this);FeaturedBoxView box=new FeaturedBoxView(true,true);box.shelfGrounded=true;stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
@@ -3524,3 +3579,4 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
 }
+

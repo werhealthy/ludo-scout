@@ -28,8 +28,9 @@ public class LibraryWriteUiRegression {
  static void check(boolean ok,String msg){if(!ok)throw new AssertionError(msg);}
  static void duplicateClickWritesOnce(){LibraryWriteUiRegression n=new LibraryWriteUiRegression();Dialog sheet=new Dialog(),parent=new Dialog();View button=new View();int[] writes={0};n.saveLibraryChange(new LibraryGame(),()->writes[0]++,sheet,parent,button);n.saveLibraryChange(new LibraryGame(),()->writes[0]++,sheet,parent,button);n.uiDataIo.flush();check(writes[0]==1,"duplicate click performed "+writes[0]+" writes");}
  static void failurePreservesInputAndAllowsRetry(){LibraryWriteUiRegression n=new LibraryWriteUiRegression();Dialog sheet=new Dialog(),parent=new Dialog();View button=new View();n.saveLibraryChange(new LibraryGame(),()->{throw new IllegalStateException("busy");},sheet,parent,button);n.uiDataIo.flush();check(sheet.showing&&parent.showing&&button.enabled&&n.opened==0,"failed save discarded input");n.saveLibraryChange(new LibraryGame(),()->{},sheet,parent,button);n.uiDataIo.flush();check(n.opened==1,"retry did not return to detail");}
+ static void directHeartPreservesPositionAndSingleFlight(){LibraryWriteUiRegression n=new LibraryWriteUiRegression();Dialog parent=new Dialog();View hearts=new View();int[] writes={0};n.saveLibraryChange(new LibraryGame(),()->writes[0]++,parent,parent,hearts);n.saveLibraryChange(new LibraryGame(),()->writes[0]++,parent,parent,hearts);n.uiDataIo.flush();check(writes[0]==1&&n.opened==1&&!parent.showing,"direct heart save/position/duplicate");}
  static void leavingDuringWriteDoesNotReopen(){LibraryWriteUiRegression n=new LibraryWriteUiRegression();Dialog sheet=new Dialog(),parent=new Dialog();n.saveLibraryChange(new LibraryGame(),()->{},sheet,parent,new View());sheet.dismiss();parent.dismiss();n.uiDataIo.flush();check(n.opened==0,"stale save reopened detail");}
- public static void main(String[] args){int failures=0;for(Runnable test:new Runnable[]{LibraryWriteUiRegression::duplicateClickWritesOnce,LibraryWriteUiRegression::failurePreservesInputAndAllowsRetry,LibraryWriteUiRegression::leavingDuringWriteDoesNotReopen})try{test.run();System.out.println("PASS Library async save");}catch(AssertionError e){failures++;System.out.println("FAIL "+e.getMessage());}if(failures>0)throw new AssertionError(failures+" async save failures");}
+ public static void main(String[] args){int failures=0;for(Runnable test:new Runnable[]{LibraryWriteUiRegression::duplicateClickWritesOnce,LibraryWriteUiRegression::failurePreservesInputAndAllowsRetry,LibraryWriteUiRegression::leavingDuringWriteDoesNotReopen,LibraryWriteUiRegression::directHeartPreservesPositionAndSingleFlight})try{test.run();System.out.println("PASS Library async save");}catch(AssertionError e){failures++;System.out.println("FAIL "+e.getMessage());}if(failures>0)throw new AssertionError(failures+" async save failures");}
  __PRODUCTION__
 }
 """.replace("__PRODUCTION__",body)
@@ -49,7 +50,7 @@ for i in range(action_brace,len(ui)):
 action_harness=r"""
 import java.util.*;
 public class LibraryActionsRegression {
- static final int SHEET_ID=1,TEXT=2,TEAL=3,ORANGE=4,RED=5,MUTED=6,LIME=7;
+ static final int SHEET_ID=1,TEXT=2,TEAL=3,ORANGE=4,RED=5,MUTED=6,LIME=7,PINK=8;
  static class Typeface {static int NORMAL=0;}
  static class TextUtils {static boolean isEmpty(String s){return s==null||s.isEmpty();}}
  interface Click {void click(View v);}
@@ -70,6 +71,7 @@ public class LibraryActionsRegression {
  TextView text(String name,int size,int color,int style){return new TextView(name);}
  Button button(String name,int color){return new Button(name);}int dp(int n){return n;}
  void purchaseSource(BggSearchClient.Game game){edited=game;}
+ void rateLibraryGame(LibraryGame game,Dialog parent){if(!parent.showing)throw new AssertionError("rating lost parent");}
  void markLibraryGameSold(LibraryGame game,Dialog parent){if(!parent.showing)throw new AssertionError("parent lost");sold++;}
  void confirmDeleteLibraryGame(LibraryGame game,Dialog parent){if(!parent.showing)throw new AssertionError("parent lost");deleteConfirm++;}
  void saveLibraryChange(LibraryGame game,Runnable change,Dialog sheet,Dialog parent,View button){if(!parent.showing)throw new AssertionError("parent lost");saves++;change.run();}
@@ -78,12 +80,12 @@ public class LibraryActionsRegression {
  __ACTIONS__
  public static void main(String[] args){
   LibraryActionsRegression n=new LibraryActionsRegression();LibraryGame g=new LibraryGame();Dialog parent=new Dialog();
-  n.showLibraryProductActions(g,parent);Dialog menu=n.sheets.get(0);check(menu.content.children.size()==3,"owned actions");
+  n.showLibraryProductActions(g,parent);Dialog menu=n.sheets.get(0);check(menu.content.children.size()==4,"owned actions");
   n.row(menu,"Segna come venduto").click();check(!menu.showing&&parent.showing&&n.sold==1,"sale routing");
   n.showLibraryProductActions(g,parent);menu=n.sheets.get(1);n.row(menu,"Elimina definitivamente").click();check(n.deleteConfirm==1&&parent.showing&&!menu.showing,"delete must preserve confirmation parent");
   n.showLibraryProductActions(g,parent);menu=n.sheets.get(2);n.row(menu,"Modifica acquisto").click();check(!menu.showing&&!parent.showing&&n.edited!=null,"edit routing");
   check(n.edited.id.equals(g.bggId)&&n.edited.editionName.equals(g.editionLabel)&&n.edited.editionId.equals(g.editionId)&&n.edited.rating.equals(g.rating)&&n.edited.categories.equals(g.categories),"edit lost game or edition");
-  g.collectionState="sold";parent=new Dialog();n.showLibraryProductActions(g,parent);menu=n.sheets.get(3);check(menu.content.children.size()==2,"sold purchase edit must stay unavailable");
+  g.collectionState="sold";parent=new Dialog();n.showLibraryProductActions(g,parent);menu=n.sheets.get(3);check(menu.content.children.size()==3,"sold purchase edit must stay unavailable");
   n.row(menu,"Rimetti in Libreria").click();Dialog confirm=n.sheets.get(4);check(n.saves==0&&n.libraryDb.restored==0&&!menu.showing&&parent.showing,"restore ran before confirmation");
   confirm.dismiss();check(n.saves==0,"cancel changed data");
   n.showLibraryProductActions(g,parent);n.row(n.sheets.get(5),"Rimetti in Libreria").click();confirm=n.sheets.get(6);n.row(confirm,"Conferma").click();check(n.saves==1&&n.libraryDb.restored==1&&parent.showing,"restore bypassed save route");
@@ -95,3 +97,4 @@ with tempfile.TemporaryDirectory() as temp:
     p=Path(temp)/"LibraryActionsRegression.java";p.write_text(action_harness)
     subprocess.run(["javac","-d",temp,str(p)],check=True)
     subprocess.run(["java","-cp",temp,"LibraryActionsRegression"],check=True)
+
