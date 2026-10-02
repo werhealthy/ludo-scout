@@ -44,6 +44,10 @@ public class EngineOverviewPresentationRegression {
   eq("in coda",EngineOverviewPresentation.phaseState(3,5,2,false,false,false,0,100));
   eq("in pausa",EngineOverviewPresentation.phaseState(3,5,2,false,false,true,0,100));
   eq("dati incompleti",EngineOverviewPresentation.phaseState(3,5,0,false,false,true,0,100));
+  // A PROCESSING lease remains work when pause/pacing suppresses its animation.
+  eq("in pausa",EngineOverviewPresentation.phaseState(3,1,0,true,false,true,0,100));
+  eq("in attesa",EngineOverviewPresentation.phaseState(3,1,0,true,false,false,200,100));
+  eq("in pausa",EngineOverviewPresentation.phaseState(1,1,0,true,true,false,0,100));
   if(!EngineOverviewPresentation.contentSettled(true,new int[]{0,0,0,0,3}))throw new AssertionError("complete scroll not settled");
   if(EngineOverviewPresentation.contentSettled(true,new int[]{1,0,0,0,0}))throw new AssertionError("pending local analysis hidden by settled run");
   if(EngineOverviewPresentation.contentSettled(false,new int[5]))throw new AssertionError("unmaterialised work marked done");
