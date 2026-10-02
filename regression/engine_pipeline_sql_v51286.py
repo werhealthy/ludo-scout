@@ -30,7 +30,7 @@ db.executescript('''
 CREATE TABLE observations(signature TEXT,observed_at INTEGER,display_name TEXT,game_name TEXT,vinted_title TEXT);
 CREATE TABLE games(id INTEGER PRIMARY KEY,bgg_id TEXT,match_state TEXT,rating REAL,database_visible INTEGER);
 CREATE TABLE market_listings(id INTEGER PRIMARY KEY,game_id INTEGER,legacy_signature TEXT,temp_fingerprint TEXT,lifecycle TEXT,enrichment_state TEXT,manual_review_required INTEGER,match_state TEXT,vinted_item_id TEXT,vinted_url TEXT);
-CREATE TABLE deals(signature TEXT,verification_state TEXT,lifecycle TEXT,listing_type TEXT,tier TEXT,rating REAL,bgg_id TEXT,vinted_item_id TEXT,vinted_url TEXT);
+CREATE TABLE deals(signature TEXT,verification_state TEXT,lifecycle TEXT,listing_type TEXT,tier TEXT,rating REAL,bgg_id TEXT,vinted_item_id TEXT,vinted_url TEXT,benchmark_cents INTEGER DEFAULT 2000,total_cents INTEGER DEFAULT 1000,discount REAL DEFAULT 50);
 CREATE TABLE processing_jobs(listing_id INTEGER,job_type TEXT,source TEXT,state TEXT,game_id INTEGER);
 ''')
 def add(sig,game=None,bgg=None,rating=None,gs='PENDING',state='PENDING_ANALYSIS',linked=False,review=0,visible=1):
@@ -38,7 +38,7 @@ def add(sig,game=None,bgg=None,rating=None,gs='PENDING',state='PENDING_ANALYSIS'
     if game is not None:db.execute('INSERT OR IGNORE INTO games VALUES(?,?,?,?,?)',(game,bgg,gs,rating,visible))
     db.execute('INSERT INTO observations(signature,observed_at) VALUES(?,100)',(sig,))
     db.execute('INSERT INTO market_listings VALUES(?,?,?,?,?,?,?,?,?,?)',(lid,game,sig,sig,'ACTIVE',state,review,'MATCHED' if gs=='MATCHED' else gs,str(lid) if linked else '', 'url' if linked else ''))
-    db.execute("INSERT INTO deals VALUES(?,'OK','ACTIVE','GAME','good',?,?,?,?)",(sig,rating,bgg,str(lid) if linked else '','url' if linked else ''))
+    db.execute("INSERT INTO deals(signature,verification_state,lifecycle,listing_type,tier,rating,bgg_id,vinted_item_id,vinted_url) VALUES(?,'OK','ACTIVE','GAME','good',?,?,?,?)",(sig,rating,bgg,str(lid) if linked else '','url' if linked else ''))
     return lid
 def counts():
     result=dict(db.execute(sql,(0,200)))
@@ -97,3 +97,26 @@ assert not list(db.execute(active,(0,200)))
 db.execute("INSERT INTO processing_jobs(game_id,job_type,source,state) VALUES(2,'BGG_ENRICHMENT','AUTO','PROCESSING')")
 assert 1 in [row[0] for row in db.execute(active,(0,200))]
 print('PASS production SQLite phase occupancy, identities, review/price holds, pending/manual/deep jobs and time scope')
+
+
+# The returned representative must belong to the selected phase, not MIN(signature).
+for table in ['observations','games','market_listings','deals','processing_jobs']:db.execute('DELETE FROM '+table)
+add('a-incomplete',101,'101',7,'MATCHED','ANALYZED',False)
+add('z-ready',102,'101',7,'MATCHED','CORE_COMPLETE',True)
+row=db.execute(items,('0','200','4','4')).fetchone()
+assert row[1]=='z-ready' and row[2]==102,('ready representative is incomplete',row)
+# Missing comparison is not ready; genuine zero and negative savings remain evaluable.
+db.execute("UPDATE deals SET benchmark_cents=NULL,discount=NULL WHERE signature='z-ready'")
+assert not list(db.execute(items,('0','200','4','4'))),'missing price comparison marked ready'
+assert db.execute(items,('0','200','3','3')).fetchone()[1]=='z-ready','incomplete comparison lost its connected representative'
+for discount in [0,-10]:
+ db.execute("UPDATE deals SET benchmark_cents=2000,discount=? WHERE signature='z-ready'",(discount,))
+ assert db.execute(items,('0','200','4','4')).fetchone()[1]=='z-ready'
+print('PASS coherent ready representative and missing/zero/negative comparison gates')
+
+# Legacy signatures are not unique; canonical identity still occurs once.
+for table in ['observations','games','market_listings','deals','processing_jobs']:db.execute('DELETE FROM '+table)
+add('same',201,'201',7,'MATCHED','CORE_COMPLETE',True)
+add('same',202,'201',7,'MATCHED','CORE_COMPLETE',True)
+assert sum(counts().values())==1,'shared legacy signature inflated identity'
+print('PASS shared legacy signature deduplicates canonical game')

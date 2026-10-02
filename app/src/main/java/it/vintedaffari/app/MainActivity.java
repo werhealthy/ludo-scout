@@ -2603,8 +2603,9 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
             if(game!=null){FrameLayout artwork=new FrameLayout(this);artwork.setBackground(round(SURFACE2,10,0,0));artwork.setClipToOutline(true);TextView missing=appIcon(LudoIcons.BOOK_OPEN,20,MUTED);missing.setGravity(Gravity.CENTER);missing.setContentDescription("Copertina non disponibile");artwork.addView(missing,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);artwork.addView(image,new FrameLayout.LayoutParams(-1,-1));setEngineGameArtwork(image,missing,game);LinearLayout.LayoutParams artParams=new LinearLayout.LayoutParams(dp(64),dp(80));artParams.rightMargin=dp(12);row.addView(artwork,artParams);}
             LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);String itemTitle=game==null?item.title:game.name;TextView title=text(TextUtils.isEmpty(itemTitle)?"Annuncio acquisito":itemTitle,16,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);
             if(game!=null&&game.rating!=null){TextView rating=text("BGG "+String.format(Locale.ITALY,"%.1f",game.rating),13,DISCOVER_YELLOW,Typeface.BOLD);rating.setPadding(0,dp(4),0,0);copy.addView(rating);}
-            TextView phase=text(enginePhase==-3?"Acquisito da Vinted":enginePhase==-2?"In attesa dell’analisi":titles[item.phase],12,CYAN,Typeface.NORMAL);phase.setPadding(0,dp(4),0,0);copy.addView(phase);
+            TextView phase=text(enginePhase==-3?"Acquisito da Vinted":enginePhase==-2?"In attesa dell’analisi":item.phase==3&&deal!=null&&saving(deal)==null?"Confronto prezzo da completare":titles[item.phase],12,CYAN,Typeface.NORMAL);phase.setPadding(0,dp(4),0,0);copy.addView(phase);
             if(deal!=null&&deal.itemPriceCents>0){TextView price=text("Vinted · "+money(deal.itemPriceCents),14,TEXT,Typeface.BOLD);price.setPadding(0,dp(6),0,0);copy.addView(price);}
+            if(deal!=null){Integer saving=saving(deal);String comparison=saving==null?"Confronto prezzo non disponibile":saving>0?saving+"% sotto il riferimento BGG":saving==0?"Prezzo pari al riferimento BGG":Math.abs(saving)+"% sopra il riferimento BGG";TextView discount=text(comparison,13,saving!=null&&saving>0?DISCOVER_MINT:MUTED,Typeface.BOLD);discount.setPadding(0,dp(4),0,0);copy.addView(discount);}
             row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
             if(deal!=null||game!=null){TextView arrow=appIcon(LudoIcons.CHEVRON_RIGHT,14,MUTED);arrow.setGravity(Gravity.CENTER);LinearLayout.LayoutParams arrowParams=new LinearLayout.LayoutParams(dp(24),dp(48));arrowParams.leftMargin=dp(8);row.addView(arrow,arrowParams);row.setOnClickListener(v->{if(deal!=null)openDetail(deal);else openDatabaseGame(item.gameId,"activity");});}
             LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.bottomMargin=dp(12);body.addView(row,rp);
@@ -2647,7 +2648,8 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         int waitingRuns=db.waitingObservationSessionCount();int recoveryCount=marketStore.vintedReviewCount()+marketStore.bggMatchReviewCount();long reviewAt=System.currentTimeMillis();
         DealDatabase.ObservationSession pipelineRun=run!=null?run:db.latestObservationSession();
         int[] phases=pipelineRun==null?new int[5]:db.enginePipelineCounts(pipelineRun.startAt,pipelineRun.endAt);
-        int[] livePhases=pipelineRun==null?new int[5]:db.enginePipelineActiveCounts(pipelineRun.startAt,pipelineRun.endAt);int activeMask=0;for(int phase=0;phase<5;phase++)if(livePhases[phase]>0)activeMask|=1<<phase;int intakeCount=db.engineIntakeCount();
+        int[] livePhases=pipelineRun==null?new int[5]:db.enginePipelineActiveCounts(pipelineRun.startAt,pipelineRun.endAt);if(pipelineRun!=null&&phases[0]>0){MarketStore.RuntimeStatus local=marketStore.diagnosticState("local_analysis");List<String> scope=new ArrayList<>();for(DealDatabase.PipelineItem item:db.enginePipelineItems(pipelineRun.startAt,pipelineRun.endAt,0))scope.add(item.signature);livePhases[0]=Math.min(phases[0],Math.max(livePhases[0],EngineLocalActivity.activeCount(local.updatedAt,System.currentTimeMillis(),local.value,local.detail,scope)));}
+        int activeMask=0;for(int phase=0;phase<5;phase++)if(livePhases[phase]>0)activeMask|=1<<phase;int intakeCount=db.engineIntakeCount();
         getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activitySnapshotTiming","ownerMs="+(ownerAt-started)+";reviewMs="+(reviewAt-ownerAt)+";pipelineMs="+(System.currentTimeMillis()-reviewAt)).apply();
         boolean bggPaused=marketStore.isBggPaused(),vintedPaused=marketStore.isVintedPaused();long vintedWaitUntil=VintedPublicSession.waitUntil(this);MarketStore.JobSummary global=marketStore.jobSummary();int globalCount=global==null?0:global.active();List<MarketStore.Job> globalJobs=Collections.emptyList();if(pipelineRun==null&&globalCount>0){globalJobs=new ArrayList<>(marketStore.recentJobs(24));globalJobs.removeIf(job->!MarketStore.PENDING.equals(job.state)&&!MarketStore.PROCESSING.equals(job.state)&&!MarketStore.FAILED_RETRYABLE.equals(job.state));}EngineOverviewSnapshot snapshot=new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,Collections.emptyList(),Collections.emptyList());snapshot.pipelineRun=pipelineRun;snapshot.phases=phases;snapshot.livePhases=livePhases;snapshot.activeMask=activeMask;snapshot.intakeCount=intakeCount;snapshot.bggPaused=bggPaused;snapshot.vintedPaused=vintedPaused;snapshot.vintedWaitUntil=vintedWaitUntil;snapshot.globalWorkCount=globalCount;snapshot.globalJobs=globalJobs;return snapshot;
     }
@@ -2713,7 +2715,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if(snapshot.recoveryCount>0){LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(16);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
         installEngineHistoryPull();
 
-        uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,10_000L);
+        uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,snapshot.phases[0]>0||snapshot.activeMask!=0?2_000L:10_000L);
     }
 
     private View engineResearchEmptyCard(){
@@ -2740,7 +2742,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     private void showEngineOverviewMenu(){
         Dialog menu=bottomSheet("Motore");LinearLayout content=menu.findViewById(SHEET_ID);
         TextView history=menuAction("Cronologia degli scroll",TEXT);history.setOnClickListener(v->{menu.dismiss();openEngineHistory();});content.addView(history);
-        TextView metrics=menuAction("Come leggere i numeri",TEXT);metrics.setOnClickListener(v->{menu.dismiss();Dialog info=bottomSheet("Attività e coda");LinearLayout box=info.findViewById(SHEET_ID);TextView explanation=text("Attive: voci dello scroll con un job in corso, rilevate nell’ultimo aggiornamento. In coda: le altre voci presenti nella fase. Pronti: voci disponibili dello scroll, non tutto il Catalogo.\n\nLe voci dello stesso gioco riconosciuto sono raggruppate. L’attività si aggiorna circa ogni 10 secondi. I cerchi pulsano solo durante lavoro osservato; in pausa o in attesa restano fermi. Pronti non pulsa.\n\nLo storico delle operazioni concluse non è ancora disponibile: i job possono essere riaperti e il loro stato corrente non conserva tutti i passaggi.",14,TEXT,Typeface.NORMAL);explanation.setPadding(0,dp(8),0,dp(16));box.addView(explanation);info.show();});content.addView(metrics);
+        TextView metrics=menuAction("Come leggere i numeri",TEXT);metrics.setOnClickListener(v->{menu.dismiss();Dialog info=bottomSheet("Attività e coda");LinearLayout box=info.findViewById(SHEET_ID);TextView explanation=text("I numeri grandi indicano gli elementi presenti nella fase. In elaborazione: lavoro locale o job in corso osservato. In coda: gli altri elementi della fase. Pronti: voci disponibili dello scroll, non tutto il Catalogo.\n\nLe voci dello stesso gioco riconosciuto sono raggruppate. Durante il lavoro locale l’attività si aggiorna circa ogni 2 secondi; da ferma ogni 10. I cerchi pulsano solo durante lavoro osservato; in pausa o in attesa restano fermi. Pronti non pulsa.\n\nLo storico delle operazioni concluse non è ancora disponibile: i job possono essere riaperti e il loro stato corrente non conserva tutti i passaggi.",14,TEXT,Typeface.NORMAL);explanation.setPadding(0,dp(8),0,dp(16));box.addView(explanation);info.show();});content.addView(metrics);
         TextView settings=menuAction("Impostazioni e diagnostica",TEXT);settings.setOnClickListener(v->{menu.dismiss();settings();});content.addView(settings);menu.show();
     }
     private void openEngineHistory(){engineSection="history";clearEngineHistoryPull();render();if(scroll!=null)scroll.scrollTo(0,0);}
@@ -2781,7 +2783,9 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         String status=engineCenterStatus(snapshot);if(!active&&status.contains("pausa"))symbol="\uf04c";else if(!active&&status.equals("Scroll elaborato"))symbol=LudoIcons.CHECK;
         TextView icon=appIcon(symbol,compact?22:26,active?DISCOVER_LAVENDER:MUTED);icon.setGravity(Gravity.CENTER);center.addView(icon,new LinearLayout.LayoutParams(-1,dp(36)));TextView label=text(status,compact?11:16,TEXT,Typeface.NORMAL);label.setGravity(Gravity.CENTER);center.addView(label,new LinearLayout.LayoutParams(-1,-2));center.setOnClickListener(v->openEnginePhase(-1,snapshot));center.setContentDescription(status+". Apri il lavoro dello scroll.");return center;
     }
+    private int[] previousEnginePhases=new int[5];
     private View enginePipelineCard(EngineOverviewSnapshot snapshot){
+        previousEnginePhases=engineMotion.consume(String.valueOf(snapshot.pipelineRun.startAt),snapshot.loadedAt,snapshot.phases);
         LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);
         DealDatabase.ObservationSession scope=snapshot.pipelineRun;TextView period=text(engineScopeLabel(scope),12,MUTED,Typeface.NORMAL);period.setPadding(0,0,0,dp(4));page.addView(period);
         if(scope!=null){TextView acquired=text(scope.uniqueListings+(scope.uniqueListings==1?" annuncio acquisito":" annunci acquisiti"),15,TEXT,Typeface.NORMAL);acquired.setPadding(0,0,0,dp(16));page.addView(acquired);}
@@ -2795,29 +2799,39 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         int width=getResources().getDisplayMetrics().widthPixels-dp(36);page.addView(wheel,new LinearLayout.LayoutParams(-1,Math.min(dp(380),width)));return page;
     }
     private View enginePhaseNode(EngineOverviewSnapshot snapshot,int phase,boolean row){
-        int[] colors={DISCOVER_LAVENDER,DISCOVER_PINK,DISCOVER_MINT,DISCOVER_YELLOW,Color.rgb(85,155,243)};String title=EngineOverviewPresentation.phaseLabel(phase);boolean ready=phase==4,active=!ready&&enginePhaseIsActive(snapshot,phase);int live=active?snapshot.livePhases[phase]:0;int number=ready?snapshot.phases[phase]:live;
-        LinearLayout node=new LinearLayout(this);node.setOrientation(row?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);node.setBaselineAligned(false);node.setGravity(Gravity.CENTER);node.setPadding(dp(8),dp(6),dp(8),dp(6));if(!row)node.setBackground(round(SURFACE,999,1,colors[phase]));else node.setMinimumHeight(dp(64));
+        int[] colors={DISCOVER_LAVENDER,DISCOVER_PINK,DISCOVER_MINT,DISCOVER_YELLOW,Color.rgb(85,155,243)};String title=EngineOverviewPresentation.phaseLabel(phase);boolean ready=phase==4,active=!ready&&enginePhaseIsActive(snapshot,phase);int live=active?snapshot.livePhases[phase]:0;int number=snapshot.phases[phase];
+        LinearLayout node=new LinearLayout(this);node.setOrientation(row?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);node.setBaselineAligned(false);node.setGravity(Gravity.CENTER);node.setPadding(dp(8),dp(6),dp(8),dp(6));if(!row)node.setBackground(active?new EngineActivityRing(colors[phase]):round(SURFACE,999,1,colors[phase]));else node.setMinimumHeight(dp(64));
         TextView name=text(title,row?16:11,TEXT,Typeface.NORMAL);name.setGravity(row?Gravity.CENTER_VERTICAL:Gravity.CENTER);if(row)node.addView(name,new LinearLayout.LayoutParams(0,-2,1));else node.addView(name,new LinearLayout.LayoutParams(-1,-2));
-        LinearLayout numbers=new LinearLayout(this);numbers.setOrientation(LinearLayout.VERTICAL);numbers.setGravity(Gravity.CENTER);TextView count=text(snapshot.pipelineRun==null?"—":String.valueOf(number),row?22:23,colors[phase],Typeface.BOLD);count.setGravity(Gravity.CENTER);numbers.addView(count);String phaseState=EngineOverviewPresentation.phaseState(phase,snapshot.phases[phase],active,snapshot.bggPaused,snapshot.vintedPaused,snapshot.vintedWaitUntil,System.currentTimeMillis());TextView caption=text(phaseState,10,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);numbers.addView(caption);
+        LinearLayout numbers=new LinearLayout(this);numbers.setOrientation(LinearLayout.VERTICAL);numbers.setGravity(Gravity.CENTER);TextView count=text(snapshot.pipelineRun==null?"—":String.valueOf(number),row?22:23,colors[phase],Typeface.BOLD);count.setGravity(Gravity.CENTER);numbers.addView(count);String phaseState=ready?"disponibili":active?live+" in elaborazione":EngineOverviewPresentation.phaseState(phase,snapshot.phases[phase],false,snapshot.bggPaused,snapshot.vintedPaused,snapshot.vintedWaitUntil,System.currentTimeMillis());TextView caption=text(phaseState,10,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);numbers.addView(caption);
         if(!ready){int waiting=Math.max(0,snapshot.phases[phase]-live);TextView queued=text(snapshot.pipelineRun==null?"— in coda":waiting+" in coda",10,MUTED,Typeface.NORMAL);queued.setGravity(Gravity.CENTER);numbers.addView(queued);}
-        node.addView(numbers,row?new LinearLayout.LayoutParams(dp(88),-2):new LinearLayout.LayoutParams(-1,-2));if(snapshot.pipelineRun!=null)animateEngineCount(count,node,number,number,active);node.setContentDescription(snapshot.pipelineRun==null?title+": nessuno scroll nel periodo corrente.":title+": "+number+(ready?" disponibili": " voci attive, "+Math.max(0,snapshot.phases[phase]-live)+" in coda")+". "+phaseState+". Apri la fase.");return node;
+        node.addView(numbers,row?new LinearLayout.LayoutParams(dp(88),-2):new LinearLayout.LayoutParams(-1,-2));if(snapshot.pipelineRun!=null)animateEngineCount(count,node,previousEnginePhases[phase],number,active);node.setContentDescription(snapshot.pipelineRun==null?title+": nessuno scroll nel periodo corrente.":title+": "+number+(ready?" disponibili": " elementi nella fase, "+live+" attivi, "+Math.max(0,snapshot.phases[phase]-live)+" in coda")+". "+phaseState+". Apri la fase.");return node;
+    }
+    private final class EngineActivityRing extends Drawable {
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final int color;
+        EngineActivityRing(int color){this.color=color;}
+        @Override public void draw(Canvas canvas){Rect b=getBounds();float r=Math.min(b.width(),b.height())/2f-dp(2),cx=b.exactCenterX(),cy=b.exactCenterY();paint.setStyle(Paint.Style.FILL);paint.setColor(SURFACE);canvas.drawCircle(cx,cy,r,paint);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));paint.setColor(OUTLINE);canvas.drawCircle(cx,cy,r,paint);paint.setColor(color);paint.setStrokeCap(Paint.Cap.ROUND);canvas.drawArc(new RectF(cx-r,cy-r,cx+r,cy+r),-90+getLevel()*360f/10000f,80,false,paint);}
+        @Override protected boolean onLevelChange(int level){invalidateSelf();return true;}
+        @Override public void setAlpha(int alpha){paint.setAlpha(alpha);invalidateSelf();}
+        @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);invalidateSelf();}
+        @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
     }
     private void animateEngineCount(TextView count,View node,int old,int current,boolean active){
         count.setText(String.valueOf(current));
+        if(old!=current&&ValueAnimator.areAnimatorsEnabled()){count.setAlpha(.35f);count.setTranslationY(dp(5));count.animate().alpha(1f).translationY(0f).setDuration(280).start();}
         if(!active)return;
-        ValueAnimator pulse=ValueAnimator.ofFloat(1f,1.045f);pulse.setDuration(850);pulse.setRepeatMode(ValueAnimator.REVERSE);pulse.setRepeatCount(ValueAnimator.INFINITE);
+        ValueAnimator pulse=ValueAnimator.ofFloat(0f,1f);pulse.setDuration(1200);pulse.setRepeatMode(ValueAnimator.RESTART);pulse.setRepeatCount(ValueAnimator.INFINITE);
         Runnable gate=new Runnable(){@Override public void run(){
             boolean allowed=EngineOverviewPresentation.motionAllowed(active,engineUiResumed,hasWindowFocus(),"activity".equals(tab)&&"overview".equals(engineSection),node.isAttachedToWindow(),node.isShown(),ValueAnimator.areAnimatorsEnabled());
-            if(allowed){if(!pulse.isStarted())pulse.start();}else{pulse.cancel();node.setScaleX(1f);node.setScaleY(1f);}
+            if(allowed){if(!pulse.isStarted())pulse.start();}else{pulse.cancel();node.setScaleX(1f);node.setScaleY(1f);node.setAlpha(1f);}
             if(node.isAttachedToWindow())node.postDelayed(this,500);
         }};
         pulse.addUpdateListener(animation->{
             if(!EngineOverviewPresentation.motionAllowed(active,engineUiResumed,hasWindowFocus(),"activity".equals(tab)&&"overview".equals(engineSection),node.isAttachedToWindow(),node.isShown(),ValueAnimator.areAnimatorsEnabled())){animation.cancel();node.setScaleX(1f);node.setScaleY(1f);return;}
-            float scale=(float)animation.getAnimatedValue();node.setScaleX(scale);node.setScaleY(scale);
+            float fraction=(float)animation.getAnimatedValue();if(node.getBackground() instanceof EngineActivityRing)node.getBackground().setLevel(Math.round(fraction*10000));else node.setAlpha(.75f+.25f*(float)Math.sin(Math.PI*fraction));
         });
         node.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
             @Override public void onViewAttachedToWindow(View v){v.removeCallbacks(gate);v.post(gate);}
-            @Override public void onViewDetachedFromWindow(View v){v.removeCallbacks(gate);pulse.cancel();v.setScaleX(1f);v.setScaleY(1f);}
+            @Override public void onViewDetachedFromWindow(View v){v.removeCallbacks(gate);pulse.cancel();v.setScaleX(1f);v.setScaleY(1f);v.setAlpha(1f);}
         });
     }
     private View engineCurrentRunHero(DealDatabase.ObservationSession run,long now,int waitingRuns){

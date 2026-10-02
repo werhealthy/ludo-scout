@@ -12,7 +12,7 @@ final class EngineOverviewPresentation {
         return "overview";
     }
     static String phaseLabel(int phase) {
-        String[] labels={"Da riconoscere","Dati BGG","Da collegare","Verifica Vinted","Pronti"};
+        String[] labels={"Da riconoscere","Dati BGG","Da collegare","Verifica annuncio","Pronti"};
         return labels[phase];
     }
     static boolean activePhase(int mask,int phase,boolean bggPaused,boolean vintedPaused,long waitUntil,long now) {
@@ -24,7 +24,7 @@ final class EngineOverviewPresentation {
         if(active)return "attive";
         if(total>0&&((phase==1&&bggPaused)||(phase==3&&vintedPaused)))return "in pausa";
         if(total>0&&phase==3&&waitUntil>now)return "in attesa";
-        return "attive";
+        return total>0?"in coda":"nessun elemento";
     }
     static boolean motionAllowed(boolean active,boolean resumed,boolean focused,boolean overview,boolean attached,boolean shown,boolean enabled) {
         return active&&resumed&&focused&&overview&&attached&&shown&&enabled;
