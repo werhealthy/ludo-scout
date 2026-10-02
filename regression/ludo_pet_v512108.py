@@ -3,6 +3,9 @@ from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1]
 source=root/"app/src/main/java/it/vintedaffari/app/LudoPetState.java"
+room_source=root/"app/src/main/java/it/vintedaffari/app/LudoRoomState.java"
+swipe_source=root/"app/src/main/java/it/vintedaffari/app/LudoRoomSwipe.java"
+assert room_source.exists() and swipe_source.exists(), "Ludo rooms and directional swipe policy missing"
 assert source.exists(), "Pet interaction missing: suggestions must resolve to current eligible IDs"
 harness='''package it.vintedaffari.app;
 public class PetRegression {
@@ -28,3 +31,72 @@ with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)/"PetRegression.java";p.write_text(harness)
  subprocess.run(["javac","-d",tmp,str(source),str(root/"app/src/main/java/it/vintedaffari/app/GamePreferenceState.java"),str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.PetRegression"],check=True)
+
+room_harness=r'''package it.vintedaffari.app;
+public class LudoRoomsRegression {
+ static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
+ public static void main(String[] args){
+  LudoRoomState state=new LudoRoomState("invalid",-5,180);check(!state.isHome()&&state.position("explore")==0,"safe default");
+  check(state.switchTo("home",640)==180&&state.isHome(),"open Casa at its position");
+  check(state.switchTo("explore",360)==640,"return restores Esplorazione position");
+  LudoRoomState reload=new LudoRoomState(state.room(),state.position("explore"),state.position("home"));check(reload.position("home")==360&&reload.position("explore")==640,"recreation");
+  check(LudoRoomState.HOME.equals(LudoRoomState.swipeTarget("explore",1)),"swipe left opens Casa");
+  check(LudoRoomState.EXPLORE.equals(LudoRoomState.swipeTarget("home",-1)),"swipe right opens Esplorazione");
+  check(LudoRoomState.HOME.equals(LudoRoomState.swipeTarget("home",1)),"room boundary");
+  LudoRoomSwipe swipe=new LudoRoomSwipe();swipe.down(200,200);check(!swipe.move(198,280,8),"vertical must remain scroll");check(!swipe.move(100,282,8)&&swipe.release(60,282,72)==0,"vertical cannot turn into room swipe");
+  swipe.down(200,200);check(!swipe.move(195,203,8),"touch slop");check(swipe.move(150,202,8),"intentional horizontal claim");check(swipe.release(100,203,72)==1,"horizontal opens Casa");
+  swipe.down(200,200);check(swipe.move(230,200,8)&&swipe.release(230,200,72)==0,"short drag does not switch");
+  swipe.down(100,200);check(swipe.move(150,203,8)&&swipe.release(200,204,72)==-1,"right opens Esplorazione");
+  swipe.down(100,200);swipe.move(160,201,8);swipe.cancel();check(swipe.release(220,201,72)==0,"cancel or multipointer cannot switch");
+  swipe.down(200,200);check(!swipe.move(150,245,8)&&swipe.release(100,280,72)==0,"diagonal stays harmless");
+  System.out.println("PASS room restoration/boundaries and horizontal versus vertical/slop/short/cancel/diagonal input");
+ }
+}'''
+with tempfile.TemporaryDirectory() as tmp:
+ p=Path(tmp)/"LudoRoomsRegression.java";p.write_text(room_harness)
+ subprocess.run(["javac","-d",tmp,str(room_source),str(swipe_source),str(p)],check=True)
+ subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.LudoRoomsRegression"],check=True)
+ui=(root/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text()
+assert 'navItem(LudoIcons.BOOK_OPEN,"Libreria","library")' not in ui
+assert 'if("library".equals(value)){openLudoHome();return;}' in ui
+assert 'renderLudoHomeScene();renderLibrary();return;' in ui
+assert 'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui
+assert 'addLudoRoomTab(tabs,"Casa",LudoRoomState.HOME)' in ui
+assert 'refreshHost.setRoomSwipeHandler' in ui
+assert 'petView.setExplorer(true)' in ui and 'ludoFireplaceBackground()' in ui
+assert 'Avvia nuove ricerche · test' not in ui
+assert 'https://www.vinted.it/catalog?search_text=catan' not in ui
+print("PASS Ludo composition: library route bridges to Casa, actual collection reuse, both selector tabs, themed scenes and real search")
+
+def activity_method(signature):
+ start=ui.index(signature);brace=ui.index("{",start);depth=0
+ for i in range(brace,len(ui)):
+  if ui[i]=="{":depth+=1
+  elif ui[i]=="}":
+   depth-=1
+   if depth==0:return ui[start:i+1]
+bridge=r'''package it.vintedaffari.app;
+import java.util.*;
+public class LudoRoomBridgeRegression {
+ String tab="catalog",renderedLudoRoom="";LudoRoomState ludoRooms=new LudoRoomState("explore",300,500);
+ Map<String,Integer> tabScrollPositions=new HashMap<>();Scroll scroll=new Scroll();int saves,switches;
+ static class Scroll {int y=900;int getScrollY(){return y;}}
+ LudoRoomState ludoRoomState(){return ludoRooms;}
+ void saveLudoRooms(){saves++;}
+ void navigate(String value){tab=value;}
+ void switchLudoRoom(String value){switches++;ludoRooms.switchTo(value,scroll.y);}
+ __ACTUAL__
+ static void check(boolean ok,String msg){if(!ok)throw new AssertionError(msg);}
+ public static void main(String[] args){
+  LudoRoomBridgeRegression n=new LudoRoomBridgeRegression();n.openLudoHome();check("companion".equals(n.tab)&&n.ludoRooms.isHome(),"legacy route must reach Casa");check(n.tabScrollPositions.get("companion")==500,"legacy route home position");check(n.ludoRooms.position("explore")==300,"other page scroll must not overwrite room");
+  check(n.isLibraryVisible(),"Casa refreshes collection");n.ludoRooms.switchTo("explore",500);check(!n.isLibraryVisible(),"Esplorazione must not pretend collection visible");
+  n.tab="library";check(n.isLibraryVisible(),"legacy visibility");n.tab="catalog";n.prepareLudoNavigation("companion");check(n.tabScrollPositions.get("companion")==300,"normal entry room position");
+  n.tab="companion";n.renderedLudoRoom="explore";n.scroll.y=640;n.recordLudoRoomPosition();check(n.ludoRooms.position("explore")==640,"current room position saved");
+  n.openLudoHome();check(n.switches==1,"same destination uses room switch");
+  System.out.println("PASS actual Library-to-Casa bridge, collection visibility and independent navigation positions");
+ }
+}'''.replace("__ACTUAL__","\n".join(activity_method(s) for s in ["private void openLudoHome(","private boolean isLibraryVisible(","private void prepareLudoNavigation(","private void recordLudoRoomPosition("]))
+with tempfile.TemporaryDirectory() as tmp:
+ p=Path(tmp)/"LudoRoomBridgeRegression.java";p.write_text(bridge)
+ subprocess.run(["javac","-d",tmp,str(room_source),str(p)],check=True)
+ subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.LudoRoomBridgeRegression"],check=True)

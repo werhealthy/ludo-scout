@@ -1732,6 +1732,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
                 "engineLocalOnly={"+engineLocalOnlySummary+"}\n"+
                 "engineResetEvidence={"+engineResetEvidence+"}\n"+
+                "browserEngine={"+BrowserCaptureDiagnostics.summary(db,marketDiag)+"}\n"+
                 "browserCapture={"+context.getSharedPreferences("vinted_browser_experiment",Context.MODE_PRIVATE).getString("report","state=NOT_RUN")+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
