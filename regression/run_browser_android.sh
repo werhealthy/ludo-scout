@@ -11,7 +11,7 @@ emulator -list-avds
 mkdir -p "$RUNNER_TEMP/ludo-browser-emulator"
 emulator -avd ludo-browser-tests -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/ludo-browser-emulator/emulator.log" 2>&1 &
 emulator_pid=$!
-trap 'adb logcat -d -b crash || true; adb logcat -d | rg -i "FATAL|crash|exception|instrumentation|testRunner|classnotfound|noclassdef" | tail -100 || true; tail -80 "$RUNNER_TEMP/ludo-browser-emulator/emulator.log"; adb emu kill || true' EXIT
+trap 'adb logcat -d -b crash || true; adb logcat -d | grep -Ei "FATAL|crash|exception|instrumentation|testRunner|classnotfound|noclassdef" | tail -100 || true; tail -80 "$RUNNER_TEMP/ludo-browser-emulator/emulator.log"; adb emu kill || true' EXIT
 sleep 5
 if ! kill -0 "$emulator_pid" 2>/dev/null; then
   echo 'Emulator process exited before ADB became available'
@@ -27,6 +27,6 @@ adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
 chmod +x gradlew
-classes=$(rg --files app/src/androidTest/java | sed -n 's#app/src/androidTest/java/##; s#/#.#g; s#\.java$##; /Test$/p' | paste -sd, -)
+classes=$(python3 -c 'from pathlib import Path; print(",".join(str(p.relative_to("app/src/androidTest/java")).replace("/", ".")[:-5] for p in sorted(Path("app/src/androidTest/java").rglob("*Test.java"))))')
 test -n "$classes"
 ./gradlew --no-daemon :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.class=$classes"
