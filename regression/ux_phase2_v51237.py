@@ -107,3 +107,36 @@ assert transition.index("uiDataIo.execute")<transition.index("gameStatsByBggId")
 assert "!source.isShowing()" in transition and "canonical==null||snapshot==null" in transition
 assert "installPullToGame(sc,hint,canonical.id,source)" in transition and "new GameRecord" not in transition
 print("PASS Library pinned provider, preserved details, canonical prepared pull and missing-local fallback")
+
+# Execute the actual transition readiness gate for both permitted source types.
+readiness=r"""
+import java.util.*;
+public class LibraryPullReadinessRegression {
+ static class Dialog {boolean showing=true;boolean isShowing(){return showing;}}
+ static class PreparedGameOverlay {long gameId;Dialog dialog;PreparedGameOverlay(long id){gameId=id;dialog=new Dialog();}}
+ Dialog activeDetailDialog,activeGameOverlay;
+ Set<Dialog> libraryDetailDialogs=new HashSet<>();
+ Map<Dialog,PreparedGameOverlay> preparedGameOverlays=new HashMap<>();
+ boolean isFinishing(){return false;}boolean isDestroyed(){return false;}
+ __READY__
+ static void check(boolean ok,String label){if(!ok)throw new AssertionError(label);}
+ public static void main(String[] args){
+  LibraryPullReadinessRegression n=new LibraryPullReadinessRegression();Dialog source=new Dialog();
+  n.preparedGameOverlays.put(source,new PreparedGameOverlay(42));
+  check(!n.readyGameTransition(source,42),"unregistered source");
+  n.libraryDetailDialogs.add(source);check(n.readyGameTransition(source,42),"Library must open canonical game");
+  check(!n.readyGameTransition(source,43),"wrong canonical identity");
+  n.activeGameOverlay=new Dialog();check(!n.readyGameTransition(source,42),"duplicate overlay");
+  n.activeGameOverlay=null;source.showing=false;check(!n.readyGameTransition(source,42),"closed Library source");
+  source.showing=true;n.libraryDetailDialogs.remove(source);check(!n.readyGameTransition(source,42),"dismissed registration");
+  n.activeDetailDialog=source;check(n.readyGameTransition(source,42),"existing listing gesture");
+  n.preparedGameOverlays.get(source).dialog=null;check(!n.readyGameTransition(source,42),"consumed preparation");
+  System.out.println("PASS actual transition readiness: Library and listing, closed/unrelated source, canonical identity, duplicate and consumed preparation");
+ }
+}
+""".replace("__READY__",method("private boolean readyGameTransition("))
+with tempfile.TemporaryDirectory() as temp:
+    path=Path(temp)/"LibraryPullReadinessRegression.java";path.write_text(readiness)
+    subprocess.run(["javac","-d",temp,str(path)],check=True)
+    subprocess.run(["java","-cp",temp,"LibraryPullReadinessRegression"],check=True)
+assert "libraryDetailDialogs.add(d)" in detail and "libraryDetailDialogs.remove(d)" in detail
