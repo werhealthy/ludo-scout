@@ -2482,7 +2482,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         TextView icon=appIcon(LudoIcons.SEARCH,30,DISCOVER_LAVENDER);icon.setGravity(Gravity.CENTER);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);card.addView(icon,new LinearLayout.LayoutParams(-1,dp(56)));
         TextView title=text("Non c’è ancora niente qui",22,TEXT,Typeface.BOLD);title.setGravity(Gravity.CENTER);card.addView(title);
         TextView hint=text("Inizia una ricerca su Vinted.",14,MUTED,Typeface.NORMAL);hint.setGravity(Gravity.CENTER);hint.setPadding(0,dp(8),0,dp(20));card.addView(hint);
-        Button search=productPrimaryButton("Cerca su Vinted",LudoIcons.SEARCH,CYAN,()->openVintedBrowserExperiment("https://www.vinted.it/catalog","SEARCH",""));card.addView(search,new LinearLayout.LayoutParams(-1,dp(56)));return card;
+        Button search=productPrimaryButton("Cerca su Vinted",LudoIcons.SEARCH,CYAN,()->openVintedBrowserExperiment("https://www.vinted.it/catalog","SEARCH",""));search.setMinHeight(dp(56));card.addView(search,new LinearLayout.LayoutParams(-1,-2));return card;
     }
     private void showEngineGlobalWork(EngineOverviewSnapshot snapshot){
         Dialog sheet=bottomSheet("Lavoro del Motore");LinearLayout box=sheet.findViewById(SHEET_ID);
