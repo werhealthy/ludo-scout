@@ -76,3 +76,39 @@ assert row('https://image/f800.jpg?a=1&b=2', 'broken', now) is None
 assert row('https://image/f800.jpg?a=1&b=2', 7, now-86_400_001) is None
 assert row('https://image/f800.jpg?a=1&b=2', 7, now+1) is None
 print('Exact photo cache SQLite fixtures passed')
+
+# Run the real telemetry/epoch methods with SQLite boundary adapters.
+def java_method(source, name):
+    match = re.search(r'(?:public |private )static [^\\n]+\\b'+name+r'\\([^\\n]*\\)\\{', source)
+    start = match.start()
+    brace = source.index('{', start)
+    depth = 1
+    end = brace+1
+    while depth:
+        depth += (source[end]=='{') - (source[end]=='}')
+        end += 1
+    return source[start:end]
+session_source = (PKG / 'VintedPublicSession.java').read_text()
+telemetry = 'package it.vintedaffari.app;import android.content.*;import android.database.*;import android.database.sqlite.*;public class VintedPublicSession {private static final String LEDGER_PREFIX="t2_ledger:",LEDGER_BUILD="request-ledger-v3-efficiency";'
+for method_name in ['recordPhotoMatcherEvent','ensureLedgerEpoch','incLedger','control','controlText','putControl']:
+    telemetry += java_method(session_source, method_name)
+telemetry += '}'
+ledger_stubs = {
+'android/content/Context.java': STUBS['android/content/Context.java'],
+'android/content/ContentValues.java': '''package android.content;public class ContentValues extends java.util.HashMap<String,Object>{public void putNull(String k){put(k,null);}}''',
+'android/database/Cursor.java': '''package android.database;public class Cursor implements AutoCloseable{final Object v;public Cursor(Object v){this.v=v;}public boolean moveToFirst(){return v!=null;}public long getLong(int i){return ((Number)v).longValue();}public String getString(int i){return (String)v;}public boolean isNull(int i){return v==null;}public void close(){}}''',
+'android/database/sqlite/SQLiteDatabase.java': '''package android.database.sqlite;import android.content.ContentValues;import android.database.Cursor;import java.util.*;public class SQLiteDatabase{public static final int CONFLICT_REPLACE=5;public final Map<String,ContentValues> rows=new HashMap<>();boolean transaction;public void beginTransactionNonExclusive(){transaction=true;}public boolean inTransaction(){return transaction;}public void setTransactionSuccessful(){}public void endTransaction(){transaction=false;}public int delete(String table,String where,String[] args){rows.entrySet().removeIf(e->e.getKey().startsWith("t2_ledger:"));return 1;}public Cursor rawQuery(String sql,String[] args){if(sql.contains("COUNT(*)"))return new Cursor(0L);ContentValues r=rows.get(args[0]);return new Cursor(r==null?null:r.get(sql.contains("text_value")?"text_value":"value"));}public long insertWithOnConflict(String table,String nullHack,ContentValues v,int conflict){rows.put((String)v.get("name"),v);return 1;} }''',
+'it/vintedaffari/app/DealDatabase.java': '''package it.vintedaffari.app;import android.content.Context;import android.database.sqlite.SQLiteDatabase;public class DealDatabase{public static final SQLiteDatabase db=new SQLiteDatabase();public DealDatabase(Context c){}public SQLiteDatabase getWritableDatabase(){return db;}public void close(){}}''',
+'it/vintedaffari/app/VintedPublicSession.java': telemetry,
+'it/vintedaffari/app/PhotoLedgerRegression.java': '''package it.vintedaffari.app;import android.content.*;import java.lang.reflect.*;public class PhotoLedgerRegression{static void check(boolean b,String m){if(!b)throw new AssertionError(m);}static long count(String k){ContentValues v=DealDatabase.db.rows.get("t2_ledger:"+k);return v==null?0:((Number)v.get("value")).longValue();}public static void main(String[] args)throws Exception{Context c=new Context();VintedPublicSession.recordPhotoMatcherEvent(c,"cache",0);Method init=VintedPublicSession.class.getDeclaredMethod("ensureLedgerEpoch",android.database.sqlite.SQLiteDatabase.class,long.class);init.setAccessible(true);init.invoke(null,DealDatabase.db,System.currentTimeMillis());check(count("photo:cache")==1,"first photo event must survive diagnostic epoch initialization");VintedPublicSession.recordPhotoMatcherEvent(c,"download",0);VintedPublicSession.recordPhotoMatcherEvent(c,"http",403);VintedPublicSession.recordPhotoMatcherEvent(c,"http",429);VintedPublicSession.recordPhotoMatcherEvent(c,"error",0);VintedPublicSession.recordPhotoMatcherEvent(c,"invalid",0);check(count("photo:download")==1&&count("photo:http")==2&&count("photo:http:403")==1&&count("photo:http:429")==1&&count("photo:error")==1,"photo outcomes persist");check(count("physical")==0&&count("link:physical")==0,"photo traffic leaves page ledger untouched");check(count("photo:invalid")==0,"unbounded keys rejected");check(!DealDatabase.db.inTransaction(),"telemetry releases transaction");System.out.println("Photo ledger epoch behavior passed");}}'''
+}
+with tempfile.TemporaryDirectory() as temp:
+    build = Path(temp)
+    files = []
+    for name, content in ledger_stubs.items():
+        file = build / name
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(content)
+        files.append(str(file))
+    subprocess.run(['javac','-d',str(build),*files],check=True)
+    subprocess.run(['java','-cp',str(build),'it.vintedaffari.app.PhotoLedgerRegression'],check=True)
