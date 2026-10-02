@@ -1,5 +1,10 @@
 # Ludo Scout — Current state
 
+## Backend — priorità B2 Vinted, audit 2026-10-02
+Utente sospende B–C120 e dà priorità assoluta alla riduzione dei blocchi/chiamate Vinted. Audit e piano registrati in docs/specs/backend-reliability-recognition.md, commit c9147f55e24fd324e907def774136aa08c846c1a; modifica documentale, nessunaAPK. 403/429 causano pausa locale45min; durata remota non dimostrata. Gate/ledger pagine escludono download foto nel matcher (fino6candidati per selezione); matcher scrive cache dHash ma non la consulta. Cache pagine16URL/10min locale al processo, gateSQLite condiviso. Batch/snapshot già presenti. Nessun test rete sul telefono né prova causa403; nessuna promessa link automatici nello scroll (A120:0ID/14219card, numeratorelegacy).
+Unico prossimo step backend: riusare cache foto nel matcher normale con identico algoritmo/soglie e misure hit/download/esito; prima test equivalenza e fallback, poi CI/build/distribuzione verificate. Pausa/budget/schema/filtri invariati. Prova diagnostica120 resta pendente e sospesa, A ricevuta; non chiudere B1. Backend5; conteggio frontend da fonte corrente, nessun gruppo chiuso da questo audit.
+
+
 ## Frontend — feedback121 e scaletta UX ampliata, 2026-10-02 10:43 Europe/Rome
 Utente considera Home fatta, ma chiede revisione sistemica di Motore, schede prodotto/relazione annuncio-gioco-Libreria, Catalogo/annunci/giochi/bundle, ruoloLudo, Libreria, wizard e azioni secondarie/micro-interazioni. Scaletta unica aggiornata a7gruppi sostanziosi (backend separato5); precedente3 era troppo aggregato e non rappresentava questo nuovo scope. Feature consegnate conservate; implementato/testato non significa accettatoUX.
 Feedback121 respinge outline e rimozione loghi: pulsanti pieni con fondo uguale al fondo dell’assetVinted/BGG e loghi ripristinati, colori da verificare sugli asset. Cerchio deve percorrere l’inverso in dimensione/riempimento insieme al contenuto, diventando invisibile solo a fine ritorno;121 azzeraDrawable subito e anima solo il contenuto.
