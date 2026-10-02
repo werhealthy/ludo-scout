@@ -1,5 +1,16 @@
 # Ludo Scout — Current state
 
+## Frontend — galleria compatta e colore133 verificato/distribuito, 2026-10-02
+
+Feedback screenshot131 e approvazione15:49Europe/Rome: tre miniature52dp verticali accanto alla scatola, +N sull'ultima per foto ulteriori; galleria completa/indice reale/filtri foto BGG conservati. Hero e miniature dentro mediaRow, altezza adattiva calcolata sul viewport con minimo196dp e scroll per contenuti lunghi; refresh artwork tocca soltanto hero e conserva le miniature. Barra informazioni senza box, linea sottile, margini comuni al titolo. Sfondo annuncio sostituisce viola fisso con alone radiale dealAccent34% al centro/16% intermedio; niente pannello sull'artwork. Glow condiviso offerte Home/Catalogo ora radiale80/255 e28/255, senza gradiente rettangolare. Superfici locali miniature/overflow/area azioni traslucide; provider fill/loghi conservati. Nessun blur o cambiamento globale del design system, dati, filtri, classificazione, schema, rete o dipendenze. Browser backend132 preservato.
+
+PR155 head29272da26d6b072013dfb2f2d5b17f1b462c607c: CI403/run37015900124/job110866548255 success con regressioni,24fixture browser,unitAndroid,Java compile e reviewAPK. Mergea106f7f5da82237d450e620dfcff5ddbd26377fd. Nessun telefono/emulatore o accettazione visiva dichiarati.
+Beta152/run37016369589: primo tentativo/job110868108414 fallisce soltanto fixture browser batchlimits (416/500 dopo350ms); codice browser invariato, invio in batch32 con15ms e ACK. Secondo tentativo senza modifiche/job110868654050 success su regressioni/browser24/testAndroid/build/firma. Instabilità dell'attesa fissa350ms registrata per backend, da sostituire con attesa della condizione entro timeout; nessuna modifica al test o capturer in questo frontend.
+Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato. Firebase upload2026-10-02T14:02:30.8570301Z e distribuzione distinta tester14:02:31.4724123Z: release5.12.133-product-gallery-glow(1000152).
+
+Prova telefono: annuncio0/3/>3foto, tocco+N e galleria completa, titolo1/2righe e testo grande, colore dell'offerta visibile/nessun riquadro dietro scatola/leggibilità. Frontend7/backend5 aperti. Unico prossimo passo frontend: accettazione visiva della133 sul telefono, prima di altre modifiche alla scheda. Motore e gruppi restano aperti.
+
+
 ## Backend — browser132 verificato e distribuito, 2026-10-02
 
 PR151 integrata in590ef6ec787fc67c70c8d106adaa7064ba8a93d2, codicecc840d8f18e3b6646b119f840c4fb7559bf7f793. CI402/run37014150633/job110860781145 success:24fixture JS, regressioni esistenti, unitAndroid/policy, compilazioneJava e reviewAPK. Review indipendente conclusa senza problemi importanti residui. Beta151/run37014767304/job110862816393 success: test/build, firma C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificata; Firebase upload13:47:08.2743019Z e distribuzione tester13:47:08.8071242Z confermati separatamente. Release5.12.132-vinted-browser-experiment(1000151). Frontend131/PR152/153 preservato. PR150 documentale superata e chiusa.
