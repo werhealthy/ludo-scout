@@ -72,6 +72,9 @@ jobs:
       - name: Run Home media recovery behavior regression
         run: python3 regression/home_media_v512119.py
 
+      - name: Run engine diagnostic local-only SQLite regression
+        run: python3 regression/engine_diagnostic_local_only.py
+
       - name: Run Motore live identity SQLite regression
         run: python3 regression/engine_live_counts.py
 
@@ -251,5 +254,6 @@ jobs:
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=PR Review,O=Ludo Scout,C=IT"
       - name: Build review APK
         run: ./gradlew --no-daemon :app:assembleDebug
+
 
 
