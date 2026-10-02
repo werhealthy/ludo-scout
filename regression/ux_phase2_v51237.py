@@ -34,9 +34,10 @@ checks=[
      "librarySearchBar()" in library and
      "showLibraryArchiveMenu(sold.size())" in library and
      "libraryScopeTabs(" not in library),
-    ("Ludo uses Esplorazione and Casa with existing collection and pet spaces",
+    ("Ludo uses three immersive rooms with existing collection and secondary hunt settings",
      'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui and
-     'addLudoRoomTab(tabs,"Casa",LudoRoomState.HOME)' in ui and
+     'addLudoRoomTab(tabs,"Libreria",LudoRoomState.HOME)' in ui and
+     'addLudoRoomTab(tabs,"Cacce",LudoRoomState.HUNTS)' in ui and
      'renderLudoHomeScene();renderLibrary();return;' in companion and
      'openPetSpace(true)' in companion and 'openPetSpace(false)' in companion),
     ("Ludo root page no longer exposes a back affordance",

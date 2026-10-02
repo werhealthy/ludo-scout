@@ -40,8 +40,12 @@ public class LudoRoomsRegression {
   check(state.switchTo("home",640)==180&&state.isHome(),"open Casa at its position");
   check(state.switchTo("explore",360)==640,"return restores Esplorazione position");
   LudoRoomState reload=new LudoRoomState(state.room(),state.position("explore"),state.position("home"));check(reload.position("home")==360&&reload.position("explore")==640,"recreation");
-  check(LudoRoomState.HOME.equals(LudoRoomState.swipeTarget("explore",1)),"swipe left opens Casa");
-  check(LudoRoomState.EXPLORE.equals(LudoRoomState.swipeTarget("home",-1)),"swipe right opens Esplorazione");
+  check("hunts".equals(LudoRoomState.swipeTarget("explore",1)),"swipe left opens Cacce before Casa");
+  check("home".equals(LudoRoomState.swipeTarget("hunts",1)),"second swipe opens Libreria");
+  check("hunts".equals(LudoRoomState.swipeTarget("home",-1)),"back from Libreria reaches Cacce");
+  check("explore".equals(LudoRoomState.swipeTarget("hunts",-1)),"back from Cacce reaches Esplorazione");
+  state.switchTo("hunts",640);state.recordScroll(270);check(state.switchTo("home",270)==360,"third room keeps Casa position");check(state.switchTo("hunts",400)==270,"Cacce restores independently");
+  check(LudoRoomState.EXPLORE.equals(LudoRoomState.swipeTarget("explore",-1)),"first room boundary");
   check(LudoRoomState.HOME.equals(LudoRoomState.swipeTarget("home",1)),"room boundary");
   LudoRoomSwipe swipe=new LudoRoomSwipe();swipe.down(200,200);check(!swipe.move(198,280,8),"vertical must remain scroll");check(!swipe.move(100,282,8)&&swipe.release(60,282,72)==0,"vertical cannot turn into room swipe");
   swipe.down(200,200);check(!swipe.move(195,203,8),"touch slop");check(swipe.move(150,202,8),"intentional horizontal claim");check(swipe.release(100,203,72)==1,"horizontal opens Casa");
@@ -61,12 +65,16 @@ assert 'navItem(LudoIcons.BOOK_OPEN,"Libreria","library")' not in ui
 assert 'if("library".equals(value)){openLudoHome();return;}' in ui
 assert 'renderLudoHomeScene();renderLibrary();return;' in ui
 assert 'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui
-assert 'addLudoRoomTab(tabs,"Casa",LudoRoomState.HOME)' in ui
+assert 'addLudoRoomTab(tabs,"Libreria",LudoRoomState.HOME)' in ui
+assert 'addLudoRoomTab(tabs,"Cacce",LudoRoomState.HUNTS)' in ui
 assert 'refreshHost.setRoomSwipeHandler' in ui
-assert 'petView.setExplorer(true)' in ui and 'ludoFireplaceBackground()' in ui
+assert 'actorView.setIllustration(art)' in ui and 'ludoFireplaceBackground()' in ui
 assert 'Avvia nuove ricerche · test' not in ui
 assert 'https://www.vinted.it/catalog?search_text=catan' not in ui
-print("PASS Ludo composition: library route bridges to Casa, actual collection reuse, both selector tabs, themed scenes and real search")
+print("PASS Ludo composition: preserved library route, real collection, three selector tabs and themed scenes")
+import runpy
+runpy.run_path(str(root/"regression/ludo_monthly_overview.py"))
+runpy.run_path(str(root/"regression/ludo_hunts_ui.py"))
 
 def activity_method(signature):
  start=ui.index(signature);brace=ui.index("{",start);depth=0
@@ -120,3 +128,21 @@ with tempfile.TemporaryDirectory() as tmp:
  subprocess.run(["javac","-d",tmp,str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"LudoSearchDraftRegression"],check=True)
 assert 'search.setText(ludoSearchQuery)' in ui and '.putString("search",ludoSearchDraft())' in ui
+
+month_harness=r'''package it.vintedaffari.app;
+import java.time.*;
+public class LudoMonthBoundaryRegression {
+ static void check(long now,long want){if(LudoMonthlyOverview.monthStart(now)!=want)throw new AssertionError("Europe/Rome calendar month");}
+ public static void main(String[] args){
+  check(Instant.parse("2026-10-01T00:05:00Z").toEpochMilli(),Instant.parse("2026-09-30T22:00:00Z").toEpochMilli());
+  check(Instant.parse("2026-10-31T23:30:00Z").toEpochMilli(),Instant.parse("2026-10-31T23:00:00Z").toEpochMilli());
+  check(Instant.parse("2026-03-31T23:30:00Z").toEpochMilli(),Instant.parse("2026-03-31T22:00:00Z").toEpochMilli());
+  LudoRoomState restored=new LudoRoomState("hunts",110,220,330);
+  if(restored.position("hunts")!=220||restored.switchTo("home",240)!=330||restored.switchTo("explore",350)!=110||restored.switchTo("hunts",130)!=240)throw new AssertionError("all room positions must survive persistence");
+  System.out.println("PASS calendar month in Europe/Rome across DST and all three restored room positions");
+ }
+}'''
+with tempfile.TemporaryDirectory() as tmp:
+ p=Path(tmp)/"LudoMonthBoundaryRegression.java";p.write_text(month_harness)
+ subprocess.run(["javac","-d",tmp,str(room_source),str(root/"app/src/main/java/it/vintedaffari/app/LudoMonthlyOverview.java"),str(p)],check=True)
+ subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.LudoMonthBoundaryRegression"],check=True)

@@ -7,6 +7,8 @@ import android.view.View;
 import android.animation.ValueAnimator;
 /** Flat vector pet with lifecycle-bound motion and no per-frame bitmap allocations. */
 final class LudoPetView extends View {
+ private android.graphics.Bitmap illustration;private final android.graphics.RectF artBounds=new android.graphics.RectF();
+ void setIllustration(android.graphics.Bitmap bitmap){illustration=bitmap;invalidate();}
  private final Paint paint=new Paint(3);private final Path mouth=new Path();
  private ValueAnimator idle;private boolean resumed;private float phase,reaction;private boolean lookingRight,explorer;
  LudoPetView(Context context){super(context);setContentDescription("Ludo, il tuo compagno di giochi");setFocusable(true);setOnClickListener(v->react());}
@@ -19,7 +21,7 @@ final class LudoPetView extends View {
  @Override protected void onDetachedFromWindow(){if(idle!=null){idle.cancel();idle=null;}super.onDetachedFromWindow();}
  @Override protected void onWindowVisibilityChanged(int visibility){super.onWindowVisibilityChanged(visibility);sync();}
  @Override protected void onVisibilityChanged(View changed,int visibility){super.onVisibilityChanged(changed,visibility);if(paint!=null)sync();}
- @Override protected void onDraw(Canvas canvas){super.onDraw(canvas);float unit=Math.min(getWidth()/300f,getHeight()/300f);canvas.save();canvas.translate((getWidth()-300*unit)/2,(getHeight()-300*unit)/2);canvas.scale(unit,unit);
+ @Override protected void onDraw(Canvas canvas){super.onDraw(canvas);if(illustration!=null&&!illustration.isRecycled()){float scale=Math.min(getWidth()/(float)illustration.getWidth(),getHeight()/(float)illustration.getHeight());float width=illustration.getWidth()*scale,height=illustration.getHeight()*scale;float breath=(float)Math.sin(phase*Math.PI*2)*getHeight()*.006f+reaction*getHeight()*.02f;artBounds.set((getWidth()-width)/2,(getHeight()-height)/2-breath,(getWidth()+width)/2,(getHeight()+height)/2-breath);paint.setAlpha(255);canvas.drawBitmap(illustration,null,artBounds,paint);return;}float unit=Math.min(getWidth()/300f,getHeight()/300f);canvas.save();canvas.translate((getWidth()-300*unit)/2,(getHeight()-300*unit)/2);canvas.scale(unit,unit);
  paint.setStyle(Paint.Style.FILL);paint.setColor(0xff241637);canvas.drawOval(45,260,255,282,paint);
  float breath=(float)Math.sin(phase*Math.PI*2)*2+reaction*6;canvas.save();canvas.translate(0,-breath);
  if(explorer){paint.setColor(0xff735747);canvas.drawRoundRect(18,162,75,236,15,15,paint);paint.setColor(0xffAD8C5C);canvas.drawRoundRect(22,174,48,210,8,8,paint);}
