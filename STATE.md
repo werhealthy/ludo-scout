@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Frontend146 — Ludo Esplorazione/Casa e Libreria integrata
+
+“Vai”20:41 approva la composizione proposta. Ludo ha selettore accessibile Esplorazione/Casa e swipe orizzontale intenzionale; il contenuto resta verticale. Casa riusa la LibraryDatabase e i componenti144: ricerca collezione, wizard/aggiunta, scatole sugli scaffali, scheda personale e archivio Venduti secondario. La barra primaria ora è Home/Catalogo/Ludo; vecchi navigate("library"), tab ripristinati, foto e draft arrivano a Casa. Nessuna collezione duplicata. Ludo in Casa è vicino al camino; in Esplorazione ha costume esploratore e sfondo foresta. Riutilizzati asset esistenti e renderer vettoriale, senza nuove dipendenze o servizi.
+
+Esplorazione conserva consiglio corrente/ultimo gioco, Preferiti e Cacce; Gusti nel menu. Ricerca manuale su Vinted con nome immesso e CTA “Cerca nuovi giochi”, senza query Catan/test hardcoded. Browser/capture esistenti invariati. Stanze e scroll indipendenti in SharedPreferences ludo_rooms_v1; testo ricerca conservato su refresh asincroni/cambio stanza e stato locale. PR187 corregge i percorsi Back affinché salvino/preparino la stanza come la navigazione primaria;146 supersede145 per Back e testo ricerca. Nessuna modifica a backend/code, schema, pricing, filtri, preferiti BGG, rating, acquisti/vendite, Cacce o memoria ultimo gioco. Motore UI resta standby.
+
+Verifiche: PR186 validation458 run37050296227/job110981735543 success, HEAD ed78820f1bb24091b3c75807dfc991b7ecd23fe0, merge f1d2a5444f6fbc053c1d00217d5b85f875f550cc. PR187 validation461 run37051936509/job110987199541 success, HEAD8b6849e2f545c85577df751187265bc03f561ed6, merge48d78f53273119b2d146ed2c7741738f2dded93d. Suite esistente, pricing unit test, compile e review APK passati. Fixture Java su policy reali stanza/swipe e metodi Activity/adattatore touch estratti: posizioni indipendenti/restoration/boundaries, verticale/diagonale/slop/breve/cancel/multipointer, bridge legacy/visibilità, Back, testo ripristinato/live/ricostruito/cancellato. Primo guard Home falliva perché richiedeva il tab Libreria rimosso per decisione approvata; aggiornato senza rimuovere controlli icone/arte/prezzi. Beta169 run37052302927/job110988420583 success, versione5.12.146-ludo-rooms (1000169); certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato. 2026-10-02T19:14:04.4096306Z ✔  uploaded new release 5.12.146-ludo-rooms (1000169) successfully!; 2026-10-02T19:14:05.1084149Z ✔  distributed to testers/groups successfully.
+
+Accettazione telefono pendente: resa delle due scene e Libreria dentro Casa, swipe vs scroll, ricerca/refresh testo, Back/rotazione/riapertura e posizioni, wizard/voto/vendita/BGG e gesture prodotto. JVM con confini Android controllati non equivale a test strumentale/restart reale o prova frame-time. Libreria144 non diventa accettata per la sola integrazione.
+
+Frontend7/backend5 aperti. Unico prossimo gruppo raccomandato: composizione Catalogo unificato + Bundle/Esplora secondo decisione20:00. Feedback su Ludo/Casa rientra nel gruppo Ludo/Libreria già aperto.
+
+
 ## Feedback20:35 — rinviare il polish Libreria al contesto Ludo
 
 L'utente segnala che la Libreria144 non convince del tutto, ma chiede di riguardarla dopo averla integrata nella logica di Ludo e di passare al next step. Non registrare144 come accettata visivamente. Priorità di questa chat: rendere concreta la composizione Ludo con Libreria come stanza; la decisione Catalogo/Bundle20:00 resta valida nel backlog.
