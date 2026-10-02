@@ -3,6 +3,11 @@ package it.vintedaffari.app;
 /** Presentation only: never decides queue ownership or changes pipeline eligibility. */
 final class EngineOverviewPresentation {
     private EngineOverviewPresentation() {}
+    static String backSection(String section,boolean hasDay) {
+        if("run".equals(section)&&hasDay)return "day";
+        if("day".equals(section))return "history";
+        return "overview";
+    }
     static String phaseLabel(int phase) {
         String[] labels={"Da riconoscere","Dati BGG","Da collegare","Verifica Vinted","Pronti"};
         return labels[phase];
