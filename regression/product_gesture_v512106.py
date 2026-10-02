@@ -19,6 +19,7 @@ public class MotionEvent {
  public static final int ACTION_DOWN=0,ACTION_UP=1,ACTION_MOVE=2,ACTION_CANCEL=3,ACTION_POINTER_DOWN=5;
  int action,pointers;float y;
  public MotionEvent(int a,float v,int p){action=a;y=v;pointers=p;}
+ public static MotionEvent obtain(MotionEvent e){return new MotionEvent(e.action,e.y,e.pointers);}public void setAction(int a){action=a;}public void recycle(){}
  public int getAction(){return action;} public int getActionMasked(){return action;}
  public int getPointerCount(){return pointers;} public float getY(){return y;} public float getX(){return y;}
 }
@@ -40,18 +41,22 @@ public class ProductGestureRegression {
   int getScrollY(){return y;}View getChildAt(int i){return child;}
   boolean canScrollVertically(int direction){return direction>0&&y<500;}
   void setOnTouchListener(Touch t){touch=t;}
-  void send(int action,float finger){touch.on(this,new MotionEvent(action,finger,1));}
+  float nativeAnchor;boolean nativeDrag;
+  void requestDisallowInterceptTouchEvent(boolean b){}
+  boolean onTouchEvent(MotionEvent e){if(e.getActionMasked()==3){nativeDrag=false;return true;}if(e.getActionMasked()==0){nativeAnchor=e.getY();nativeDrag=true;}else if(e.getActionMasked()==2&&nativeDrag){y=Math.max(0,Math.min(500,y+Math.round(nativeAnchor-e.getY())));nativeAnchor=e.getY();}else if(e.getActionMasked()==1){nativeDrag=false;}return true;}
+  void send(int action,float finger){MotionEvent e=new MotionEvent(action,finger,1);if(!touch.on(this,e))onTouchEvent(e);}
  }
  static class Animation {Animation alpha(float a){return this;}Animation setDuration(long t){return this;}void start(){}}
  static class KeyEvent {static final int KEYCODE_ENTER=66,KEYCODE_DPAD_CENTER=23,ACTION_UP=1;int getAction(){return ACTION_UP;}}
  static class TextView extends View {interface KeyListener {boolean on(View v,int key,KeyEvent event);}void setOnKeyListener(KeyListener l){}boolean performClick(){return false;}AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}float alpha,progress;void setAlpha(float a){alpha=a;}void setText(String s){}Animation animate(){return new Animation();}}
  static class Dialog {boolean showing=true;boolean isShowing(){return showing;}void dismiss(){showing=false;}}
- boolean ready=true;int opens;Dialog activeDetailDialog; 
+ boolean ready=true;int opens;Dialog activeDetailDialog;TextView lastHint; 
  float dp(float v){return v;}int dp(int v){return v;}
  void openGameDetailOverlay(long id){if(id!=42)throw new AssertionError("wrong game");opens++;}
  boolean readyGameTransition(Dialog source,long gameId){return ready&&source.isShowing()&&activeDetailDialog==source&&gameId==42;}
  void showPreparedGameTransition(Dialog source,long gameId){if(!readyGameTransition(source,gameId))throw new AssertionError("invalid transition");opens++;}
- void updateGamePullHint(TextView hint,float progress,boolean ready){hint.progress=progress;}
+ void updateGamePullHint(TextView hint,float progress,boolean ready){hint.progress=progress;lastHint=hint;}
+ void updateGamePullHint(TextView hint,float progress,boolean ready,boolean animateReturn){updateGamePullHint(hint,progress,ready);}
  static ProductGestureRegression fixture(ScrollView sc,Dialog source){
   ProductGestureRegression n=new ProductGestureRegression();n.activeDetailDialog=source;n.installPullToGame(sc,new TextView(),42,source);return n;
  }
@@ -63,12 +68,13 @@ public class ProductGestureRegression {
  static void shortOldPullDoesNotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(1,200);equal(0,n.opens,"short pull must remain reading");}
  static void ongoingScrollCannotBecomePull(){ScrollView sc=new ScrollView();sc.y=0;Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,500);sc.y=500;sc.send(2,350);sc.send(2,100);sc.send(1,100);equal(0,n.opens,"same touch cannot arm at bottom");}
  static void retreatCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(2,280);sc.send(1,280);equal(0,n.opens,"retreat");}
+ static void reversingRemainsUnderFinger(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,80);sc.send(2,135);sc.send(2,190);if(Math.abs(n.lastHint.progress-.5f)>.001f)throw new AssertionError("native scroll erased half-progress on reversal: "+n.lastHint.progress);equal(500,sc.y,"claimed pull must keep native scroll at bottom");sc.send(2,245);if(Math.abs(n.lastHint.progress-.25f)>.001f)throw new AssertionError("quarter reverse progress");sc.send(2,300);if(n.lastHint.progress!=0)throw new AssertionError("zero progress remains under finger");sc.send(2,190);if(Math.abs(n.lastHint.progress-.5f)>.001f)throw new AssertionError("pull can grow again without lifting finger");sc.send(1,190);equal(0,n.opens,"partial reversal does not open");}
  static void finalReleaseRetreatCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(1,280);equal(0,n.opens,"retreat at final release");}
  static void closedSourceCannotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);d.showing=false;sc.send(1,200);equal(0,n.opens,"dismissed source");}
  static void unavailablePreloadCannotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);n.ready=false;sc.send(1,200);equal(0,n.opens,"unavailable preload");}
  static void extraPointerCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.touch.on(sc,new MotionEvent(5,200,2));sc.send(1,200);equal(0,n.opens,"multiple fingers");}
  public static void main(String[] args){
-  int failures=0;Runnable[] tests={ProductGestureRegression::cancelNeverOpens,ProductGestureRegression::arrivingAtBottomDoesNotCountEarlierScroll,ProductGestureRegression::insufficientPullDoesNotOpen,ProductGestureRegression::fullIntentionalPullOpensOnce,ProductGestureRegression::retreatCancels,ProductGestureRegression::closedSourceCannotOpen,ProductGestureRegression::unavailablePreloadCannotOpen,ProductGestureRegression::extraPointerCancels,ProductGestureRegression::finalReleaseRetreatCancels,ProductGestureRegression::shortOldPullDoesNotOpen,ProductGestureRegression::ongoingScrollCannotBecomePull};
+  int failures=0;Runnable[] tests={ProductGestureRegression::reversingRemainsUnderFinger,ProductGestureRegression::cancelNeverOpens,ProductGestureRegression::arrivingAtBottomDoesNotCountEarlierScroll,ProductGestureRegression::insufficientPullDoesNotOpen,ProductGestureRegression::fullIntentionalPullOpensOnce,ProductGestureRegression::retreatCancels,ProductGestureRegression::closedSourceCannotOpen,ProductGestureRegression::unavailablePreloadCannotOpen,ProductGestureRegression::extraPointerCancels,ProductGestureRegression::finalReleaseRetreatCancels,ProductGestureRegression::shortOldPullDoesNotOpen,ProductGestureRegression::ongoingScrollCannotBecomePull};
   for(Runnable test:tests)try{test.run();System.out.println("PASS product gesture");}catch(AssertionError e){failures++;System.out.println("FAIL "+e.getMessage());}
   if(failures>0)throw new AssertionError(failures+" gesture scenarios failed");
  }
