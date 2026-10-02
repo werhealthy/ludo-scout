@@ -30,5 +30,14 @@ public final class RadarReliabilityRegression {
         check(drained.await(3,TimeUnit.SECONDS),"final flush did not finish");
         RadarIntakeCounters restored=new RadarIntakeCounters();restored.initialize(new File(dir,"final.properties"),new HashMap<>(),6000);
         check(restored.get("analysisCommitted")==8,"destroy lost accepted work counters");
+        // A replacement service shares the process owner while the old instance still drains.
+        RadarIntakeCounters owner=new RadarIntakeCounters();File shared=new File(dir,"overlap.properties");owner.initialize(shared,new HashMap<>(),7000);
+        owner.add("cardsParsedTotal",4);Map<String,Long> stale=new HashMap<>();stale.put("cardsParsedTotal",999L);
+        owner.initialize(shared,stale,8000);check(owner.get("cardsParsedTotal")==4,"recreation re-seeded an initialized owner");
+        Thread old=new Thread(()->{for(int i=0;i<25;i++){owner.add("cardsParsedTotal",1);owner.persist(shared);}});
+        Thread replacement=new Thread(()->{for(int i=0;i<25;i++){owner.add("cardsParsedTotal",1);owner.persist(shared);}});
+        old.start();replacement.start();old.join();replacement.join();
+        RadarIntakeCounters overlapReload=new RadarIntakeCounters();overlapReload.initialize(shared,new HashMap<>(),9000);
+        check(overlapReload.get("cardsParsedTotal")==54&&!owner.metadata().contains("counterError=IOException"),"overlap overwrite/tmp rename lost increments");
     }
 }

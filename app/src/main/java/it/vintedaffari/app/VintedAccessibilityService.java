@@ -89,7 +89,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();
     private final ExecutorService diagnosticIo=Executors.newSingleThreadExecutor();
     private final RadarPersistence radarPersistence=new RadarPersistence();
-    private final RadarIntakeCounters radarCounters=new RadarIntakeCounters();
+    // Service recreation may overlap the previous instance's asynchronous drain.
+    private static final RadarIntakeCounters radarCounters=new RadarIntakeCounters();
     private volatile boolean radarDestroyed=false;
     private boolean analysisSelectionInFlight=false;
     private final AtomicBoolean a11yDiagnosticFlushQueued=new AtomicBoolean(false);

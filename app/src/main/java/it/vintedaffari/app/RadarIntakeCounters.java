@@ -13,6 +13,7 @@ import java.util.Properties;
 final class RadarIntakeCounters {
     static final String[] KEYS={"vintedEvents","scans","cardsParsedTotal","analysisBatches","analysesStored","classifierBlocked","nonGameRejected","analysisCommitted","analysisQuarantined"};
     private final Map<String,Long> values=new LinkedHashMap<>();
+    private final Object diskLock=new Object();
     private boolean ready;private long epoch;private String error="";
     RadarIntakeCounters(){for(String key:KEYS)values.put(key,0L);}
     synchronized long add(String key,long delta){
@@ -23,6 +24,8 @@ final class RadarIntakeCounters {
     synchronized boolean ready(){return ready;}
     synchronized String metadata(){return "source=radar-owner-file;counterEpoch="+epoch+";counterReady="+ready+";counterError="+error+";flushWindowMs=2000";}
     void initialize(File file,Map<String,Long> seed,long now){
+        synchronized(diskLock){
+        synchronized(this){if(ready)return;}
         Properties disk=new Properties();String failure="";
         try{if(file.isFile()){if(file.length()>16384)throw new IOException("oversize");try(FileInputStream in=new FileInputStream(file)){disk.load(in);}}}
         catch(IOException|IllegalArgumentException e){failure=e.getClass().getSimpleName();}
@@ -32,8 +35,10 @@ final class RadarIntakeCounters {
             for(String key:KEYS){long baseline=Math.max(number(disk.getProperty(key),0L),Math.max(0L,seed.getOrDefault(key,0L)));long delta=values.get(key);values.put(key,delta>Long.MAX_VALUE-baseline?Long.MAX_VALUE:baseline+delta);}
             error=failure;ready=true;
         }
+        }
     }
     void persist(File file){
+        synchronized(diskLock){
         Properties copy=new Properties();
         synchronized(this){if(!ready)return;copy.setProperty("epoch",String.valueOf(epoch));for(String key:KEYS)copy.setProperty(key,String.valueOf(values.get(key)));}
         try{
@@ -43,6 +48,7 @@ final class RadarIntakeCounters {
             if(!tmp.renameTo(file))throw new IOException("rename");
             synchronized(this){error="";}
         }catch(IOException e){synchronized(this){error=e.getClass().getSimpleName();}}
+        }
     }
     private static long number(String s,long fallback){try{return Math.max(0L,Long.parseLong(s));}catch(Exception e){return fallback;}}
 }
