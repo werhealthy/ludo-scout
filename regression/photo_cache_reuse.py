@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory() as temp:
 import re, sqlite3
 cache_source = (PKG / 'VintedPhotoHashCache.java').read_text()
 method = cache_source.split('public static Long lookupExact(', 1)[1].split('public static Long lookup(', 1)[0]
-suffix = re.search(r'"SELECT hash64 FROM "\\+TABLE\\+"([^"]+)"', method).group(1)
+suffix = method.split('"SELECT hash64 FROM "+TABLE+"', 1)[1].split('"', 1)[0]
 sql = 'SELECT hash64 FROM vinted_photo_hash_cache_v1' + suffix
 db = sqlite3.connect(':memory:')
 db.execute('CREATE TABLE vinted_photo_hash_cache_v1(photo_key TEXT PRIMARY KEY,image_url TEXT,hash64 INTEGER,last_at INTEGER)')
