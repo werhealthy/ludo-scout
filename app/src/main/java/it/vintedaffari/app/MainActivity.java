@@ -1616,7 +1616,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView back=appIcon(LudoIcons.CHEVRON_LEFT,22,TEXT);back.setGravity(Gravity.CENTER);back.setContentDescription("Torna indietro");back.setOnClickListener(v->dialog.dismiss());toolbar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
         toolbar.addView(text("Annuncio",16,MUTED,Typeface.NORMAL),new LinearLayout.LayoutParams(0,-2,1));
         toolbar.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));
-        TextView more=appIcon(LudoIcons.ELLIPSIS_VERTICAL,18,TEXT);more.setGravity(Gravity.CENTER);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
+        TextView more=roundIconButton(LudoIcons.ELLIPSIS_VERTICAL,TEXT,true);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
         LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);
 
         FrameLayout hero=new FrameLayout(this);hero.addView(dealProductArtwork(d),new FrameLayout.LayoutParams(-1,-1));LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,productMediaHeight());hlp.topMargin=dp(8);box.addView(hero,hlp);
