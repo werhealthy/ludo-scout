@@ -53,3 +53,14 @@ assert len(candidates())==1,"optional deep work does not block the existing read
 db.execute("UPDATE processing_jobs SET source='MANUAL_RECOVERY'")
 assert not candidates(),"manual deep recovery still blocks trust"
 print("PASS monthly Offertone candidate SQL: same identity, current availability, trust, date and core-job gates")
+
+# The combined statement provides one read snapshot and a row even with no offers.
+snapshot="SELECT summary.game_count,candidates.* FROM ("+sql+") summary LEFT JOIN ("+candidate+") candidates ON 1=1"
+rows=db.execute(snapshot,("100","200","100","200")).fetchall()
+assert len(rows)==1 and rows[0][0]==4 and rows[0][1] is None, "no active offers must retain the monthly total"
+db.execute("DELETE FROM processing_jobs")
+rows=db.execute(snapshot,("100","200","100","200")).fetchall()
+assert rows[0][0]==4 and rows[0][1]=='a' and len(rows[0])==10, "combined cursor field order"
+rows=db.execute(snapshot,("220","230","220","230")).fetchall()
+assert len(rows)==1 and rows[0][0]==0 and rows[0][1] is None, "empty snapshot keeps true zero and no candidate"
+print("PASS single SQLite read snapshot: totals, offers, cursor fields and empty month")

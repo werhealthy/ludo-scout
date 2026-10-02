@@ -1488,15 +1488,15 @@ private void showFilterSheet(){
         uiDataIo.execute(()->{Integer games=null,greatBuys=null;String error=null;
             try{
                 android.database.sqlite.SQLiteDatabase database=db.getReadableDatabase();
-                String[] bounds={String.valueOf(month),String.valueOf(now)};
-                try(android.database.Cursor cursor=database.rawQuery(LudoMonthlyOverview.STATIC_QUERY,bounds)){if(cursor.moveToFirst())games=cursor.getInt(0);else throw new IllegalStateException("Panoramica non disponibile");}
+                String[] bounds={String.valueOf(month),String.valueOf(now),String.valueOf(month),String.valueOf(now)};
                 Set<String> identities=new HashSet<>();
-                try(android.database.Cursor cursor=database.rawQuery(LudoMonthlyOverview.GREAT_BUY_QUERY,bounds)){
+                try(android.database.Cursor cursor=database.rawQuery(LudoMonthlyOverview.SNAPSHOT_QUERY,bounds)){
                     while(cursor.moveToNext()){
-                        DealRecord deal=new DealRecord();deal.bggId=cursor.getString(0);deal.itemPriceCents=cursor.getInt(1);deal.totalCents=cursor.isNull(2)?null:cursor.getInt(2);deal.benchmarkCents=cursor.isNull(3)?null:cursor.getInt(3);deal.protectedPriceCents=cursor.isNull(4)?null:cursor.getInt(4);deal.shippingCents=cursor.isNull(5)?null:cursor.getInt(5);deal.shippingVerifiedCents=cursor.isNull(6)?null:cursor.getInt(6);deal.offerCents=cursor.isNull(7)?null:cursor.getInt(7);deal.tier=cursor.getString(8);
+                        games=cursor.getInt(0);if(cursor.isNull(1))continue;
+                        DealRecord deal=new DealRecord();deal.bggId=cursor.getString(1);deal.itemPriceCents=cursor.getInt(2);deal.totalCents=cursor.isNull(3)?null:cursor.getInt(3);deal.benchmarkCents=cursor.isNull(4)?null:cursor.getInt(4);deal.protectedPriceCents=cursor.isNull(5)?null:cursor.getInt(5);deal.shippingCents=cursor.isNull(6)?null:cursor.getInt(6);deal.shippingVerifiedCents=cursor.isNull(7)?null:cursor.getInt(7);deal.offerCents=cursor.isNull(8)?null:cursor.getInt(8);deal.tier=cursor.getString(9);
                         if(DealEvaluator.evaluate(deal).decision==DealEvaluator.Decision.GREAT_BUY)identities.add(deal.bggId);
                     }
-                }greatBuys=identities.size();
+                }if(games==null)throw new IllegalStateException("Panoramica non disponibile");greatBuys=identities.size();
             }catch(RuntimeException failure){games=null;greatBuys=null;error="Non riesco a leggere la panoramica.";}
             final Integer found=games,quality=greatBuys;final String failure=error;
             runOnUiThread(()->{ludoOverviewLoading=false;if(isFinishing()||isDestroyed())return;ludoMonthGames=found;ludoMonthGreatBuys=quality;ludoOverviewError=failure;ludoOverviewAt=System.currentTimeMillis();ludoOverviewMonth=month;if("companion".equals(tab)&&LudoRoomState.EXPLORE.equals(ludoRoomState().room()))scheduleRender(0);});
