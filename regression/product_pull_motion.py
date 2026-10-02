@@ -25,9 +25,9 @@ public class ProductPullMotion {
   Animation animate(){return animation;}}
  static class Animation {View view;Animation(View v){view=v;}void cancel(){}Animation translationY(float v){view.translation=v;return this;}Animation setDuration(long t){return this;}Animation setInterpolator(Object i){return this;}void start(){}}
  static class Drawable {}
- static class GamePullProgress extends Drawable {float progress;ValueAnimator returning;View content;TextView retry;void setProgress(float p){progress=p;}void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}}
+ static class GamePullProgress extends Drawable {float progress;ValueAnimator returning;View content;TextView retry;float revealDistance=96,indicatorTravel=64;void setProgress(float p){progress=p;}void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}}
  static class TextView extends View {String text="",description;float alpha;Drawable[] drawables={null,new GamePullProgress(),null,null};
-  Drawable[] getCompoundDrawables(){return drawables;}String getText(){return text;}void setText(String t){text=t;}boolean isClickable(){return false;}void setAlpha(float a){alpha=a;}void setContentDescription(String s){description=s;}}
+  Drawable[] getCompoundDrawables(){return drawables;}String getText(){return text;}void setText(String t){text=t;}boolean isClickable(){return false;}boolean hasOnClickListeners(){return false;}void setAlpha(float a){alpha=a;}void setContentDescription(String s){description=s;}}
  static class ValueAnimator extends android.animation.Animator {
   interface Update {void on(ValueAnimator a);}static boolean enabled=true;static ValueAnimator latest;
   float from,to,current;boolean cancelled;Update update;android.animation.AnimatorListenerAdapter listener;
@@ -49,7 +49,7 @@ public class ProductPullMotion {
   eq(.75f,gesture.move(135,true,220),"three quarters remain continuous");
   eq(0,gesture.move(300,true,220),"retreat clears progress");
   ProductPullMotion app=new ProductPullMotion();TextView hint=new TextView();View content=new View();hint.parent=new View();((GamePullProgress)hint.drawables[1]).content=content;
-  app.updateGamePullHint(hint,.25f,true);eq(72,hint.translation,"indicator emerges from below");eq(.25f,hint.alpha,"indicator fades with pull");eq(-24,content.translation,"quarter pull lifts content");
+  app.updateGamePullHint(hint,.25f,true);eq(48,hint.translation,"indicator emerges from below");eq(.25f,hint.alpha,"indicator fades with pull");eq(-24,content.translation,"quarter pull lifts content");
   app.updateGamePullHint(hint,.5f,true);eq(-48,content.translation,"half pull lifts content");
   app.updateGamePullHint(hint,.75f,true);eq(-72,content.translation,"continuous lift");
   app.updateGamePullHint(hint,0,true);
@@ -64,6 +64,16 @@ public class ProductPullMotion {
   ValueAnimator.enabled=false;app.updateGamePullHint(hint,0,true);eq(0,ring.progress,"disabled animations clear immediately");eq(0,content.translation,"disabled animations restore content");ValueAnimator.enabled=true;
   app.updateGamePullHint(hint,.8f,true);app.updateGamePullHint(hint,0,true);ValueAnimator detached=ValueAnimator.latest;hint.attached=false;detached.frame(.5f);eq(0,ring.progress,"detached view clears return");eq(0,content.translation,"detached view resets content");if(ring.returning!=null)throw new AssertionError("detached return leaks animator");
   eq(160,content.height,"gesture leaves measured scroll extent unchanged");
+  // Production layout reserves 72dp plus two scaled text lines; compound ring center is near33dp.
+  for(int lineHeight:new int[]{14,21,28,42}){
+   float height=Math.max(96,lineHeight*2+72),travel=height-32;
+   for(float p:new float[]{.01f,.05f,.1f,.25f,1f}){
+    float center=-height+travel*(1-p)+33;
+    float radius=3+11.75f*p;
+    if(center-radius>=0)throw new AssertionError("ring clipped at early progress "+p);
+    if(center-radius<-(16+height*p))throw new AssertionError("ring overlaps last content");
+   }
+  }
   if(!hint.text.isEmpty())throw new AssertionError("resting hint must be invisible");
   System.out.println("PASS production linear fill, continuous content lift and cancellation");
  }

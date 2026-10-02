@@ -1653,11 +1653,11 @@ private void openDetail(DealRecord d){openDetail(d,false);}
 
         FrameLayout scrollStage=new FrameLayout(this);scrollStage.setClipChildren(true);scrollStage.addView(sc,new FrameLayout.LayoutParams(-1,-1));
         if(game!=null){
-            TextView pullHint=text("",12,MUTED,Typeface.NORMAL);pullHint.setGravity(Gravity.CENTER);pullHint.setMinHeight(dp(96));pullHint.setLines(2);pullHint.setPadding(0,dp(8),0,dp(8));pullHint.setAlpha(0f);pullHint.setTranslationY(dp(96));
+            TextView pullHint=text("",12,MUTED,Typeface.NORMAL);pullHint.setGravity(Gravity.CENTER);pullHint.setMinHeight(dp(96));pullHint.setLines(2);pullHint.setPadding(0,dp(8),0,dp(8));pullHint.setAlpha(0f);int pullHeight=Math.max(dp(96),pullHint.getLineHeight()*2+dp(72));pullHint.setTranslationY(pullHeight-dp(32));
             TextView retry=text("Scheda gioco non pronta · tocca per riprovare",12,MUTED,Typeface.NORMAL);retry.setMinHeight(dp(48));retry.setGravity(Gravity.CENTER);retry.setVisibility(View.GONE);retry.setOnClickListener(v->pullHint.performClick());box.addView(retry,new LinearLayout.LayoutParams(-1,-2));
-            GamePullProgress progress=new GamePullProgress();progress.content=box;progress.retry=retry;progress.setBounds(0,0,dp(44),dp(44));pullHint.setCompoundDrawables(null,progress,null,null);pullHint.setCompoundDrawablePadding(dp(6));
+            GamePullProgress progress=new GamePullProgress();progress.content=box;progress.retry=retry;progress.revealDistance=pullHeight;progress.indicatorTravel=pullHeight-dp(32);progress.setBounds(0,0,dp(44),dp(44));pullHint.setCompoundDrawables(null,progress,null,null);pullHint.setCompoundDrawablePadding(dp(6));
             pullHint.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){@Override public void onViewAttachedToWindow(View v){}@Override public void onViewDetachedFromWindow(View v){progress.cancelReturn();renderGamePullHint(pullHint,0,false);}});
-            scrollStage.addView(pullHint,new FrameLayout.LayoutParams(-1,dp(96),Gravity.BOTTOM));installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));
+            scrollStage.addView(pullHint,new FrameLayout.LayoutParams(-1,pullHeight,Gravity.BOTTOM));installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));
         }
 
         LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(scrollStage,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(16));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
@@ -1709,7 +1709,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         });
     }
     private final class GamePullProgress extends Drawable {
-        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;private ValueAnimator returning;private View content;private TextView retry;
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;private ValueAnimator returning;private View content;private TextView retry;private float revealDistance,indicatorTravel;
         void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}
         void setProgress(float value){progress=Math.max(0f,Math.min(1f,value));invalidateSelf();}
         @Override public void draw(Canvas canvas){if(progress<=0)return;Rect r=getBounds();float density=getResources().getDisplayMetrics().density;float radius=(3f+11.75f*progress)*density;circle.set(r.exactCenterX()-radius,r.exactCenterY()-radius,r.exactCenterX()+radius,r.exactCenterY()+radius);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f*density);paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(OUTLINE);canvas.drawOval(circle,paint);paint.setColor(CYAN);canvas.drawArc(circle,-90,360*progress,false,paint);}
@@ -1737,12 +1737,12 @@ private void openDetail(DealRecord d){openDetail(d,false);}
 
     private void renderGamePullHint(TextView hint,float progress,boolean ready){
         Drawable[] drawables=hint.getCompoundDrawables();GamePullProgress ring=drawables[1] instanceof GamePullProgress?(GamePullProgress)drawables[1]:null;if(ring!=null)ring.setProgress(progress);
-        String label=!ready?(hint.isClickable()?"Preparazione non riuscita · tocca per riprovare":""):progress>=1?"Rilascia per aprire la scheda gioco":progress>0?"Scheda gioco":"";
+        String label=!ready?(hint.hasOnClickListeners()?"Preparazione non riuscita · tocca per riprovare":""):progress>=1?"Rilascia per aprire la scheda gioco":progress>0?"Scheda gioco":"";
         if(!label.contentEquals(hint.getText()))hint.setText(label);
         // Translate without relayout: ring, caption and content move together on the same progress.
-        if(ring!=null&&ring.content!=null){ring.content.animate().cancel();ring.content.setTranslationY(-dp(96f)*progress);}
-        hint.setTranslationY(dp(96f)*(1f-progress));hint.setAlpha(progress);
-        if(ring!=null&&ring.retry!=null)ring.retry.setVisibility(!ready&&hint.isClickable()?View.VISIBLE:View.GONE);
+        if(ring!=null&&ring.content!=null){ring.content.animate().cancel();ring.content.setTranslationY(-ring.revealDistance*progress);}
+        if(ring!=null)hint.setTranslationY(ring.indicatorTravel*(1f-progress));hint.setAlpha(progress);
+        if(ring!=null&&ring.retry!=null)ring.retry.setVisibility(!ready&&hint.hasOnClickListeners()?View.VISIBLE:View.GONE);
         // Keep a stable scroll extent and an accessible/key equivalent when visually at rest.
         hint.setContentDescription(label.isEmpty()?(ready?"Apri scheda gioco. Dal fondo, scorri ancora":"La scheda gioco si sta preparando"):label+(progress>0?" · "+Math.round(progress*100)+"%":""));
     }
@@ -1759,7 +1759,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         hint.setOnClickListener(null);hint.setClickable(false);updateGamePullHint(hint,0,false);
         PreparedGameOverlay request=new PreparedGameOverlay(gameId);preparedGameOverlays.put(source,request);
         uiDataIo.execute(()->{GameRecord game=null;GameDetailData data=null;try{game=marketStore.gameStats(gameId);if(game!=null)data=loadGameDetailData(game);}catch(RuntimeException ignored){}final GameRecord g=game;final GameDetailData snapshot=data;
-            runOnUiThread(()->{if(isFinishing()||isDestroyed()||!source.isShowing()||preparedGameOverlays.get(source)!=request)return;if(g==null||snapshot==null){hint.setOnClickListener(v->prepareGameTransition(source,gameId,hint));updateGamePullHint(hint,0,false);return;}request.dialog=buildPreparedGameOverlay(g,snapshot,()->prepareGameTransition(source,gameId,hint));updateGamePullHint(hint,0,true);});
+            runOnUiThread(()->{if(isFinishing()||isDestroyed()||!source.isShowing()||preparedGameOverlays.get(source)!=request)return;if(g==null||snapshot==null){hint.setOnClickListener(v->prepareGameTransition(source,gameId,hint));hint.setClickable(false);updateGamePullHint(hint,0,false);return;}request.dialog=buildPreparedGameOverlay(g,snapshot,()->prepareGameTransition(source,gameId,hint));updateGamePullHint(hint,0,true);});
         });
     }
     private Dialog buildPreparedGameOverlay(GameRecord game,GameDetailData snapshot,Runnable onClosed){
