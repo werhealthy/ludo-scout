@@ -25,6 +25,25 @@ assert 'Nessun bundle confermato' in method('private void renderBundles(')
 assert 'BundleExploration.begin(this,d)' in method('private void openBundleProspect(')
 for signature in ['private void saveUiState(', 'private void restoreUiState(', 'private void persistTransientUiSession(', 'private void restoreTransientUiSession(']:
  assert 'bundleSection' in method(signature) and 'bundleScroll_' in method(signature)
+# Execute the production identity SELECT with more matches than the preview can hold.
+import re,sqlite3
+market=(root/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text()
+helper=market[market.index('public Set<String> catalogGameMatches('):market.index('    public int countVisibleGamesAdvanced(')]
+parts=re.search(r'String sql="(.*?)"\+where\+"(.*?)";',helper).groups()
+conn=sqlite3.connect(':memory:')
+conn.executescript("CREATE TABLE games(id INTEGER,bgg_id TEXT,database_visible INTEGER,match_state TEXT,normalized_name TEXT,categories TEXT,mechanics TEXT,designers TEXT,publishers TEXT,families TEXT);CREATE TABLE game_aliases(game_id INTEGER,normalized_alias TEXT);")
+for i in range(40):
+ conn.execute("INSERT INTO games VALUES(?,?,1,'MATCHED',?,'','','','','')",(i,str(i),'unrelated title '+str(i)))
+ conn.execute("INSERT INTO game_aliases VALUES(?,?)",(i,'catan edition '+str(i)))
+conn.execute("UPDATE games SET database_visible=0 WHERE id=38")
+conn.execute("UPDATE games SET match_state='BGG_MATCH_REQUIRED' WHERE id=37")
+eligible=[str(i) for i in range(25,40)]
+where="g.database_visible=1 AND g.match_state='MATCHED' AND g.bgg_id IN ("+','.join('?' for _ in eligible)+')'
+rows={r[0] for r in conn.execute(parts[0]+where+parts[1],eligible+['%catan%']*7)}
+assert rows==set(eligible)-{'37','38'}
+assert '39' in rows and '0' not in rows
+assert 'LIMIT' not in helper and 'start+=800' in helper
+print('PASS production SQL alias beyond preview, eligibility, canonical match state, chunked binds')
 code=r'''
 import java.util.*;
 class ViewTreeObserver {interface OnGlobalLayoutListener {void onGlobalLayout();}ArrayList<OnGlobalLayoutListener> pending=new ArrayList<>();boolean isAlive(){return true;}void addOnGlobalLayoutListener(OnGlobalLayoutListener r){pending.add(r);}void removeOnGlobalLayoutListener(OnGlobalLayoutListener r){pending.remove(r);}void flush(){for(OnGlobalLayoutListener r:new ArrayList<>(pending))r.onGlobalLayout();}}
