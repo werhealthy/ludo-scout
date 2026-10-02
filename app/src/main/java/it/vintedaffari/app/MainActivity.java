@@ -1690,7 +1690,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private final class GamePullProgress extends Drawable {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;
         void setProgress(float value){progress=Math.max(0f,Math.min(1f,value));invalidateSelf();}
-        @Override public void draw(Canvas canvas){if(progress<=0)return;Rect r=getBounds();float radius=dp(3f+11.75f*progress);circle.set(r.exactCenterX()-radius,r.exactCenterY()-radius,r.exactCenterX()+radius,r.exactCenterY()+radius);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2.5f));paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(OUTLINE);canvas.drawOval(circle,paint);paint.setColor(CYAN);canvas.drawArc(circle,-90,360*progress,false,paint);}
+        @Override public void draw(Canvas canvas){if(progress<=0)return;Rect r=getBounds();float density=getResources().getDisplayMetrics().density;float radius=(3f+11.75f*progress)*density;circle.set(r.exactCenterX()-radius,r.exactCenterY()-radius,r.exactCenterX()+radius,r.exactCenterY()+radius);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f*density);paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(OUTLINE);canvas.drawOval(circle,paint);paint.setColor(CYAN);canvas.drawArc(circle,-90,360*progress,false,paint);}
         @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
         @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
         @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
