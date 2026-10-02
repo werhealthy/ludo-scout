@@ -728,6 +728,19 @@ private void applyDiscoverChrome(){
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);card.setLayoutParams(lp);return card;
     }
 
+    private View featuredMoreButton(){
+        FrameLayout target=new FrameLayout(this);target.setMinimumWidth(dp(48));target.setMinimumHeight(dp(48));target.setFocusable(true);
+        View surface=new View(this);surface.setBackground(round(Color.rgb(23,20,34),999,1,Color.rgb(94,83,120)));
+        target.addView(surface,new FrameLayout.LayoutParams(dp(36),dp(36),Gravity.CENTER));
+        View dots=new View(this);dots.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        dots.setBackground(new Drawable(){
+            final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+            public void draw(Canvas canvas){Rect bounds=getBounds();float cx=bounds.exactCenterX(),cy=bounds.exactCenterY(),radius=bounds.width()/12f;paint.setColor(Color.rgb(226,221,242));for(int i=-1;i<=1;i++)canvas.drawCircle(cx+i*bounds.width()/3f,cy,radius,paint);}
+            public void setAlpha(int alpha){paint.setAlpha(alpha);}public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+        });
+        target.addView(dots,new FrameLayout.LayoutParams(dp(18),dp(18),Gravity.CENTER));return target;
+    }
+
     private View heroOpportunityCard(DealRecord d){
         FrameLayout card=new FrameLayout(this);card.setClipToOutline(true);card.setBackground(premiumSurface(true));
         LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(16),dp(8),dp(16),dp(16));card.addView(content,new FrameLayout.LayoutParams(-1,-2));
@@ -741,8 +754,8 @@ private void applyDiscoverChrome(){
             if(art.getParent()!=null)((ViewGroup)art.getParent()).removeView(art);content.removeAllViews();
             LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
             TextView eyebrow=discoverTextWeight("Gioco in evidenza",12,Color.rgb(242,231,255),600);eyebrow.setCompoundDrawablesRelativeWithIntrinsicBounds(iconDrawable(LudoIcons.STAR,DISCOVER_ORANGE,12),null,null,null);eyebrow.setCompoundDrawablePadding(dp(6));
-            eyebrow.setPadding(dp(10),dp(6),dp(10),dp(6));eyebrow.setBackground(round(Color.argb(90,67,36,95),999,1,DISCOVER_OUTLINE));header.addView(eyebrow,new LinearLayout.LayoutParams(-2,-2));header.addView(new View(this),new LinearLayout.LayoutParams(0,dp(1),1));
-            TextView more=roundIconButton("\uf141",Color.rgb(226,221,242),true);more.setContentDescription("Azioni del gioco in evidenza");more.setOnClickListener(v->showProductActions(d,true));header.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout.LayoutParams moreLp=new LinearLayout.LayoutParams(dp(48),dp(48));moreLp.leftMargin=dp(4);header.addView(more,moreLp);content.addView(header);
+            eyebrow.setPadding(dp(10),dp(6),dp(10),dp(6));eyebrow.setBackground(round(Color.argb(90,67,36,95),999,1,Color.rgb(112,72,145)));header.addView(eyebrow,new LinearLayout.LayoutParams(-2,-2));header.addView(new View(this),new LinearLayout.LayoutParams(0,dp(1),1));
+            View more=featuredMoreButton();more.setContentDescription("Azioni del gioco in evidenza");more.setOnClickListener(v->showProductActions(d,true));header.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout.LayoutParams moreLp=new LinearLayout.LayoutParams(dp(48),dp(48));moreLp.leftMargin=dp(4);header.addView(more,moreLp);content.addView(header);
             boolean inline=HomePresentation.heroInline(available/getResources().getDisplayMetrics().density,getResources().getConfiguration().fontScale);
             LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);
             TextView title=discoverTextWeight(name(d),24,DISCOVER_TEXT,700);title.setMaxLines(3);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);
@@ -2471,7 +2484,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         else body.addView(text("Annunci in attesa di elaborazione",18,TEXT,Typeface.BOLD));
         if(snapshot.pipelineRun==null&&snapshot.globalWorkCount>0){LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(-1,-2);gp.topMargin=dp(12);body.addView(engineQueueRow(LudoIcons.GEAR,snapshot.globalWorkCount+" attività del Motore",MUTED,()->showEngineGlobalWork(snapshot)),gp);}
         if(snapshot.waitingRuns>0||snapshot.intakeCount>0){LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(-1,-2);qp.topMargin=dp(16);body.addView(engineIntakeCard(snapshot),qp);}
-        {LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(16);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
+        if(snapshot.recoveryCount>0){LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(16);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
         installEngineHistoryPull();
 
         uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,10_000L);
@@ -2559,16 +2572,27 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         int[] colors={DISCOVER_LAVENDER,DISCOVER_PINK,DISCOVER_MINT,DISCOVER_YELLOW,Color.rgb(85,155,243)};String title=EngineOverviewPresentation.phaseLabel(phase);boolean ready=phase==4,active=!ready&&enginePhaseIsActive(snapshot,phase);int live=active?snapshot.livePhases[phase]:0;int number=ready?snapshot.phases[phase]:live;
         LinearLayout node=new LinearLayout(this);node.setOrientation(row?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);node.setBaselineAligned(false);node.setGravity(Gravity.CENTER);node.setPadding(dp(8),dp(6),dp(8),dp(6));if(!row)node.setBackground(round(SURFACE,999,1,colors[phase]));else node.setMinimumHeight(dp(64));
         TextView name=text(title,row?16:11,TEXT,Typeface.NORMAL);name.setGravity(row?Gravity.CENTER_VERTICAL:Gravity.CENTER);if(row)node.addView(name,new LinearLayout.LayoutParams(0,-2,1));else node.addView(name,new LinearLayout.LayoutParams(-1,-2));
-        LinearLayout numbers=new LinearLayout(this);numbers.setOrientation(LinearLayout.VERTICAL);numbers.setGravity(Gravity.CENTER);TextView count=text(snapshot.pipelineRun==null?"—":String.valueOf(number),row?22:23,colors[phase],Typeface.BOLD);count.setGravity(Gravity.CENTER);numbers.addView(count);TextView caption=text(ready?"disponibili":"attive",10,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);numbers.addView(caption);
+        LinearLayout numbers=new LinearLayout(this);numbers.setOrientation(LinearLayout.VERTICAL);numbers.setGravity(Gravity.CENTER);TextView count=text(snapshot.pipelineRun==null?"—":String.valueOf(number),row?22:23,colors[phase],Typeface.BOLD);count.setGravity(Gravity.CENTER);numbers.addView(count);String phaseState=EngineOverviewPresentation.phaseState(phase,snapshot.phases[phase],active,snapshot.bggPaused,snapshot.vintedPaused,snapshot.vintedWaitUntil,System.currentTimeMillis());TextView caption=text(phaseState,10,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);numbers.addView(caption);
         if(!ready){int waiting=Math.max(0,snapshot.phases[phase]-live);TextView queued=text(snapshot.pipelineRun==null?"— in coda":waiting+" in coda",10,MUTED,Typeface.NORMAL);queued.setGravity(Gravity.CENTER);numbers.addView(queued);}
-        node.addView(numbers,row?new LinearLayout.LayoutParams(dp(88),-2):new LinearLayout.LayoutParams(-1,-2));if(snapshot.pipelineRun!=null)animateEngineCount(count,count,number,number,active);node.setContentDescription(snapshot.pipelineRun==null?title+": nessuno scroll nel periodo corrente.":title+": "+number+(ready?" disponibili": " voci attive, "+Math.max(0,snapshot.phases[phase]-live)+" in coda")+". Apri la fase.");return node;
+        node.addView(numbers,row?new LinearLayout.LayoutParams(dp(88),-2):new LinearLayout.LayoutParams(-1,-2));if(snapshot.pipelineRun!=null)animateEngineCount(count,node,number,number,active);node.setContentDescription(snapshot.pipelineRun==null?title+": nessuno scroll nel periodo corrente.":title+": "+number+(ready?" disponibili": " voci attive, "+Math.max(0,snapshot.phases[phase]-live)+" in coda")+". "+phaseState+". Apri la fase.");return node;
     }
     private void animateEngineCount(TextView count,View node,int old,int current,boolean active){
         count.setText(String.valueOf(current));
-        if(!active||!ValueAnimator.areAnimatorsEnabled())return;
-        ValueAnimator pulse=ValueAnimator.ofFloat(1f,1.025f);pulse.setDuration(900);pulse.setRepeatMode(ValueAnimator.REVERSE);pulse.setRepeatCount(ValueAnimator.INFINITE);
-        pulse.addUpdateListener(animation->{if(!engineUiResumed||!hasWindowFocus()||!"activity".equals(tab)||!"overview".equals(engineSection)||!node.isAttachedToWindow()||!node.isShown()){animation.cancel();node.setScaleX(1f);node.setScaleY(1f);return;}float scale=(float)animation.getAnimatedValue();node.setScaleX(scale);node.setScaleY(scale);});
-        node.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){@Override public void onViewAttachedToWindow(View v){if(engineUiResumed&&hasWindowFocus())pulse.start();}@Override public void onViewDetachedFromWindow(View v){pulse.cancel();v.setScaleX(1f);v.setScaleY(1f);}});
+        if(!active)return;
+        ValueAnimator pulse=ValueAnimator.ofFloat(1f,1.045f);pulse.setDuration(850);pulse.setRepeatMode(ValueAnimator.REVERSE);pulse.setRepeatCount(ValueAnimator.INFINITE);
+        Runnable gate=new Runnable(){@Override public void run(){
+            boolean allowed=EngineOverviewPresentation.motionAllowed(active,engineUiResumed,hasWindowFocus(),"activity".equals(tab)&&"overview".equals(engineSection),node.isAttachedToWindow(),node.isShown(),ValueAnimator.areAnimatorsEnabled());
+            if(allowed){if(!pulse.isStarted())pulse.start();}else{pulse.cancel();node.setScaleX(1f);node.setScaleY(1f);}
+            if(node.isAttachedToWindow())node.postDelayed(this,500);
+        }};
+        pulse.addUpdateListener(animation->{
+            if(!EngineOverviewPresentation.motionAllowed(active,engineUiResumed,hasWindowFocus(),"activity".equals(tab)&&"overview".equals(engineSection),node.isAttachedToWindow(),node.isShown(),ValueAnimator.areAnimatorsEnabled())){animation.cancel();node.setScaleX(1f);node.setScaleY(1f);return;}
+            float scale=(float)animation.getAnimatedValue();node.setScaleX(scale);node.setScaleY(scale);
+        });
+        node.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
+            @Override public void onViewAttachedToWindow(View v){v.removeCallbacks(gate);v.post(gate);}
+            @Override public void onViewDetachedFromWindow(View v){v.removeCallbacks(gate);pulse.cancel();v.setScaleX(1f);v.setScaleY(1f);}
+        });
     }
     private View engineCurrentRunHero(DealDatabase.ObservationSession run,long now,int waitingRuns){
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(20),dp(20),dp(20),dp(18));
