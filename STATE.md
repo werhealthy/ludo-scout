@@ -1,5 +1,19 @@
 # Ludo Scout — Current state
 
+## Frontend — correzioni Hero e movimento Motore140
+
+Feedback17:47Europe/Rome: puntini Hero ancora fuori centro, bordo verde del tag non coerente, nascondere richieste manuali vuote; integrare le specifiche di lettura/movimento Motore. PR172 sostituisce glyph ellissi con tre cerchi geometrici simmetrici, target48dp/superficie36dp/simbolo18dp e gap4dp preservati; stessi colori del cuore neutro. Tag Hero bordo viola112/72/145, piedistallo Home viola originale conservato. Non è accettazione visiva sul telefono.
+
+Motore nasconde aiuto quando recoveryCount0. Le fasi0–3 mostrano numero grande delle voci attive osservate, piccolo delle altre voci in coda; Pronti è disponibilità dello scroll e non entra nello stato PROCESSING del centro. Identità riconosciute raggruppate, scope/query/drilldown/cadenza10s invariati. Caption esplicite per pausa e attesa Vinted; cerchio intero pulsa4.5% durante attività, fermo per pausa/attesa e gate resume/focus/overview/attach/shown/animazioni di sistema. Gate500ms riprende al ritorno focus senza richiedere nuovo render, callback eliminato su detach. Numeri diretti, nessun incremento/delta spacciato per throughput. Menu Come leggere i numeri aggiornato. Gesto cronologia e risoluzioni già esistenti conservati; nessun nuovo writer/reset/schema/rete/soglia/filtro.
+
+CI423/run37030152542 fallisce sull'aspettativa precedente che anche phase4 sia attiva. Aggiornata la fixture160mask per escludere solo Pronti (disponibilità); aggiunta prova del centro con mask16, nessun indebolimento delle fasi0–3/pausa/attesa. Test JUnit aggiunti preservando i quattro test EngineMotionState preesistenti: Pronti, pausa/pacing e tutti7gate di movimento. CI425/run37030360750/job110915342014 success sullo head027b0fe57599e36ca9589d687b6188cb404bc700: regressioni complete/browser40/unitAndroid/compile/reviewAPK. Diff5file verificata, beta allineata a fea1f3d prima merge. PR172 merge20e20da7fb3b9a28c21d82bb92d8e51532f3bce4. Backend139 preservato.
+
+Beta161/run37030872662/job110917073668 success: regressioni/unitAndroid/APK e certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificati. Firebase upload2026-10-02T16:04:17.9952747Z e distribuzione distinta tester16:04:18.4072018Z. Release5.12.140-engine-motion(1000161), localCode189. Nessuna prova visiva/frame/lifecycle Android sul telefono dichiarata dai test di policy.
+
+Prova telefono: puntini e tag viola Hero; Motore senza lavoro/manual review con sola CTA; aprire fase e tornare, attività reale pulsante/pausa/attesa ferma, ritorno focus e animazioni di sistema disabilitate. Se il browser cattura ma la ruota resta vuota, restituire report: il writer intake è ancora assente, non sostituire i conteggi con il Catalogo. Storico conclusioni/delta resta aperto: job mutabili non sono eventi conclusi; nessuna scelta di periodo/reset implicita.
+Unico prossimo gruppo frontend: Motore, percorso contestuale di risoluzione e ritorno ai job nella stessa posizione, coordinato con l'intake backend. Browser restyling resta nel gruppo Wizard/filtri. Frontend7/backend5 aperti.
+
+
 ## Backend — reset automatico disattivato139, verificato e distribuito
 
 Approvazione esplicita utente «Vai» del2026-10-02 17:22Europe/Rome. PR169 rimuove soltanto applyFreshStart dall'entry point EngineStartupMaintenance.run: l'obsoleto reset5.12.1 non è più invocato automaticamente in presenza di flag assente/false/obsoleto. Helper legacy, metodo MarketStore, registro SQLite e dati attuali conservati; altre manutenzioni e ordine invariati. Nessun ripristino dello storico cancellato, riattivazione massiva di job, schema, filtro, rete o intake browser. MainActivity/DealDatabase/MarketStore non modificati dal backend. Browser rimane sperimentale, catalogWrites0; questa release non rende analizzabili i campioni catturati.
