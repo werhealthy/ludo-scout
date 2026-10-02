@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — browser132 verificato e distribuito, 2026-10-02
+
+PR151 integrata in590ef6ec787fc67c70c8d106adaa7064ba8a93d2, codicecc840d8f18e3b6646b119f840c4fb7559bf7f793. CI402/run37014150633/job110860781145 success:24fixture JS, regressioni esistenti, unitAndroid/policy, compilazioneJava e reviewAPK. Review indipendente conclusa senza problemi importanti residui. Beta151/run37014767304/job110862816393 success: test/build, firma C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificata; Firebase upload13:47:08.2743019Z e distribuzione tester13:47:08.8071242Z confermati separatamente. Release5.12.132-vinted-browser-experiment(1000151). Frontend131/PR152/153 preservato. PR150 documentale superata e chiusa.
+
+SEARCH da Ludo acquisisce passivamente, VIEW dettaglio consultazioneOFF+Cattura, EsploraBundle apre direttamente browserON; snapshot manuale congelato e ACK con token/generazione, pause protette dal lifecycle. Nessun writerCatalogo/jobVinted né HTTP aggiuntivo del capturer; rete del sito e vecchi job restano separati. Dati pubblicazione e seller assenti restano ignoti, nessun totale catalogo venditore promesso. Cookie del sito nel profiloWebView UI separato, terze partiOFF, nessun accesso/estrazione. Nessun nuovo servizio a pagamento.
+
+Unico prossimo passo backend: prova telefono SEARCH prima pagina+due scroll, VIEW OFF+Cattura, Bundle dettaglio/profilo/scroll, pausa/Back; Copia report e campioni pubblicazione. Fluidità, payload reali, data, sellercoverage, worker/serviceworker e challengeHTTP200 non ancora provati. Questa beta non popola il Catalogo: intake e filtri posseduti/lingua restano da implementare. Resetlegacy non modificato né dati cancellati. Backend5/frontend7 aperti.
+
 ## Backend — browser sperimentale132, implementazione approvata
 
 Approvazione «Si»15:05Europe/Rome. PR151 implementa SEARCH ON, VIEW OFF con Cattura one-shot e apertura diretta BUNDLE ON. WebView non esportata :ui, origini/frame verificati, limiti500ID/32item/128KiB, massimo4 letture contemporanee; batch confermati dal bridge e snapshot manuale congelato. Nessuna scrittura catalogo o nuova richiesta del capturer; cookie nel profilo UI WebView separato, nessun accesso al contenuto. Fonte pubblicazione esplicita e seller soltanto da dati espliciti. Report sanitizzato persistito, campioni pubblici soltanto in memoria. Nessun servizio a pagamento.

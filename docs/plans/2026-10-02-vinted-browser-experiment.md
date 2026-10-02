@@ -58,3 +58,6 @@
 ## Follow-up separato: suggerimenti personali
 Audit già dimostra controlli non uniformi. Una correzione circoscritta successiva deve filtrare owned per ID BGG normalizzato in tutte le liste LocalScoutBrain/Bundle e dare bucket compatibile/da-verificare/non-compatibile senza modificare rating/benchmark; usare GamePreferenceState/HomePresentation e fonte dipendenza verificata. Testare posseduto vs venduto, ID con zeri/spazi, FR|DEP/IT|DEP/EN|DEP/IND/?DEP/conflitto IND+DEP e lingue fuori dai5prefissi, bundle con membro non idoneo e almeno2idonei. Il feedback è autorizzato, la fix non è ancora implementata. Non bloccare il test isolato browser su una migrazione produzione e non dichiarare risolto Acropolis senza dati reali.
 
+
+## Evidence finale
+PR151/CI402 regressioni,24JSfixture, unitAndroid e policy, compilazione Java e APK tutti verdi. Merge590ef6ec; beta151 firma/upload/distribuzione verificati,132(1000151). Review indipendente senza importanti residui; prova sul telefono e integrazione catalogo rimangono pendenti. Checkout isolato via API GitHub; Java/SDK assenti localmente, verifiche Android eseguite in CI. Directory WebView UI separata evita lock fra processi; nessun vecchio flag explored o job bundle avviato dall'esperimento. Nessun minor issue rimandato dalla review.
