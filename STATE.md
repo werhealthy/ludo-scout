@@ -1,5 +1,12 @@
 # Ludo Scout — Current state
 
+## Frontend — rifinitura azioni e sfumature 5.12.131
+
+PR152 frontend/rarity-action-polish: like Home accanto a overflow; area48dp e superficie interna con7dp di spazio come azioni circolari comuni. Overflow scheda annuncio usa helper comune. Titolo Vinted finale rimosso dalla presentazione, dati conservati; riquadro spostato dal riepilogo alla barra lingua/voto/giocatori/durata sotto le foto. Gradient verticale8.6% da dealAccent esistente dietro scatole offerte Home/podio, dettaglio e artwork condiviso; nessuna classificazione aggiunta a giochi senza annuncio. File condiviso MainActivity.java solo UI, versione e scaletta aggiornate. Nessun cambio dati/schema/filtri/backend/rete.
+
+Verifiche PR in corso; nessuna compilazione o resa telefono dichiarata. Distribuzione131 ancora pendente. Prova telefono prevista: like/overflow allineati, barra con box e riepilogo libero, nessun titolo Vinted finale, sfumatura coerente col tag su colori diversi. Frontend7/backend5 aperti. Unico prossimo passo: completare CI e distribuzione verificata della131, quindi accettazione visiva.
+
+
 ## Backend — UX browser aggiornata e audit filtri personali, 2026-10-02 14:57
 
 Utente autorizza direzione e primo test con «Cominciamo»: scroll libero da Ludo con cattura ON, consultazione semplice OFF+azione Cattura, card Esplora bundle apre direttamente pagina Vinted con catturaON. Recovery conferma ID aperto senza share tra app; lingua indipendente verificata non richiede conferma; lingua necessaria estera non va in suggerimenti/bundle, catalogo in fondo. Pubblicazione fondamentale: no timestamp foto/first_seen sostitutivi. Profilo catturato solo per pagine già caricate, copertura parziale esplicita. Zero nuovi servizi a pagamento.

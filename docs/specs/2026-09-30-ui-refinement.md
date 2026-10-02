@@ -1,5 +1,10 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback attuale — azioni coerenti e colore offerta
+
+Like della Home accanto alle altre azioni, stessa area48dp e superficie con inset7dp; padding comune per azioni circolari senza imporre dimensioni identiche alle card. Scheda annuncio: eliminare titolo Vinted finale indesiderato; riepilogo titolo/offerta/prezzo senza box, barra lingua/voto/giocatori/durata con superficie propria. Sfumatura leggera dietro artwork delle offerte Home/podio e dettaglio annuncio, ricavata da dealAccent esistente; nessuna nuova classificazione o colore inventato per giochi senza annuncio. Implementazione su frontend/rarity-action-polish, verifiche automatiche e telefono pendenti. Frontend7/backend5 aperti.
+
+
 ## Feedback backend 2026-10-02 14:57 — browser e suggerimenti affidabili
 Nuove ricerche da Ludo aprono Vinted in-app con cattura attiva; consultazione normale OFF con comando Cattura; card Esplora bundle apre direttamente Vinted/cattura, senza scheda prodotto intermedia. Recovery dall'ID attualmente aperto evita share tra app. Specifica e piano nel backlog backend, codice non implementato. Lingua indipendente verificata non richiede conferma, lingua necessaria ignota resta da verificare, estera non IT/EN esclusa da suggerimenti/bundle e in fondo al catalogo. Giochi posseduti esclusi da ogni suggerimento e membro bundle. Nuovo audit backend trova gate non uniformi in Ludo/Bundle: fix pendente, non chiudere il requisito. Pubblicazione fondamentale e nessun timestamp foto/first_seen sostitutivo. Frontend7/backend5, requisiti consolidati nelle aree esistenti; coordinare MainActivity per evitare conflitti.
 
