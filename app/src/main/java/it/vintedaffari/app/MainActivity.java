@@ -1454,7 +1454,7 @@ private void showFilterSheet(){
     private void renderCompanion(){
         LudoRoomState rooms=ludoRoomState();ludoSearchQuery=ludoSearchDraft();ludoSearchInput=null;if(rooms.room().equals(renderedLudoRoom)&&scroll!=null)rooms.recordScroll(scroll.getScrollY());renderedLudoRoom=rooms.room();final String displayedRoom=rooms.room();final int roomY=rooms.position(displayedRoom);
         if(scroll!=null)scroll.post(()->{if("companion".equals(tab)&&displayedRoom.equals(ludoRoomState().room()))scroll.scrollTo(0,roomY);});
-        body.setPadding(0,0,0,dp(20));body.setBackgroundColor(BG);
+        requestPetSnapshot();body.setPadding(0,0,0,dp(20));body.setBackgroundColor(BG);
         if(rooms.isHome()){renderLudoHomeScene();renderLibrary();return;}
         renderLudoEnvironment(rooms.room());
         if(LudoRoomState.HUNTS.equals(rooms.room())){renderLudoHunts();return;}
@@ -1465,13 +1465,13 @@ private void showFilterSheet(){
     private void renderLudoEnvironment(String room){
         boolean home=LudoRoomState.HOME.equals(room),hunts=LudoRoomState.HUNTS.equals(room);
         FrameLayout stage=new FrameLayout(this);stage.setBackgroundColor(BG);
-        ImageView backdrop=sceneBackdrop(stage,home?R.drawable.ludo_room:hunts?R.drawable.ludo_bg_peek_wide:R.drawable.ludo_bg_forest_wide);backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        ImageView backdrop=sceneBackdrop(stage,home?R.drawable.ludo_room:hunts?R.drawable.ludo_bg_tavern_vertical:R.drawable.ludo_bg_forest_wide);backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
         View veil=new View(this);veil.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xB30A0B14,0x180A0B14,0x000A0B14,BG}));veil.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);stage.addView(veil,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);controls.setPadding(dp(18),dp(16),dp(18),0);
         LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);heading.addView(text("Ludo",30,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));
         TextView options=appIcon(LudoIcons.ELLIPSIS_VERTICAL,20,TEXT);options.setGravity(Gravity.CENTER);options.setContentDescription("Azioni di Ludo");options.setOnClickListener(v->{PopupMenu menu=new PopupMenu(this,options);menu.getMenu().add("I miei gusti").setOnMenuItemClickListener(item->{requestPetSnapshot();openPetSpace(true);return true;});menu.getMenu().add("Gestisci le cacce salvate").setOnMenuItemClickListener(item->{requestPetSnapshot();openPetSpace(false);return true;});menu.show();});heading.addView(options,new LinearLayout.LayoutParams(dp(48),dp(48)));controls.addView(heading);controls.addView(ludoRoomTabs());stage.addView(controls,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         petView=new LudoPetView(this);petView.setExplorer(!home);petView.lookAtGame(false);petView.setContentDescription(home?"Ludo a casa, vicino al camino":hunts?"Ludo e i giochi che cerchi":"Ludo esplora nuovi giochi");final LudoPetView actorView=petView;
-        int asset=home?R.drawable.ludo_hello:hunts?R.drawable.ludo_deal_search:R.drawable.ludo_deal_search;
+        int asset=home?R.drawable.ludo_hello:R.drawable.ludo_deal_search;
         galleryNet.execute(()->{Bitmap art=sceneAsset(asset);runOnUiThread(()->{if(!isDestroyed()&&actorView==petView&&art!=null&&!art.isRecycled())actorView.setIllustration(art);});});
         int actorSize=Math.min(dp(260),getResources().getDisplayMetrics().widthPixels-dp(80));FrameLayout.LayoutParams actor=new FrameLayout.LayoutParams(actorSize,actorSize,Gravity.END|Gravity.BOTTOM);actor.rightMargin=dp(18);actor.bottomMargin=dp(14);stage.addView(petView,actor);
         if(home){View fireplace=new View(this);fireplace.setBackground(ludoFireplaceBackground());fireplace.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);FrameLayout.LayoutParams fire=new FrameLayout.LayoutParams(dp(96),dp(128),Gravity.START|Gravity.BOTTOM);fire.leftMargin=dp(20);fire.bottomMargin=dp(32);stage.addView(fireplace,fire);}
@@ -1485,7 +1485,7 @@ private void showFilterSheet(){
     private void requestLudoOverview(){
         long now=System.currentTimeMillis(),month=LudoMonthlyOverview.monthStart(now);
         if(ludoOverviewLoading||month==ludoOverviewMonth&&(ludoMonthGames!=null||ludoOverviewError!=null)&&now-ludoOverviewAt<15000)return;
-        ludoOverviewLoading=true;
+        if(month!=ludoOverviewMonth){ludoMonthGames=null;ludoMonthAboveSix=null;ludoOverviewError=null;}ludoOverviewLoading=true;
         uiDataIo.execute(()->{Integer games=null,above=null;String error=null;try(android.database.Cursor cursor=db.getReadableDatabase().rawQuery(LudoMonthlyOverview.STATIC_QUERY,new String[]{String.valueOf(month),String.valueOf(now)})){if(cursor.moveToFirst()){games=cursor.getInt(0);above=cursor.getInt(1);}else error="Panoramica non disponibile";}catch(RuntimeException failure){error="Non riesco a leggere la panoramica.";}
             final Integer found=games,quality=above;final String failure=error;
             runOnUiThread(()->{ludoOverviewLoading=false;if(isFinishing()||isDestroyed())return;ludoMonthGames=found;ludoMonthAboveSix=quality;ludoOverviewError=failure;ludoOverviewAt=System.currentTimeMillis();ludoOverviewMonth=month;if("companion".equals(tab)&&LudoRoomState.EXPLORE.equals(ludoRoomState().room()))scheduleRender(0);});
