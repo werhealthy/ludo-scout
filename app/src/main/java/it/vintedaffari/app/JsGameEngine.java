@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class JsGameEngine {
+    public enum RuntimeHost { EXISTING_UI, HEADLESS }
+    private final RuntimeHost host;
+    private final android.os.Handler runtimeHandler=new android.os.Handler(android.os.Looper.getMainLooper());
 
     public interface ReadyListener {
         void onReady(int gameCount);
@@ -49,6 +52,10 @@ public final class JsGameEngine {
     private static final long READY_TIMEOUT_MS = 30_000L;
 
     public JsGameEngine(Context context, WindowManager windowManager) {
+        this(context,windowManager,RuntimeHost.EXISTING_UI);
+    }
+    public JsGameEngine(Context context, WindowManager windowManager,RuntimeHost host) {
+        this.host=host;
         this.context = context;
         this.windowManager = windowManager;
     }
@@ -93,7 +100,7 @@ public final class JsGameEngine {
             }
         });
 
-        attachHiddenWebView();
+        if(host==RuntimeHost.EXISTING_UI)attachHiddenWebView();
         verifyStartedAt=android.os.SystemClock.elapsedRealtime();
         webView.loadUrl("file:///android_asset/engine/engine.html");
         scheduleVerifyRetry(webView,READY_RETRY_MS);
@@ -175,10 +182,9 @@ public final class JsGameEngine {
     private void scheduleVerifyRetry(WebView current,long delayMs){
         if(current==null||current!=webView||ready||verifyRetryScheduled)return;
         verifyRetryScheduled=true;
-        current.postDelayed(()->{
-            verifyRetryScheduled=false;
-            verifyEngine();
-        },Math.max(1L,delayMs));
+        Runnable retry=()->{if(current!=webView)return;verifyRetryScheduled=false;verifyEngine();};
+        if(host==RuntimeHost.HEADLESS)runtimeHandler.postDelayed(retry,Math.max(1L,delayMs));
+        else current.postDelayed(retry,Math.max(1L,delayMs));
     }
 
     private static boolean traceAttempt(int attempt){
@@ -247,6 +253,7 @@ public final class JsGameEngine {
     }
 
     public void destroy() {
+        runtimeHandler.removeCallbacksAndMessages(null);
         ready = false;
         verifyInFlight = false;
         verifyRetryScheduled = false;
