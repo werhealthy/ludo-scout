@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — browser sperimentale132, implementazione approvata
+
+Approvazione «Si»15:05Europe/Rome. PR151 implementa SEARCH ON, VIEW OFF con Cattura one-shot e apertura diretta BUNDLE ON. WebView non esportata :ui, origini/frame verificati, limiti500ID/32item/128KiB, massimo4 letture contemporanee; batch confermati dal bridge e snapshot manuale congelato. Nessuna scrittura catalogo o nuova richiesta del capturer; cookie nel profilo UI WebView separato, nessun accesso al contenuto. Fonte pubblicazione esplicita e seller soltanto da dati espliciti. Report sanitizzato persistito, campioni pubblici soltanto in memoria. Nessun servizio a pagamento.
+
+Fixture Node24/24 locali; review indipendente ha individuato e portato a correggere perdita batch, memoria, URL non-item, snapshot mobile e ACK obsoleti. CI Android399 in corso; compilazione/distribuzione e prova sito su telefono non ancora dichiarate. Frontend131 preservato nel merge, nuova versione132. Intake produzione, filtri owned/lingua e copertura data/seller reali restano pendenti. Backend5/frontend7 aperti.
+
 ## Frontend — rifinitura azioni e sfumature 5.12.131, verificata e distribuita
 
 PR152: like Home accanto a overflow, area48dp e superficie interna con7dp di spazio comune alle azioni circolari; overflow annuncio usa helper comune. Titolo Vinted finale rimosso dalla sola presentazione, dati conservati; riquadro spostato dal riepilogo alla barra lingua/voto/giocatori/durata sotto le foto. Gradiente verticale8.6% da dealAccent esistente dietro scatole offerte Home/podio, dettaglio e artwork condiviso. PR153 estende il gradiente al renderer Catalogo, conservando superficie neutra per firme game: e senza annuncio. File condiviso MainActivity.java solo UI; nessun cambio dati/schema/filtri/backend/rete.
@@ -7,6 +13,22 @@ PR152: like Home accanto a overflow, area48dp e superficie interna con7dp di spa
 PR152 head12311e579331a91549cb2a466c1fa2b3e027e3ac, CI395/run37011801573/job110853043311 success con regressioni/Androidunit/Java compile/APK; merge19863e0f4a1185a5b8de1895395f9582b9e49546. PR153 codicea9d4bb022ecebd765d968f3de8f19484426342b3, CI397/run37012426729/job110855116864 success con le stesse verifiche; head37f706a8aa4bfce3ee169342c3866e46ff990398 differisce soltanto per STATE, mergea34f5f691a6f7b29f2ecfb307a1070384d3763a4.
 Distribuzione finale beta150/run37012889644/job110856633825 success: regressioni/test/build e certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificati. Firebase upload2026-10-02T13:28:09.1026122Z e distribuzione distinta tester13:28:09.9355324Z, release5.12.131-rarity-action-polish (1000150). Prima distribuzione149 superata dalla150.
 Nessun rendering telefono/emulatore né accettazione visiva dichiarati. Prova: like/overflow allineati, barra con box e riepilogo libero, assenza titolo Vinted finale, sfumatura coerente col tag in Home/Catalogo/dettaglio su colori diversi e testo grande. Frontend7/backend5 aperti. Unico prossimo passo frontend: accettazione visiva della131 sul telefono; Motore resta aperto e richiede screenshot/diagnostica attuali.
+
+## Backend — UX browser aggiornata e audit filtri personali, 2026-10-02 14:57
+
+Utente autorizza direzione e primo test con «Cominciamo»: scroll libero da Ludo con cattura ON, consultazione semplice OFF+azione Cattura, card Esplora bundle apre direttamente pagina Vinted con catturaON. Recovery conferma ID aperto senza share tra app; lingua indipendente verificata non richiede conferma; lingua necessaria estera non va in suggerimenti/bundle, catalogo in fondo. Pubblicazione fondamentale: no timestamp foto/first_seen sostitutivi. Profilo catturato solo per pagine già caricate, copertura parziale esplicita. Zero nuovi servizi a pagamento.
+Audit read-only su beta266594c: Home filtra owned; LocalScoutBrain filtra posseduti soltanto in picks e non fresh/topRated/cheapest/bundlePicks. MainActivity.bundleGameEligible non consulta library e controlla soltanto5prefissi esteri; BundlePlanner privo gate owned/lingua. Home offerEligible ammette?DEP. Acropolis sul telefono non ispezionato, causa specifica identità non provata. language-engine usa languageDependence/evidence, BggMetadata Java non espone il campo; provenienza necessaria.
+Specifiche aggiornate nel backlog backend, piano browser sperimentale docs/plans/2026-10-02-vinted-browser-experiment.md. Piano da rivedere secondo writing-plans prima codice; esecuzione diretta proposta, nessuna delegazione avviata. Nessun codice, fixture, dipendenza installata, APK o correzione suggerimenti ancora consegnata. Browser non scrive catalogo nel primo test; intake produzione e filtri sono consegne distinte per limitare rischio.
+Prossimo passo unico: revisione piano e conferma esecuzione diretta, poi implementazione/test browser. Frontend130 preservato. Backend5/frontend7, nessun gruppo chiuso.
+
+
+## Backend — proposta browser passivo e vincolo zero servizi a pagamento, 2026-10-02
+
+Feedback utente14:40Europe/Rome: preferisce nuove ricerche avviate dalla sezione Ludo, vuole ridurre realmente richieste e migliorare bundle, nessuna tecnologia a pagamento. Audit read-only su beta266594cfa5a05d06f6b3c77aeb8f753f4994c260: URL presente evita ricerca ma resolveExistingMetadata continua a chiamare verifyPublicItem; seller/data mancanti possono generare VINTED_DEEP. VintedCard/recordSighting non portano ID esatto; necessario intake arricchito. BundlePlanner riusa stesso sellerID localmente; SellerBundleScanner deep riprova pagine item, senza catalogo esposto nel report. Specifica proposta e criteri del test nel backlog backend sezione “Proposta B2 — browser Vinted passivo”, non decisione di sostituzione o implementazione.
+Report129 ricevuto conferma diag:fresh_start_reset1790938327666 (12:52:07.666Europe/Rome), jobs1488/observations3269/listings534 archiviati; osservazioni totali0. La causa di perdita/staleness flag resta non dimostrata; il reset automatico non è stato disabilitato dalla129. Utente accetta nuova baseline, nessuna nuova cancellazione autorizzata.
+Browser sperimentale previsto senza login/writer produzione; zero nuove richieste capture, origine/frame/payload verificati; dati mancanti senza riempimento automatico remoto nel futuro intake. Bundle da annunci acquisiti, copertura profilo parziale finché non navigata; nessun totale finale/sconto inventato. AndroidX WebKit non è dipendenza diretta attuale, scelta compatibile da approvare; nessun servizio a pagamento. Sito/payload/provider e fluidità non ancora provati su dispositivo, nessun codice/APK/test eseguito in questo checkpoint documentale.
+Unico prossimo passo backend: revisione specifica proposta del test, poi piano e prototipo sperimentale. Frontend130 preservato, backend5/frontend7 aperti; proposta dentroB2 senza nuovo gruppo.
+
 
 ## Frontend — proporzioni scheda annuncio e Home 5.12.130, 2026-10-02
 

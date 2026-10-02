@@ -58,7 +58,7 @@ checks=[
     ("bundle page distinguishes real bundles from seller exploration",
      '"Bundle confermati · "' in ui and
      ('"Da controllare · "' in ui or '"Da esplorare · "' in ui) and
-     "BundleExploration.begin(this,d)" in ui),
+     'openVintedBrowserExperiment(d.vintedUrl,"BUNDLE",d.sellerId)' in ui),
     ("bundle exploration intent is bounded",
      "TTL_MS=10L*60_000L" in explore and
      "bundleExploreHintsThisIntent>=40" in radar),
@@ -80,4 +80,5 @@ failed=[name for name,ok in checks if not ok]
 if failed:
     raise SystemExit("5.12.30 engine recovery truth regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} 5.12.30 recovery/truth guards")
+
 
