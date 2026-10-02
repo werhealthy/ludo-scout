@@ -1,5 +1,78 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Proposta da approvare — consegna completa ricerca browser → Motore, feedback139
+
+Stato: progettazione verificata sul codice, non implementazione e non nuova APK. Base audit fea1f3d6e1fbb4c306976c6d3a53c4ad8460865b. Il feedback più recente chiede una sola consegna sostanziosa con UI browser coerente al Catalogo e acquisizione reale fino alle code e al Motore. Questo contratto consolida B2/B4; UI browser e stato Motore restano nei gruppi frontend esistenti. Backend5/frontend7 aperti.
+
+### Diagnosi139 e obiettivo
+
+Il report139 conserva recordedAt1790938327666 e il riepilogo del reset precedente. È una sola osservazione: non prova ancora due avvii né il ripristino dei dati eliminati. L'intake browser è il blocco attuale dimostrato:156ID in memoria/96prezzi, catalogWrites0, engineLatestCaptureNONE, osservazioni totali0. Un job globale VINTED_DEEP resta PENDING/PACING; non appartiene alla ricerca browser. scanOptInOFF non deve impedire la nuova acquisizione browser esplicitamente attivata.
+
+VintedBrowserActivity.parse conserva soltanto campioni nella mappa items e saveReport salva il report nelle preferenze. resetPage/onDestroy cancellano la mappa. Il sanitizer attuale scarta anche foto, descrizione e sellerName presenti nel payload JS. MarketStore.recordSighting e DealDatabase.signature dipendono da titolo/brand/prezzo; VintedCard non porta ID/URL e ha prezzo double non nullable. market_listings.current_price_cents è NOT NULL. Un adattatore cieco confonderebbe due annunci con uguale titolo/prezzo e trasformerebbe un prezzo assente in un valore fittizio.
+
+Esito richiesto: ogni ID validato e confermato dal writer è persistente, appartiene a una ricerca visibile nel Motore e ha uno stato spiegabile. Ogni annuncio elaborabile entra nel lavoro reale una sola volta per revisione utile. Incompleti, filtrati e review restano distinguibili dai pronti; non promettere156offerte pronte o156job remoti. Il campione156/96 è baseline, non un totale obbligatorio di una futura pagina.
+
+### Scelta architetturale e approvazione specifica
+
+Raccomandazione: staging SQLite additivo per la cattura, identità per ID Vinted e lavoro locale durevole nell'owner della coda esistente. La UI e il collegamento al Motore vengono consegnati insieme; nessuna APK intermedia limitata al contatore.
+
+Alternative valutate: scrivere direttamente nelle tabelle legacy riduce i file ma non rappresenta prezzi ignoti e riusa firme ambigue; lasciare i campioni in memoria e chiamare l'analisi dalla Activity evita la migrazione ma perde lavoro alla chiusura e non dà ripresa affidabile. Lo staging aggiunge schema e responsabilità esplicite, preservando i dati e i filtri esistenti.
+
+Approvazione richiesta prima del codice: migrazione additiva e nuovo tipo di job locale browser, con esecuzione dell'analisi locale anche quando Accessibility è disabilitata. Nessuna nuova dipendenza o servizio a pagamento; nessuna modifica delle soglie BGG/pricing/classificazione o delle protezioni Vinted. Non avviare una pulizia/backfill distruttiva. Nessun recupero promesso per i156campioni già persi dalla memoria139.
+
+### Contratto persistente
+
+Aggiungere nello stesso database/helper delle code, con una migrazione versionata:
+- browser_captures: identità della ricerca, filtri/URL consentito, inizio/fine, stato, riferimento alla run del Motore. Apertura esplicita o cambiamento dei filtri avvia una ricerca; paginazione/scroll restano nella ricerca. Riavvio conserva le ricerche precedenti e il lavoro, senza navigare da solo.
+- browser_candidates: chiave primaria ID Vinted, URL canonico verificato, titolo e metadati validati, prezzo articolo nullable in centesimi, prezzo protetto separato, fonti e tempi di osservazione per campo, revisione utile, revisione elaborata, stato e motivo. Non usare zero per prezzo ignoto.
+- browser_capture_items: chiave composta ricerca/ID, pagina e tempi osservati, revisione e fotografia dei campi necessari alla lettura storica. Lo stesso ID può comparire in più ricerche senza creare un secondo annuncio canonico.
+
+La forma finale di colonne/indici deve seguire le query di intake/selezione/resume e i test, senza alterare il significato delle colonne esistenti. L'appartenenza a una ricerca è esplicita, non ricostruita da una finestra temporale o da una firma di testo.
+
+Una transazione breve persiste candidati, appartenenza e job locale eleggibile; nessuna invocazione JS/rete o attesa del main thread dentro la transazione. Il writer seriale esistente della Activity effettua il commit fuori UI. ACK significa commit riuscito del pacchetto; su errore SQLite il pacchetto non è dichiarato acquisito, riprova bounded/backpressure del canale esistente e errore visibile. La navigazione invalida i pacchetti non accettati della vecchia pagina; non annulla lavoro già confermato.
+
+Conservare i limiti attuali di32elementi/pacchetto,128KiB e500ID/pagina; overflow esplicito, nessun annuncio valido perso silenziosamente. Rigettare origine/frame/ID-URL non validi, numeri/oggetti fuori contratto e pacchetti obsoleti prima del commit. Validare separatamente foto pubbliche già esposte, descrizione e sellerName; nessuna lettura di credenziali. Campi assenti non cancellano dati migliori; fonti DOM/payload/dettaglio e observedAt restano separati da una vera data di pubblicazione. La variazione del solo observedAt non crea nuova analisi.
+
+### Identità, analisi e code reali
+
+ID Vinted è l'identità dell'annuncio. ID diversi con titolo/prezzo identici restano distinti; cambi di titolo/prezzo aggiornano lo stesso annuncio. Agganciare un listing esistente soltanto per ID esatto; non unire automaticamente una riga legacy priva di ID perché la firma coincide. Usare firma canonica per ID nelle nuove osservazioni e conservare i riferimenti storici esistenti.
+
+Nuovo job locale BROWSER_ANALYSIS nella coda processing_jobs esistente, chiave deduplicata per ID e fonte/revisione esplicite. Senza titolo/prezzo articolo leggibile il candidato è INCOMPLETE con motivo, conservato e visibile, senza job a vuoto in loop. Un successivo dato esplicito sufficiente lo rende elaborabile. Una revisione rilevante durante un job in corso mantiene pending la nuova revisione; il commit del risultato richiede la revisione acquisita, senza applicare risultati vecchi a dati nuovi.
+
+L'owner QueueKeepAliveService/recupero WorkManager esistente seleziona e rivendica questi job con lease, batch limitati e retry per errori tecnici. Un runner locale condiviso riusa JsGameEngine e lo stesso percorso ListingClassifier/BoardGameIntakeGate, pricing BGG_ONLY, applyAnalysis e persistenza degli esiti; non usare il diverso matcher QueueJobRunner.matchBggIdentities come sostituto implicito dell'analisi JS. Estrarre soltanto il confine analisi/persistenza necessario, senza riscrivere MainActivity/MarketStore o modificare il matcher.
+
+Il runtime JS per i job browser è posseduto dalla coda, invocato sul main thread Android e caricato solo quando c'è lavoro; selezione/persistenza restano fuori main. Rispettare il suffisso WebView per processo già presente, inizializzazione asincrona, single-flight, limiti di memoria e teardown quando inattivo. Nessuna dipendenza dal servizio Accessibility attivo o da scanOptIn. Errore/caricamento del runtime mantengono il job tecnico visibile e recuperabile; non diventano review umana.
+
+Dopo analisi, creare/aggiornare Market listing, osservazioni e deal per ID preservando soglie, tipo prodotto, review e classificazione. Solo candidati con dati e fiducia richiesti raggiungono il Catalogo. Le BGG enrichment già previste restano nella loro corsia; dati mancanti non vengono inventati per rendere completa la card.
+
+### Confine Vinted e provenienza
+
+Origine browser persistente fino a enqueue, reconcile, recovery e arricchimento: dati seller/pubblicazione/lingua assenti non devono generare job VINTED, VINTED_DEEP o bundle remoti per questi annunci. Il link esatto è quello già osservato e validato per ID; vietato cercare di nuovo l'annuncio per titolo per riempire campi mancanti. Usare seller graph locale quando i dati già acquisiti lo permettono.
+
+Nessuna nuova fetch del capturer, auto-scroll, auto-paginazione, auto-navigazione, retry di pagine, cookie/token extraction, API privata o bypass. Consentire soltanto navigazione esplicita dell'utente e cattura del DOM/payload già caricato dal sito. Apertura manuale di un dettaglio può arricchire lo stesso ID se espone dati leggibili. Il ledger distingue job browser zero-network, traffico normale WebView, arricchimento BGG e vecchio lavoro Vinted globale; non chiamare zero tutta la rete dell'app.
+
+### UI browser e Motore nella stessa consegna
+
+Riprodurre struttura e token nativi del Catalogo attuale (renderCatalog/showFilterSheet): Remus, FontAwesome, palette Ludo, campo ricerca a capsula54dp, pulsante filtri separato con badge, pannello con righe gerarchiche, chip rimuovibili dei filtri attivi, controllo ordinamento compatto. Spazi16dp tra sezioni e8–12dp tra elementi; target almeno48dp e altezza adattiva per font grande. Nessuna fila di tutti i filtri testuali compressi.
+
+Ricerca testuale con invio esplicito; ricerche salvate accessibili nel pannello dedicato senza affollare la barra. Categoria Giochi da tavolo e ordinamenti Vinted esistenti; selezione min/max prezzo nel pannello. Applicare/rimuovere un filtro conserva gli altri parametri consentiti e torna a pagina1. Cambiare filtri Vinted non cambia le soglie del Catalogo. Non offrire BGG/sconto/lingua come filtri del sito se i dati non sono disponibili.
+
+Header: chiusura/ritorno distinto dai controlli di pagina; titolo e menu secondario. Navigazione precedente/numero/successiva in posizione stabile; comandi cattura con icone/stati separati e CTA Motore. Stato compatto con acquisiti confermati e lavoro in corso; dettagli/diagnostica nel menu. Non tre righe di testo fra due frecce identiche ad altri comandi. La WebView resta contenuto del sito, mentre la cornice nativa segue l'app.
+
+Motore legge ricerche e stati persistenti anche durante capture/chiusura browser; aggiorna senza I/O sul main. Totali per ID e liste hanno la stessa popolazione. Per una revisione corrente ogni ID è in un solo gruppo: incompleto, in coda, in analisi, filtrato, review, pronto o errore tecnico. Lavoro BGG residuo è associato e visibile senza duplicare gli annunci nel totale. Non moltiplicare i giochi per il numero di job.
+
+Nessuna ricerca e nessun intake: conservare card vuota138 “Non c'è ancora niente qui” con CTA “Cerca su Vinted”, loading/errore distinti e vecchi job globali in riga separata. Con candidati incompleti mostrare la ricerca e i motivi, non falsa card vuota. Lo stato fermo per metadata assenti deve spiegare quale dato manca, senza cerchi apparentemente in attività.
+
+### Verifica e criterio di consegna
+
+Test eseguibili di identità e migrazione: stesso titolo/prezzo con ID diversi; stesso ID con prezzo/titolo cambiati; prezzo assente/protetto separato; null non sovrascrive dati; metadati/drop invalidi; migrazione conserva storico/preferiti/review e registro reset. Pacchetti duplicati/tardivi, ACK prima/dopo commit, Activity distrutta, errore/contesa DB e nuova revisione durante analisi devono avere esiti verificabili.
+
+Test reali di pipeline con confini simulati: cattura → staging/membership → claim → analisi → esito → Motore/Catalogo, riapertura/process death, lease stale, runtime non pronto/errore, Accessibility disabilitata. Verificare conto degli ID e coerenza liste; errore tecnico distinto da review. Spy di enqueue/reconcile/recovery e richieste dimostra nessun nuovo job/richiesta remota Vinted generato dall'intake browser.
+
+Regressioni esistenti, fixture JS, unit Android, build/review APK e review indipendente prima del merge; riallineamento a beta preservando frontend concorrente. Una sola release firmata con certificato atteso, upload e distribuzione Firebase distintamente verificati. Non dichiarare UX/prestazioni telefono sulla base della CI.
+
+Prova sul telefono dopo la consegna: ricerca a prezzo basso per più risultati, due pagine al tocco, verifica barra/chip/pannello/insets/font grande, apri Motore e controlla elenco/conti/stati, chiudi e riapri senza cancellare dati, riapri uno stesso ID e verifica assenza duplicati. Restituire screenshot browser/Motore e due diagnostiche versione/tempi. Accettazione: gli ID confermati restano contabilizzati, gli elaborabili hanno lavoro/esito reale, gli incompleti hanno motivo visibile, nessun aumento automatico della rete Vinted dovuto ai campi assenti. I156campioni139 non possono essere recuperati retroattivamente se non salvati altrove.
+
 ## Backend — reset automatico disattivato139, verificato e distribuito
 
 Approvazione esplicita utente «Vai» del2026-10-02 17:22Europe/Rome. PR169 rimuove soltanto applyFreshStart dall'entry point EngineStartupMaintenance.run: l'obsoleto reset5.12.1 non è più invocato automaticamente in presenza di flag assente/false/obsoleto. Helper legacy, metodo MarketStore, registro SQLite e dati attuali conservati; altre manutenzioni e ordine invariati. Nessun ripristino dello storico cancellato, riattivazione massiva di job, schema, filtro, rete o intake browser. MainActivity/DealDatabase/MarketStore non modificati dal backend. Browser rimane sperimentale, catalogWrites0; questa release non rende analizzabili i campioni catturati.

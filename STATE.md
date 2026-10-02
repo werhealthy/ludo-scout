@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Priorità aggiornata — browser → Motore completo, feedback139
+
+Il feedback139 richiede un'unica prossima consegna con UI browser coerente al Catalogo e intake/code/esiti reali; nessun altro micro-fix come release autonoma. Audit base fea1f3d6e1fbb4c306976c6d3a53c4ad8460865b:156ID/96prezzi solo in memoria, catalogWrites0, observations totali0, run/captureNONE;1job residuo VINTED_DEEP PENDING/PACING distinto dalla ricerca. Stato UI snapshot pronto, non prova un problema di rendering dei job browser.
+
+Il solo report139 conserva data1790938327666/riepilogo del reset: osservazione positiva ma non doppio riavvio né recupero storico. Le prove già distribuite139 restano valide; nessuna nuova APK qui.
+
+Proposta tecnica e UI completa consolidata all'inizio di docs/specs/backend-reliability-recognition.md; frontend aggiornata nella scaletta unica. Richiede approvazione specifica per staging SQLite additivo e job locale browser con runtime indipendente da Accessibility. Poi piano di implementazione, test end-to-end e una sola release completa. Preservare dati/filtri/provenienza, identificare annunci per ID e non titolo/prezzo; niente job remoti Vinted per campi mancanti.
+
+Backend5/frontend7 aperti; nessun gruppo chiuso. Unico prossimo passo: revisione della proposta completa browser→Motore e autorizzazione della migrazione/ownership locale. La verifica del secondo avvio139 rimane pendente senza sostituire questa priorità.
+
 ## Backend — reset automatico disattivato139, verificato e distribuito
 
 Approvazione esplicita utente «Vai» del2026-10-02 17:22Europe/Rome. PR169 rimuove soltanto applyFreshStart dall'entry point EngineStartupMaintenance.run: l'obsoleto reset5.12.1 non è più invocato automaticamente in presenza di flag assente/false/obsoleto. Helper legacy, metodo MarketStore, registro SQLite e dati attuali conservati; altre manutenzioni e ordine invariati. Nessun ripristino dello storico cancellato, riattivazione massiva di job, schema, filtro, rete o intake browser. MainActivity/DealDatabase/MarketStore non modificati dal backend. Browser rimane sperimentale, catalogWrites0; questa release non rende analizzabili i campioni catturati.

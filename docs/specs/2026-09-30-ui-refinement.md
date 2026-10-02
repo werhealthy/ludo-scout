@@ -1,5 +1,17 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback139 — prossima consegna completa browser e intake
+
+Richiesta esplicita: interrompere le consegne di micro-fix, allineare la ricerca Vinted browser al design system reale del Catalogo e collegare tutti gli annunci validati al Motore con lavoro reale. Nessuna accettazione visiva del browser135/139.
+
+Contratto tecnico e UI unificato da approvare in [backend-reliability-recognition.md](backend-reliability-recognition.md), sezione “Proposta da approvare — consegna completa ricerca browser → Motore, feedback139”. È parte dei gruppi frontend Wizard/filtri e Motore esistenti, con responsabilità backend sull'intake; non un backlog parallelo.
+
+Cornice nativa: ricerca54dp e filtro con badge, pannello filtri/applica, chip attive rimuovibili, ordinamento compatto, icone coerenti Remus/FontAwesome, padding e safe insets, font grande/target48dp. Ricerche salvate in accesso dedicato. Separare ritorno, paginazione, cattura e accesso Motore per posizione e gerarchia. La WebView mantiene il sito. I filtri Catalogo BGG/sconto/lingua non diventano filtri Vinted senza dati corrispondenti.
+
+Motore: card vuota138 soltanto in assenza reale di ricerca/intake; con candidati mostrare acquisiti persistenti, incompleti, coda, analisi ed esiti. Vecchi job globali separati. Stessa popolazione per conti e liste, nessuna ruota di zeri per dati non salvati. La UI dipende dal writer durevole per ID, non dal report della Activity.
+
+Stato: proposta verificata sul codice, nessuna implementazione/APK nuova. Frontend7/backend5 aperti. Prossimo gruppo unico congiunto: browser → Motore completo; prova reset139 dopo riapertura conservata come verifica pendente, non come consegna bloccante separata.
+
 ## Feedback17:18 — chiusura Hero e Motore senza ricerca
 
 Utente accetta137 salvo coppia azioni del gioco in evidenza: usare ellissi FontAwesome orizzontale centrata, stessa superficie/bordo/colore base del cuore, distanza4dp tra target (36/18dp e area48dp conservati); stato salvato resta distinguibile. Piedistallo Home sempre viola originale; colore sconto solo annuncio, layout e stile del prodotto accettati.
