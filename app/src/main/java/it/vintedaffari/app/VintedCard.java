@@ -12,12 +12,18 @@ public final class VintedCard {
     public final Rect bounds;
     public final String rawDescription;
     public final String sellerName;
+    /** Durable browser identity; empty for the legacy Accessibility path. */
+    public final String capturedSignature;
 
     public VintedCard(String title,String brand,String condition,double itemPrice,Double protectedPrice,Integer favorites,Rect bounds,String rawDescription) {
         this(title,brand,condition,itemPrice,protectedPrice,favorites,bounds,rawDescription,"");
     }
 
     public VintedCard(String title,String brand,String condition,double itemPrice,Double protectedPrice,Integer favorites,Rect bounds,String rawDescription,String sellerName) {
+        this(title,brand,condition,itemPrice,protectedPrice,favorites,bounds,rawDescription,sellerName,"");
+    }
+
+    public VintedCard(String title,String brand,String condition,double itemPrice,Double protectedPrice,Integer favorites,Rect bounds,String rawDescription,String sellerName,String capturedSignature) {
         this.title = title;
         this.brand = brand;
         this.condition = condition;
@@ -27,5 +33,6 @@ public final class VintedCard {
         this.bounds = new Rect(bounds);
         this.rawDescription = rawDescription;
         this.sellerName = sellerName == null ? "" : sellerName.trim();
+        this.capturedSignature = capturedSignature == null ? "" : capturedSignature;
     }
 }

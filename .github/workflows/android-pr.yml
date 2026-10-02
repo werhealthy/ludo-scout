@@ -43,6 +43,11 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Verify durable browser engine intake
+        run: |
+          python3 regression/browser_engine_intake.py
+          python3 regression/browser_engine_boundary.py
+
       - name: Verify startup never invokes destructive legacy reset
         run: python3 regression/startup_reset_disabled.py
 
@@ -263,6 +268,7 @@ jobs:
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=PR Review,O=Ludo Scout,C=IT"
       - name: Build review APK
         run: ./gradlew --no-daemon :app:assembleDebug
+
 
 
 

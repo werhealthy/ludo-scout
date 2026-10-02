@@ -680,6 +680,97 @@ public final class MarketStore {
         Log.i(TAG, "migration=v8->v9 market schema backfill completed at=" + now);
     }
 
+    /** Persist validated public captures by exact ID. Missing-price snapshots remain durable,
+     * but cannot become zero-price observations. Called exclusively on the browser IO lane. */
+    public long captureBrowserItem(JSONObject item,long now) throws org.json.JSONException {
+        String itemId=item.optString("id"),url=item.optString("url");
+        if(!VintedBrowserPolicy.matchesItem(url,itemId))return -1;
+        SQLiteDatabase db=helper.getWritableDatabase();
+        db.beginTransaction();
+        try{
+            String snapshotKey="browser_snapshot:"+itemId;
+            JSONObject merged=new JSONObject();
+            String previous=scalarString(db,"SELECT text_value FROM queue_controls WHERE name=?",new String[]{snapshotKey});
+            if(!TextUtils.isEmpty(previous))try{merged=new JSONObject(previous);}catch(org.json.JSONException ignored){}
+            Integer previousSnapshotPrice=BrowserCapturePolicy.priceCents(merged.opt("priceCents"),merged.optString("currency"));
+            Integer incomingPrice=BrowserCapturePolicy.priceCents(item.opt("priceCents"),item.optString("currency"));
+            if(incomingPrice!=null&&!incomingPrice.equals(previousSnapshotPrice)&&!item.has("protectedPriceCents"))merged.remove("protectedPriceCents");
+            boolean preserveRich="dom".equals(item.optString("source"))&&!"dom".equals(merged.optString("source","dom"));
+            for(java.util.Iterator<String> keys=item.keys();keys.hasNext();){String key=keys.next();Object value=item.opt(key);
+                if(value==null||value==JSONObject.NULL||(value instanceof String&&((String)value).isEmpty()))continue;
+                if(preserveRich&&("title".equals(key)||"description".equals(key)||"source".equals(key))&&merged.has(key))continue;
+                merged.put(key,value);
+            }
+            db.execSQL(BrowserIntakeSql.PROVENANCE,new Object[]{snapshotKey,1,now,merged.toString()});
+            Integer price=BrowserCapturePolicy.priceCents(merged.opt("priceCents"),merged.optString("currency"));
+            String title=merged.optString("title").trim();
+            if(price==null||title.isEmpty()){db.setTransactionSuccessful();return -1;}
+            Integer protectedPrice=BrowserCapturePolicy.priceCents(merged.opt("protectedPriceCents"),merged.optString("currency"));
+            String brand=merged.optString("brand"),condition=merged.optString("condition");
+            String raw=title+(merged.optString("description").isEmpty()?"":" · "+merged.optString("description"));
+            if(!merged.optString("language").isEmpty())raw+=" · Lingua: "+merged.optString("language");
+            raw=safe(raw);
+            long id=0;String signature="browser:"+itemId;boolean changed=true,active=true;
+            try(Cursor c=db.rawQuery(BrowserIntakeSql.LOOKUP,new String[]{itemId})){
+                if(c.moveToFirst()){
+                    id=c.getLong(0);signature=c.getString(1);
+                    changed=!title.equals(c.getString(2))||(!brand.isEmpty()&&!brand.equals(c.getString(3)))||(!condition.isEmpty()&&!condition.equals(c.getString(4)))||price!=c.getInt(5)||(!raw.equals(c.getString(10)))||protectedPrice!=null&&(c.isNull(6)||protectedPrice!=c.getInt(6));
+                    active="ACTIVE".equals(c.getString(7))&&c.getInt(8)==0;
+                    if(protectedPrice==null&&price==c.getInt(5)&&!c.isNull(6))protectedPrice=c.getInt(6);
+                    if(brand.isEmpty())brand=c.isNull(3)?"":c.getString(3);
+                    if(condition.isEmpty())condition=c.isNull(4)?"":c.getString(4);
+                }
+            }
+            VintedCard card=new VintedCard(title,brand,condition,price/100.0,protectedPrice==null?null:protectedPrice/100.0,null,new Rect(0,0,1,1),raw,"",signature);
+            ListingClassifier.Result classified=ListingClassifier.classify(card);
+            String analysisState=classified.allowIdentityCandidate?"PENDING_ANALYSIS":"BLOCKED_CLASSIFIER";
+            if(id==0){
+                db.execSQL(BrowserIntakeSql.INSERT,new Object[]{signature,signature,itemId,title,brand,condition,price,protectedPrice,raw,url,now,now,analysisState,analysisState});
+                Long inserted=scalarLong(db,"SELECT id FROM market_listings WHERE vinted_item_id=?",new String[]{itemId});
+                if(inserted==null)throw new IllegalStateException("Browser identity could not be persisted");id=inserted;
+            }
+            db.execSQL(BrowserIntakeSql.PROVENANCE,new Object[]{"browser_listing:"+id,1,now,"browser-public-capture-v1"});
+            String photos="",image="";JSONArray receivedPhotos=merged.optJSONArray("photos");
+            if(receivedPhotos!=null)for(int n=0;n<Math.min(10,receivedPhotos.length());n++){
+                String photo=BrowserCapturePolicy.photo(receivedPhotos.optString(n));if(photo.isEmpty())continue;
+                if(image.isEmpty())image=photo;photos+=(photos.isEmpty()?"":",")+photo;
+            }
+            JSONObject publication=merged.optJSONObject("publication");String published=publication==null?"":publication.optString("raw");
+            if(active){
+                db.execSQL(BrowserIntakeSql.UPDATE,new Object[]{title,brand,condition,price,protectedPrice,protectedPrice,price,raw,url,image,photos,merged.optString("sellerId").matches("[1-9][0-9]{0,18}")?merged.optString("sellerId"):"",merged.optString("sellerName"),published,"",now,id});
+                if(changed){
+                    ContentValues state=new ContentValues();state.put("enrichment_state",analysisState);state.put("match_state",analysisState);
+                    db.update("market_listings",state,"id=?",new String[]{String.valueOf(id)});
+                    ContentValues history=new ContentValues();history.put("listing_id",id);history.put("observed_at",now);history.put("price_cents",price);put(history,"protected_price_cents",protectedPrice);history.put("source","browser-public-capture");db.insertOrThrow("price_observations",null,history);
+                    // Same transaction/database as the canonical row. ID signatures do not collapse
+                    // different sellers' cards even when title and price happen to be identical.
+                }
+                helper.recordSighting(card,classified,now);
+                syncBrowserDeal(db,id);
+            }
+            db.setTransactionSuccessful();return id;
+        }finally{db.endTransaction();helper.invalidateActiveObservationSessionCache();}
+    }
+
+    /** Serialize a browser result with new captures so stale JS callbacks cannot reprice a row. */
+    public boolean commitBrowserAnalysis(VintedCard card,GameAnalysis analysis,ListingClassifier.Result classified,long now,boolean huntCandidate){
+        SQLiteDatabase db=helper.getWritableDatabase();db.beginTransaction();
+        try{Long id=listingIdForCard(db,card);if(id==null||!browserOwned(db,id)){db.setTransactionSuccessful();return false;}
+            String life=scalarString(db,"SELECT lifecycle FROM market_listings WHERE id=? AND COALESCE(manual_review_required,0)=0",new String[]{String.valueOf(id)});
+            if(!"ACTIVE".equals(life)){db.setTransactionSuccessful();return false;}
+            helper.record(card,analysis,classified,now);applyAnalysis(card,analysis,classified,now);if(huntCandidate){helper.recordHuntCandidate(card,analysis,classified,now);syncBrowserDeal(db,id);}
+            db.setTransactionSuccessful();return true;
+        }finally{db.endTransaction();}
+    }
+
+    private static boolean browserOwned(SQLiteDatabase db,long listingId){
+        try(Cursor c=db.rawQuery(BrowserIntakeSql.BROWSER_OWNED,new String[]{String.valueOf(listingId)})){return c.moveToFirst();}
+    }
+
+    private static void syncBrowserDeal(SQLiteDatabase db,long listingId){
+        db.execSQL("UPDATE deals SET vinted_item_id=(SELECT vinted_item_id FROM market_listings WHERE id=?),vinted_url=(SELECT vinted_url FROM market_listings WHERE id=?),image_url=COALESCE((SELECT image_url FROM market_listings WHERE id=?),image_url),listing_photos_csv=COALESCE((SELECT listing_photos_csv FROM market_listings WHERE id=?),listing_photos_csv),seller_id=COALESCE((SELECT seller_id FROM market_listings WHERE id=?),seller_id),seller_name=COALESCE((SELECT seller_name FROM market_listings WHERE id=?),seller_name),published_label=COALESCE((SELECT published_label FROM market_listings WHERE id=?),published_label) WHERE signature=(SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?)",new Object[]{listingId,listingId,listingId,listingId,listingId,listingId,listingId,listingId});
+    }
+
     public long recordSighting(VintedCard card, ListingClassifier.Result listing, long now) {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.recordSighting");
         try{
@@ -812,6 +903,7 @@ public final class MarketStore {
             // resolved automatically; ordinary observations stay useful locally without becoming jobs.
             if(liveResolve)enqueueListingJob(db, listingId, JOB_VINTED, now,320,"LIVE_DEAL");
             if ("MATCHED".equals(matchState)&&bggRefreshDue(db,gameId,now)) enqueueGameJob(db, gameId, JOB_BGG, now);
+            if(!card.capturedSignature.isEmpty())syncBrowserDeal(db,listingId);
             db.setTransactionSuccessful();
         } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
     
@@ -834,8 +926,8 @@ public final class MarketStore {
     public List<VintedCard> pendingAnalysisCards(int limit) {
         List<VintedCard> out=new ArrayList<>();
         int bounded=Math.max(1,Math.min(8,limit));
-        String sql="SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text " +
-                "FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS' " +
+        String sql="SELECT vinted_title,brand,item_condition,current_price_cents,protected_price_cents,favorites,observed_text,COALESCE(NULLIF(legacy_signature,''),temp_fingerprint),id " +
+                "FROM market_listings WHERE lifecycle='ACTIVE' AND enrichment_state='PENDING_ANALYSIS' AND COALESCE(manual_review_required,0)=0 " +
                 "ORDER BY last_seen DESC LIMIT ?";
         try(Cursor c=helper.getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(bounded)})){
             while(c.moveToNext()){
@@ -843,7 +935,7 @@ public final class MarketStore {
                 Double protectedPrice=c.isNull(4)?null:c.getInt(4)/100.0;
                 Integer fav=c.isNull(5)?null:c.getInt(5);
                 out.add(new VintedCard(c.getString(0),c.getString(1),c.getString(2),price,protectedPrice,fav,
-                        new Rect(0,0,1,1),c.isNull(6)?c.getString(0):c.getString(6)));
+                        new Rect(0,0,1,1),c.isNull(6)?c.getString(0):c.getString(6),"",browserOwned(helper.getReadableDatabase(),c.getLong(8))?c.getString(7):""));
             }
         }
         return out;
@@ -1954,7 +2046,7 @@ public final class MarketStore {
                 "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' "+
                 "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
                 "AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.rating>=? "+
-                "AND COALESCE(l.enriched_at,0)<? AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN (?,?,?)) "+
+                "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='browser_listing:'||l.id AND q.value=1) AND COALESCE(l.enriched_at,0)<? AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN (?,?,?)) "+
                 "ORDER BY CASE WHEN l.published_label IS NULL OR l.published_label='' OR l.seller_id IS NULL OR l.seller_id='' THEN 0 ELSE 1 END,COALESCE(l.enriched_at,0) ASC LIMIT 1",
                 new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(cutoff),PENDING,PROCESSING,FAILED_RETRYABLE});
         if(listingId!=null){
@@ -3513,6 +3605,7 @@ public final class MarketStore {
     }
     private void enqueueGameJob(SQLiteDatabase db,long gameId,String type,long now){enqueueJob(db,"bgg:"+gameId,type,null,gameId,now,190,"AUTO");}
     private void enqueueJob(SQLiteDatabase db,String key,String type,Long listingId,Long gameId,long now,int priority,String source){
+        if(isVintedJobType(type)&&listingId!=null&&browserOwned(db,listingId)&&!BrowserCapturePolicy.explicitRequest(source))return;
         QueueWorkScheduler.schedule(context);
         try(Cursor c=db.rawQuery("SELECT state,next_attempt_at,priority FROM processing_jobs WHERE job_key=?",new String[]{key})){
             if(c.moveToFirst()){
@@ -3551,6 +3644,7 @@ public final class MarketStore {
     private static GameRecord readGameWithSummary(Cursor c){GameRecord g=readGameBase(c);int i=32;g.listingCount=c.getInt(i++);g.activeListingCount=c.getInt(i++);g.currentMinPriceCents=c.isNull(i)?null:c.getInt(i);i++;g.historicalMinPriceCents=c.isNull(i)?null:c.getInt(i);i++;g.historicalMaxPriceCents=c.isNull(i)?null:c.getInt(i);i++;g.historicalAveragePriceCents=c.isNull(i)?null:c.getDouble(i);i++;g.recentAveragePriceCents=c.isNull(i)?null:(int)Math.round(c.getDouble(i));i++;g.observationCount=c.getInt(i);return g;}
 
     private static String listingVintedJobType(SQLiteDatabase db,long listingId){
+        if(browserOwned(db,listingId))return null;
         try(Cursor c=db.rawQuery("SELECT vinted_url,seller_id,published_label,image_url,enrichment_state FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)})){
             if(!c.moveToFirst())return JOB_VINTED;
             if("LOCAL_ONLY".equals(c.getString(4))||"DEFERRED_LINK".equals(c.getString(4)))return null;
@@ -3560,13 +3654,13 @@ public final class MarketStore {
         }
     }
     private static boolean bggRefreshDue(SQLiteDatabase db,long gameId,long now){try(Cursor c=db.rawQuery("SELECT metadata_updated_at,image_url,rating FROM games WHERE id=?",new String[]{String.valueOf(gameId)})){if(!c.moveToFirst())return true;long updated=c.getLong(0);return updated<=0||TextUtils.isEmpty(c.getString(1))||c.isNull(2)||now-updated>=7L*24*60*60_000L;}}
-    private static Long listingIdForCard(SQLiteDatabase db,VintedCard card){if(card==null)return null;String fp=fingerprint(card),legacy=DealDatabase.signature(card);return scalarLong(db,"SELECT id FROM market_listings WHERE temp_fingerprint=? OR (legacy_signature=? AND temp_fingerprint=legacy_signature) ORDER BY CASE WHEN temp_fingerprint=? THEN 0 ELSE 1 END LIMIT 1",new String[]{fp,legacy,fp});}
+    private static Long listingIdForCard(SQLiteDatabase db,VintedCard card){if(card==null)return null;if(!card.capturedSignature.isEmpty())return scalarLong(db,"SELECT id FROM market_listings WHERE (legacy_signature=? OR temp_fingerprint=?) AND vinted_title=? AND current_price_cents=? AND COALESCE(observed_text,'')=? AND COALESCE(brand,'')=? AND COALESCE(item_condition,'')=? AND COALESCE(protected_price_cents,-1)=CAST(? AS INTEGER) LIMIT 1",new String[]{card.capturedSignature,card.capturedSignature,card.title,String.valueOf(cents(card.itemPrice)),safe(card.rawDescription),card.brand==null?"":card.brand,card.condition==null?"":card.condition,String.valueOf(card.protectedPrice==null?-1:cents(card.protectedPrice))});String fp=fingerprint(card),legacy=DealDatabase.signature(card);return scalarLong(db,"SELECT id FROM market_listings WHERE temp_fingerprint=? OR (legacy_signature=? AND temp_fingerprint=legacy_signature) ORDER BY CASE WHEN temp_fingerprint=? THEN 0 ELSE 1 END LIMIT 1",new String[]{fp,legacy,fp});}
     private static Long scalarLong(SQLiteDatabase db,String sql,String[] args){try(Cursor c=db.rawQuery(sql,args)){return c.moveToFirst()&&!c.isNull(0)?c.getLong(0):null;}}
     private static String scalarString(SQLiteDatabase db,String sql,String[] args){try(Cursor c=db.rawQuery(sql,args)){return c.moveToFirst()&&!c.isNull(0)?c.getString(0):null;}}
     private static boolean same(Integer a,Integer b){return a==null?b==null:a.equals(b);}
     private static String emptyToNull(String s){return TextUtils.isEmpty(s)?null:s;}
     private static String resolvedLanguage(GameAnalysis a){if(a==null||TextUtils.isEmpty(a.languageCode))return null;String s=a.languageCode.toUpperCase(Locale.ROOT);if(a.languageBlocked&&!s.contains("DEP")&&!s.contains("IND"))s+="|DEP";return s;}
-    public static String fingerprint(VintedCard c){return normalize(c==null?null:c.title)+"|"+normalize(c==null?null:c.brand)+"|"+normalize(c==null?null:c.condition)+"|"+(c==null?0:cents(c.itemPrice));}
+    public static String fingerprint(VintedCard c){if(c!=null&&!c.capturedSignature.isEmpty())return c.capturedSignature;return normalize(c==null?null:c.title)+"|"+normalize(c==null?null:c.brand)+"|"+normalize(c==null?null:c.condition)+"|"+(c==null?0:cents(c.itemPrice));}
     private static boolean isUsableResolvedTitle(String value){if(TextUtils.isEmpty(value))return false;String x=value.trim();if(x.length()<2||x.length()>180)return false;String n=x.toLowerCase(Locale.ROOT);return !n.contains("protezione acquisti")&&!n.contains("include la protezione")&&!n.matches("^[\\d\\s.,€]+$");}
     private static String normalize(String v){if(v==null)return"";String n=Normalizer.normalize(v,Normalizer.Form.NFD).replaceAll("\\p{M}+","");return n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim();}
     private static int cents(double v){return(int)Math.round(v*100.0);}
