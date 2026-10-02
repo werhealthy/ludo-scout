@@ -56,8 +56,10 @@ checks=[
      '"Vinted da completare · "' not in ui and
      'View dot=new View(this);dot.setBackground(round(ORANGE,999,0,0))' in ui),
     ("bundle page distinguishes real bundles from seller exploration",
-     '"Bundle confermati · "' in ui and
-     ('"Da controllare · "' in ui or '"Da esplorare · "' in ui) and
+     'addBundleSection(sections,"Bundle · "' in ui and
+     'addBundleSection(sections,"Esplora · "' in ui and
+     'if("bundle".equals(bundleSection))' in ui and
+     'sources.removeIf(d->bundleDealsForSource(d).size()<2)' in ui and
      'openVintedBrowserExperiment(d.vintedUrl,"BUNDLE",d.sellerId)' in ui),
     ("bundle exploration intent is bounded",
      "TTL_MS=10L*60_000L" in explore and
