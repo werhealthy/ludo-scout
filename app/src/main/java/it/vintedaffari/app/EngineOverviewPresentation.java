@@ -26,6 +26,20 @@ final class EngineOverviewPresentation {
         if(total>0&&phase==3&&waitUntil>now)return "in attesa";
         return total>0?"in coda":"nessun elemento";
     }
+    static String phaseState(int phase,int total,int queued,boolean active,boolean bggPaused,boolean vintedPaused,long waitUntil,long now) {
+        if(phase==4)return "disponibili";
+        if(total<=0)return "nessun elemento";
+        if(queued<=0&&!active)return "dati incompleti";
+        if((phase==1&&bggPaused)||(phase==3&&vintedPaused))return "in pausa";
+        if(phase==3&&waitUntil>now)return "in attesa";
+        if(active)return "attive";
+        return "in coda";
+    }
+    static boolean contentSettled(boolean backendSettled,int[] queued) {
+        if(!backendSettled)return false;
+        for(int phase=0;phase<4;phase++)if(queued[phase]>0)return false;
+        return true;
+    }
     static boolean motionAllowed(boolean active,boolean resumed,boolean focused,boolean overview,boolean attached,boolean shown,boolean enabled) {
         return active&&resumed&&focused&&overview&&attached&&shown&&enabled;
     }
