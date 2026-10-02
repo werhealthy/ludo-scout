@@ -1592,7 +1592,7 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
         LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(-1,productMediaHeight());ip.topMargin=dp(8);box.addView(productBoxArtwork(g.bggId,g.imageUrl,g.name),ip);
         addProductSection(box,productQuickFacts(g.rating,g.minPlayers,g.maxPlayers,g.playtime,g.weight,null,()->{if(!TextUtils.isEmpty(g.bggId))openBgg(g.bggId);},null),8);
         View divider=new View(this);divider.setBackgroundColor(Color.argb(55,255,255,255));LinearLayout.LayoutParams dpLine=new LinearLayout.LayoutParams(-1,dp(1));dpLine.topMargin=dp(8);dpLine.bottomMargin=dp(12);box.addView(divider,dpLine);
-        TextView title=text(g.name,26,TEXT,Typeface.BOLD);title.setMaxLines(3);box.addView(title);
+        TextView title=text(g.name,26,TEXT,Typeface.BOLD);box.addView(title);
         TextView state=text("sold".equals(g.collectionState)?"Venduto":"Nella tua collezione",12,"sold".equals(g.collectionState)?ORANGE:DISCOVER_LAVENDER,Typeface.BOLD);addProductSection(box,state,6);
         String edition=TextUtils.isEmpty(g.editionLabel)?"Edizione non specificata":g.editionLabel;TextView editionText=text(edition,14,MUTED,Typeface.NORMAL);addProductSection(box,editionText,8);
         box.addView(libraryPersonalRatingCard(g,d));
