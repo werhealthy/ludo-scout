@@ -80,7 +80,7 @@ public class LibraryShelfRegression {
  __METHODS__
  static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
  public static void main(String[] args){
-  check(libraryShelfCapacity(320,1f)==2,"narrow screen");check(libraryShelfCapacity(372,1f)==3,"wider phone");check(libraryShelfCapacity(372,1.5f)==2,"large text must reduce density");check(libraryShelfCapacity(0,1f)==1,"zero width");
+  check(libraryShelfCapacity(320,1f)==2,"narrow screen");check(libraryShelfCapacity(372,1f)==2,"wider phone stays paired");check(libraryShelfCapacity(372,1.5f)==1,"large text must keep large readable boxes");check(libraryShelfCapacity(0,1f)==1,"zero width");
   for(int width:new int[]{0,240,320,372,600,1000})for(float font:new float[]{1f,1.5f,2f})for(int count:new int[]{0,1,2,3,4,9,100,101}){
    LibraryShelfRegression n=new LibraryShelfRegression();List<LibraryGame> games=new ArrayList<>();for(int i=0;i<count;i++)games.add(new LibraryGame(i));int capacity=libraryShelfCapacity(width,font);
    n.fillLibraryShelves(new LinearLayout(n),games,capacity);check(n.rows==(count+capacity-1)/capacity,"shelf count");check(n.shown.size()==count,"lost games");for(int i=0;i<count;i++)check(n.shown.get(i)==i,"order/duplicate");
