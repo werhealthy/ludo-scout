@@ -79,7 +79,7 @@ print('Exact photo cache SQLite fixtures passed')
 
 # Run the real telemetry/epoch methods with SQLite boundary adapters.
 def java_method(source, name):
-    match = re.search(r'(?:public |private )static [^\\n]+\\b'+name+r'\\([^\\n]*\\)\\{', source)
+    match = re.search(r'(?:public |private )static [^\n]+\b'+name+r'\([^\n]*\)\{', source)
     start = match.start()
     brace = source.index('{', start)
     depth = 1
