@@ -5,7 +5,7 @@
 Il feedback più recente corregge la posizione della barra: sotto le foto Vinted, sopra il riepilogo. Riquadro per titolo del gioco/offerta/prezzo; titolo originale dell'annuncio e informazioni successive sulla pagina, senza un ulteriore riquadro. Artwork annuncio occupa lo spazio reale sopra i pulsanti provider; testo a due righe e contenuti aggiuntivi riducono l'altezza disponibile. Conservare un minimo leggibile quando il contenuto richiede scroll, senza tagliare dati o riservare spazio al gesto.
 Home: scatola quadrata più grande e bordo superiore allineato al titolo; “Gioco in evidenza” è un tag con superficie propria. Icone delle sezioni centrate verticalmente e più distanti dai titoli. Podio BGG: primo più grande, differenza più marcata rispetto a secondo e terzo. È polish della Home approvata, non un redesign o una nuova area.
 Motore ancora non accettato: nessuna diagnosi della causa dai soli feedback visivi; prossimo passo resta leggere diagnostica attuale/screenshot, distinguendo problema dei dati e comprensione della UI. Non sostituire scope/query senza evidenza.
-Implementazione in branch frontend/product-home-proportions; verifiche automatiche e distribuzione da registrare al checkpoint. Accettazione telefono pendente. Restano 7 gruppi frontend; backend separato 5.
+Implementato PR149 e distribuito 5.12.130: CI389 e beta148 verdi, certificato/upload Firebase/distribuzione tester verificati; dettagli in STATE. Accettazione telefono pendente. Restano 7 gruppi frontend; backend separato 5.
 
 ## Feedback 2026-10-02 13:03 — densità Motore e scheda annuncio
 
