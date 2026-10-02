@@ -39,6 +39,14 @@ public class EngineOverviewPresentationRegression {
   if(EngineOverviewPresentation.activePhase(2,1,true,false,0,100))throw new AssertionError("BGG pause animated");
   eq("Scroll elaborato",status(true,true,16,0,0,false,false,0));
   eq("Da riconoscere",EngineOverviewPresentation.phaseLabel(0));eq("Pronti",EngineOverviewPresentation.phaseLabel(4));
+  // An incomplete price comparison has stock, but no executable queue or animation.
+  eq("dati incompleti",EngineOverviewPresentation.phaseState(3,5,0,false,false,false,0,100));
+  eq("in coda",EngineOverviewPresentation.phaseState(3,5,2,false,false,false,0,100));
+  eq("in pausa",EngineOverviewPresentation.phaseState(3,5,2,false,false,true,0,100));
+  eq("dati incompleti",EngineOverviewPresentation.phaseState(3,5,0,false,false,true,0,100));
+  if(!EngineOverviewPresentation.contentSettled(true,new int[]{0,0,0,0,3}))throw new AssertionError("complete scroll not settled");
+  if(EngineOverviewPresentation.contentSettled(true,new int[]{1,0,0,0,0}))throw new AssertionError("pending local analysis hidden by settled run");
+  if(EngineOverviewPresentation.contentSettled(false,new int[5]))throw new AssertionError("unmaterialised work marked done");
   System.out.println("PASS production overview status, mixed-lane pause and 160 activity masks");
  }
 }
