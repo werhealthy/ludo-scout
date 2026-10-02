@@ -1,5 +1,12 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback 2026-10-02 13:03 — densità Motore e scheda annuncio
+
+L'utente rifiuta la densità troppo vuota della125–126 e segnala scope assente/tutti0. Richieste manuali devono conservare un riquadro riconoscibile; non estendere questo ritorno a box annidati su tutta la pagina. Numero colorato=attività osservata ora, piccolo=in coda nella fase; nessuno è storico. Occorre diagnosticare perché sul dispositivo non risulta uno scroll nel periodo corrente. Non dichiarare risolto il problema dati dalla sola sostituzione degli0 con trattini. Ricostruire scope degli ultimi7giorni/ciclo corrente e stato globale dalla diagnostica installata prima di cambiare filtri/epoch/query.
+Scheda annuncio: pulsanti a capsula ampi, fill/loghi provider conservati; barra lingua/voto/giocatori/durata compatta in alto, sotto toolbar prima della copertina; descrizione BGG solo nella scheda gioco. Layout compatto deve mantenere dati reali, tap/accessibilità e consentire ritorno a righe con testo grande.
+127 implementa questo perimetro UI, CI/review/distribuzione in STATE. Accettazione telefono pendente; gesto126 non ancora accettato. Storico conclusioni resta aperto. Unico prossimo passo Motore: diagnosi scope assente dai dati del telefono.
+
+
 ## Intervento approvato 2026-10-02 12:13 — Motore aperto e gesto reversibile
 
 Il feedback124 accetta definitivamente i pulsanti con loghi/riempimenti: conservarli. Rifiuta lo scatto inverso, il doppio stato e la densità di card della overview. «Vai» approva la struttura proposta: ruota direttamente sulla pagina, stato unico con icona al centro, code/aiuto come righe compatte allineate, cronologia dal fondo con alternativa nel menu e accessibile.
@@ -10,7 +17,7 @@ Il gesto deve seguire il dito anche al ritorno, compreso lo zero; soltanto relea
 
 
 
-## Scaletta operativa unica — aggiornata 2026-10-02, dopo la consegna 126
+## Scaletta operativa unica — aggiornata 2026-10-02, dopo la consegna 127
 
 Questo file è la fonte unica per le cose da fare. Leggerlo all'inizio di ogni sessione insieme a `AGENTS.md` e `STATE.md`. Le priorità qui sotto prevalgono sulle vecchie indicazioni di “prossimo step” nella cronologia. Aggiornare questi gruppi senza duplicare i lavori già consegnati.
 
@@ -28,7 +35,7 @@ Home considerata fatta dall’utente: conservarne la baseline approvata; non ria
 
 Accessibilità, testo grande, safe insets/tastiera, Back, annullamento e animazioni sono criteri trasversali di tutti i gruppi, non un unico job che possa chiudere intere aree.
 L’analisi UX deve ricostruire prima oggetti, relazioni, ingressi/uscite e azioni del codice attuale, poi proporre le alternative e far approvare le decisioni importanti. Nessun nuovo assetto di tab, ruoloLudo, tracking, schema o comportamento è approvato dalla sola richiesta di analisi.
-Unico prossimo passo frontend: Motore, definire la fonte affidabile dello storico delle conclusioni per periodo con il backend; resta poi il percorso contestuale di risoluzione e ritorno ai job nella stessa posizione. Overview numeri/periodo/attività e gesto dal basso consegnati nella124; verifica telefono aperta, aree Motore/Schede non chiuse. Non avviare tutti i redesign insieme.
+Unico prossimo passo frontend: Motore, diagnosticare lo scope assente e i contatori dal report del telefono; restano poi fonte affidabile dello storico delle conclusioni e percorso contestuale di risoluzione. Overview numeri/periodo/attività e gesto dal basso consegnati nella124; verifica telefono aperta, aree Motore/Schede non chiuse. Non avviare tutti i redesign insieme.
 
 ## Frontend — Motore overview e gesto dal basso 5.12.124, 2026-10-02 11:42 Europe/Rome
 
