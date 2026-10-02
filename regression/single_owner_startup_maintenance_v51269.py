@@ -18,7 +18,7 @@ checks = [
         "private void applyTurnaroundReviewCutoverIfNeeded"))),
     ("queue foreground service owns startup maintenance", "EngineStartupMaintenance.run(this,market)" in service),
     ("startup cutovers are grouped behind one queue-process entry point", "static void run(Context context, MarketStore market)" in maintenance),
-    ("existing first-install archive remains restart-safe", "v5121FreshStartApplied" in maintenance and "freshStartLegacyBacklog" in maintenance),
+    ("destructive legacy reset is retired from automatic startup; historical helper retained",\n        "applyFreshStart(context, market);" not in maintenance and\n        "v5121FreshStartApplied" in maintenance and "freshStartLegacyBacklog" in maintenance),
     ("operational epoch remains persisted and idempotent", "startOperationalEpochIfMissing" in maintenance and "v51216OperationalEpochApplied" in maintenance),
     ("review archive and product sweep remain restart-safe", "archiveAutomaticReviewDebtBefore" in maintenance and "v51221ProductNoiseSweepApplied" in maintenance),
     ("legacy one-time queue repairs remain accounted for", all(name in maintenance for name in (
