@@ -1,5 +1,12 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback 2026-10-02 14:22 — proporzioni annuncio e Home
+
+Il feedback più recente corregge la posizione della barra: sotto le foto Vinted, sopra il riepilogo. Riquadro per titolo del gioco/offerta/prezzo; titolo originale dell'annuncio e informazioni successive sulla pagina, senza un ulteriore riquadro. Artwork annuncio occupa lo spazio reale sopra i pulsanti provider; testo a due righe e contenuti aggiuntivi riducono l'altezza disponibile. Conservare un minimo leggibile quando il contenuto richiede scroll, senza tagliare dati o riservare spazio al gesto.
+Home: scatola quadrata più grande e bordo superiore allineato al titolo; “Gioco in evidenza” è un tag con superficie propria. Icone delle sezioni centrate verticalmente e più distanti dai titoli. Podio BGG: primo più grande, differenza più marcata rispetto a secondo e terzo. È polish della Home approvata, non un redesign o una nuova area.
+Motore ancora non accettato: nessuna diagnosi della causa dai soli feedback visivi; prossimo passo resta leggere diagnostica attuale/screenshot, distinguendo problema dei dati e comprensione della UI. Non sostituire scope/query senza evidenza.
+Implementazione in branch frontend/product-home-proportions; verifiche automatiche e distribuzione da registrare al checkpoint. Accettazione telefono pendente. Restano 7 gruppi frontend; backend separato 5.
+
 ## Feedback 2026-10-02 13:03 — densità Motore e scheda annuncio
 
 L'utente rifiuta la densità troppo vuota della125–126 e segnala scope assente/tutti0. Richieste manuali devono conservare un riquadro riconoscibile; non estendere questo ritorno a box annidati su tutta la pagina. Numero colorato=attività osservata ora, piccolo=in coda nella fase; nessuno è storico. Occorre diagnosticare perché sul dispositivo non risulta uno scroll nel periodo corrente. Non dichiarare risolto il problema dati dalla sola sostituzione degli0 con trattini. Ricostruire scope degli ultimi7giorni/ciclo corrente e stato globale dalla diagnostica installata prima di cambiare filtri/epoch/query.

@@ -450,7 +450,7 @@ private void applyDiscoverChrome(){
     private void addDiscoverSectionHeading(String title,String action,Runnable onAction){
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
         String icon="Categorie".equals(title)?LudoIcons.GAMEPAD:"Le migliori offerte".equals(title)?LudoIcons.TAG:"I migliori su BGG".equals(title)?LudoIcons.STAR:"Appena pubblicati".equals(title)?LudoIcons.CLOCK:LudoIcons.GIFT;
-        row.addView(appIcon(icon,22,DISCOVER_LAVENDER),new LinearLayout.LayoutParams(dp(34),dp(32)));
+        TextView sectionIcon=appIcon(icon,22,DISCOVER_LAVENDER);sectionIcon.setGravity(Gravity.CENTER);LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(28),dp(32));iconLp.rightMargin=dp(12);row.addView(sectionIcon,iconLp);
         TextView heading=discoverTextWeight(title,18,DISCOVER_TEXT,700);
         heading.setLetterSpacing(-.019f);
         row.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
@@ -709,10 +709,10 @@ private void applyDiscoverChrome(){
         int medal=rank==1?Color.rgb(255,214,118):rank==2?Color.rgb(143,148,157):DISCOVER_ORANGE;
         TextView position=discoverTextWeight(String.valueOf(rank),12,Color.BLACK,700);position.setGravity(Gravity.CENTER);position.setBackground(round(medal,999,0,0));position.setContentDescription("Posizione "+rank+" nella selezione");
         FrameLayout cover=rankedBoxArtwork(d);FrameLayout.LayoutParams medalLp=new FrameLayout.LayoutParams(dp(24),dp(24),Gravity.TOP|Gravity.START);cover.addView(position,medalLp);
-        int imageWidth=rank==1?116:rank==2?104:96;int imageHeight=rank==1?152:rank==2?128:112;
+        int imageWidth=rank==1?140:rank==2?108:88;int imageHeight=rank==1?184:rank==2?132:104;
         row.addView(cover,new LinearLayout.LayoutParams(stacked?-1:dp(imageWidth),dp(stacked?imageHeight+32:imageHeight)));
         LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setPadding(stacked?0:dp(12),stacked?dp(12):0,0,0);
-        TextView title=discoverTextWeight(name(d),16,DISCOVER_TEXT,700);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);
+        TextView title=discoverTextWeight(name(d),rank==1?19:rank==2?17:16,DISCOVER_TEXT,700);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));center.addView(heading);
         LinearLayout values=new LinearLayout(this);values.setOrientation(stacked?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);values.setGravity(Gravity.CENTER_VERTICAL);
         values.addView(homeScore(d,18));TextView price=discoverTextWeight(total(d),16,DISCOVER_TEXT,600);price.setSingleLine(true);price.setGravity((stacked?Gravity.START:Gravity.END)|Gravity.CENTER_VERTICAL);
@@ -740,7 +740,7 @@ private void applyDiscoverChrome(){
             if(art.getParent()!=null)((ViewGroup)art.getParent()).removeView(art);content.removeAllViews();
             LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
             TextView eyebrow=discoverTextWeight("Gioco in evidenza",12,Color.rgb(242,231,255),600);eyebrow.setCompoundDrawablesRelativeWithIntrinsicBounds(iconDrawable(LudoIcons.STAR,DISCOVER_ORANGE,12),null,null,null);eyebrow.setCompoundDrawablePadding(dp(6));
-            header.addView(eyebrow,new LinearLayout.LayoutParams(0,-2,1));
+            eyebrow.setPadding(dp(10),dp(6),dp(10),dp(6));eyebrow.setBackground(round(Color.argb(90,67,36,95),999,1,DISCOVER_OUTLINE));header.addView(eyebrow,new LinearLayout.LayoutParams(-2,-2));header.addView(new View(this),new LinearLayout.LayoutParams(0,dp(1),1));
             TextView more=roundIconButton("⋯",TEXT);more.setContentDescription("Azioni del gioco in evidenza");more.setOnClickListener(v->showProductActions(d,true));header.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));content.addView(header);
             boolean inline=HomePresentation.heroInline(available/getResources().getDisplayMetrics().density,getResources().getConfiguration().fontScale);
             LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);
@@ -753,9 +753,10 @@ private void applyDiscoverChrome(){
             TextView badge=discoverDiscountBadge(d,12);if(badge!=null){LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-2,-2);bp.topMargin=dp(4);amount.addView(badge,bp);}
             money.addView(amount,new LinearLayout.LayoutParams(0,-2,1));money.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));copy.addView(money);
             if(inline){
-                LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
-                int artWidth=Math.round(available*.44f);int artHeight=Math.max(dp(112),Math.min(dp(196),Math.round(artWidth*(height/(float)width+.26f))));
-                row.addView(art,new LinearLayout.LayoutParams(artWidth,artHeight));copy.setPadding(dp(12),0,0,0);row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));content.addView(row,new LinearLayout.LayoutParams(-1,-2));
+                boolean square=HomePresentation.coverMode(width,height)==HomePresentation.SQUARE;
+                LinearLayout row=new LinearLayout(this);row.setGravity(square?Gravity.TOP:Gravity.CENTER_VERTICAL);
+                int artWidth=Math.round(available*(square?.54f:.44f));int artHeight=square?Math.round(artWidth*(height/(float)width+.22f)/1.24f):Math.max(dp(112),Math.min(dp(196),Math.round(artWidth*(height/(float)width+.26f))));
+                row.addView(art,new LinearLayout.LayoutParams(artWidth,artHeight));copy.setPadding(dp(12),square?dp(8):0,0,0);row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));content.addView(row,new LinearLayout.LayoutParams(-1,-2));
             }else{
                 int artHeight=Math.max(dp(128),Math.min(dp(220),Math.round(available*(height/(float)width+.26f))));content.addView(art,new LinearLayout.LayoutParams(-1,artHeight));copy.setPadding(0,dp(12),0,0);content.addView(copy);
             }
@@ -1615,12 +1616,13 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         toolbar.addView(text("Annuncio",16,MUTED,Typeface.NORMAL),new LinearLayout.LayoutParams(0,-2,1));
         toolbar.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));
         TextView more=appIcon(LudoIcons.ELLIPSIS_VERTICAL,18,TEXT);more.setGravity(Gravity.CENTER);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
-        LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);addProductSection(box,productInfo,8);
+        LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);
 
         FrameLayout hero=new FrameLayout(this);hero.addView(dealProductArtwork(d),new FrameLayout.LayoutParams(-1,-1));LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,productMediaHeight());hlp.topMargin=dp(8);box.addView(hero,hlp);
         View photos=listingPhotoThumbnails(d);if(photos!=null){LinearLayout.LayoutParams photosParams=new LinearLayout.LayoutParams(-1,dp(72));photosParams.topMargin=dp(8);box.addView(photos,photosParams);}
+        addProductSection(box,productInfo,12);
         LinearLayout summary=new LinearLayout(this);summary.setOrientation(LinearLayout.VERTICAL);summary.setPadding(dp(16),dp(16),dp(16),dp(16));summary.setBackground(round(SURFACE,20,0,0));addProductSection(box,summary,12);
-        TextView title=text(name(d),26,TEXT,Typeface.BOLD);title.setMaxLines(3);title.setEllipsize(TextUtils.TruncateAt.END);addProductSection(summary,title,0);
+        TextView title=text(name(d),26,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);addProductSection(summary,title,0);
         LinearLayout productTags=new LinearLayout(this);productTags.setOrientation(LinearLayout.VERTICAL);summary.addView(productTags,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout signalRow=new LinearLayout(this);signalRow.setGravity(Gravity.CENTER_VERTICAL);boolean large=getResources().getConfiguration().fontScale>1.2f;signalRow.setOrientation(large?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         TextView decision=text(DealEvaluator.evaluate(d).label,12,dealAccent(d),Typeface.BOLD);decision.setMaxLines(2);signalRow.addView(decision,large?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));signalRow.addView(publicationText(d,12,Typeface.NORMAL));addProductSection(summary,signalRow,8);
@@ -1629,6 +1631,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView price=text(total(d),32,TEXT,Typeface.BOLD);moneyRow.addView(price,large?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
         TextView savingBadge=discoverDiscountBadge(d,12);if(savingBadge!=null){LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-2,-2);sp.leftMargin=large?0:dp(12);sp.topMargin=large?dp(6):0;moneyRow.addView(savingBadge,sp);}addProductSection(summary,moneyRow,4);
         if(d.offerCents!=null){TextView offer=text("Offerta "+money(d.offerCents),12,MUTED,Typeface.NORMAL);addProductSection(summary,offer,4);}
+        if(!TextUtils.isEmpty(d.vintedTitle)&&!d.vintedTitle.trim().equalsIgnoreCase(name(d).trim())){TextView listingTitle=text(d.vintedTitle,16,TEXT,Typeface.NORMAL);addProductSection(box,listingTitle,16);}
         boolean hasVinted=!TextUtils.isEmpty(d.vintedUrl);
         LinearLayout actionBar=new LinearLayout(this);boolean stackedActions=getResources().getConfiguration().fontScale>1.2f;actionBar.setOrientation(stackedActions?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);actionBar.setPadding(dp(20),dp(12),dp(20),dp(12));actionBar.setBackgroundColor(BG);
         Button vintedLink=productProviderAction(hasVinted?"Apri Vinted":"Collega annuncio",R.drawable.provider_vinted_logo,LIME,()->{if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);});
@@ -1663,6 +1666,17 @@ private void openDetail(DealRecord d){openDetail(d,false);}
             scrollStage.addView(pullHint,new FrameLayout.LayoutParams(-1,pullHeight,Gravity.BOTTOM));installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));
         }
 
+        // Fit artwork to the real viewport above provider actions. Wrapped text,
+        // status rows and photos reduce its height instead of leaving a blank tail.
+        Runnable fitArtwork=()->{
+            if(!dialog.isShowing()||sc.getHeight()<=0||box.getHeight()<=0)return;
+            int otherHeight=box.getHeight()-hero.getHeight();
+            int target=Math.max(dp(180),sc.getHeight()-sc.getPaddingTop()-sc.getPaddingBottom()-otherHeight);
+            ViewGroup.LayoutParams artworkParams=hero.getLayoutParams();
+            if(artworkParams.height!=target){artworkParams.height=target;hero.setLayoutParams(artworkParams);}
+        };
+        sc.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->sc.post(fitArtwork));
+        box.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->sc.post(fitArtwork));
         LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(scrollStage,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(16));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
 
     }
