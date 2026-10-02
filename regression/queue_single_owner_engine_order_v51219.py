@@ -63,7 +63,7 @@ checks=[
     ("RAM hints cannot directly bypass active-run ordering",
      "freshForAnalysis" not in scan and "marketStore.pendingAnalysisCards(8)" in scan and "new ArrayList<>(pendingForAnalysis.values())" in scan),
     ("locally pending scroll is rechecked without another Vinted visit",
-     "marketStore.pendingAnalysisCards(8)" in continuation and "postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L)" in continuation),
+     "flushPendingAnalysis();" in continuation and "radarPersistence.submit" in scan and "marketStore.pendingAnalysisCards(8)" in scan and "postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L)" in scan),
     ("WebView readiness has bounded retry window",
      "READY_RETRY_MS = 500L" in engine and "READY_TIMEOUT_MS = 30_000L" in engine and "retryVerifyOrFail" in engine),
     ("WebView readiness retry chain is single-flight",

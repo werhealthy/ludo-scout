@@ -20,6 +20,7 @@ scan_publish = service.index("publishA11yDiagnosticSnapshot();", scan_counter_wr
 analysis_result = service.index("@Override public void onResult(List<GameAnalysis> analyses)")
 analysis_error = service.index("@Override public void onError(String message)", analysis_result)
 analysis_callback = service[analysis_result:analysis_error]
+analysis_persistence = service[service.index("private void persistAnalysisResults"):service.index("private void continuePersistentAnalysis")]
 
 checks = [
     ("Vinted events queue a cross-process intake snapshot", "publishA11yDiagnosticSnapshot();" in event_handler),
@@ -30,7 +31,7 @@ checks = [
     ("the existing SQLite diagnostics channel is used", 'setDiagnosticState("a11y_intake"' in snapshot_writer and "SharedPreferences are process-local caches" in market),
     ("the snapshot includes event, parse and analysis freshness", all(k in snapshot_writer for k in ("eventAt=", "cardsParsedTotal=", "analysisBatches=", "localAnalysisLastBatchAt="))),
     ("completed Accessibility parses publish updated counters", scan_publish > scan_counter_write),
-    ("completed local analyses publish their completion time", "publishA11yDiagnosticSnapshot();" in analysis_callback and "localAnalysisLastBatchAt" in analysis_callback),
+    ("completed local analyses publish their completion time after background persistence", "radarPersistence.submit" in analysis_callback and "publishA11yDiagnosticSnapshot();" in analysis_persistence and "localAnalysisLastBatchAt" in analysis_persistence),
     ("debug reads intake telemetry from SQLite", 'diagnosticState("a11y_intake")' in diagnostics),
     ("debug uses the cross-process card count and event time", 'parseLongField(a11yIntakePayload,"cardsParsedTotal"' in diagnostics and 'parseLongField(a11yIntakePayload,"eventAt"' in diagnostics),
     ("debug exposes source freshness and payload", "a11yIntakeCrossProcess={authoritative=" in diagnostics),

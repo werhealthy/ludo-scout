@@ -40,6 +40,8 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run radar reliability and capture funnel regression
+        run: python3 regression/radar_reliability.py
       - name: Run database contention trace behavior regression
         run: python3 regression/db_contention_trace.py
 

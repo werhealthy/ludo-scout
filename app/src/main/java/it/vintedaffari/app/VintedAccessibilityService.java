@@ -88,6 +88,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private MarketStore marketStore;
     private final ExecutorService maintenanceIo=Executors.newSingleThreadExecutor();
     private final ExecutorService diagnosticIo=Executors.newSingleThreadExecutor();
+    private final RadarPersistence radarPersistence=new RadarPersistence();
+    // Service recreation may overlap the previous instance's asynchronous drain.
+    private static final RadarIntakeCounters radarCounters=new RadarIntakeCounters();
+    private volatile boolean radarDestroyed=false;
+    private boolean analysisSelectionInFlight=false;
     private final AtomicBoolean a11yDiagnosticFlushQueued=new AtomicBoolean(false);
     private volatile String pendingA11yDiagnosticSnapshot=null;
     private long lastA11yDiagnosticPublishAt=0L;
@@ -186,6 +191,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         QueueWorkScheduler.schedule(this);
         database = new DealDatabase(getApplicationContext());
         marketStore = new MarketStore(getApplicationContext(),database);
+        initializeRadarCounters();
         long serviceConnectedAt=System.currentTimeMillis();
         marketStore.setDiagnosticState("radar_service",1,"build="+BuildConfig.VERSION_NAME+";state=CONNECTED;at="+serviceConnectedAt);
         marketStore.setDiagnosticState("engine_runtime",0,"build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=CONNECTING;serviceConnectedAt="+serviceConnectedAt);
@@ -248,7 +254,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 // Persisted MarketStore state owns classifier ordering. Clear stale RAM hints
                 // so a newer waiting scroll cannot jump ahead of the oldest active Motore run.
                 pendingForAnalysis.clear();
-                if(marketStore!=null){for(VintedCard c:marketStore.pendingAnalysisCards(8))pendingForAnalysis.put(DealDatabase.signature(c),c);}
+                // Durable batch selection runs on radarPersistence, outside the WebView callback.
                 Log.i(TAG, "Motore pronto: " + gameCount + " giochi. Flush coda attiva=" + pendingForAnalysis.size());
                 flushPendingAnalysis();
                 rebuildLocalBundles();
@@ -277,7 +283,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         long eventNow=System.currentTimeMillis();pendingVintedEventDiag++;
         if(lastVintedEventDiagFlushAt==0L||eventNow-lastVintedEventDiagFlushAt>=2_000L||pendingVintedEventDiag>=64L){
             SharedPreferences p=diag();long delta=pendingVintedEventDiag;pendingVintedEventDiag=0L;lastVintedEventDiagFlushAt=eventNow;
-            long eventTotal=p.getLong("vintedEvents",0)+delta;int eventType=event.getEventType();
+            long eventTotal=radarCounters.add("vintedEvents",delta);int eventType=event.getEventType();
             p.edit().putLong("vintedEvents",eventTotal).putLong("lastEventAt",eventNow).putInt("lastEventType",eventType).apply();
             publishA11yDiagnosticSnapshot();
         }
@@ -296,7 +302,23 @@ public final class VintedAccessibilityService extends AccessibilityService {
      * Mirror a coalesced intake snapshot through MarketStore's existing SQLite diagnostics channel.
      * The write runs off the Accessibility callback and failures never affect observation.
      */
+    private java.io.File radarCounterFile(){return new java.io.File(getFilesDir(),"radar_intake_v2.properties");}
+    private void initializeRadarCounters(){
+        final Map<String,Long> legacy=new LinkedHashMap<>();
+        SharedPreferences original=diag();
+        for(String key:RadarIntakeCounters.KEYS)legacy.put(key,original.getLong(key,0L));
+        diagnosticIo.execute(()->{
+            Map<String,Long> seed=new LinkedHashMap<>();
+            String previous="";
+            try{previous=marketStore.diagnosticState("a11y_intake").detail;}catch(Throwable error){Log.w(TAG,"Intake seed unavailable",error);}
+            for(String key:RadarIntakeCounters.KEYS)seed.put(key,Math.max(legacy.get(key),parseLongField(previous,key,0L)));
+            radarCounters.initialize(radarCounterFile(),seed,System.currentTimeMillis());radarCounters.persist(radarCounterFile());
+            handler.post(()->{if(!radarDestroyed)publishA11yDiagnosticSnapshot();});
+        });
+    }
+
     private synchronized void publishA11yDiagnosticSnapshot() {
+        if(radarDestroyed||!radarCounters.ready())return;
         long now=System.currentTimeMillis();long wait=A11Y_DIAGNOSTIC_MIN_WRITE_MS-(now-lastA11yDiagnosticPublishAt);
         if(lastA11yDiagnosticPublishAt>0L&&wait>0L){
             if(!a11yDiagnosticPublishScheduled){a11yDiagnosticPublishScheduled=true;handler.postDelayed(()->{synchronized(VintedAccessibilityService.this){a11yDiagnosticPublishScheduled=false;}publishA11yDiagnosticSnapshot();},wait);}
@@ -304,12 +326,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
         }
         lastA11yDiagnosticPublishAt=now;
         SharedPreferences p=diag();long eventAt=p.getLong("lastEventAt",0L);if(eventAt<=0L)return;
-        String payload="build=a11y-intake-v1;eventAt="+eventAt+";eventType="+p.getInt("lastEventType",0)+
-                ";vintedEvents="+p.getLong("vintedEvents",0)+";scans="+p.getLong("scans",0)+
-                ";lastCardsParsed="+p.getInt("lastCardsParsed",0)+";cardsParsedTotal="+p.getLong("cardsParsedTotal",0)+
-                ";analysisBatches="+p.getLong("analysisBatches",0)+";localAnalysisLastBatchAt="+p.getLong("localAnalysisLastBatchAt",0)+
-                ";localAnalysisLastBatchSize="+p.getInt("localAnalysisLastBatchSize",0)+";analysesStored="+p.getLong("analysesStored",0)+
-                ";classifierBlocked="+p.getLong("classifierBlocked",0);
+        String payload="build=a11y-intake-v2;app="+BuildConfig.VERSION_NAME+";pid="+android.os.Process.myPid()+";"+radarCounters.metadata()+";eventAt="+eventAt+";eventType="+p.getInt("lastEventType",0)+
+                ";vintedEvents="+radarCounters.get("vintedEvents")+";scans="+radarCounters.get("scans")+
+                ";lastCardsParsed="+p.getInt("lastCardsParsed",0)+";cardsParsedTotal="+radarCounters.get("cardsParsedTotal")+
+                ";analysisBatches="+radarCounters.get("analysisBatches")+";localAnalysisLastBatchAt="+p.getLong("localAnalysisLastBatchAt",0)+
+                ";localAnalysisLastBatchSize="+p.getInt("localAnalysisLastBatchSize",0)+";analysesStored="+radarCounters.get("analysesStored")+
+                ";classifierBlocked="+radarCounters.get("classifierBlocked")+";nonGameRejected="+radarCounters.get("nonGameRejected")+
+                ";analysisCommitted="+radarCounters.get("analysisCommitted")+";analysisQuarantined="+radarCounters.get("analysisQuarantined");
         queueA11yDiagnosticSnapshot(payload);
     }
 
@@ -326,6 +349,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     String snapshot;
                     while((snapshot=pendingA11yDiagnosticSnapshot)!=null){
                         pendingA11yDiagnosticSnapshot=null;
+                        radarCounters.persist(radarCounterFile());
                         try{MarketStore store=marketStore;if(store!=null)store.setDiagnosticState("a11y_intake",parseLongField(snapshot,"vintedEvents",0L),snapshot);}
                         catch(Throwable t){Log.w(TAG,"Accessibility telemetry write skipped",t);}
                     }
@@ -401,7 +425,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if (!scanEnabled || database == null) return;
 
         SharedPreferences p = diag();
-        p.edit().putLong("scans", p.getLong("scans", 0) + 1).apply();
+        p.edit().putLong("scans", radarCounters.add("scans",1)).apply();
 
         AccessibilityNodeInfo root = getRootInActiveWindow();
         CharSequence rootPkg=root==null?null:root.getPackageName();
@@ -499,7 +523,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         } else diag().edit().putLong("productPageDiscoverySuppressed",diag().getLong("productPageDiscoverySuppressed",0)+1).apply();
         p.edit()
                 .putInt("lastCardsParsed", discovered.size())
-                .putLong("cardsParsedTotal", p.getLong("cardsParsedTotal", 0) + discovered.size())
+                .putLong("cardsParsedTotal", radarCounters.add("cardsParsedTotal",discovered.size()))
                 .apply();
         publishA11yDiagnosticSnapshot();
         if (discovered.isEmpty()) return;
@@ -516,7 +540,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             // Unknown proper names still pass through: only category-level non-game evidence is dropped.
             if (listingNow.type == ListingClassifier.Type.NON_GAME) {
                 SharedPreferences pp = diag();
-                pp.edit().putLong("nonGameRejected", pp.getLong("nonGameRejected", 0) + 1)
+                pp.edit().putLong("nonGameRejected", radarCounters.add("nonGameRejected",1))
                         .putString("lastNonGameRejected", card.title + " · " + listingNow.reason).apply();
                 continue;
             }
@@ -529,7 +553,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 recentlySighted.put(sig, now);
                 if (!listingNow.allowPriceModel) {
                     SharedPreferences pp = diag();
-                    pp.edit().putLong("classifierBlocked", pp.getLong("classifierBlocked", 0) + 1)
+                    pp.edit().putLong("classifierBlocked", radarCounters.add("classifierBlocked",1))
                             .putString("lastClassifierBlock", listingNow.type.name() + ": " + listingNow.reason + " | " + card.title)
                             .putLong("lastClassifierBlockAt",now).putString("lastClassifierBlockBuild",BuildConfig.VERSION_NAME).apply();
                 }
@@ -561,16 +585,20 @@ public final class VintedAccessibilityService extends AccessibilityService {
     }
 
     private void flushPendingAnalysis() {
-        if (engine == null || !engine.isReady()) return;
-        List<VintedCard> batch = marketStore==null?new ArrayList<>(pendingForAnalysis.values()):marketStore.pendingAnalysisCards(8);
-        if(batch.isEmpty())return;
-        long now = System.currentTimeMillis();
-        for (VintedCard card : batch) {
-            String sig=DealDatabase.signature(card);
-            pendingForAnalysis.remove(sig);
-            recentlyAnalyzed.put(sig, now);
-        }
-        analyzeBatch(batch);
+        if(radarDestroyed||analysisBatchInFlight||analysisSelectionInFlight||engine==null||!engine.isReady())return;
+        analysisSelectionInFlight=true;
+        final List<VintedCard> fallback=new ArrayList<>(pendingForAnalysis.values());
+        if(!radarPersistence.submit(()->{
+            List<VintedCard> selected=Collections.emptyList();boolean waiting=false;
+            try{selected=marketStore==null?fallback:marketStore.pendingAnalysisCards(8);if(selected.isEmpty()&&database!=null)waiting=database.waitingObservationSessionCount()>0;}
+            catch(Throwable error){Log.e(TAG,"Radar analysis selection failed",error);waiting=true;}
+            final List<VintedCard> batch=selected;final boolean retry=waiting;
+            handler.post(()->{
+                analysisSelectionInFlight=false;if(radarDestroyed)return;
+                if(!batch.isEmpty()){long now=System.currentTimeMillis();for(VintedCard card:batch){String sig=DealDatabase.signature(card);pendingForAnalysis.remove(sig);recentlyAnalyzed.put(sig,now);}analyzeBatch(batch);}
+                else if(retry)handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L);
+            });
+        }))analysisSelectionInFlight=false;
     }
 
     private void analyzeBatch(List<VintedCard> cards) {
@@ -578,77 +606,16 @@ public final class VintedAccessibilityService extends AccessibilityService {
         if(analysisBatchInFlight){for(VintedCard c:cards){pendingForAnalysis.put(DealDatabase.signature(c),c);if(pendingForAnalysis.size()>500)pendingForAnalysis.remove(pendingForAnalysis.keySet().iterator().next());}return;}
         analysisBatchInFlight=true;
         SharedPreferences p = diag();
-        p.edit().putLong("analysisBatches", p.getLong("analysisBatches", 0) + 1).apply();
+        p.edit().putLong("analysisBatches", radarCounters.add("analysisBatches",1)).apply();
 
         engine.analyze(cards, new JsGameEngine.BatchListener() {
             @Override public void onResult(List<GameAnalysis> analyses) {
-                long t = System.currentTimeMillis();
-                int count = Math.min(cards.size(), analyses.size());
-                for (int i = 0; i < count; i++) {
-                    VintedCard card = cards.get(i);
-                    GameAnalysis ga=analyses.get(i);
-                    GameRecord scanTarget=activeMarketScanGame();if(scanTarget!=null&&ga!=null&&!BoardGameIntakeGate.isStrongNonGameText(card.title,card.rawDescription)&&BoardGameIntakeGate.plausibleOverlap(card.title,scanTarget.name))ga=ga.withCanonicalIdentity(scanTarget,"Ricerca prezzi Vinted esplicita");
-                    ListingClassifier.Result analyzedListing=ListingClassifier.classify(card);
-                    if(analyzedListing.type==ListingClassifier.Type.NON_GAME){
-                        DealRecord wrong=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
-                        if(wrong!=null){database.exclude(wrong,"Classificato automaticamente come non gioco da tavolo");if(marketStore!=null)marketStore.setLegacyListingUserHidden(wrong.signature,true);}
-                        continue;
-                    }
-                    // An unresolved title is no longer automatically turned into human BGG work.
-                    // It must show positive board-game evidence; otherwise keep it in a reversible
-                    // auto-filtered quarantine and let the fast discovery pipeline continue.
-                    if(ga==null||!"matched".equals(ga.status)||TextUtils.isEmpty(ga.bggId)){
-                        BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
-                        if(gate.action==BoardGameIntakeGate.Action.QUARANTINE){
-                            DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
-                            if(noisy!=null)database.exclude(noisy,"Scarto automatico pre-BGG: "+gate.reason);
-                            if(marketStore!=null)marketStore.quarantineUnresolvedObservation(card,gate.reason,t);
-                            SharedPreferences pp=diag();pp.edit().putLong("bggAutoQuarantined",pp.getLong("bggAutoQuarantined",0)+1).putString("lastBggAutoQuarantine",card.title+" · "+gate.reason).apply();
-                            continue;
-                        }
-                    }else{
-                        // Exact-name BGG matches can still be the wrong product type (e.g. the board
-                        // game Watergate vs books titled Watergate). For titles with learned/seeded
-                        // cross-category collisions require a second board-game signal.
-                        boolean collisionRisk=marketStore!=null&&marketStore.isCollisionRiskTitle(card.title);
-                        BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,analyzedListing,ga,collisionRisk);
-                        if(matchedGate.action==BoardGameIntakeGate.Action.QUARANTINE){
-                            DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
-                            if(noisy!=null)database.exclude(noisy,"Scarto automatico post-match: "+matchedGate.reason);
-                            if(marketStore!=null)marketStore.quarantineCollisionObservation(card,matchedGate.reason,t);
-                            SharedPreferences pp=diag();pp.edit().putLong("matchedCollisionQuarantined",pp.getLong("matchedCollisionQuarantined",0)+1).putString("lastMatchedCollision",card.title+" · "+matchedGate.reason).apply();
-                            continue;
-                        }
-                    }
-                    // Safe mode: the embedded BGG used-price reference remains authoritative.
-                    // Vinted observations are still stored for history/audit but never reprice this analysis.
-                    database.record(card, ga, analyzedListing, t);
-                    if(marketStore!=null)marketStore.applyAnalysis(card,ga,analyzedListing,t);
-                    boolean huntCandidate=ga!=null&&"matched".equals(ga.status)&&!TextUtils.isEmpty(ga.bggId)
-                            &&HuntDatabase.wantsCandidate(getApplicationContext(),ga.bggId,ga.totalCents);
-                    if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);
-                    DealRecord stored=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
-                    String[] sellerHint=contextualSellerHints.remove(DealDatabase.signature(card));
-                    if(stored!=null&&sellerHint!=null&&sellerHint.length>0&&!TextUtils.isEmpty(sellerHint[0])){
-                        database.applySellerHint(stored.signature,sellerHint[0],sellerHint.length>1?sellerHint[1]:null);
-                        stored=database.findBySignature(stored.signature);bundleDatabase.increment("accessibilitySellerHints");rebuildLocalBundlesForSeller(stored);maybeScanBundles(stored);
-                    }
-                    if(stored!=null){boolean huntHit=HuntDatabase.evaluateAndNotify(getApplicationContext(),ga,stored);if((huntCandidate||huntHit)&&marketStore!=null)marketStore.promoteLegacyListingForHunt(stored.signature);DealAlertNotifier.evaluateAndNotify(getApplicationContext(),stored);}
-                    // applyAnalysis already enqueues BGG/Vinted durable jobs. :radar only observes
-                    // and produces work; the queue process owns network consumption and can batch BGG.
-                    maybeResolveLink(card);
-                }
-                SharedPreferences p2 = diag();
-                p2.edit()
-                        .putLong("analysesStored", p2.getLong("analysesStored", 0) + count)
-                        .putString("lastError", "")
-                        .apply();
-                diag().edit().putLong("localAnalysisLastBatchAt",System.currentTimeMillis())
-                        .putInt("localAnalysisLastBatchSize",count).apply();
-                publishA11yDiagnosticSnapshot();
-                analysisBatchInFlight=false;
-                sendBroadcast(new android.content.Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
-                handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,1_500L);
+                if(radarDestroyed)return;
+                final List<VintedCard> captured=new ArrayList<>(cards);
+                final List<GameAnalysis> results=new ArrayList<>(analyses);
+                final Map<String,String[]> sellerHints=new LinkedHashMap<>();
+                for(VintedCard card:captured){String sig=DealDatabase.signature(card);String[] hint=contextualSellerHints.remove(sig);if(hint!=null)sellerHints.put(sig,hint.clone());}
+                if(!radarPersistence.submit(()->persistAnalysisResults(captured,results,sellerHints))){analysisBatchInFlight=false;}
             }
 
             @Override public void onError(String message) {
@@ -662,21 +629,89 @@ public final class VintedAccessibilityService extends AccessibilityService {
         });
     }
 
-    private void continuePersistentAnalysis(){
-        if(analysisBatchInFlight||engine==null||!engine.isReady()||marketStore==null)return;
-        List<VintedCard> next=marketStore.pendingAnalysisCards(8);
-        if(!next.isEmpty()){
-            long now=System.currentTimeMillis();
-            for(VintedCard card:next){String sig=DealDatabase.signature(card);pendingForAnalysis.remove(sig);recentlyAnalyzed.put(sig,now);}
-            analyzeBatch(next);
-            return;
+    private void persistAnalysisResults(List<VintedCard> cards,List<GameAnalysis> analyses,Map<String,String[]> sellerHints){
+        DbContentionTrace.Scope trace=DbContentionTrace.start("Radar.persistAnalysisResults");
+        try{
+                long t = System.currentTimeMillis();
+                int count = Math.min(cards.size(), analyses.size());
+                int committed=0,quarantined=0;
+                for (int i = 0; i < count; i++) {
+                    VintedCard card = cards.get(i);
+                    GameAnalysis ga=analyses.get(i);
+                    GameRecord scanTarget=activeMarketScanGame();if(scanTarget!=null&&ga!=null&&!BoardGameIntakeGate.isStrongNonGameText(card.title,card.rawDescription)&&BoardGameIntakeGate.plausibleOverlap(card.title,scanTarget.name))ga=ga.withCanonicalIdentity(scanTarget,"Ricerca prezzi Vinted esplicita");
+                    ListingClassifier.Result analyzedListing=ListingClassifier.classify(card);
+                    if(analyzedListing.type==ListingClassifier.Type.NON_GAME){
+                        DealRecord wrong=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
+                        if(wrong!=null){database.exclude(wrong,"Classificato automaticamente come non gioco da tavolo");if(marketStore!=null)marketStore.setLegacyListingUserHidden(wrong.signature,true);}
+                        quarantined++;radarCounters.add("analysisQuarantined",1);continue;
+                    }
+                    // An unresolved title is no longer automatically turned into human BGG work.
+                    // It must show positive board-game evidence; otherwise keep it in a reversible
+                    // auto-filtered quarantine and let the fast discovery pipeline continue.
+                    if(ga==null||!"matched".equals(ga.status)||TextUtils.isEmpty(ga.bggId)){
+                        BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
+                        if(gate.action==BoardGameIntakeGate.Action.QUARANTINE){
+                            DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
+                            if(noisy!=null)database.exclude(noisy,"Scarto automatico pre-BGG: "+gate.reason);
+                            if(marketStore!=null)marketStore.quarantineUnresolvedObservation(card,gate.reason,t);
+                            SharedPreferences pp=diag();pp.edit().putLong("bggAutoQuarantined",pp.getLong("bggAutoQuarantined",0)+1).putString("lastBggAutoQuarantine",card.title+" · "+gate.reason).apply();
+                            quarantined++;radarCounters.add("analysisQuarantined",1);continue;
+                        }
+                    }else{
+                        // Exact-name BGG matches can still be the wrong product type (e.g. the board
+                        // game Watergate vs books titled Watergate). For titles with learned/seeded
+                        // cross-category collisions require a second board-game signal.
+                        boolean collisionRisk=marketStore!=null&&marketStore.isCollisionRiskTitle(card.title);
+                        BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,analyzedListing,ga,collisionRisk);
+                        if(matchedGate.action==BoardGameIntakeGate.Action.QUARANTINE){
+                            DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
+                            if(noisy!=null)database.exclude(noisy,"Scarto automatico post-match: "+matchedGate.reason);
+                            if(marketStore!=null)marketStore.quarantineCollisionObservation(card,matchedGate.reason,t);
+                            SharedPreferences pp=diag();pp.edit().putLong("matchedCollisionQuarantined",pp.getLong("matchedCollisionQuarantined",0)+1).putString("lastMatchedCollision",card.title+" · "+matchedGate.reason).apply();
+                            quarantined++;radarCounters.add("analysisQuarantined",1);continue;
+                        }
+                    }
+                    // Safe mode: the embedded BGG used-price reference remains authoritative.
+                    // Vinted observations are still stored for history/audit but never reprice this analysis.
+                    database.record(card, ga, analyzedListing, t);
+                    if(marketStore!=null)marketStore.applyAnalysis(card,ga,analyzedListing,t);
+                    committed++;radarCounters.add("analysisCommitted",1);
+                    boolean huntCandidate=ga!=null&&"matched".equals(ga.status)&&!TextUtils.isEmpty(ga.bggId)
+                            &&HuntDatabase.wantsCandidate(getApplicationContext(),ga.bggId,ga.totalCents);
+                    if(huntCandidate)database.recordHuntCandidate(card,ga,analyzedListing,t);
+                    DealRecord stored=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
+                    String[] sellerHint=sellerHints.get(DealDatabase.signature(card));
+                    if(stored!=null&&sellerHint!=null&&sellerHint.length>0&&!TextUtils.isEmpty(sellerHint[0])){
+                        database.applySellerHint(stored.signature,sellerHint[0],sellerHint.length>1?sellerHint[1]:null);
+                        stored=database.findBySignature(stored.signature);bundleDatabase.increment("accessibilitySellerHints");rebuildLocalBundlesForSeller(stored);final DealRecord bundleSource=stored;handler.post(()->{if(!radarDestroyed)maybeScanBundles(bundleSource);});
+                    }
+                    if(stored!=null){boolean huntHit=HuntDatabase.evaluateAndNotify(getApplicationContext(),ga,stored);if((huntCandidate||huntHit)&&marketStore!=null)marketStore.promoteLegacyListingForHunt(stored.signature);DealAlertNotifier.evaluateAndNotify(getApplicationContext(),stored);}
+                    // applyAnalysis already enqueues BGG/Vinted durable jobs. :radar only observes
+                    // and produces work; the queue process owns network consumption and can batch BGG.
+                    maybeResolveLink(card);
+                }
+                diag().edit().putLong("analysesStored",radarCounters.add("analysesStored",count))
+                        .putString("lastError","").putLong("localAnalysisLastBatchAt",System.currentTimeMillis())
+                        .putInt("localAnalysisLastBatchSize",count).putInt("localAnalysisLastCommitted",committed)
+                        .putInt("localAnalysisLastQuarantined",quarantined).apply();
+        }catch(Throwable error){
+            trace.failed(error);diag().edit().putString("lastError","analysis-persist: "+error.getClass().getSimpleName()).apply();
+            Log.e(TAG,"Radar analysis persistence failed",error);
+        }finally{
+            trace.close();
+            handler.post(()->{
+                if(radarDestroyed)return;
+                publishA11yDiagnosticSnapshot();analysisBatchInFlight=false;
+                sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
+                handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,1_500L);
+            });
         }
-        // A newer captured scroll stays waiting until the current run finishes all automatic work.
-        // Re-check without requiring the user to revisit Vinted.
-        if(database!=null&&database.waitingObservationSessionCount()>0)
-            handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,5_000L);
     }
 
+    private void continuePersistentAnalysis(){
+        // Selection and persistence share one FIFO lane; WebView invocation remains on main.
+        flushPendingAnalysis();
+    }
 
     private void pumpPersistentMarketJobs(){
         if(marketStore==null)return;
@@ -1564,6 +1599,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
         String engineWaitingSummary=firstWaiting==null?"state=NONE":("state="+waitingState+";start="+firstWaiting.startAt+";end="+firstWaiting.endAt+";ageMs="+Math.max(0L,engineDiagNow-firstWaiting.startAt)+";etaMs="+DealDatabase.engineEtaMs(firstWaiting)+";coreWork="+firstWaiting.coreWorkListings+";corePending="+firstWaiting.corePendingListings+";coreRemaining="+firstWaiting.coreRemainingListings+";reviewPct="+(firstWaiting.validListings<=0?0:Math.round(firstWaiting.reviewListings*100f/firstWaiting.validListings))+";observations="+firstWaiting.observations+";unique="+firstWaiting.uniqueListings+";games="+firstWaiting.validListings+";bgg="+firstWaiting.bggMatchedListings+";vinted="+firstWaiting.vintedLinkedListings+";ready="+firstWaiting.completeListings+";review="+firstWaiting.reviewListings+";held="+firstWaiting.heldListings+";analysisPending="+firstWaiting.analysisPendingListings);
         String engineCoreRemainingSummary=marketDiag.engineCoreRemainingSummary();
         MarketStore.RuntimeStatus a11yIntakeStatus=marketDiag.diagnosticState("a11y_intake");
+        DealDatabase.ObservationSession latestCapture=db.latestObservationSession();
+        String latestCaptureSummary=latestCapture==null?"state=NONE":"start="+latestCapture.startAt+";end="+latestCapture.endAt+";observations="+latestCapture.observations+";uniqueSignatures="+latestCapture.uniqueListings+";qualifiedListings="+latestCapture.validListings+";bgg="+latestCapture.bggMatchedListings+";vinted="+latestCapture.vintedLinkedListings+";ready="+latestCapture.completeListings+";held="+latestCapture.heldListings;
+        String captureFunnel=latestCapture==null?"state=NONE":db.observationFunnel(latestCapture.startAt,latestCapture.endAt);
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
@@ -1688,6 +1726,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "vintedRequestLedger={"+VintedPublicSession.requestLedgerSummary(context)+"}\n"+
                 "engineEpoch={"+engineEpochSummary+"}\n"+
                 "engineRun={"+engineRunSummary+"}\n"+
+                "engineLatestCapture={"+latestCaptureSummary+"}\n"+
+                "engineCaptureFunnel={"+captureFunnel+"}\n"+
                 "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
                 "engineWaiting={"+engineWaitingSummary+"}\n"+
                 "engineSla={"+engineSlaSummary+"}\n"+
@@ -1767,6 +1807,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
     @Override public void onInterrupt() { }
 
     @Override public void onDestroy() {
+        if(pendingVintedEventDiag>0L){radarCounters.add("vintedEvents",pendingVintedEventDiag);pendingVintedEventDiag=0L;}
+        radarDestroyed=true;
         setScanEnabled(false);hideScanOverlay();
         handler.removeCallbacksAndMessages(null);
         if(retryRegistered)try{unregisterReceiver(retryReceiver);}catch(Exception ignored){}
@@ -1776,13 +1818,17 @@ public final class VintedAccessibilityService extends AccessibilityService {
             marketStore.setDiagnosticState("engine_runtime",0,"build=engine-runtime-v1;app="+BuildConfig.VERSION_NAME+";state=STOPPED");
         }
         if (engine != null) engine.destroy();
-        if (database != null) database.close();
+
         if (bundleScanner != null) bundleScanner.close();
-        if (bundleDatabase != null) bundleDatabase.close();
+
         maintenanceIo.shutdownNow();
-        diagnosticIo.shutdownNow();
+        diagnosticIo.shutdown();
+        radarPersistence.close(()->{
+            try{while(!diagnosticIo.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS)){}while(!maintenanceIo.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS)){} }
+            catch(InterruptedException interrupted){Thread.currentThread().interrupt();return;}
+            radarCounters.persist(radarCounterFile());
+            if(database!=null)database.close();if(bundleDatabase!=null)bundleDatabase.close();
+        });
         super.onDestroy();
     }
 }
-
-
