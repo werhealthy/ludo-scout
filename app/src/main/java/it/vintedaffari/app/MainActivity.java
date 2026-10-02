@@ -882,8 +882,25 @@ private void applyDiscoverChrome(){
         @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
         @Override public int getOpacity(){return PixelFormat.OPAQUE;}
     };}
-    private android.graphics.drawable.Drawable dealArtworkTint(DealRecord d){int accent=dealAccent(d);int tint=Color.argb(22,Color.red(accent),Color.green(accent),Color.blue(accent));android.graphics.drawable.GradientDrawable glow=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{tint,Color.TRANSPARENT});glow.setCornerRadius(dp(20));return glow;}
-    private View dealProductArtwork(DealRecord d){View artwork=TextUtils.isEmpty(d.bggId)?galleryView(d,0,true):productBoxArtwork(d.bggId,d.bggImageUrl,name(d));artwork.setBackground(dealArtworkTint(d));return artwork;}
+    private int offerBackgroundColor(int accent,float amount){return Color.rgb(Math.round(Color.red(BG)*(1-amount)+Color.red(accent)*amount),Math.round(Color.green(BG)*(1-amount)+Color.green(accent)*amount),Math.round(Color.blue(BG)*(1-amount)+Color.blue(accent)*amount));}
+    private Drawable productPageBackground(DealRecord d){final int accent=dealAccent(d);return new Drawable(){
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        @Override protected void onBoundsChange(Rect bounds){paint.setShader(new RadialGradient(bounds.centerX(),bounds.top+dp(180),Math.max(dp(430),bounds.width()*.95f),new int[]{offerBackgroundColor(accent,.34f),offerBackgroundColor(accent,.16f),BG},new float[]{0,.55f,1},Shader.TileMode.CLAMP));}
+        @Override public void draw(Canvas canvas){canvas.drawRect(getBounds(),paint);}
+        @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
+        @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
+        @Override public int getOpacity(){return PixelFormat.OPAQUE;}
+    };}
+    private Drawable dealArtworkTint(DealRecord d){final int accent=dealAccent(d);return new Drawable(){
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        @Override protected void onBoundsChange(Rect bounds){float radius=Math.max(1,Math.max(bounds.width(),bounds.height())*.65f);paint.setShader(new RadialGradient(bounds.centerX(),bounds.top+bounds.height()*.4f,radius,new int[]{Color.argb(80,Color.red(accent),Color.green(accent),Color.blue(accent)),Color.argb(28,Color.red(accent),Color.green(accent),Color.blue(accent)),Color.TRANSPARENT},new float[]{0,.5f,1},Shader.TileMode.CLAMP));}
+        @Override public void draw(Canvas canvas){canvas.drawRect(getBounds(),paint);}
+        @Override public void getOutline(Outline outline){outline.setRoundRect(getBounds(),dp(20));}
+        @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
+        @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
+        @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+    };}
+    private View dealProductArtwork(DealRecord d){return TextUtils.isEmpty(d.bggId)?galleryView(d,0,true):productBoxArtwork(d.bggId,d.bggImageUrl,name(d));}
 
     private View discoverFlatArtwork(DealRecord d,int width,int height){
         return discoverBggCover(d,width,height,14);
@@ -1610,20 +1627,22 @@ private View libraryRow(LibraryGame g){
     // ---------- DETAIL ----------
 private void openDetail(DealRecord d){openDetail(d,false);}
     private void openDetail(DealRecord d,boolean preserveParent){
-        if(d==null)return;final Dialog parent=preserveParent&&activeDetailDialog!=null&&activeDetailDialog.isShowing()?activeDetailDialog:null;final String parentSignature=parent==null?"":activeDealSignature;activeDealSignature=d.signature==null?"":d.signature;if(parent==null&&activeDetailDialog!=null&&activeDetailDialog.isShowing()){suppressDetailDismissState=true;activeDetailDialog.dismiss();suppressDetailDismissState=false;}Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);activeDetailDialog=dialog;marketDetailDialogs.add(dialog);ScrollView sc=new EndPullScrollView(this);sc.setBackground(productPageBackground());sc.setOverScrollMode(View.OVER_SCROLL_NEVER);LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(box);
+        if(d==null)return;final Dialog parent=preserveParent&&activeDetailDialog!=null&&activeDetailDialog.isShowing()?activeDetailDialog:null;final String parentSignature=parent==null?"":activeDealSignature;activeDealSignature=d.signature==null?"":d.signature;if(parent==null&&activeDetailDialog!=null&&activeDetailDialog.isShowing()){suppressDetailDismissState=true;activeDetailDialog.dismiss();suppressDetailDismissState=false;}Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);activeDetailDialog=dialog;marketDetailDialogs.add(dialog);ScrollView sc=new EndPullScrollView(this);sc.setBackground(productPageBackground(d));sc.setOverScrollMode(View.OVER_SCROLL_NEVER);LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(box);
         MarketStore.Job refreshJob=marketStore.activeJobForLegacySignature(d.signature);boolean missingNow=needsDataRefresh(d);GameRecord game=TextUtils.isEmpty(d.bggId)?null:marketStore.gameStatsByBggId(d.bggId);
 
         LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);
         TextView back=appIcon(LudoIcons.CHEVRON_LEFT,22,TEXT);back.setGravity(Gravity.CENTER);back.setContentDescription("Torna indietro");back.setOnClickListener(v->dialog.dismiss());toolbar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
         toolbar.addView(text("Annuncio",16,MUTED,Typeface.NORMAL),new LinearLayout.LayoutParams(0,-2,1));
         toolbar.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));
-        TextView more=roundIconButton(LudoIcons.ELLIPSIS_VERTICAL,TEXT,true);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
+        TextView more=roundIconButton(LudoIcons.ELLIPSIS_VERTICAL,TEXT,true);more.setContentDescription("Altre azioni");more.setOnClickListener(v->showDetailActions(d,dialog,missingNow,refreshJob));more.setBackground(new android.graphics.drawable.InsetDrawable(round(Color.argb(70,255,255,255),999,1,Color.argb(70,255,255,255)),dp(7)));toolbar.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(toolbar);
         LinearLayout productInfo=new LinearLayout(this);productInfo.setOrientation(LinearLayout.VERTICAL);
 
-        FrameLayout hero=new FrameLayout(this);hero.addView(dealProductArtwork(d),new FrameLayout.LayoutParams(-1,-1));LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,productMediaHeight());hlp.topMargin=dp(8);box.addView(hero,hlp);
-        View photos=listingPhotoThumbnails(d);if(photos!=null){LinearLayout.LayoutParams photosParams=new LinearLayout.LayoutParams(-1,dp(72));photosParams.topMargin=dp(8);box.addView(photos,photosParams);}
+        LinearLayout mediaRow=new LinearLayout(this);mediaRow.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout hero=new FrameLayout(this);hero.addView(dealProductArtwork(d),new FrameLayout.LayoutParams(-1,-1));mediaRow.addView(hero,new LinearLayout.LayoutParams(0,-1,1));
+        View photos=listingPhotoThumbnails(d);if(photos!=null){LinearLayout.LayoutParams photosParams=new LinearLayout.LayoutParams(dp(52),-2);photosParams.leftMargin=dp(12);mediaRow.addView(photos,photosParams);}
+        LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,productMediaHeight());hlp.topMargin=dp(8);box.addView(mediaRow,hlp);
         addProductSection(box,productInfo,12);
-        LinearLayout summary=new LinearLayout(this);summary.setOrientation(LinearLayout.VERTICAL);summary.setPadding(0,0,0,0);productInfo.setPadding(dp(16),dp(12),dp(16),dp(12));productInfo.setBackground(round(SURFACE,20,0,0));addProductSection(box,summary,12);
+        LinearLayout summary=new LinearLayout(this);summary.setOrientation(LinearLayout.VERTICAL);summary.setPadding(0,0,0,0);productInfo.setPadding(0,dp(4),0,dp(4));View infoDivider=new View(this);infoDivider.setBackgroundColor(Color.argb(55,255,255,255));addProductSection(box,infoDivider,4);infoDivider.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(1)));addProductSection(box,summary,12);
         TextView title=text(name(d),26,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);addProductSection(summary,title,0);
         LinearLayout productTags=new LinearLayout(this);productTags.setOrientation(LinearLayout.VERTICAL);summary.addView(productTags,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout signalRow=new LinearLayout(this);signalRow.setGravity(Gravity.CENTER_VERTICAL);boolean large=getResources().getConfiguration().fontScale>1.2f;signalRow.setOrientation(large?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
@@ -1635,7 +1654,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         if(d.offerCents!=null){TextView offer=text("Offerta "+money(d.offerCents),12,MUTED,Typeface.NORMAL);addProductSection(summary,offer,4);}
         boolean hasVinted=!TextUtils.isEmpty(d.vintedUrl);
         if(hasVinted){TextView browser=secondaryTextAction("Consulta Vinted nel browser · test");browser.setOnClickListener(v->openVintedBrowserExperiment(d.vintedUrl,"VIEW",d.sellerId));addProductSection(box,browser,12);}
-        LinearLayout actionBar=new LinearLayout(this);boolean stackedActions=getResources().getConfiguration().fontScale>1.2f;actionBar.setOrientation(stackedActions?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);actionBar.setPadding(dp(20),dp(12),dp(20),dp(12));actionBar.setBackgroundColor(BG);
+        LinearLayout actionBar=new LinearLayout(this);boolean stackedActions=getResources().getConfiguration().fontScale>1.2f;actionBar.setOrientation(stackedActions?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);actionBar.setPadding(dp(20),dp(12),dp(20),dp(12));actionBar.setBackgroundColor(Color.argb(150,Color.red(BG),Color.green(BG),Color.blue(BG)));
         Button vintedLink=productProviderAction(hasVinted?"Apri Vinted":"Collega annuncio",R.drawable.provider_vinted_logo,LIME,()->{if(hasVinted)openVinted(d);else openVintedRecoveryForDeal(d,dialog);});
         actionBar.addView(vintedLink,stackedActions?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
         if(!TextUtils.isEmpty(d.bggId)){Button bggLink=productProviderAction("BGG",R.drawable.provider_bgg_logo,SURFACE2,()->openBgg(d.bggId));LinearLayout.LayoutParams bp=stackedActions?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(-2,-2);bp.leftMargin=stackedActions?0:dp(8);bp.topMargin=stackedActions?dp(8):0;actionBar.addView(bggLink,bp);}
@@ -1672,14 +1691,14 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         // status rows and photos reduce its height instead of leaving a blank tail.
         Runnable fitArtwork=()->{
             if(!dialog.isShowing()||sc.getHeight()<=0||box.getHeight()<=0)return;
-            int otherHeight=box.getHeight()-hero.getHeight();
-            int target=Math.max(dp(180),sc.getHeight()-sc.getPaddingTop()-sc.getPaddingBottom()-otherHeight);
-            ViewGroup.LayoutParams artworkParams=hero.getLayoutParams();
-            if(artworkParams.height!=target){artworkParams.height=target;hero.setLayoutParams(artworkParams);}
+            int otherHeight=box.getHeight()-mediaRow.getHeight();
+            int target=Math.max(dp(196),sc.getHeight()-sc.getPaddingTop()-sc.getPaddingBottom()-otherHeight);
+            ViewGroup.LayoutParams artworkParams=mediaRow.getLayoutParams();
+            if(artworkParams.height!=target){artworkParams.height=target;mediaRow.setLayoutParams(artworkParams);}
         };
         sc.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->sc.post(fitArtwork));
         box.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->sc.post(fitArtwork));
-        LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(scrollStage,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(16));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
+        LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground(d));page.addView(scrollStage,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(16));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
 
     }
 
@@ -2177,18 +2196,19 @@ private void loadFirstRemote(ImageView im,List<String> urls,Runnable ok){loadFir
 
     /** Only real listing photos: no text button or BGG cover in this rail. */
     private View listingPhotoThumbnails(DealRecord d){
-        List<String> items=galleryItems(d);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,dp(2),dp(4),dp(2));int number=0;
-        for(int i=0;i<items.size();i++){String item=items.get(i);if(isBggPhoto(d,item))continue;final int galleryIndex=i;number++;
-            FrameLayout tile=new FrameLayout(this);tile.setBackground(round(SURFACE2,10,1,OUTLINE));tile.setClipToOutline(true);tile.setContentDescription("Apri foto "+number+" dell’annuncio");tile.setFocusable(true);
+        List<String> items=galleryItems(d);int total=0;for(String item:items)if(!isBggPhoto(d,item))total++;LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.VERTICAL);row.setGravity(Gravity.CENTER);int number=0;
+        for(int i=0;i<items.size();i++){String item=items.get(i);if(isBggPhoto(d,item))continue;if(number>=3)break;final int galleryIndex=i;number++;
+            FrameLayout tile=new FrameLayout(this);tile.setBackground(round(Color.argb(45,255,255,255),10,1,Color.argb(65,255,255,255)));tile.setClipToOutline(true);tile.setContentDescription("Apri foto "+number+" dell’annuncio");tile.setFocusable(true);
             ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);tile.addView(image,new FrameLayout.LayoutParams(-1,-1));
             TextView pending=appIcon(LudoIcons.CAMERA,18,MUTED);pending.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);tile.addView(pending,new FrameLayout.LayoutParams(-1,-1));
             Object request=new Object();image.setTag(request);
             if(item.startsWith("file:"))galleryNet.execute(()->{Bitmap bitmap=decodeLocalBitmap(new File(item.substring(5)),160,160);runOnUiThread(()->{if(image.getTag()!=request||isFinishing()||isDestroyed())return;if(bitmap!=null){image.setImageBitmap(bitmap);pending.setVisibility(View.GONE);}});});
             else loadImageOn(galleryNet,image,gallerySources(d,item),()->pending.setVisibility(View.GONE),null);
             tile.setForeground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(65,255,255,255)),null,round(Color.WHITE,10,0,0)));tile.setOnClickListener(v->{int index=galleryItems(d).indexOf(item);showGallery(d,index>=0?index:galleryIndex);});
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(64),dp(64));if(row.getChildCount()>0)lp.leftMargin=dp(8);row.addView(tile,lp);
+            if(number==3&&total>3){TextView extra=text("+"+(total-3),17,Color.WHITE,Typeface.BOLD);extra.setGravity(Gravity.CENTER);extra.setBackgroundColor(Color.argb(145,0,0,0));extra.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);tile.addView(extra,new FrameLayout.LayoutParams(-1,-1));tile.setContentDescription("Apri tutte le foto dell’annuncio, "+(total-3)+" altre foto");}
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(52),dp(52));if(row.getChildCount()>0)lp.topMargin=dp(8);row.addView(tile,lp);
         }
-        if(number==0)return null;HorizontalScrollView rail=new HorizontalScrollView(this);rail.setHorizontalScrollBarEnabled(false);rail.addView(row);return rail;
+        return number==0?null:row;
     }
     private List<String> galleryItems(DealRecord d){List<String> out=new ArrayList<>();File bgg=TextUtils.isEmpty(d.bggId)?null:ArtworkStore.displayFile(this,d.bggId);if(bgg!=null&&bgg.exists()&&bgg.length()>1024)out.add("file:"+bgg.getAbsolutePath());else if(!TextUtils.isEmpty(d.bggImageUrl))out.add(d.bggImageUrl);if(!TextUtils.isEmpty(d.listingPhotosCsv))for(String u:d.listingPhotosCsv.split(",")){u=u.trim();if(!u.isEmpty()&&!out.contains(u))out.add(u);}File local=ThumbnailStore.fileFor(this,d.signature);if(out.isEmpty()&&local.exists()&&local.length()>1024){String p="file:"+local.getAbsolutePath();if(!out.contains(p))out.add(p);}if(!TextUtils.isEmpty(d.imageUrl)&&!out.contains(d.imageUrl))out.add(d.imageUrl);List<String> clean=new ArrayList<>();for(String item:out){if(item.startsWith("file:")){clean.add(item);continue;}String url=item.replace("&amp;","&").replace("\\/","/").replace("\\u002F","/");while(url.endsWith("\\"))url=url.substring(0,url.length()-1);try{java.net.URI uri=new java.net.URI(url);if(("https".equals(uri.getScheme())||"http".equals(uri.getScheme()))&&uri.getHost()!=null&&!clean.contains(url))clean.add(url);}catch(Exception ignored){}}return PhotoIdentity.unique(clean);}
     private void setGalleryImage(ImageView im,String item,DealRecord d,TextView status){

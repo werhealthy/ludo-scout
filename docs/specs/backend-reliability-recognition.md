@@ -15,6 +15,7 @@ Diagnostica reale132: acquiredUnique500, dom500, price/seller/publication/langua
 
 Motore “nessuno scroll” è previsto nella132: catalogWrites0 e browser non crea runs/observations. Non dichiarare browser integrato nel Motore o schede pronte. Campi venditore/pubblicazione/lingua assenti restano ignoti; prossimo esperimento legge correttamente dati DOM e misura copertura perpagina. Prezzo minimo incrementale è proposta da confermare, non garanzia di ottenere tutto il mercato o aggirare limite risultati;403/429/challenge fermano acquisizione senza retry autonomi. Nessun servizio/dipendenza/schema nuovo. Backend5/frontend7 aperti.
 
+
 ## Proposta B2 — browser Vinted passivo, 2026-10-02 14:40 Europe/Rome
 
 Stato: direzione browser/test autorizzata dall'utente con «Cominciamo» alle14:57Europe/Rome, requisiti aggiornati sotto; codice non implementato. Piano di esecuzione da rivedere. L'utente vuole zero nuove tecnologie a pagamento, meno richieste Vinted e bundle affidabili; propone accesso da Ludo con “Avvia nuove ricerche” e autorizza la preparazione del test dopo le verifiche. Questo lavoro resta nel gruppo acquisizione B2; backend5/frontend7, nessun gruppo chiuso.
