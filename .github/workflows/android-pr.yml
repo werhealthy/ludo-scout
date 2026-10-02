@@ -40,6 +40,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run Vinted photo cache reuse behavior
+        run: python3 regression/photo_cache_reuse.py
+
       - name: Run radar reliability and capture funnel regression
         run: python3 regression/radar_reliability.py
       - name: Run database contention trace behavior regression
