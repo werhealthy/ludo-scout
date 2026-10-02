@@ -1659,14 +1659,16 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     private View libraryScopeTabs(int owned,int sold){LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(SURFACE2,16,1,OUTLINE));addLibraryScopeTab(tabs,"Collezione · "+owned,"owned");addLibraryScopeTab(tabs,"Venduti · "+sold,"sold");return tabs;}
     private void addLibraryScopeTab(LinearLayout tabs,String label,String value){boolean on=value.equals(libraryScope);TextView t=text(label,13,on?TEXT:MUTED,Typeface.BOLD);t.setGravity(Gravity.CENTER);t.setBackground(round(on?LIME:Color.TRANSPARENT,12,0,0));t.setOnClickListener(v->{libraryScope=value;render();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(4);tabs.addView(t,lp);}
 
+    private String libraryShelfPositionKey="";private final int[] libraryShelfPositions={0,0};
     private View libraryShelves(List<LibraryGame> games){
+        String key=libraryScope+"|"+libraryQuery;if(!key.equals(libraryShelfPositionKey)){libraryShelfPositionKey=key;libraryShelfPositions[0]=libraryShelfPositions[1]=0;}
         LinearLayout shelves=new LinearLayout(this);shelves.setOrientation(LinearLayout.VERTICAL);
         int split=(games.size()+1)/2;
-        shelves.addView(libraryShelf(games,0,split));
-        LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(-1,-2);second.topMargin=dp(20);shelves.addView(libraryShelf(games,split,games.size()),second);
+        shelves.addView(libraryShelf(games,0,split,0));
+        LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(-1,-2);second.topMargin=dp(20);shelves.addView(libraryShelf(games,split,games.size(),1),second);
         return shelves;
     }
-    private View libraryShelf(List<LibraryGame> games,int start,int end){
+    private View libraryShelf(List<LibraryGame> games,int start,int end,int shelf){
         HorizontalScrollView rail=new HorizontalScrollView(this);rail.setHorizontalScrollBarEnabled(true);rail.setFillViewport(true);rail.setClipToPadding(false);
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);row.setPadding(dp(10),0,dp(10),dp(12));row.setMinimumHeight(dp(232));row.setBackground(libraryShelfBackdrop());
         for(int i=start;i<end;i++){
@@ -1680,7 +1682,11 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
             for(int child=0;child<tile.getChildCount();child++)tile.getChildAt(child).setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
             tile.setOnClickListener(v->openLibraryDetail(g));LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(dp(width),-2);tp.rightMargin=dp(12);row.addView(tile,tp);
         }
-        rail.addView(row,new HorizontalScrollView.LayoutParams(-2,-2));return rail;
+        rail.addView(row,new HorizontalScrollView.LayoutParams(-2,-2));
+        final String key=libraryShelfPositionKey;final int savedX=libraryShelfPositions[shelf];final boolean[] restored={false};
+        rail.setOnScrollChangeListener((view,x,y,oldX,oldY)->{if(restored[0]&&key.equals(libraryShelfPositionKey))libraryShelfPositions[shelf]=x;});
+        rail.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{if(!restored[0]&&r>l){restored[0]=true;rail.scrollTo(savedX,0);}});
+        return rail;
     }
     private FrameLayout libraryShelfBox(LibraryGame g){
         FrameLayout stage=new FrameLayout(this);FeaturedBoxView box=new FeaturedBoxView(true,true);box.shelfGrounded=true;stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
