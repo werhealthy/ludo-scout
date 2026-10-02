@@ -812,13 +812,24 @@ private void applyDiscoverChrome(){
     private Button productProviderAction(String label,int logo,int color,Runnable action){
         // Match the opaque background of each original logo so its square blends into the button.
         int fill=logo==R.drawable.provider_vinted_logo?Color.rgb(1,119,131):Color.rgb(68,63,100);
-        Button b=button(label,fill);b.setTextColor(Color.WHITE);b.setGravity(Gravity.CENTER);b.setPadding(dp(16),dp(12),dp(16),dp(12));
+        Button b=button(label,fill);b.setIncludeFontPadding(false);b.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);b.setTextColor(Color.WHITE);b.setGravity(Gravity.CENTER);b.setPadding(dp(16),dp(12),dp(16),dp(12));
         b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(35,255,255,255)),round(fill,16,0,0),null));
         Drawable icon=getResources().getDrawable(logo,getTheme()).mutate();icon.setBounds(0,0,dp(24),dp(24));
         android.text.SpannableString content=new android.text.SpannableString("\uFFFC  "+label);
-        content.setSpan(new android.text.style.ImageSpan(icon,android.text.style.ImageSpan.ALIGN_BOTTOM),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        content.setSpan(new CenteredProviderSpan(icon),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         b.setText(content);b.setContentDescription(label);b.setOnClickListener(v->action.run());return b;
     }
+    private static final class CenteredProviderSpan extends android.text.style.ImageSpan {
+        CenteredProviderSpan(Drawable drawable){super(drawable);}
+        @Override public int getSize(Paint paint,CharSequence text,int start,int end,Paint.FontMetricsInt metrics){
+            Rect bounds=getDrawable().getBounds();Paint.FontMetricsInt font=paint.getFontMetricsInt();int center=(font.ascent+font.descent)/2;
+            if(metrics!=null){metrics.ascent=Math.min(font.ascent,center-bounds.height()/2);metrics.descent=Math.max(font.descent,center+(bounds.height()+1)/2);metrics.top=metrics.ascent;metrics.bottom=metrics.descent;}return bounds.width();
+        }
+        @Override public void draw(Canvas canvas,CharSequence text,int start,int end,float x,int top,int y,int bottom,Paint paint){
+            Drawable drawable=getDrawable();Paint.FontMetricsInt font=paint.getFontMetricsInt();canvas.save();canvas.translate(x,y+(font.ascent+font.descent-drawable.getBounds().height())/2f);drawable.draw(canvas);canvas.restore();
+        }
+    }
+
     private View productQuickFacts(Double rating,Integer minPlayers,Integer maxPlayers,Integer minutes,Double weight,String language,Runnable ratingAction,Runnable languageAction){
         String players=minPlayers==null?"—":minPlayers+(maxPlayers!=null&&!maxPlayers.equals(minPlayers)?"–"+maxPlayers:"");
         String[] values={rating==null?"—":String.format(Locale.ITALY,"%.1f",rating),players,minutes==null?"—":minutes+" min",language==null?(weight==null?"—":String.format(Locale.ITALY,"%.1f/5",weight)):HomePresentation.editionName(language)};
@@ -1640,9 +1651,17 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView photoStatus=text("",11,MUTED,Typeface.NORMAL);photoStatus.setPadding(0,dp(14),0,0);photoStatus.setVisibility(View.GONE);box.addView(photoStatus);refreshDetailPhotos(d,hero,photoStatus);
         TextView refreshStatus=text("",11,MUTED,Typeface.NORMAL);refreshStatus.setVisibility(View.GONE);addProductSection(box,refreshStatus,8);
 
-        if(game!=null){TextView pullHint=text("",12,MUTED,Typeface.NORMAL);pullHint.setGravity(Gravity.CENTER);pullHint.setMinHeight(dp(168));pullHint.setLines(2);pullHint.setPadding(0,dp(24),0,dp(24));GamePullProgress progress=new GamePullProgress();progress.setBounds(0,0,dp(44),dp(44));pullHint.setCompoundDrawables(null,progress,null,null);pullHint.setCompoundDrawablePadding(dp(8));pullHint.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){@Override public void onViewAttachedToWindow(View v){}@Override public void onViewDetachedFromWindow(View v){progress.cancelReturn();renderGamePullHint(pullHint,0,false);}});LinearLayout.LayoutParams php=new LinearLayout.LayoutParams(-1,-2);php.topMargin=dp(16);box.addView(pullHint,php);installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));}
+        FrameLayout scrollStage=new FrameLayout(this);scrollStage.setClipChildren(true);scrollStage.addView(sc,new FrameLayout.LayoutParams(-1,-1));
+        if(game!=null){
+            TextView pullHint=text("",12,MUTED,Typeface.NORMAL);pullHint.setGravity(Gravity.CENTER);pullHint.setMinHeight(dp(96));pullHint.setLines(2);pullHint.setPadding(0,dp(8),0,dp(8));pullHint.setAlpha(0f);pullHint.setTranslationY(dp(96));
+            TextView retry=text("Scheda gioco non pronta · tocca per riprovare",12,MUTED,Typeface.NORMAL);retry.setMinHeight(dp(48));retry.setGravity(Gravity.CENTER);retry.setVisibility(View.GONE);retry.setOnClickListener(v->pullHint.performClick());box.addView(retry,new LinearLayout.LayoutParams(-1,-2));
+            GamePullProgress progress=new GamePullProgress();progress.content=box;progress.retry=retry;progress.setBounds(0,0,dp(44),dp(44));pullHint.setCompoundDrawables(null,progress,null,null);pullHint.setCompoundDrawablePadding(dp(6));
+            pullHint.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){@Override public void onViewAttachedToWindow(View v){}@Override public void onViewDetachedFromWindow(View v){progress.cancelReturn();renderGamePullHint(pullHint,0,false);}});
+            scrollStage.addView(pullHint,new FrameLayout.LayoutParams(-1,dp(96),Gravity.BOTTOM));installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));
+        }
 
-        LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(sc,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(24));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
+        LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(scrollStage,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(16));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
+
     }
 
     private void finishListingDetail(Dialog dialog,Dialog parent,String parentSignature){
@@ -1674,11 +1693,11 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     }
     private void installPullToGame(ScrollView sc,TextView hint,long gameId,Dialog detail){
         GamePullGesture gesture=new GamePullGesture();
-        hint.setFocusable(true);hint.setAccessibilityDelegate(new View.AccessibilityDelegate(){
+        sc.setFocusable(true);sc.setAccessibilityDelegate(new View.AccessibilityDelegate(){
             @Override public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);if(readyGameTransition(detail,gameId)){info.addAction(new android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,"Apri scheda gioco"));info.setClickable(true);}}
             @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK&&readyGameTransition(detail,gameId)){showPreparedGameTransition(detail,gameId);return true;}return super.performAccessibilityAction(host,action,args);}
         });
-        hint.setOnKeyListener((view,key,event)->{if(key!=KeyEvent.KEYCODE_ENTER&&key!=KeyEvent.KEYCODE_DPAD_CENTER)return false;if(event.getAction()==KeyEvent.ACTION_UP){if(readyGameTransition(detail,gameId))showPreparedGameTransition(detail,gameId);else hint.performClick();}return true;});
+        sc.setOnKeyListener((view,key,event)->{if(key!=KeyEvent.KEYCODE_ENTER&&key!=KeyEvent.KEYCODE_DPAD_CENTER)return false;if(event.getAction()==KeyEvent.ACTION_UP){if(readyGameTransition(detail,gameId))showPreparedGameTransition(detail,gameId);else hint.performClick();}return true;});
         sc.setOnTouchListener((v,e)->{
             int action=e.getActionMasked();boolean ready=readyGameTransition(detail,gameId);
             boolean bottom=!sc.canScrollVertically(1);
@@ -1690,7 +1709,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         });
     }
     private final class GamePullProgress extends Drawable {
-        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;private ValueAnimator returning;
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;private ValueAnimator returning;private View content;private TextView retry;
         void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}
         void setProgress(float value){progress=Math.max(0f,Math.min(1f,value));invalidateSelf();}
         @Override public void draw(Canvas canvas){if(progress<=0)return;Rect r=getBounds();float density=getResources().getDisplayMetrics().density;float radius=(3f+11.75f*progress)*density;circle.set(r.exactCenterX()-radius,r.exactCenterY()-radius,r.exactCenterX()+radius,r.exactCenterY()+radius);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f*density);paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(OUTLINE);canvas.drawOval(circle,paint);paint.setColor(CYAN);canvas.drawArc(circle,-90,360*progress,false,paint);}
@@ -1717,13 +1736,15 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     }
 
     private void renderGamePullHint(TextView hint,float progress,boolean ready){
-        Drawable[] drawables=hint.getCompoundDrawables();if(drawables[1] instanceof GamePullProgress)((GamePullProgress)drawables[1]).setProgress(progress);
+        Drawable[] drawables=hint.getCompoundDrawables();GamePullProgress ring=drawables[1] instanceof GamePullProgress?(GamePullProgress)drawables[1]:null;if(ring!=null)ring.setProgress(progress);
         String label=!ready?(hint.isClickable()?"Preparazione non riuscita · tocca per riprovare":""):progress>=1?"Rilascia per aprire la scheda gioco":progress>0?"Scheda gioco":"";
         if(!label.contentEquals(hint.getText()))hint.setText(label);
         // Translate without relayout: ring, caption and content move together on the same progress.
-        if(hint.getParent() instanceof View){View content=(View)hint.getParent();content.animate().cancel();content.setTranslationY(-dp(72f)*progress);}
+        if(ring!=null&&ring.content!=null){ring.content.animate().cancel();ring.content.setTranslationY(-dp(96f)*progress);}
+        hint.setTranslationY(dp(96f)*(1f-progress));hint.setAlpha(progress);
+        if(ring!=null&&ring.retry!=null)ring.retry.setVisibility(!ready&&hint.isClickable()?View.VISIBLE:View.GONE);
         // Keep a stable scroll extent and an accessible/key equivalent when visually at rest.
-        hint.setAlpha(ready?1f:.65f);hint.setContentDescription(label.isEmpty()?(ready?"Apri scheda gioco. Dal fondo, scorri ancora":"La scheda gioco si sta preparando"):label+(progress>0?" · "+Math.round(progress*100)+"%":""));
+        hint.setContentDescription(label.isEmpty()?(ready?"Apri scheda gioco. Dal fondo, scorri ancora":"La scheda gioco si sta preparando"):label+(progress>0?" · "+Math.round(progress*100)+"%":""));
     }
 
     private static final class PreparedGameOverlay {final long gameId;Dialog dialog;PreparedGameOverlay(long id){gameId=id;}}
@@ -2263,8 +2284,8 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         uiDataIo.execute(()->{try{List<DealDatabase.PipelineItem> rows=phase==-3?db.waitingScrollItems(start,end):phase==-2?db.engineIntakeItems():db.enginePipelineItems(start,end,phase);Map<Long,GameRecord> games=new HashMap<>();Map<String,DealRecord> deals=new HashMap<>();for(DealDatabase.PipelineItem item:rows){if(item.gameId>0&&!games.containsKey(item.gameId))games.put(item.gameId,marketStore.gameStats(item.gameId));if(!TextUtils.isEmpty(item.signature)&&!deals.containsKey(item.signature))deals.put(item.signature,db.findBySignature(item.signature));}runOnUiThread(()->{if(request!=phaseRequestId||isDestroyed()||isFinishing())return;enginePhaseItems=rows;enginePhaseGames=games;enginePhaseDeals=deals;if("activity".equals(tab)&&"phase".equals(engineSection))render();});}catch(Throwable error){runOnUiThread(()->{if(request==phaseRequestId&&!isDestroyed()&&!isFinishing()&&"phase".equals(engineSection)){body.addView(text("Lettura non disponibile. Tocca per riprovare",14,RED,Typeface.NORMAL));body.getChildAt(body.getChildCount()-1).setOnClickListener(v->openEnginePhase(phase,snapshot));}});}});
     }
     private void renderEnginePhase(){
-        String[] titles={"Osservati","Giochi","Idonei","Verifiche Vinted","Pronti"};
-        renderEngineHeader(enginePhase==-3?"Annunci acquisiti":enginePhase==-2?"Da analizzare":enginePhase<0?"In lavorazione":titles[enginePhase],enginePhase==-2?"Tutti gli scroll":engineRunStart==0?"":"Scroll delle "+engineTime(engineRunStart),true);
+        String[] titles=new String[5];for(int i=0;i<5;i++)titles[i]=EngineOverviewPresentation.phaseLabel(i);
+        renderEngineHeader(enginePhase==-3?"Annunci acquisiti":enginePhase==-2?"Da analizzare":enginePhase<0?"In lavorazione":titles[enginePhase],enginePhase==-2?"Tutti gli scroll":engineRunStart==0?"":"Scroll · "+new java.text.SimpleDateFormat("d MMM · HH:mm",Locale.ITALY).format(new java.util.Date(engineRunStart)),true);
         if(enginePhaseItems==null){body.addView(engineSnapshotMessage("Carico gli articoli…"));return;}
         TextView count=text(enginePhaseItems.size()+" elementi",13,MUTED,Typeface.NORMAL);count.setPadding(0,0,0,dp(8));body.addView(count);
         if(enginePhaseItems.isEmpty()){TextView empty=text("Nessun elemento in questa fase",15,MUTED,Typeface.NORMAL);empty.setPadding(0,dp(16),0,dp(16));body.addView(empty);}
@@ -2376,14 +2397,30 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         renderEngineHeader("Motore","",false);
         // Stale-while-revalidate: never replace usable Activity data with an empty loading page.
         if(snapshot.loadedAt<engineEnteredAt||now-snapshot.loadedAt>30_000L)requestEngineOverviewSnapshot();
-        DealDatabase.ObservationSession run=snapshot.run;
-        body.addView(enginePipelineCard(snapshot));
-        if(snapshot.recoveryCount>0){
-            LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(14);
-            body.addView(engineAttentionCard(snapshot.recoveryCount),ap);
-        }
+        body.addView(engineOverviewStatus(snapshot));
+        LinearLayout.LayoutParams pipelineParams=new LinearLayout.LayoutParams(-1,-2);pipelineParams.topMargin=dp(16);body.addView(enginePipelineCard(snapshot),pipelineParams);
+        LinearLayout queue=new LinearLayout(this);queue.setOrientation(LinearLayout.VERTICAL);queue.setPadding(dp(16),dp(16),dp(16),dp(4));queue.setBackground(round(SURFACE,20,1,OUTLINE));queue.addView(text("Coda generale",17,TEXT,Typeface.BOLD));TextView queueNote=text("Tutti gli scroll acquisiti",12,MUTED,Typeface.NORMAL);queueNote.setPadding(0,dp(4),0,dp(12));queue.addView(queueNote);queue.addView(engineIntakeCard(snapshot));LinearLayout.LayoutParams queueParams=new LinearLayout.LayoutParams(-1,-2);queueParams.topMargin=dp(16);body.addView(queue,queueParams);
+        if(snapshot.recoveryCount>0){LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(16);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
+        TextView history=secondaryTextAction("Cronologia degli scroll");history.setMinHeight(dp(48));history.setPadding(dp(16),dp(12),dp(16),dp(12));history.setOnClickListener(v->{engineSection="history";render();if(scroll!=null)scroll.scrollTo(0,0);});LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=dp(16);body.addView(history,hp);
 
         uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,10_000L);
+    }
+
+    private String engineScopeLabel(DealDatabase.ObservationSession scope){
+        if(scope==null)return "Nessuno scroll acquisito";
+        String start=new java.text.SimpleDateFormat("d MMM · HH:mm",Locale.ITALY).format(new java.util.Date(scope.startAt));
+        String end=new java.text.SimpleDateFormat("d MMM · HH:mm",Locale.ITALY).format(new java.util.Date(scope.endAt));return start+" – "+end;
+    }
+    private boolean enginePhaseIsActive(EngineOverviewSnapshot snapshot,int phase){return EngineOverviewPresentation.activePhase(snapshot.activeMask,phase,snapshot.bggPaused,snapshot.vintedPaused,snapshot.vintedWaitUntil,System.currentTimeMillis());}
+    private View engineOverviewStatus(EngineOverviewSnapshot snapshot){
+        long now=System.currentTimeMillis();DealDatabase.ObservationSession scope=snapshot.pipelineRun;boolean settled=scope!=null&&DealDatabase.engineContentSettled(scope);
+        LinearLayout status=new LinearLayout(this);status.setOrientation(LinearLayout.VERTICAL);status.setPadding(dp(16),dp(16),dp(16),dp(16));status.setBackground(round(SURFACE2,20,0,0));
+        String title=EngineOverviewPresentation.status(scope!=null,settled,snapshot.activeMask,snapshot.phases[1],snapshot.phases[3],snapshot.bggPaused,snapshot.vintedPaused,snapshot.vintedWaitUntil,now);status.addView(text(title,20,TEXT,Typeface.BOLD));
+        String detail=scope==null?"Qui vedrai l’attività degli annunci acquisiti.":snapshot.run==null?"Stato dell’ultimo scroll acquisito.":"Stato dello scroll attualmente in elaborazione.";
+        if(snapshot.phases[3]>0&&!snapshot.vintedPaused&&snapshot.vintedWaitUntil>now)detail+=" Prossimo controllo non prima delle "+engineTime(snapshot.vintedWaitUntil)+".";
+        if(snapshot.vintedPaused&&snapshot.phases[3]>0)detail+=" Le verifiche Vinted sono sospese.";
+        if(snapshot.bggPaused&&snapshot.phases[1]>0)detail+=" I dati BGG sono sospesi.";
+        TextView note=text(detail,13,MUTED,Typeface.NORMAL);note.setPadding(0,dp(8),0,0);status.addView(note);return status;
     }
 
     private View engineIntakeCard(EngineOverviewSnapshot snapshot){
@@ -2400,28 +2437,29 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if(!engineMotion.initialized()){int[] previous=new int[5];for(int i=0;i<5;i++)previous[i]=motionPrefs.getInt("phase"+i,0);engineMotion.restore(motionPrefs.getString("scope",""),previous);}
         int[] previous=snapshot.loadedAt<engineEnteredAt?snapshot.phases:engineMotion.consume(motionScope,snapshot.loadedAt,snapshot.phases);
         if(snapshot.loadedAt>=engineEnteredAt){android.content.SharedPreferences.Editor edit=motionPrefs.edit().putString("scope",motionScope);for(int i=0;i<5;i++)edit.putInt("phase"+i,snapshot.phases[i]);edit.apply();}
-        TextView label=text(scope==null?"In attesa del prossimo scroll":"Scroll delle "+engineTime(scope.startAt),17,TEXT,Typeface.BOLD);card.addView(label);
-        TextView status=text(snapshot.run==null?(scope==null?"Nessuno scroll acquisito":"Ultimo scroll elaborato"):snapshot.activeMask!=0?"Elaborazione in corso":snapshot.bggPaused&&snapshot.vintedPaused?"Elaborazione in pausa":snapshot.phases[3]>0&&snapshot.vintedPaused?"Verifiche Vinted in pausa":snapshot.phases[3]>0&&snapshot.vintedWaitUntil>System.currentTimeMillis()?"Attesa del prossimo controllo Vinted":snapshot.phases[1]>0&&snapshot.bggPaused?"Schede BGG in pausa":"In attesa di elaborazione",13,MUTED,Typeface.NORMAL);status.setPadding(0,dp(4),0,dp(12));card.addView(status);card.addView(engineIntakeCard(snapshot));
-
-        String[] names={"Osservati","Giochi","Idonei","Verifiche\nVinted","Pronti"};String[] icons={LudoIcons.SEARCH,LudoIcons.BOOK_OPEN,LudoIcons.CHECK,LudoIcons.GEAR,LudoIcons.STAR};int[] colors={DISCOVER_LAVENDER,DISCOVER_PINK,DISCOVER_MINT,DISCOVER_YELLOW,Color.rgb(85,155,243)};
+        TextView label=text(scope==null?"Il tuo scroll":snapshot.run==null?"Ultimo scroll":"Scroll in elaborazione",17,TEXT,Typeface.BOLD);card.addView(label);
+        TextView period=text(engineScopeLabel(scope),12,MUTED,Typeface.NORMAL);period.setPadding(0,dp(4),0,dp(8));card.addView(period);
+        if(scope!=null){TextView acquired=text(scope.uniqueListings+(scope.uniqueListings==1?" annuncio acquisito":" annunci acquisiti"),15,TEXT,Typeface.BOLD);acquired.setPadding(0,0,0,dp(8));card.addView(acquired);}
+        TextView meaning=text("Voci raggruppate per gioco riconosciuto; gli annunci ancora sconosciuti restano separati. Ogni voce compare solo nella sua fase attuale.",12,MUTED,Typeface.NORMAL);meaning.setPadding(0,0,0,dp(8));card.addView(meaning);
+        String[] names=new String[5];for(int i=0;i<5;i++)names[i]=EngineOverviewPresentation.phaseLabel(i);String[] icons={LudoIcons.SEARCH,LudoIcons.BOOK_OPEN,LudoIcons.CHECK,LudoIcons.GEAR,LudoIcons.STAR};int[] colors={DISCOVER_LAVENDER,DISCOVER_PINK,DISCOVER_MINT,DISCOVER_YELLOW,Color.rgb(85,155,243)};
         if(getResources().getConfiguration().fontScale>1.15f||getResources().getDisplayMetrics().widthPixels<dp(340)){
-            int working=0;for(int i=0;i<4;i++)working+=snapshot.phases[i];TextView total=text(working+" elementi in lavorazione",22,TEXT,Typeface.BOLD);total.setPadding(0,dp(20),0,dp(12));total.setOnClickListener(v->openEnginePhase(-1,snapshot));card.addView(total);
-            for(int i=0;i<5;i++){final int phase=i;LinearLayout node=new LinearLayout(this);node.setGravity(Gravity.CENTER_VERTICAL);node.setPadding(dp(14),dp(12),dp(14),dp(12));node.setBackground(round(SURFACE,16,1,colors[i]));TextView title=text((i+1)+". "+names[i].replace('\n',' '),16,TEXT,Typeface.NORMAL);node.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView count=text(String.valueOf(snapshot.phases[i]),23,colors[i],Typeface.BOLD);LinearLayout counter=new LinearLayout(this);counter.setOrientation(LinearLayout.VERTICAL);counter.setGravity(Gravity.CENTER);counter.addView(count);node.addView(counter);animateEngineCount(count,counter,previous[i],snapshot.phases[i],(snapshot.activeMask&(1<<i))!=0);node.setOnClickListener(v->openEnginePhase(phase,snapshot));LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.bottomMargin=dp(10);card.addView(node,np);}return card;
+            int working=0;for(int i=0;i<4;i++)working+=snapshot.phases[i];TextView total=text(working+" voci in lavorazione",22,TEXT,Typeface.BOLD);total.setPadding(0,dp(20),0,dp(12));total.setOnClickListener(v->openEnginePhase(-1,snapshot));card.addView(total);
+            for(int i=0;i<5;i++){final int phase=i;LinearLayout node=new LinearLayout(this);node.setGravity(Gravity.CENTER_VERTICAL);node.setPadding(dp(14),dp(12),dp(14),dp(12));node.setBackground(round(SURFACE,16,1,colors[i]));TextView title=text((i+1)+". "+names[i].replace('\n',' '),16,TEXT,Typeface.NORMAL);node.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView count=text(String.valueOf(snapshot.phases[i]),23,colors[i],Typeface.BOLD);LinearLayout counter=new LinearLayout(this);counter.setOrientation(LinearLayout.VERTICAL);counter.setGravity(Gravity.CENTER);counter.addView(count);node.addView(counter);animateEngineCount(count,counter,previous[i],snapshot.phases[i],enginePhaseIsActive(snapshot,i));node.setOnClickListener(v->openEnginePhase(phase,snapshot));LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.bottomMargin=dp(10);card.addView(node,np);}return card;
         }
         FrameLayout wheel=new FrameLayout(this);wheel.setClipChildren(false);
         View ring=new View(this);ring.setBackground(new Drawable(){final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);public void draw(Canvas canvas){Rect b=getBounds();float cx=b.width()/2f,cy=b.height()/2f,r=Math.min(b.width(),b.height())*.33f;paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));paint.setStrokeCap(Paint.Cap.ROUND);for(int i=0;i<5;i++){paint.setColor(colors[i]);paint.setAlpha(110);canvas.drawArc(new RectF(cx-r,cy-r,cx+r,cy+r),-90+i*72+14,44,false,paint);}}public void setAlpha(int a){}public void setColorFilter(ColorFilter f){}public int getOpacity(){return PixelFormat.TRANSLUCENT;}});wheel.addView(ring,new FrameLayout.LayoutParams(-1,-1));
-        int working=0;for(int i=0;i<4;i++)working+=snapshot.phases[i];LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setGravity(Gravity.CENTER);TextView total=text(String.valueOf(working),31,TEXT,Typeface.BOLD);total.setGravity(Gravity.CENTER);center.addView(total);TextView caption=text("elementi in\nlavorazione",11,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);center.addView(caption);center.setOnClickListener(v->openEnginePhase(-1,snapshot));center.setContentDescription("Apri elementi in lavorazione");int oldWorking=0;for(int i=0;i<4;i++)oldWorking+=previous[i];animateEngineCount(total,center,oldWorking,working,false);total.setAutoSizeTextTypeUniformWithConfiguration(18,31,1,android.util.TypedValue.COMPLEX_UNIT_SP);wheel.addView(center,new FrameLayout.LayoutParams(dp(80),dp(76),Gravity.CENTER));
-        for(int i=0;i<5;i++){final int phase=i;LinearLayout node=new LinearLayout(this);node.setOrientation(LinearLayout.VERTICAL);node.setGravity(Gravity.CENTER);node.setBackground(round(SURFACE,999,1,colors[i]));node.addView(appIcon(icons[i],16,colors[i]),new LinearLayout.LayoutParams(-1,dp(22)));TextView title=text(names[i],11,TEXT,Typeface.NORMAL);title.setGravity(Gravity.CENTER);title.setMaxLines(2);node.addView(title);TextView count=text(String.valueOf(snapshot.phases[i]),21,colors[i],Typeface.BOLD);count.setGravity(Gravity.CENTER);node.addView(count);animateEngineCount(count,node,previous[i],snapshot.phases[i],(snapshot.activeMask&(1<<i))!=0);node.setContentDescription((i+1)+". "+names[i].replace('\n',' ')+": "+snapshot.phases[i]+" elementi");node.setOnClickListener(v->openEnginePhase(phase,snapshot));FrameLayout.LayoutParams np=new FrameLayout.LayoutParams(dp(88),dp(88));wheel.addView(node,np);node.setTag(i);}
+        int working=0;for(int i=0;i<4;i++)working+=snapshot.phases[i];LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setGravity(Gravity.CENTER);TextView total=text(String.valueOf(working),31,TEXT,Typeface.BOLD);total.setGravity(Gravity.CENTER);center.addView(total);TextView caption=text("voci in\nlavorazione",11,MUTED,Typeface.NORMAL);caption.setGravity(Gravity.CENTER);center.addView(caption);center.setOnClickListener(v->openEnginePhase(-1,snapshot));center.setContentDescription("Apri elementi in lavorazione");int oldWorking=0;for(int i=0;i<4;i++)oldWorking+=previous[i];animateEngineCount(total,center,oldWorking,working,false);total.setAutoSizeTextTypeUniformWithConfiguration(18,31,1,android.util.TypedValue.COMPLEX_UNIT_SP);wheel.addView(center,new FrameLayout.LayoutParams(dp(80),dp(76),Gravity.CENTER));
+        for(int i=0;i<5;i++){final int phase=i;LinearLayout node=new LinearLayout(this);node.setOrientation(LinearLayout.VERTICAL);node.setGravity(Gravity.CENTER);node.setBackground(round(SURFACE,999,1,colors[i]));node.addView(appIcon(icons[i],16,colors[i]),new LinearLayout.LayoutParams(-1,dp(22)));TextView title=text(names[i],11,TEXT,Typeface.NORMAL);title.setGravity(Gravity.CENTER);title.setMaxLines(2);node.addView(title);TextView count=text(String.valueOf(snapshot.phases[i]),21,colors[i],Typeface.BOLD);count.setGravity(Gravity.CENTER);node.addView(count);animateEngineCount(count,node,previous[i],snapshot.phases[i],enginePhaseIsActive(snapshot,i));node.setContentDescription((i+1)+". "+names[i].replace('\n',' ')+": "+snapshot.phases[i]+" voci in questo scroll");node.setOnClickListener(v->openEnginePhase(phase,snapshot));FrameLayout.LayoutParams np=new FrameLayout.LayoutParams(dp(88),dp(88));wheel.addView(node,np);node.setTag(i);}
         wheel.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l==or-ol&&b-t==ob-ot)return;float cx=(r-l)/2f,cy=(b-t)/2f,radius=Math.min(r-l,b-t)*.33f;for(int i=2;i<wheel.getChildCount();i++){View node=wheel.getChildAt(i);int phase=(Integer)node.getTag();double angle=Math.toRadians(-90+phase*72);node.setX(cx+(float)Math.cos(angle)*radius-dp(44));node.setY(cy+(float)Math.sin(angle)*radius-dp(44));}});
         int width=getResources().getDisplayMetrics().widthPixels-dp(68);card.addView(wheel,new LinearLayout.LayoutParams(-1,Math.min(dp(340),width)));
         return card;
     }
     private void animateEngineCount(TextView count,View node,int old,int current,boolean active){
-        if(!ValueAnimator.areAnimatorsEnabled())return;
-        if(old!=current){count.setText(String.valueOf(old));ValueAnimator values=ValueAnimator.ofInt(old,current);values.setDuration(Math.min(1500,650+Math.abs((long)current-old)*8));values.addUpdateListener(v->count.setText(String.valueOf(v.getAnimatedValue())));values.start();node.animate().scaleX(1.07f).scaleY(1.07f).setDuration(250).withEndAction(()->node.animate().scaleX(1).scaleY(1).setDuration(350).start()).start();
-            if(node instanceof LinearLayout){TextView delta=text((current>old?"↑ +":"↓ ")+(current-old),9,current>old?TEAL:RED,Typeface.BOLD);delta.setGravity(Gravity.CENTER);((LinearLayout)node).addView(delta);delta.animate().alpha(0).setStartDelay(2500).setDuration(500).start();}
-            node.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){}public void onViewDetachedFromWindow(View v){values.cancel();v.animate().cancel();}});
-        }else if(active){node.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){}public void onViewDetachedFromWindow(View v){v.animate().cancel();}});node.animate().scaleX(1.08f).scaleY(1.08f).setDuration(420).withEndAction(()->node.animate().scaleX(1).scaleY(1).setDuration(420).start()).start();}
+        count.setText(String.valueOf(current));
+        if(!active||!ValueAnimator.areAnimatorsEnabled())return;
+        ValueAnimator pulse=ValueAnimator.ofFloat(1f,1.025f);pulse.setDuration(900);pulse.setRepeatMode(ValueAnimator.REVERSE);pulse.setRepeatCount(ValueAnimator.INFINITE);
+        pulse.addUpdateListener(animation->{if(!engineUiResumed||!hasWindowFocus()||!"activity".equals(tab)||!"overview".equals(engineSection)||!node.isAttachedToWindow()||!node.isShown()){animation.cancel();node.setScaleX(1f);node.setScaleY(1f);return;}float scale=(float)animation.getAnimatedValue();node.setScaleX(scale);node.setScaleY(scale);});
+        node.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){@Override public void onViewAttachedToWindow(View v){if(engineUiResumed&&hasWindowFocus())pulse.start();}@Override public void onViewDetachedFromWindow(View v){pulse.cancel();v.setScaleX(1f);v.setScaleY(1f);}});
     }
     private View engineCurrentRunHero(DealDatabase.ObservationSession run,long now,int waitingRuns){
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(20),dp(20),dp(20),dp(18));
@@ -2504,7 +2542,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         LinearLayout card=new LinearLayout(this);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(16),dp(14),dp(12),dp(14));card.setBackground(round(SURFACE,20,1,ORANGE));
         TextView icon=text("!",16,ORANGE,Typeface.BOLD);icon.setGravity(Gravity.CENTER);icon.setBackground(round(SURFACE2,999,1,ORANGE));card.addView(icon,new LinearLayout.LayoutParams(dp(34),dp(34)));
         LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(12),0,dp(8),0);
-        copy.addView(text("Richiedono attenzione",16,TEXT,Typeface.BOLD));
+        copy.addView(text("Serve il tuo aiuto",16,TEXT,Typeface.BOLD));
         copy.addView(text(count+(count==1?" elemento richiede":" elementi richiedono")+" una scelta",12,MUTED,Typeface.NORMAL));
         card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));TextView arrow=appIcon(LudoIcons.CHEVRON_RIGHT,16,ORANGE);arrow.setGravity(Gravity.CENTER);card.addView(arrow,new LinearLayout.LayoutParams(dp(34),dp(44)));
         card.setOnClickListener(v->{engineSection="review";render();});card.setContentDescription("Serve il tuo aiuto. "+count+" elementi richiedono una scelta.");

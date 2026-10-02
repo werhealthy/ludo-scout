@@ -35,7 +35,7 @@ public class ProductGestureRegression {
  }
  interface Touch {boolean on(View v,MotionEvent e);}
  static class ScrollView extends View {
-  int y=500;View child=new View();Touch touch;
+  int y=500;View child=new View();Touch touch;AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}void setOnKeyListener(TextView.KeyListener l){}
   ScrollView(){height=500;}
   int getScrollY(){return y;}View getChildAt(int i){return child;}
   boolean canScrollVertically(int direction){return direction>0&&y<500;}
@@ -203,3 +203,4 @@ with tempfile.TemporaryDirectory() as temp:
     p=Path(temp)/"RecoveryRegression.java";p.write_text(recovery)
     subprocess.run(["javac","-d",temp,str(p)],check=True)
     subprocess.run(["java","-cp",temp,"RecoveryRegression"],check=True)
+
