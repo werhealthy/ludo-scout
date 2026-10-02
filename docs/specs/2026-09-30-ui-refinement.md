@@ -1,5 +1,17 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Decisione21:52 — Ludo immersivo a tre ambienti
+
+Il feedback21:47 e “Vai”21:52 supersedono la composizione Esplorazione/Casa146. Ludo diventa una scena a tutta larghezza sfumata nella pagina, senza piccolo riquadro; illustrazioni originali esistenti più grandi al posto del personaggio viola vettoriale. Selettore Esplorazione/Cacce/Libreria e swipe orizzontale, contenuto verticale. Header e illustrazione hanno spazio separato; tolte scritte decorative sovrapposte.
+
+Esplorazione: rimossi i suggerimenti sui singoli giochi dalla schermata. Panoramica con numeri grandi: giochi distinti trovati nel mese e quanti hanno voto BGG strettamente superiore a6. Fonte dichiarata: annunci raccolti localmente, ogni identità BGG contata una volta. Mese calendario Europe/Rome, non corpus BGG importato né intero mercato Vinted. Lettura asincrona, caricamento/errore non mostrati come zero, retry; nessun cambiamento ai filtri o alla soglia di eleggibilità. CTA principale “Trova nuovi giochi” apre la ricerca Vinted nel browser esistente, con query opzionale immessa e conservata.
+
+Cacce: griglia dei giochi preferiti reali per identità BGG, copertine grandi, cuore contestuale e annunci attivi; dati assenti restano accessibili per identità e rimovibili. Non sono nuovi target alert inventati. Le vecchie cacce e relativi dati restano gestibili nel menu secondario. Libreria: ambiente Casa/camino e riuso completo di collezione, scaffali verticali, schede144, rating, acquisti/vendite e archivio secondario. Nessuna collezione duplicata. Memoria Ludo conservata anche senza suggerimenti visibili.
+
+Stato e scroll indipendenti delle tre stanze, ricerca e accessi legacy preservati. Durante il caricamento Cacce lo scroll del placeholder non sovrascrive la posizione salvata; protezione transitoria in memoria fino al layout corrente completato, con guardie per richieste obsolete, stanza cambiata e host staccato.
+
+Consegna e verifiche148 registrate in STATE. Accettazione visiva telefono ancora pendente: scene e dimensioni Ludo, gerarchia panoramica/CTA, griglia cuori, scaffali, font grande, swipe/scroll e ritorno durante caricamento. Backend147 integrato senza modifiche frontend alla sua logica; UI Motore standby. Frontend7/backend5 aperti. Unico prossimo gruppo frontend raccomandato dopo verifica visiva: Catalogo unificato + Bundle/Esplora secondo decisione20:00.
+
 ## Decisione20:41 e consegna146 — Libreria come stanza di Ludo
 
 Approvato con “Vai” il modello Esplorazione/Casa. Implementato in146: cambio stanza via selettore esplicito/accessibile o swipe orizzontale intenzionale; dentro le stanze scroll verticale. Gesti verticali/diagonali/brevi/annullati/multitouch non cambiano stanza; swipe non interferisce con refresh o schede/pannelli coprenti.
