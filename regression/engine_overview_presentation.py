@@ -8,7 +8,7 @@ main=(src/'MainActivity.java').read_text()
 pipeline=main.split('private View enginePipelineCard(')[1].split('private void animateEngineCount(')[0]
 overview=main.split('private void renderEngineOverview(')[1].split('private String engineScopeLabel(')[0]
 assert 'engineIntakeCard(snapshot)' not in pipeline, 'global queue cannot inherit scroll scope'
-assert 'Coda generale' in overview and 'Cronologia degli scroll' in overview
+assert 'engineIntakeCard(snapshot)' in overview and 'installEngineHistoryPull()' in overview
 motion=main.split('private void animateEngineCount(')[1].split('private View engineCurrentRunHero(')[0]
 assert 'ofInt' not in motion and 'current-old' not in motion, 'stock changes must not appear as throughput'
 

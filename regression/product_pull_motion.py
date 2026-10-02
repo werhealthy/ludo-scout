@@ -25,7 +25,7 @@ public class ProductPullMotion {
   Animation animate(){return animation;}}
  static class Animation {View view;Animation(View v){view=v;}void cancel(){}Animation translationY(float v){view.translation=v;return this;}Animation setDuration(long t){return this;}Animation setInterpolator(Object i){return this;}void start(){}}
  static class Drawable {}
- static class GamePullProgress extends Drawable {float progress;ValueAnimator returning;View content;TextView retry;float revealDistance=96,indicatorTravel=64;void setProgress(float p){progress=p;}void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}}
+ static class GamePullProgress extends Drawable {float progress;ValueAnimator returning;View content;TextView retry;String targetLabel="Scheda gioco",releaseLabel="Rilascia per aprire la scheda gioco";float revealDistance=96,indicatorTravel=64;void setProgress(float p){progress=p;}void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}}
  static class TextView extends View {String text="",description;float alpha;Drawable[] drawables={null,new GamePullProgress(),null,null};
   Drawable[] getCompoundDrawables(){return drawables;}String getText(){return text;}void setText(String t){text=t;}boolean isClickable(){return false;}boolean hasOnClickListeners(){return false;}void setAlpha(float a){alpha=a;}void setContentDescription(String s){description=s;}}
  static class ValueAnimator extends android.animation.Animator {
@@ -61,6 +61,7 @@ public class ProductPullMotion {
   reverse.frame(1);eq(0,ring.progress,"reverse completes ring");eq(0,content.translation,"reverse completes content");
   app.updateGamePullHint(hint,.6f,true);app.updateGamePullHint(hint,0,true);ValueAnimator interrupted=ValueAnimator.latest;interrupted.frame(.25f);
   app.updateGamePullHint(hint,.4f,true);interrupted.frame(1);eq(.4f,ring.progress,"obsolete return must not erase new gesture");eq(-38.4f,content.translation,"new gesture controls content");
+  app.updateGamePullHint(hint,.8f,true,false);app.updateGamePullHint(hint,0,true,false);eq(0,ring.progress,"zero under finger must not start return animator");if(ring.returning!=null)throw new AssertionError("finger retreat triggered autonomous return");
   ValueAnimator.enabled=false;app.updateGamePullHint(hint,0,true);eq(0,ring.progress,"disabled animations clear immediately");eq(0,content.translation,"disabled animations restore content");ValueAnimator.enabled=true;
   app.updateGamePullHint(hint,.8f,true);app.updateGamePullHint(hint,0,true);ValueAnimator detached=ValueAnimator.latest;hint.attached=false;detached.frame(.5f);eq(0,ring.progress,"detached view clears return");eq(0,content.translation,"detached view resets content");if(ring.returning!=null)throw new AssertionError("detached return leaks animator");
   eq(160,content.height,"gesture leaves measured scroll extent unchanged");
@@ -78,7 +79,7 @@ public class ProductPullMotion {
   System.out.println("PASS production linear fill, continuous content lift and cancellation");
  }
 }
-'''.replace('__MODEL__', extract('private static final class GamePullGesture')).replace('__UPDATE__', extract('private void updateGamePullHint(')).replace('__RENDER__', extract('private void renderGamePullHint(') if 'private void renderGamePullHint(' in source else '')
+'''.replace('__MODEL__', extract('private static final class GamePullGesture')).replace('__UPDATE__', extract('private void updateGamePullHint(TextView hint,float progress,boolean ready)')+'\n'+extract('private void updateGamePullHint(TextView hint,float progress,boolean ready,boolean animateReturn)')).replace('__RENDER__', extract('private void renderGamePullHint(') if 'private void renderGamePullHint(' in source else '')
 with tempfile.TemporaryDirectory() as tmp:
     p=Path(tmp)
     (p/'android/view/animation').mkdir(parents=True)

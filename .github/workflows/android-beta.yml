@@ -73,11 +73,17 @@ jobs:
       - name: Run Home media recovery behavior regression
         run: python3 regression/home_media_v512119.py
 
+      - name: Run Motore live identity SQLite regression
+        run: python3 regression/engine_live_counts.py
+
       - name: Run Motore overview presentation regression
         run: python3 regression/engine_overview_presentation.py
 
       - name: Run product pull motion regression
         run: python3 regression/product_pull_motion.py
+
+      - name: Run refresh and end-pull integration regression
+        run: python3 regression/refresh_end_pull.py
 
       - name: Run product gesture behavior regression
         run: python3 regression/product_gesture_v512106.py
