@@ -7,6 +7,14 @@ Le modifiche vanno mantenute piccole, misurabili e reversibili. Nessun miglioram
 
 ## Priorità operative
 
+## Backend — B2 riuso foto 5.12.123 consegnata, 2026-10-02
+Fix autorizzata «Vai», branch backend/photo-cache-reuse, PR134. Matcher normale legge la firma dHash già salvata prima di HTTP: solo URL esatta (normalizzazione &amp;), hash SQLite integer e last_at entro24h/non futuro. La chiave PhotoIdentity da sola non basta: crop/taglie/URLfirmate diverse possono produrre hash diversi. Miss/errore/tabellaassente/scaduto/corrotto mantengono il percorso precedente; lettura senza ensure/DDL. Algoritmo VisualCoverMatcher e soglie invariati, nessuna nuova rete o cambio schema/budget/pausa/retry. Una sola riga perphoto_key resta: crop alternati possono produrre miss sicuri; nessuna cache completa o singleflight aggiunta.
+Ledger SQLite esistente espone photoMatcher separato dai contatori pagine: cacheHits/downloadAttempts/httpResponses/http403/http429/errors; scope matcher-only. Non include tutte le immagini UI né tutte le richieste fisiche dei redirect; errors conta eccezioni del percorso, non tutti i possibili decode null. Misure best-effort come ledger esistente; transazioni brevi sul worker, overhead sul telefono non misurato. Epoch inizializzata dentro transazione prima del primo evento, altrimenti la lettura diagnostica cancellava i primi contatori.
+RED CI36336987336608/job110775240966 riproduce downloadripetuto. CI36736988497710/job110778932709 riproduce perdita primo evento foto/epoch. Harness esegue matcher/algoritmo reali con adattatori Android/HTTP controllato;100casi paritàbitmap/hash, scoreliteral/dHashzero, URLcropdiversa, errorcache,403/I/O/noobs. SQLite esegue query reale conURLesatta,ampersand,hashcorrotto,scaduto/futuro. Telemetry harness esegue metodi reali record/epoch/helpers con boundarySQLite; preserva contatori e non modifica pagine. Localmente fixtureSQLite e syntax passati; javac/SDK assenti. Revisioneindipendente finale su59353bfb senza Critical/Important dopofixepoch.
+Riallineato a beta7950191807874296cf376a920a8220b872245060 (frontend122); headfinale59353bfb92d18363d591d33f9353ee8507cdcd62 supera CI36836988621031/job110779327243 (regressioni complete, Androidunit, Javac, APKreview). PR134 integrata merge592c492e3b25ee00e998b551a38cacd246438d5e. Beta14136989029274/job110780639505 completata success: test/build/certificato attesoC7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificati. Firebase upload2026-10-02 09:23:15.574UTC e distribuzione tester/gruppi09:23:16.067UTC (11:23Europe/Rome), versione5.12.123-photo-cache-reuse(1000141), includefrontend122.
+B–C120 restano sospese, A120 ricevuta; non dichiarare diagnostica120/reboot validati né B1 chiuso. Nessuna prova telefono123 o riduzione403 dimostrata. Prova breve: installare senza cancellaredati, diagnostica iniziale,2–3min uso/scansione normale e diagnostica finale; se comparepausa interrompere e inviare finale senza aspettare/scavalcare/forzareaggiornamenti. Matcher può non essere invocato in quella sessione: zero nuovi contatori non è fallimento. Unico prossimo passoB2: confrontare foto/pageledger nelle due diagnostiche, quindi audit richieste pagine e cachecross-processo. Backend5/frontend7, nessungruppo chiuso da questo sottopasso.
+
+
 ## Priorità attiva — B2 Vinted, audit 2026-10-02
 Richiesta utente: sospendere la prova B–C120 e dare priorità assoluta ai blocchi Vinted/riduzione chiamate. B1 resta aperto; backend5/frontend3 all'ultimo conteggio verificato. Nessuna nuova prova telefono richiesta prima di un intervento misurabile.
 
@@ -22,7 +30,7 @@ Unico prossimo intervento raccomandato: riusare le firme delle foto già scarica
 
 
 ### B1 — Stabilità e performance: crash, ANR, SQLite, memoria e code
-Primo obiettivo attivo. Ricostruire dove nasce la contesa tra processi UI/radar/coda e quali operazioni tengono il database occupato più a lungo.
+Resta aperto; B2 ha priorità per richiesta utente. Ricostruire dove nasce la contesa tra processi UI/radar/coda e quali operazioni tengono il database occupato più a lungo.
 
 Misurare almeno: crash/ANR per processo e versione; attese SQLite e durata delle transazioni lente; query lente; heartbeat/lease e job bloccati; tempo delle snapshot Motore; memoria/PSS-RSS quando disponibile; backlog runnable/processing/retry. Distinguere sempre sintomo, causa probabile e causa dimostrata.
 
