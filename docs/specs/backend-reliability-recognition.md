@@ -7,6 +7,20 @@ Le modifiche vanno mantenute piccole, misurabili e reversibili. Nessun miglioram
 
 ## Priorità operative
 
+## Priorità attiva — B2 Vinted, audit 2026-10-02
+Richiesta utente: sospendere la prova B–C120 e dare priorità assoluta ai blocchi Vinted/riduzione chiamate. B1 resta aperto; backend5/frontend3 all'ultimo conteggio verificato. Nessuna nuova prova telefono richiesta prima di un intervento misurabile.
+
+Audit read-only dei sorgenti beta correnti: VintedPublicSession, VintedLinkResolver, VintedCandidateSnapshotStore, AutoLinkResolver, QueueJobRunner, SellerBundleScanner, VintedPhotoMatcher, VintedPhotoHashCache e VisualCoverMatcher.
+- 403/429 inducono pausa LOCALE fissa45min; non è una durata letta da Vinted. 403 non dimostra da solo rate limit. A120: gateREMOTE_LIMIT30/60, ledgerultimo link_catalog/catalog/403; nessuna causa remota dimostrata.
+- Gate delle pagine condiviso SQLite; cache risposte solo per processo,16URL/10min. Quindi coordinamento richieste non equivale a cache condivisa.
+- Resolver cerca fino2query e verifica la pagina articolo; catalogStructured=0 nella baseline, quindi fast path strutturato non utilizzabile. Snapshot/batch persistenti già esistono, non vanno duplicati.
+- Confronto foto: applyPhotoEvidence seleziona fino6candidati; VintedPhotoMatcher usa direttamente HttpURLConnection, fuori dal gate/ledger delle pagine. Salva dHash ma non legge cache prima di HTTP. Quindi30/60 e physical non rappresentano tutto il traffico immagini. Nessuna attribuzione causale dei403 a questo traffico.
+- VisualCoverMatcher ha già overload similarity(queryHashes,candidateHash) con stessa distanza/crop del confronto bitmap; possibile riuso senza cambiare soglie. Verificare identità foto, equivalenza risultati, cache assente/corrotta, errori DB e zero richieste su hit prima di attivarlo; evitare ensure/DDL in lookup read-only.
+- Intake A120 mostra0ID su14219card; numeratore legacy esplicito, non prova possibilità di recupero automatico link nello scroll. Nessuna nuova rete di probe avviata.
+
+Unico prossimo intervento raccomandato: riusare le firme delle foto già scaricate nel confronto normale, conservando algoritmo e soglie, e misurare separatamente hit/download/esiti foto. Non modificare pausa, budget, schema o regole di matching. Test automatici e confronto stesso punteggio precedono build; successivo audit cache pagine cross-processo resta distinto. Questa consegna è solo audit/documentazione, nessunaAPK né riduzione403 verificata.
+
+
 ### B1 — Stabilità e performance: crash, ANR, SQLite, memoria e code
 Primo obiettivo attivo. Ricostruire dove nasce la contesa tra processi UI/radar/coda e quali operazioni tengono il database occupato più a lungo.
 

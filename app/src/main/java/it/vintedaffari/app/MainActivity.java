@@ -810,11 +810,13 @@ private void applyDiscoverChrome(){
         b.setText(content);b.setContentDescription(label);b.setOnClickListener(v->action.run());return b;
     }
     private Button productProviderAction(String label,int logo,int color,Runnable action){
-        Button b=button(label,BG);b.setTextColor(color==LIME?CYAN:TEXT);b.setGravity(Gravity.CENTER);b.setPadding(dp(16),dp(12),dp(16),dp(12));
-        b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(35,255,255,255)),round(BG,16,1,color==LIME?CYAN:OUTLINE),null));
-        Drawable icon=iconDrawable(LudoIcons.ARROW_RIGHT,color==LIME?CYAN:MUTED,14);icon.setBounds(0,0,dp(14),dp(14));
-        android.text.SpannableString content=new android.text.SpannableString(label+"  \uFFFC");
-        content.setSpan(new android.text.style.ImageSpan(icon,android.text.style.ImageSpan.ALIGN_BOTTOM),content.length()-1,content.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        // Match the opaque background of each original logo so its square blends into the button.
+        int fill=logo==R.drawable.provider_vinted_logo?Color.rgb(1,119,131):Color.rgb(68,63,100);
+        Button b=button(label,fill);b.setTextColor(Color.WHITE);b.setGravity(Gravity.CENTER);b.setPadding(dp(16),dp(12),dp(16),dp(12));
+        b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.argb(35,255,255,255)),round(fill,16,0,0),null));
+        Drawable icon=getResources().getDrawable(logo,getTheme()).mutate();icon.setBounds(0,0,dp(24),dp(24));
+        android.text.SpannableString content=new android.text.SpannableString("\uFFFC  "+label);
+        content.setSpan(new android.text.style.ImageSpan(icon,android.text.style.ImageSpan.ALIGN_BOTTOM),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         b.setText(content);b.setContentDescription(label);b.setOnClickListener(v->action.run());return b;
     }
     private View productQuickFacts(Double rating,Integer minPlayers,Integer maxPlayers,Integer minutes,Double weight,String language,Runnable ratingAction,Runnable languageAction){
@@ -1638,7 +1640,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         TextView photoStatus=text("",11,MUTED,Typeface.NORMAL);photoStatus.setPadding(0,dp(14),0,0);photoStatus.setVisibility(View.GONE);box.addView(photoStatus);refreshDetailPhotos(d,hero,photoStatus);
         TextView refreshStatus=text("",11,MUTED,Typeface.NORMAL);refreshStatus.setVisibility(View.GONE);addProductSection(box,refreshStatus,8);
 
-        if(game!=null){TextView pullHint=text("",12,MUTED,Typeface.NORMAL);pullHint.setGravity(Gravity.CENTER);pullHint.setMinHeight(dp(168));pullHint.setLines(2);pullHint.setPadding(0,dp(24),0,dp(24));GamePullProgress progress=new GamePullProgress();progress.setBounds(0,0,dp(44),dp(44));pullHint.setCompoundDrawables(null,progress,null,null);pullHint.setCompoundDrawablePadding(dp(8));LinearLayout.LayoutParams php=new LinearLayout.LayoutParams(-1,-2);php.topMargin=dp(16);box.addView(pullHint,php);installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));}
+        if(game!=null){TextView pullHint=text("",12,MUTED,Typeface.NORMAL);pullHint.setGravity(Gravity.CENTER);pullHint.setMinHeight(dp(168));pullHint.setLines(2);pullHint.setPadding(0,dp(24),0,dp(24));GamePullProgress progress=new GamePullProgress();progress.setBounds(0,0,dp(44),dp(44));pullHint.setCompoundDrawables(null,progress,null,null);pullHint.setCompoundDrawablePadding(dp(8));pullHint.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){@Override public void onViewAttachedToWindow(View v){}@Override public void onViewDetachedFromWindow(View v){progress.cancelReturn();renderGamePullHint(pullHint,0,false);}});LinearLayout.LayoutParams php=new LinearLayout.LayoutParams(-1,-2);php.topMargin=dp(16);box.addView(pullHint,php);installPullToGame(sc,pullHint,game.id,dialog);sc.post(()->prepareGameTransition(dialog,game.id,pullHint));}
 
         LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setBackground(productPageBackground());page.addView(sc,new LinearLayout.LayoutParams(-1,0,1));page.addView(actionBar,new LinearLayout.LayoutParams(-1,-2));page.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);page.setPadding(safe.left,safe.top,safe.right,safe.bottom);box.setPadding(dp(20),dp(16),dp(20),dp(24));return insets;});dialog.setOnDismissListener(x->finishListingDetail(dialog,parent,parentSignature));dialog.setContentView(page);dialog.show();page.requestApplyInsets();sc.post(()->{if(dialog.isShowing())refreshDetailBgg(d,refreshStatus,false,hero,dialog,updateProductInfo,game);});Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
     }
@@ -1688,7 +1690,8 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         });
     }
     private final class GamePullProgress extends Drawable {
-        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final RectF circle=new RectF();private float progress;private ValueAnimator returning;
+        void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}
         void setProgress(float value){progress=Math.max(0f,Math.min(1f,value));invalidateSelf();}
         @Override public void draw(Canvas canvas){if(progress<=0)return;Rect r=getBounds();float density=getResources().getDisplayMetrics().density;float radius=(3f+11.75f*progress)*density;circle.set(r.exactCenterX()-radius,r.exactCenterY()-radius,r.exactCenterX()+radius,r.exactCenterY()+radius);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f*density);paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(OUTLINE);canvas.drawOval(circle,paint);paint.setColor(CYAN);canvas.drawArc(circle,-90,360*progress,false,paint);}
         @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
@@ -1697,14 +1700,28 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     }
 
     private void updateGamePullHint(TextView hint,float progress,boolean ready){
+        Drawable[] drawables=hint.getCompoundDrawables();GamePullProgress ring=drawables[1] instanceof GamePullProgress?(GamePullProgress)drawables[1]:null;
+        if(ring!=null&&progress<=0&&ring.progress>0&&ValueAnimator.areAnimatorsEnabled()&&hint.isAttachedToWindow()){
+            if(ring.returning!=null)return;
+            ValueAnimator returning=ValueAnimator.ofFloat(ring.progress,0f);ring.returning=returning;
+            returning.setDuration(180);returning.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            returning.addUpdateListener(animation->{
+                if(ring.returning!=animation)return;
+                if(!hint.isAttachedToWindow()){ring.cancelReturn();renderGamePullHint(hint,0,ready);return;}
+                renderGamePullHint(hint,(float)animation.getAnimatedValue(),ready);
+            });
+            returning.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator animation){if(ring.returning!=animation)return;ring.returning=null;renderGamePullHint(hint,0,ready);}});
+            returning.start();return;
+        }
+        if(ring!=null)ring.cancelReturn();renderGamePullHint(hint,progress,ready);
+    }
+
+    private void renderGamePullHint(TextView hint,float progress,boolean ready){
         Drawable[] drawables=hint.getCompoundDrawables();if(drawables[1] instanceof GamePullProgress)((GamePullProgress)drawables[1]).setProgress(progress);
         String label=!ready?(hint.isClickable()?"Preparazione non riuscita · tocca per riprovare":""):progress>=1?"Rilascia per aprire la scheda gioco":progress>0?"Scheda gioco":"";
         if(!label.contentEquals(hint.getText()))hint.setText(label);
         // Translate without relayout: ring, caption and content move together on the same progress.
-        if(hint.getParent() instanceof View){View content=(View)hint.getParent();content.animate().cancel();
-            if(progress>0)content.setTranslationY(-dp(72f)*progress);
-            else if(content.getTranslationY()!=0){if(ValueAnimator.areAnimatorsEnabled())content.animate().translationY(0f).setDuration(180).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();else content.setTranslationY(0f);}
-        }
+        if(hint.getParent() instanceof View){View content=(View)hint.getParent();content.animate().cancel();content.setTranslationY(-dp(72f)*progress);}
         // Keep a stable scroll extent and an accessible/key equivalent when visually at rest.
         hint.setAlpha(ready?1f:.65f);hint.setContentDescription(label.isEmpty()?(ready?"Apri scheda gioco. Dal fondo, scorri ancora":"La scheda gioco si sta preparando"):label+(progress>0?" · "+Math.round(progress*100)+"%":""));
     }
@@ -3256,5 +3273,4 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
 }
-
 
