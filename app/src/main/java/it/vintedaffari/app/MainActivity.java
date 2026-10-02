@@ -40,7 +40,7 @@ public final class MainActivity extends Activity {
     private static final class EngineOverviewSnapshot {
         final long loadedAt; final DealDatabase.ObservationSession run; final int waitingRuns,recoveryCount;
         final List<DealDatabase.ObservationDay> days;
-        DealDatabase.ObservationSession pipelineRun;int[] phases=new int[5],livePhases=new int[5];int activeMask,intakeCount;boolean bggPaused,vintedPaused;long vintedWaitUntil;List<DealDatabase.ObservationSession> recentRuns=Collections.emptyList();
+        DealDatabase.ObservationSession pipelineRun;int[] phases=new int[5],livePhases=new int[5];int activeMask,intakeCount,globalWorkCount;List<MarketStore.Job> globalJobs=Collections.emptyList();boolean bggPaused,vintedPaused;long vintedWaitUntil;List<DealDatabase.ObservationSession> recentRuns=Collections.emptyList();
         final List<DealDatabase.ObservationSession> unfinishedRuns;
         EngineOverviewSnapshot(long at,DealDatabase.ObservationSession r,int w,int recovery,List<DealDatabase.ObservationDay> d,List<DealDatabase.ObservationSession> unfinished){
             loadedAt=at;run=r;waitingRuns=w;recoveryCount=recovery;days=d==null?Collections.emptyList():d;unfinishedRuns=unfinished==null?Collections.emptyList():unfinished;
@@ -731,7 +731,7 @@ private void applyDiscoverChrome(){
     private View heroOpportunityCard(DealRecord d){
         FrameLayout card=new FrameLayout(this);card.setClipToOutline(true);card.setBackground(premiumSurface(true));
         LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(16),dp(8),dp(16),dp(16));card.addView(content,new FrameLayout.LayoutParams(-1,-2));
-        FrameLayout art=new FrameLayout(this);art.setBackground(dealArtworkTint(d));FeaturedBoxView box=new FeaturedBoxView(true,false);box.setPedestalAccent(discountAccent(d));art.addView(box,new FrameLayout.LayoutParams(-1,-1));
+        FrameLayout art=new FrameLayout(this);art.setBackground(dealArtworkTint(d));FeaturedBoxView box=new FeaturedBoxView(true,false);art.addView(box,new FrameLayout.LayoutParams(-1,-1));
         TextView placeholder=discoverTextWeight(coverPlaceholder(d),12,DISCOVER_MUTED,400);placeholder.setGravity(Gravity.CENTER);art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
         ImageView image=new ImageView(this);image.setVisibility(View.INVISIBLE);art.addView(image,new FrameLayout.LayoutParams(dp(1),dp(1)));
         String summary=discoverGameDescription(d);final int[] previous={-1,-1,-1,-1};Runnable arrange=()->{
@@ -742,7 +742,7 @@ private void applyDiscoverChrome(){
             LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
             TextView eyebrow=discoverTextWeight("Gioco in evidenza",12,Color.rgb(242,231,255),600);eyebrow.setCompoundDrawablesRelativeWithIntrinsicBounds(iconDrawable(LudoIcons.STAR,DISCOVER_ORANGE,12),null,null,null);eyebrow.setCompoundDrawablePadding(dp(6));
             eyebrow.setPadding(dp(10),dp(6),dp(10),dp(6));eyebrow.setBackground(round(Color.argb(90,67,36,95),999,1,DISCOVER_OUTLINE));header.addView(eyebrow,new LinearLayout.LayoutParams(-2,-2));header.addView(new View(this),new LinearLayout.LayoutParams(0,dp(1),1));
-            TextView more=roundIconButton("⋯",TEXT);more.setContentDescription("Azioni del gioco in evidenza");more.setOnClickListener(v->showProductActions(d,true));header.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout.LayoutParams moreLp=new LinearLayout.LayoutParams(dp(48),dp(48));moreLp.leftMargin=dp(8);header.addView(more,moreLp);content.addView(header);
+            TextView more=roundIconButton("\uf141",Color.rgb(226,221,242),true);more.setContentDescription("Azioni del gioco in evidenza");more.setOnClickListener(v->showProductActions(d,true));header.addView(gameFavoriteButton(d.bggId,name(d)),new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout.LayoutParams moreLp=new LinearLayout.LayoutParams(dp(48),dp(48));moreLp.leftMargin=dp(4);header.addView(more,moreLp);content.addView(header);
             boolean inline=HomePresentation.heroInline(available/getResources().getDisplayMetrics().density,getResources().getConfiguration().fontScale);
             LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);
             TextView title=discoverTextWeight(name(d),24,DISCOVER_TEXT,700);title.setMaxLines(3);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);
@@ -1917,7 +1917,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     private void sizeIconAction(TextView v){sizeIconAction(v,1f);}
     private void sizeIconAction(TextView v,float surfaceScale){v.setGravity(Gravity.CENTER);v.setPadding(0,0,0,0);v.setIncludeFontPadding(false);v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,dp(24)*surfaceScale);v.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot){int side=Math.min(r-l,b-t);if(side>0)v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,side*surfaceScale*.5f);}});}
     private void styleIconAction(TextView v){styleIconAction(v,.75f,false);}
-    private void styleIconAction(TextView v,float surfaceScale,boolean glass){sizeIconAction(v,surfaceScale);Drawable surface=round(glass?Color.argb(38,255,255,255):SURFACE2,999,1,glass?Color.argb(70,255,255,255):OUTLINE);v.setBackground(surface);v.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot){int inset=Math.round(Math.min(r-l,b-t)*(1-surfaceScale)/2);v.setBackground(new android.graphics.drawable.InsetDrawable(surface,inset));}});}
+    private void styleIconAction(TextView v,float surfaceScale,boolean glass){sizeIconAction(v,surfaceScale);Drawable surface=round(glass?Color.argb(38,255,255,255):Color.rgb(23,20,34),999,1,glass?Color.argb(70,255,255,255):Color.rgb(94,83,120));v.setBackground(surface);v.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot){int inset=Math.round(Math.min(r-l,b-t)*(1-surfaceScale)/2);v.setBackground(new android.graphics.drawable.InsetDrawable(surface,inset));}});}
     private TextView iconBadge(String glyph,int color){TextView v=appIcon(glyph,15,color==LIME?BG:TEXT);v.setBackground(round(color,999,0,0));return v;}
     private TextView scorePill(String label,int color){TextView v=text(label,13,BG,Typeface.BOLD);v.setGravity(Gravity.CENTER);v.setPadding(dp(13),0,dp(13),0);v.setBackground(round(color,999,0,0));return v;}
     private TextView softPill(String label){TextView v=text(label,12,TEXT,Typeface.BOLD);v.setGravity(Gravity.CENTER);v.setPadding(dp(12),0,dp(12),0);v.setBackground(round(SURFACE2,999,0,0));return v;}
@@ -2410,7 +2410,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         int[] phases=pipelineRun==null?new int[5]:db.enginePipelineCounts(pipelineRun.startAt,pipelineRun.endAt);
         int[] livePhases=pipelineRun==null?new int[5]:db.enginePipelineActiveCounts(pipelineRun.startAt,pipelineRun.endAt);int activeMask=0;for(int phase=0;phase<5;phase++)if(livePhases[phase]>0)activeMask|=1<<phase;int intakeCount=db.engineIntakeCount();
         getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putString("activitySnapshotTiming","ownerMs="+(ownerAt-started)+";reviewMs="+(reviewAt-ownerAt)+";pipelineMs="+(System.currentTimeMillis()-reviewAt)).apply();
-        boolean bggPaused=marketStore.isBggPaused(),vintedPaused=marketStore.isVintedPaused();long vintedWaitUntil=VintedPublicSession.waitUntil(this);EngineOverviewSnapshot snapshot=new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,Collections.emptyList(),Collections.emptyList());snapshot.pipelineRun=pipelineRun;snapshot.phases=phases;snapshot.livePhases=livePhases;snapshot.activeMask=activeMask;snapshot.intakeCount=intakeCount;snapshot.bggPaused=bggPaused;snapshot.vintedPaused=vintedPaused;snapshot.vintedWaitUntil=vintedWaitUntil;return snapshot;
+        boolean bggPaused=marketStore.isBggPaused(),vintedPaused=marketStore.isVintedPaused();long vintedWaitUntil=VintedPublicSession.waitUntil(this);EngineOverviewSnapshot snapshot=new EngineOverviewSnapshot(System.currentTimeMillis(),run,waitingRuns,recoveryCount,Collections.emptyList(),Collections.emptyList());snapshot.pipelineRun=pipelineRun;snapshot.phases=phases;snapshot.livePhases=livePhases;snapshot.activeMask=activeMask;snapshot.intakeCount=intakeCount;snapshot.bggPaused=bggPaused;snapshot.vintedPaused=vintedPaused;snapshot.vintedWaitUntil=vintedWaitUntil;MarketStore.JobSummary global=marketStore.jobSummary();snapshot.globalWorkCount=global==null?0:global.active();if(pipelineRun==null&&snapshot.globalWorkCount>0){List<MarketStore.Job> jobs=new ArrayList<>(marketStore.recentJobs(24));jobs.removeIf(job->!MarketStore.PENDING.equals(job.state)&&!MarketStore.PROCESSING.equals(job.state)&&!MarketStore.FAILED_RETRYABLE.equals(job.state));snapshot.globalJobs=jobs;}return snapshot;
     }
 
     private void requestEngineOverviewSnapshot(){
@@ -2466,12 +2466,30 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         renderEngineHeader("Motore","",false);
         // Stale-while-revalidate: never replace usable Activity data with an empty loading page.
         if(snapshot.loadedAt<engineEnteredAt||now-snapshot.loadedAt>30_000L)requestEngineOverviewSnapshot();
-        body.addView(enginePipelineCard(snapshot));
+        if(snapshot.pipelineRun!=null)body.addView(enginePipelineCard(snapshot));
+        else if(EngineOverviewPresentation.showResearchEmpty(false,snapshot.waitingRuns,snapshot.intakeCount))body.addView(engineResearchEmptyCard());
+        else body.addView(text("Annunci in attesa di elaborazione",18,TEXT,Typeface.BOLD));
+        if(snapshot.pipelineRun==null&&snapshot.globalWorkCount>0){LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(-1,-2);gp.topMargin=dp(12);body.addView(engineQueueRow(LudoIcons.GEAR,snapshot.globalWorkCount+(snapshot.globalWorkCount==1?" attività in coda":" attività in coda"),MUTED,()->showEngineGlobalWork(snapshot)),gp);}
         if(snapshot.waitingRuns>0||snapshot.intakeCount>0){LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(-1,-2);qp.topMargin=dp(16);body.addView(engineIntakeCard(snapshot),qp);}
         {LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(16);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
         installEngineHistoryPull();
 
         uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,10_000L);
+    }
+
+    private View engineResearchEmptyCard(){
+        LinearLayout card=verticalCard();card.setGravity(Gravity.CENTER);card.setPadding(dp(24),dp(28),dp(24),dp(24));card.setBackground(round(SURFACE,22,1,OUTLINE));
+        TextView icon=appIcon(LudoIcons.SEARCH,30,DISCOVER_LAVENDER);icon.setGravity(Gravity.CENTER);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);card.addView(icon,new LinearLayout.LayoutParams(-1,dp(56)));
+        TextView title=text("Non c’è ancora niente qui",22,TEXT,Typeface.BOLD);title.setGravity(Gravity.CENTER);card.addView(title);
+        TextView hint=text("Inizia una ricerca su Vinted.",14,MUTED,Typeface.NORMAL);hint.setGravity(Gravity.CENTER);hint.setPadding(0,dp(8),0,dp(20));card.addView(hint);
+        Button search=productPrimaryButton("Cerca su Vinted",LudoIcons.SEARCH,CYAN,()->openVintedBrowserExperiment("https://www.vinted.it/catalog","SEARCH",""));card.addView(search,new LinearLayout.LayoutParams(-1,dp(56)));return card;
+    }
+    private void showEngineGlobalWork(EngineOverviewSnapshot snapshot){
+        Dialog sheet=bottomSheet("Lavoro in coda");LinearLayout box=sheet.findViewById(SHEET_ID);
+        TextView scope=text("Attività di tutte le ricerche, separate dallo scroll corrente.",13,MUTED,Typeface.NORMAL);scope.setPadding(0,0,0,dp(12));box.addView(scope);
+        for(MarketStore.Job job:snapshot.globalJobs)box.addView(persistentJobCard(job,false));
+        if(snapshot.globalWorkCount>snapshot.globalJobs.size())box.addView(text("Mostro le prime "+snapshot.globalJobs.size()+" attività. La coda continua ad aggiornarsi.",13,MUTED,Typeface.NORMAL));
+        sheet.show();
     }
 
     private String engineScopeLabel(DealDatabase.ObservationSession scope){
