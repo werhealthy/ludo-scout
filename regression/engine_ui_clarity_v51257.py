@@ -39,9 +39,9 @@ checks = [
      "da questo scroll" in components and
      "nel Catalogo" not in components),
     ("human attention is a separate conditional inbox",
-     "Richiedono attenzione" in components and
-     "elementi richiedono" in components and
-     'engineSection="review"' in components),
+     "if(snapshot.recoveryCount>0)" in overview and
+     'text("Serve il tuo aiuto"' in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and
+     'engineSection="review"' in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")]),
     ("unfinished scrolls use user-facing waiting states",
      "Altri scroll" in components and "Riprenderà" in components and "In attesa" in components),
     ("run inspector filters by outcome instead of provider lane",
