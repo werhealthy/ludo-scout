@@ -1,5 +1,11 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback17:47 — Hero centrata e Motore con stati/movimento140
+
+Puntini Hero geometrici centrati (font ellissi138 rifiutato), stessa superficie36dp/simbolo18dp/target48dp/gap4dp del cuore neutro. Outline tag “Gioco in evidenza” viola, non teal; piedistallo Home sempre viola. Aiuto Motore nascosto se nessuna richiesta, con lavoro/cronologia preservati. Fasi0–3: grande attività osservata ora, piccolo altre voci in coda dello scroll; Pronti disponibilità, mai PROCESSING al centro. Cerchio intero pulsa4.5% durante attività reale; caption pausa/attesa, ferma in tali stati e con gate lifecycle/focus/attach/visibilità/animazioni. Ripartenza focus automatica entro500ms, callback eliminato su detach. Menu lettura numeri esplicita questa semantica. Query/raggruppamento/drilldown10s/gesto/percorsi esistenti invariati. Numeri/delta storici richiedono fonte backend duratura, non simulati.
+PR172/CI425 e beta161 superati; firma/upload/distribuzione tester distinti verificati, release140(1000161), evidenze in STATE. Accettazione telefono pendente. Nessun intake browser/reset/schema/rete/soglia/filtro modificato. Requisiti consolidati nel gruppo1Motore, nessuna chiusura dell'area. Prossimo gruppo frontend: percorso contestuale risoluzione/ritorno job, coordinato con ingresso dati backend; frontend7/backend5 aperti.
+
+
 ## Feedback17:18 — chiusura Hero e Motore senza ricerca
 
 Utente accetta137 salvo coppia azioni del gioco in evidenza: usare ellissi FontAwesome orizzontale centrata, stessa superficie/bordo/colore base del cuore, distanza4dp tra target (36/18dp e area48dp conservati); stato salvato resta distinguibile. Piedistallo Home sempre viola originale; colore sconto solo annuncio, layout e stile del prodotto accettati.
