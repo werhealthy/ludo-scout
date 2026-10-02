@@ -168,3 +168,10 @@ assert queued_counts()=={},'optional deep metadata advertised as core queue'
 db.execute("UPDATE processing_jobs SET source='MANUAL_RECOVERY'")
 assert queued_counts()=={3:1},'explicit manual recovery disappeared from core queue'
 print('PASS phase stock versus local/durable/retry queue, live work and optional deep exclusion')
+
+# The BGG local identity matcher also owns canonical work outside durable jobs.
+add('bgg-local',303,gs='BGG_MATCH_REQUIRED',state='ANALYZED')
+assert queued_counts()=={1:1,3:1},'canonical BGG local matching lost its executable queue'
+db.execute("UPDATE games SET bgg_id='303' WHERE id=303")
+assert queued_counts()=={3:1},'BGG-required marker with an existing identity invented matching work'
+print('PASS canonical BGG local matcher membership matches its real selector')
