@@ -1690,6 +1690,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         float move(float y,boolean atBottom,float distance){if(!touching||!anchored)return 0;if(!atBottom){anchored=false;progress=0;return 0;}float travel=Math.max(0,(anchor-y)/Math.max(1,distance));progress=Math.min(1,travel);if(progress>0)owned=true;return progress;}
         boolean release(float y,float distance,boolean ready){boolean complete=touching&&anchored&&progress>=1&&anchor-y>=distance&&ready;cancel();return complete;}
         boolean ownsTouch(){return owned;}
+        boolean canClaim(float y,float touchSlop){return touching&&anchored&&anchor-y>touchSlop;}
         void cancel(){touching=false;anchored=false;owned=false;progress=0;}
     }
     private void installPullToGame(ScrollView sc,TextView hint,long gameId,Dialog detail){
@@ -1702,12 +1703,14 @@ private void openDetail(DealRecord d){openDetail(d,false);}
     }
     private void installEndPull(ScrollView sc,TextView hint,java.util.function.BooleanSupplier isReady,java.util.function.BooleanSupplier showing,Runnable open,boolean mainPage){
         GamePullGesture gesture=new GamePullGesture();
+        final float touchSlop=android.view.ViewConfiguration.get(this).getScaledTouchSlop();
         View.OnTouchListener listener=(v,e)->{
             int action=e.getActionMasked();boolean ready=isReady.getAsBoolean();boolean owned=gesture.ownsTouch();
             boolean bottom=!sc.canScrollVertically(1);
             if(action==android.view.MotionEvent.ACTION_CANCEL||e.getPointerCount()!=1||!showing.getAsBoolean()||!ready){gesture.cancel();updateGamePullHint(hint,0,ready);if(mainPage&&owned)finishEngineHistoryGesture();return owned;}
             if(action==android.view.MotionEvent.ACTION_DOWN){gesture.down(e.getY(),bottom);updateGamePullHint(hint,0,ready);}
             else if(action==android.view.MotionEvent.ACTION_MOVE){
+                if(!owned&&!gesture.canClaim(e.getY(),touchSlop))return false;
                 float progress=gesture.move(e.getY(),bottom,dp(220f));
                 if(!owned&&gesture.ownsTouch()){
                     android.view.MotionEvent cancel=android.view.MotionEvent.obtain(e);cancel.setAction(android.view.MotionEvent.ACTION_CANCEL);sc.onTouchEvent(cancel);cancel.recycle();
@@ -3341,4 +3344,3 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
 }
-
