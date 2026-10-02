@@ -40,8 +40,12 @@ public class LudoRoomsRegression {
   check(state.switchTo("home",640)==180&&state.isHome(),"open Casa at its position");
   check(state.switchTo("explore",360)==640,"return restores Esplorazione position");
   LudoRoomState reload=new LudoRoomState(state.room(),state.position("explore"),state.position("home"));check(reload.position("home")==360&&reload.position("explore")==640,"recreation");
-  check(LudoRoomState.HOME.equals(LudoRoomState.swipeTarget("explore",1)),"swipe left opens Casa");
-  check(LudoRoomState.EXPLORE.equals(LudoRoomState.swipeTarget("home",-1)),"swipe right opens Esplorazione");
+  check("hunts".equals(LudoRoomState.swipeTarget("explore",1)),"swipe left opens Cacce before Casa");
+  check("home".equals(LudoRoomState.swipeTarget("hunts",1)),"second swipe opens Libreria");
+  check("hunts".equals(LudoRoomState.swipeTarget("home",-1)),"back from Libreria reaches Cacce");
+  check("explore".equals(LudoRoomState.swipeTarget("hunts",-1)),"back from Cacce reaches Esplorazione");
+  state.switchTo("hunts",640);state.recordScroll(270);check(state.switchTo("home",270)==360,"third room keeps Casa position");check(state.switchTo("hunts",400)==270,"Cacce restores independently");
+  check(LudoRoomState.EXPLORE.equals(LudoRoomState.swipeTarget("explore",-1)),"first room boundary");
   check(LudoRoomState.HOME.equals(LudoRoomState.swipeTarget("home",1)),"room boundary");
   LudoRoomSwipe swipe=new LudoRoomSwipe();swipe.down(200,200);check(!swipe.move(198,280,8),"vertical must remain scroll");check(!swipe.move(100,282,8)&&swipe.release(60,282,72)==0,"vertical cannot turn into room swipe");
   swipe.down(200,200);check(!swipe.move(195,203,8),"touch slop");check(swipe.move(150,202,8),"intentional horizontal claim");check(swipe.release(100,203,72)==1,"horizontal opens Casa");
@@ -61,7 +65,8 @@ assert 'navItem(LudoIcons.BOOK_OPEN,"Libreria","library")' not in ui
 assert 'if("library".equals(value)){openLudoHome();return;}' in ui
 assert 'renderLudoHomeScene();renderLibrary();return;' in ui
 assert 'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui
-assert 'addLudoRoomTab(tabs,"Casa",LudoRoomState.HOME)' in ui
+assert 'addLudoRoomTab(tabs,"Libreria",LudoRoomState.HOME)' in ui
+assert 'addLudoRoomTab(tabs,"Cacce",LudoRoomState.HUNTS)' in ui
 assert 'refreshHost.setRoomSwipeHandler' in ui
 assert 'petView.setExplorer(true)' in ui and 'ludoFireplaceBackground()' in ui
 assert 'Avvia nuove ricerche · test' not in ui
