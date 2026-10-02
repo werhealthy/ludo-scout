@@ -1,5 +1,10 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback approvato 2026-10-02 — scheda compatta e colore visibile
+
+Tre miniature52dp verticali accanto alla scatola, ultimo overlay+N per foto aggiuntive con galleria completa conservata. Barra informazioni senza riquadro, linea sottile e stesso margine del titolo. Alone radiale visibile del colore dealAccent esistente al posto del gradiente rettangolare troppo delicato; sfondo annuncio colorato e superfici locali traslucide senza cambiare design system globale o fill/loghi provider. Stessi contenuti, azioni, preferiti, gesto e dati; non aggiungere né eliminare informazioni. Browser backend132 preservato. Implementazione133 su frontend/product-gallery-glow; verifiche CI/distribuzione/telefono pendenti. Frontend7/backend5 aperti.
+
+
 ## Feedback attuale — azioni coerenti e colore offerta
 
 Like della Home accanto alle altre azioni, stessa area48dp e superficie con inset7dp; padding comune per azioni circolari senza imporre dimensioni identiche alle card. Scheda annuncio: eliminare titolo Vinted finale indesiderato; riepilogo titolo/offerta/prezzo senza box, barra lingua/voto/giocatori/durata con superficie propria. Sfumatura leggera dietro artwork delle offerte Home/podio e dettaglio annuncio, ricavata da dealAccent esistente; nessuna nuova classificazione o colore inventato per giochi senza annuncio. Implementato PR152/153 anche nel Catalogo: regressioni/test Android/compile/APK verificati; versione5.12.131(1000150), beta150 con firma/upload Firebase/distribuzione distinti verificati. Dettagli in STATE; accettazione visiva telefono pendente. Frontend7/backend5 aperti.
