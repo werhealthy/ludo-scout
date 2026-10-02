@@ -1,5 +1,16 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback17:12 — browser135 rifiutato e Motore senza ricerca
+
+Utente rifiuta estetica/densità browser135: testi appiccicati, padding insufficiente, gerarchia assente, azioni tutte simili. Usare il Catalogo Ludo come riferimento concreto di design: icone/superfici/tipografia esistenti, ricerca primaria, chip sintetiche, filtri secondari nascosti e ordinamento con stato selezionato; navigazione pagina precedente/successiva riconoscibile e separata dalle azioni cattura/menu/chiusura. Non è impossibilitàWebView: toolbar è nativaAndroid. Preservare filtri/URL/cattura/paginazione al tocco, senza navigazioni autonome. Accettazione135 negativa; nessuna accettazione visiva dalleCI precedenti.
+
+Motore realmente senza ricerca acquisita: sostituire ruota vuota con scheda semplice, icona e testo “Non c’è ancora niente qui”, CTA “Cerca su Vinted” verso ingressoSEARCH esistente. Il report ha1job globaleDEEP in attesaPACING: non equiparare assenza scroll ad assenza di ogni lavoro; mantenere stato/ingresso lavoro residuo distinto. Preservare aiuto/review, cronologia, accessibilità e refreshing; errore/loading non sono stato vuoto. Non usare numeri Catalogo al posto delle fasi dello scroll.
+
+Audit backend sul beta a2222530f997a5d57567deb220d2216e1a742e64: renderEngineOverview aggiunge sempre pipelineCard anche senza pipelineRun; snapshotREADY48ms, observations totali0,0PROCESSING/0BGG,1PENDING. Browser156ID/96prezzi pagina4 è ancora campione separato; saveReport scrive soltanto preferenze, nessun intake Motore. Secondo report browser pagina3/0 è altro campione e non prova perdita pagina4. Reset SQLite alle12:52Europe/Rome registra rimozione1488job/3269osservazioni; correzione startup/provenienza/intake spetta al backend e richiede decisione comportamento persistente. Dettagli nel backlogbackend. Non chiudere Motore con solo empty state o promettere risultati acquisiti dal browser prima del collegamento.
+
+Feedback consolidato nei gruppi1Motore e6Wizard/filtri, browser collegato al gruppo acquisizionebackend; nessun nuovo gruppo. Frontend7/backend5 aperti. UI e collegamento ancora da implementare/verificare sul telefono.
+
+
 ## Feedback16:54 — piedistallo, azioni contestuali e avvio navigazione Motore
 
 Piedistallo identico per geometria/luci/riflesso, cambia solo palette discountAccent della medesima sfumatura (blu/teal/verde/slate attuali), Home in evidenza e annuncio; render procedurale condiviso senza immagini duplicate. Giochi senza annuncio conservano viola originale. Cerchi card36dp/glyph18dp dentro area48dp, ratio1:2 e gap8dp tra cuore/puntini. Podio BGG cuore ancorato TOP|END indipendente dal titolo, nessun riquadro artwork reintrodotto. Annuncio conserva superficie48dp/glyph24dp accettata, fondo bianco traslucido38/255 (salvato76/255) che lascia emergere la sfumatura; stato cuore/simboli/provider conservati.
