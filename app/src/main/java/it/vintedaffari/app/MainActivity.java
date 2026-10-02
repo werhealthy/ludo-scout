@@ -1604,7 +1604,7 @@ private View libraryRow(LibraryGame g){
     // ---------- DETAIL ----------
 private void openDetail(DealRecord d){openDetail(d,false);}
     private void openDetail(DealRecord d,boolean preserveParent){
-        if(d==null)return;final Dialog parent=preserveParent&&activeDetailDialog!=null&&activeDetailDialog.isShowing()?activeDetailDialog:null;final String parentSignature=parent==null?"":activeDealSignature;activeDealSignature=d.signature==null?"":d.signature;if(parent==null&&activeDetailDialog!=null&&activeDetailDialog.isShowing()){suppressDetailDismissState=true;activeDetailDialog.dismiss();suppressDetailDismissState=false;}Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);activeDetailDialog=dialog;marketDetailDialogs.add(dialog);ScrollView sc=new ScrollView(this);sc.setBackground(productPageBackground());sc.setOverScrollMode(View.OVER_SCROLL_NEVER);LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(box);
+        if(d==null)return;final Dialog parent=preserveParent&&activeDetailDialog!=null&&activeDetailDialog.isShowing()?activeDetailDialog:null;final String parentSignature=parent==null?"":activeDealSignature;activeDealSignature=d.signature==null?"":d.signature;if(parent==null&&activeDetailDialog!=null&&activeDetailDialog.isShowing()){suppressDetailDismissState=true;activeDetailDialog.dismiss();suppressDetailDismissState=false;}Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);activeDetailDialog=dialog;marketDetailDialogs.add(dialog);ScrollView sc=new EndPullScrollView(this);sc.setBackground(productPageBackground());sc.setOverScrollMode(View.OVER_SCROLL_NEVER);LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(box);
         MarketStore.Job refreshJob=marketStore.activeJobForLegacySignature(d.signature);boolean missingNow=needsDataRefresh(d);GameRecord game=TextUtils.isEmpty(d.bggId)?null:marketStore.gameStatsByBggId(d.bggId);
 
         LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);
@@ -1705,7 +1705,7 @@ private void openDetail(DealRecord d){openDetail(d,false);}
         View.OnTouchListener listener=(v,e)->{
             int action=e.getActionMasked();boolean ready=isReady.getAsBoolean();boolean owned=gesture.ownsTouch();
             boolean bottom=!sc.canScrollVertically(1);
-            if(action==android.view.MotionEvent.ACTION_CANCEL||e.getPointerCount()!=1||!showing.getAsBoolean()||!ready){gesture.cancel();updateGamePullHint(hint,0,ready);if(mainPage)finishEngineHistoryGesture();return owned;}
+            if(action==android.view.MotionEvent.ACTION_CANCEL||e.getPointerCount()!=1||!showing.getAsBoolean()||!ready){gesture.cancel();updateGamePullHint(hint,0,ready);if(mainPage&&owned)finishEngineHistoryGesture();return owned;}
             if(action==android.view.MotionEvent.ACTION_DOWN){gesture.down(e.getY(),bottom);updateGamePullHint(hint,0,ready);}
             else if(action==android.view.MotionEvent.ACTION_MOVE){
                 float progress=gesture.move(e.getY(),bottom,dp(220f));
@@ -1715,11 +1715,11 @@ private void openDetail(DealRecord d){openDetail(d,false);}
                 }
                 updateGamePullHint(hint,progress,ready,false);owned=gesture.ownsTouch();if(mainPage&&owned&&!engineHistoryGestureActive){engineHistoryGestureEpoch++;engineHistoryGestureActive=true;}
             }else if(action==android.view.MotionEvent.ACTION_UP){
-                boolean go=gesture.release(e.getY(),dp(220f),ready&&bottom);updateGamePullHint(hint,0,ready);if(mainPage)finishEngineHistoryGesture();if(go)open.run();
+                boolean go=gesture.release(e.getY(),dp(220f),ready&&bottom);updateGamePullHint(hint,0,ready);if(mainPage&&owned)finishEngineHistoryGesture();if(go)open.run();
             }
             return owned;
         };
-        if(mainPage)refreshHost.setEndPullListener(listener);else sc.setOnTouchListener(listener);
+        if(mainPage)refreshHost.setEndPullListener(listener);else if(sc instanceof EndPullScrollView)((EndPullScrollView)sc).setEndPullListener(listener);else sc.setOnTouchListener(listener);
     }
 
     private final class GamePullProgress extends Drawable {
@@ -2446,7 +2446,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         GamePullProgress progress=new GamePullProgress();progress.content=body;progress.revealDistance=height;progress.indicatorTravel=height-dp(32);hint.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);progress.targetLabel="Cronologia degli scroll";progress.releaseLabel="Rilascia per aprire la cronologia";progress.setBounds(0,0,dp(44),dp(44));hint.setCompoundDrawables(null,progress,null,null);hint.setCompoundDrawablePadding(dp(6));hint.setTranslationY(progress.indicatorTravel);engineHistoryPullHint=hint;
         hint.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){@Override public void onViewAttachedToWindow(View v){}@Override public void onViewDetachedFromWindow(View v){progress.cancelReturn();}});
         mainScrollStage.addView(hint,new FrameLayout.LayoutParams(-1,height,Gravity.BOTTOM));
-        installEndPull(scroll,hint,()->true,()->"activity".equals(tab)&&"overview".equals(engineSection)&&engineUiResumed,this::openEngineHistory,true);
+        installEndPull(scroll,hint,()->!refreshHost.isRefreshing(),()->"activity".equals(tab)&&"overview".equals(engineSection)&&engineUiResumed,this::openEngineHistory,true);
         scroll.setAccessibilityDelegate(new View.AccessibilityDelegate(){@Override public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.addAction(new android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,"Apri cronologia degli scroll"));}@Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK){openEngineHistory();return true;}return super.performAccessibilityAction(host,action,args);}});
         scroll.setOnKeyListener((view,key,event)->{if(key!=KeyEvent.KEYCODE_ENTER&&key!=KeyEvent.KEYCODE_DPAD_CENTER)return false;if(event.getAction()==KeyEvent.ACTION_UP)openEngineHistory();return true;});
     }
