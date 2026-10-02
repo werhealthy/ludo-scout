@@ -7,6 +7,14 @@ Le modifiche vanno mantenute piccole, misurabili e reversibili. Nessun miglioram
 
 ## Priorità operative
 
+## Feedback browser — navigazione e cattura, 2026-10-02 15:56 Europe/Rome
+
+Utente sulla132 osserva paginazione1–10 invece di infinite scroll; chiede toolbar nel design system Ludo, frecce pagina precedente/successiva, shortcut ricerca, categoria fissa Hobby e collezionismo > Giochi da tavolo, ordinamenti ultimi annunci/rilevanza/prezzo crescente e comando per incrementare minimo prezzo1€. Navigazioni soltanto al tocco, preservando filtri e riportando pagina1 al cambio ricerca. Proposta bounded da approvare prima codice: UIbrowser e raccoltaDOM arricchita, contatori per pagina, nessun intake produzione in questa consegna.
+
+Diagnostica reale132: acquiredUnique500, dom500, price/seller/publication/language0, jsonOrInitial0, dropped156, unknownShapes/readErrors/rejected0; routes soltanto banners/info_banners/promoted_closets. Non prova payload catalogoJSON disponibile. Script DOM attuale leggehref/titolo/immagine e ignora prezzo; prezzi/brand/condizioni già pubblicamente esposti nelle card Vinted (fonte https://www.vinted.it/catalog/4881-board-games/brand/430207-mayfair). Categoria pubblica verificata https://www.vinted.it/catalog/4881-board-games. Acquisizione pronta dei dati già presenti può avvenire senza scroll, ma completezza pagina/prezzo/seller/data non dimostrata; dropped conta eventi, non annunci unici aggiuntivi. Cap500 record sessione raggiunto, non limitare la futura UX silenziosamente a500; definire raccolta perpagina e overflow esplicito con memoria limitata.
+
+Motore “nessuno scroll” è previsto nella132: catalogWrites0 e browser non crea runs/observations. Non dichiarare browser integrato nel Motore o schede pronte. Campi venditore/pubblicazione/lingua assenti restano ignoti; prossimo esperimento legge correttamente dati DOM e misura copertura perpagina. Prezzo minimo incrementale è proposta da confermare, non garanzia di ottenere tutto il mercato o aggirare limite risultati;403/429/challenge fermano acquisizione senza retry autonomi. Nessun servizio/dipendenza/schema nuovo. Backend5/frontend7 aperti.
+
 ## Proposta B2 — browser Vinted passivo, 2026-10-02 14:40 Europe/Rome
 
 Stato: direzione browser/test autorizzata dall'utente con «Cominciamo» alle14:57Europe/Rome, requisiti aggiornati sotto; codice non implementato. Piano di esecuzione da rivedere. L'utente vuole zero nuove tecnologie a pagamento, meno richieste Vinted e bundle affidabili; propone accesso da Ludo con “Avvia nuove ricerche” e autorizza la preparazione del test dopo le verifiche. Questo lavoro resta nel gruppo acquisizione B2; backend5/frontend7, nessun gruppo chiuso.

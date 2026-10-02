@@ -1,5 +1,8 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback browser 15:56 — proposta circoscritta
+Toolbar Vinted coerente con colori/tipografia/icone/capsule Ludo; chiudi e pausa/cattura, diagnostica nel menu, frecce pagine con indicatore/caricamento e nessun avanzamento autonomo. Chip ricerche salvate e ordinamento, categoria giochi da tavolo mantenuta, prezzo crescente+minimo variabile1€. Report132 dimostra500DOM ma0prezzi e nessun intakeMotore: migliorare prima estrazione/prepagina, non equiparare ID a schede pronte. Design in chat da approvare, nessun codice/nuovaAPK in questo checkpoint. Dettagli backend spec; frontend7/backend5 aperti.
+
 ## Feedback attuale — azioni coerenti e colore offerta
 
 Like della Home accanto alle altre azioni, stessa area48dp e superficie con inset7dp; padding comune per azioni circolari senza imporre dimensioni identiche alle card. Scheda annuncio: eliminare titolo Vinted finale indesiderato; riepilogo titolo/offerta/prezzo senza box, barra lingua/voto/giocatori/durata con superficie propria. Sfumatura leggera dietro artwork delle offerte Home/podio e dettaglio annuncio, ricavata da dealAccent esistente; nessuna nuova classificazione o colore inventato per giochi senza annuncio. Implementato PR152/153 anche nel Catalogo: regressioni/test Android/compile/APK verificati; versione5.12.131(1000150), beta150 con firma/upload Firebase/distribuzione distinti verificati. Dettagli in STATE; accettazione visiva telefono pendente. Frontend7/backend5 aperti.
