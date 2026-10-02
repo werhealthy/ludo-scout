@@ -48,6 +48,7 @@ jobs:
         run: |
           python3 regression/browser_engine_intake.py
           python3 regression/browser_engine_boundary.py
+          python3 regression/engine_local_activity.py
 
       - name: Verify startup never invokes destructive legacy reset
         run: python3 regression/startup_reset_disabled.py

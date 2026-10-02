@@ -344,7 +344,8 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 try{
                     String snapshot;
                     while((snapshot=pendingA11yDiagnosticSnapshot.getAndSet(null))!=null){
-                        radarCounters.persist(radarCounterFile());
+                        if(marketStore!=null)try{marketStore.setDiagnosticState("local_analysis",0,"STOPPED");}catch(Throwable ignored){}
+            radarCounters.persist(radarCounterFile());
                         try{MarketStore store=marketStore;if(store!=null)store.setDiagnosticState("a11y_intake",parseLongField(snapshot,"vintedEvents",0L),snapshot);}
                         catch(Throwable t){Log.w(TAG,"Accessibility telemetry write skipped",t);}
                     }
@@ -597,10 +598,25 @@ public final class VintedAccessibilityService extends AccessibilityService {
         }))analysisSelectionInFlight=false;
     }
 
+    private List<VintedCard> localAnalysisCards=Collections.emptyList();
+    private final Runnable localAnalysisHeartbeat=new Runnable(){@Override public void run(){
+        if(radarDestroyed||!analysisBatchInFlight)return;
+        publishLocalAnalysis("RUNNING",localAnalysisCards);handler.postDelayed(this,4_000L);
+    }};
+    private void publishLocalAnalysis(String state,List<VintedCard> cards){
+        final List<VintedCard> copy=new ArrayList<>(cards);
+        radarPersistence.submit(()->{try{if(marketStore==null)return;StringBuilder detail=new StringBuilder(state);
+            for(VintedCard card:copy)detail.append('\n').append(DealDatabase.signature(card));
+            marketStore.setDiagnosticState("local_analysis", "RUNNING".equals(state)?copy.size():0,detail.toString());
+            sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
+        }catch(Throwable error){Log.w(TAG,"Local analysis heartbeat unavailable",error);}});
+    }
+    private void stopLocalAnalysis(String state){handler.removeCallbacks(localAnalysisHeartbeat);localAnalysisCards=Collections.emptyList();publishLocalAnalysis(state,localAnalysisCards);}
+
     private void analyzeBatch(List<VintedCard> cards) {
         if (engine == null || !engine.isReady() || cards.isEmpty()) return;
         if(analysisBatchInFlight){for(VintedCard c:cards){pendingForAnalysis.put(DealDatabase.signature(c),c);if(pendingForAnalysis.size()>500)pendingForAnalysis.remove(pendingForAnalysis.keySet().iterator().next());}return;}
-        analysisBatchInFlight=true;
+        analysisBatchInFlight=true;localAnalysisCards=new ArrayList<>(cards);handler.removeCallbacks(localAnalysisHeartbeat);handler.post(localAnalysisHeartbeat);
         SharedPreferences p = diag();
         p.edit().putLong("analysisBatches", radarCounters.add("analysisBatches",1)).apply();
 
@@ -611,11 +627,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 final List<GameAnalysis> results=new ArrayList<>(analyses);
                 final Map<String,String[]> sellerHints=new LinkedHashMap<>();
                 for(VintedCard card:captured){String sig=DealDatabase.signature(card);String[] hint=contextualSellerHints.remove(sig);if(hint!=null)sellerHints.put(sig,hint.clone());}
-                if(!radarPersistence.submit(()->persistAnalysisResults(captured,results,sellerHints))){analysisBatchInFlight=false;}
+                if(!radarPersistence.submit(()->persistAnalysisResults(captured,results,sellerHints))){analysisBatchInFlight=false;stopLocalAnalysis("ERROR");}
             }
 
             @Override public void onError(String message) {
-                analysisBatchInFlight=false;
+                analysisBatchInFlight=false;stopLocalAnalysis("ERROR");
                 String safe = message == null ? "Errore analisi" : message;
                 diag().edit().putString("lastError", safe).apply();
                 publishA11yDiagnosticSnapshot();
@@ -698,7 +714,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             trace.close();
             handler.post(()->{
                 if(radarDestroyed)return;
-                publishA11yDiagnosticSnapshot();analysisBatchInFlight=false;
+                publishA11yDiagnosticSnapshot();analysisBatchInFlight=false;stopLocalAnalysis("IDLE");
                 sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
                 handler.postDelayed(VintedAccessibilityService.this::continuePersistentAnalysis,1_500L);
             });
@@ -1828,6 +1844,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         radarPersistence.close(()->{
             try{while(!diagnosticIo.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS)){}while(!maintenanceIo.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS)){} }
             catch(InterruptedException interrupted){Thread.currentThread().interrupt();return;}
+            if(marketStore!=null)try{marketStore.setDiagnosticState("local_analysis",0,"STOPPED");}catch(Throwable ignored){}
             radarCounters.persist(radarCounterFile());
             if(database!=null)database.close();if(bundleDatabase!=null)bundleDatabase.close();
         });
