@@ -10,6 +10,7 @@ public final class BrowserCaptureSql {
  public static final String CREATE_STATE_INDEX = "CREATE INDEX IF NOT EXISTS idx_browser_state_observed ON browser_candidates(state,observed_at,item_id)";
  public static final String UPSERT_MEMBERSHIP = "INSERT OR IGNORE INTO browser_capture_items(capture_id,item_id,page,first_observed_at,last_observed_at,revision,payload) VALUES(?,?,?,?,?,?,?)";
  public static final String UPDATE_MEMBERSHIP = "UPDATE browser_capture_items SET page=?,last_observed_at=?,revision=?,payload=? WHERE capture_id=? AND item_id=?";
+ public static final String CAPTURE_HEADERS = "SELECT c.id,c.url,c.started_at,c.updated_at,c.state,COUNT(b.item_id),SUM(CASE WHEN b.price_cents IS NOT NULL THEN 1 ELSE 0 END) FROM browser_captures c LEFT JOIN browser_capture_items m ON m.capture_id=c.id LEFT JOIN browser_candidates b ON b.item_id=m.item_id GROUP BY c.id ORDER BY c.started_at DESC,c.id DESC LIMIT ?";
  public static final String COMPLETE_CURRENT = "UPDATE browser_candidates SET state=?,reason=?,processed_revision=?,completed_at=?,lease_started_at=0,claimed_revision=0 WHERE item_id=? AND revision=? AND lease_started_at=?";
  public static void create(SQLiteDatabase db){db.execSQL(CREATE_CAPTURES);db.execSQL(CREATE_CANDIDATES);db.execSQL(CREATE_MEMBERSHIP);db.execSQL(CREATE_MEMBERSHIP_INDEX);db.execSQL(CREATE_STATE_INDEX);}
 }

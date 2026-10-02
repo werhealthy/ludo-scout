@@ -58,6 +58,17 @@ class BrowserSqlTest(unittest.TestCase):
         self.db.execute("UPDATE processing_jobs SET state='FAILED_RETRYABLE' WHERE "+query,('PROCESSING',))
         self.assertEqual(self.db.execute("SELECT state FROM processing_jobs WHERE id=8").fetchone()[0],'PROCESSING')
 
+    def test_capture_history_counts_membership_not_canonical_or_time_window(self):
+        self.assertIn('CAPTURE_HEADERS',self.sql,'history has no per-capture reader')
+        for capture in [1,2]:
+            self.db.execute("INSERT INTO browser_captures(id,url,started_at,updated_at,state) VALUES(?, 'https://www.vinted.it/catalog',10,10,'CAPTURING')",(capture,))
+        self.db.execute("INSERT INTO browser_candidates(item_id,url,title,price_cents,revision,observed_at,state) VALUES('101','https://www.vinted.it/items/101','Azul',1000,1,10,'QUEUED')")
+        for capture in [1,2]:self.db.execute(self.sql['UPSERT_MEMBERSHIP'],(capture,'101',1,10,10,1,'{}'))
+        rows=self.db.execute(self.sql['CAPTURE_HEADERS'],(50,)).fetchall()
+        self.assertEqual(len(rows),2)
+        self.assertEqual([r[5] for r in rows],[1,1])
+        self.assertEqual([r[6] for r in rows],[1,1])
+
     def test_stale_completion_cannot_finish_new_revision_or_lease(self):
         self.assertIn('COMPLETE_CURRENT',self.sql,'revision guard missing')
         self.db.execute("INSERT INTO browser_candidates(item_id,url,title,price_cents,revision,observed_at,state,lease_started_at) VALUES('101','https://www.vinted.it/items/101','Azul',1000,2,10,'ANALYZING',30)")
