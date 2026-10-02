@@ -1,5 +1,19 @@
 # Ludo Scout — Current state
 
+## Frontend — scheda annuncio compatta e Motore verificabile, 2026-10-02
+
+Feedback utente13:03Europe/Rome:125–126 troppo vuota; riquadro richieste manuali era utile; screenshot mostra Nessuno scroll acquisito e tutti0. Il grande numero colorato conta identità attive con job PROCESSING osservato, il piccolo numero è il resto attuale della fase in coda; nessuno è storico dei passaggi. Pronti è disponibilità dello scroll. Storico conclusioni resta aperto.
+Audit read-only: loadEngineOverviewSnapshot seleziona activeObservationSession o latestObservationSession; entrambe usano recentObservationSessions negli ultimi7giorni con clampEngineStart al ciclo corrente. Con scope null il codice assegnava array di0 e nascondeva coda/aiuto; lo screenshot non prova assenza di lavori globali. Nessuna causa sul dispositivo confermata, né reset o perdita dati dimostrati. Richiesta diagnostica completa della build installata tramite Motore→menu→Impostazioni e diagnostica. Non chiedere nuove scansioni prima di questa lettura. Query/epoch/pipeline/schema/rete invariati.
+
+127: richieste manuali tornano nel riquadro arrotondato sempre accessibile, con stato vuoto esplicito; scope assente usa trattini invece di0 e testo Nessuno scroll nel periodo corrente. Non è una correzione della causa dello scope nullo. Scheda annuncio: barra informazioni compatta sotto toolbar e sopra hero, aggiornamento dati conservato; descrizione BGG rimossa solo dall'annuncio, resta nella scheda gioco. Overload compact preserva gli altri chiamanti. Pulsanti provider diventano capsule con min56dp, loghi/fill/centratura invariati. Gesto126 preservato. Feedback sul gesto126 in questo messaggio non ricevuto: non considerarlo accettato.
+
+PR142 head183e7153e9f9f7726143070b35d4d2baec0628b3; mergecb16c7e0766749bb5f31dd02e60b09d68a069e4a. CI380/run36999253261/job110812915746 verde: regressioni/JVM/SQLite/Androidunit/compile/APK. Review indipendente senza Critical/Important; minor: valori lunghi nella barra compatta possono andare su più righe, resa telefono da verificare. Nessun nuovo test che duplichi layout; guardia esistente inbox aggiornata al feedback.
+Distribuzione firmata verificata: Android beta145/run36999579671/job110813949905 success; certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710. Firebase upload2026-10-02T11:15:40.8440774Z release5.12.127-product-compact-engine-inbox (1000145); distribuzione distinta tester/gruppi2026-10-02T11:15:41.6587297Z (13:15Europe/Rome).
+
+Prova telefono: barra prima della copertina, pulsanti a capsula, descrizione solo gioco; richieste manuali aprono inbox e fase priva di scope mostra trattini. Verifica testo grande/durata/lingua. Il problema dati tutti0 e lo storico duraturo sono aperti.
+Frontend7aree, backend5separati. Unico prossimo passo frontend: diagnosticare scope nullo e contatori sul dispositivo con diagnostica completa, prima di cambiare altre query o layout del Motore.
+
+
 ## Frontend — Motore aperto e gesto reversibile 5.12.125–126, 2026-10-02
 
 Feedback124: pulsanti provider accettati, gesto inverso e Motore non accettati. Utente approva la nuova struttura con «Vai» alle12:13Europe/Rome. Non chiude Motore né Schede.
