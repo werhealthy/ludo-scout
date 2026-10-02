@@ -1412,7 +1412,7 @@ private void showFilterSheet(){
             catch(RuntimeException error){failure="Non riesco a leggere i consigli. Riproviamo?";}
             try{if(remembered!=null)last=marketStore.gameStatsByBggId(remembered);}catch(RuntimeException ignored){}
             final LocalScoutBrain.Snapshot ready=snapshot;final List<DealRecord> readyHunts=hunts;final List<LibraryGame> readyLibrary=library;final GameRecord readyLast=last;final String error=failure;
-            runOnUiThread(()->{petLoading=false;if(isFinishing()||isDestroyed())return;petFailure=error;petLoadedAt=System.currentTimeMillis();rememberPetRefresh(remembered,readyLast);if(error==null){petSnapshot=ready;petHuntDeals=readyHunts;petLibrary=readyLibrary;petGameIds.clear();petGameIds.putAll(games);petCanonicalGames.clear();petCanonicalGames.putAll(canonicalGames);List<String> signatures=new ArrayList<>(),bggIds=new ArrayList<>();for(DealRecord pick:ready.picks)if(games.containsKey(pick.signature)){signatures.add(pick.signature);bggIds.add(pick.bggId);}petState.refreshGames(signatures.toArray(new String[0]),bggIds.toArray(new String[0]));}else{petGameIds.clear();petState.refresh(new String[0]);}DealRecord current=petCurrentDeal();if(current!=null)petState.select(current.signature);if("companion".equals(tab))scheduleRender(0);});
+            runOnUiThread(()->{petLoading=false;if(isFinishing()||isDestroyed())return;petFailure=error;petLoadedAt=System.currentTimeMillis();rememberPetRefresh(remembered,readyLast);if(error==null){petSnapshot=ready;petHuntDeals=readyHunts;petLibrary=readyLibrary;petGameIds.clear();petGameIds.putAll(games);petCanonicalGames.clear();petCanonicalGames.putAll(canonicalGames);List<String> signatures=new ArrayList<>(),bggIds=new ArrayList<>();for(DealRecord pick:ready.picks)if(games.containsKey(pick.signature)){signatures.add(pick.signature);bggIds.add(pick.bggId);}petState.refreshGames(signatures.toArray(new String[0]),bggIds.toArray(new String[0]));}else{petGameIds.clear();petState.refresh(new String[0]);}DealRecord current=petCurrentDeal();if(current!=null)petState.select(current.signature);if(activePetPanel!=null&&activePetPanel.isShowing())refreshPetPanel();});
         });
     }
     private DealRecord petCurrentDeal(){String id=gamePreferences().lastGame();if(id==null||petSnapshot==null||petFailure!=null)return null;for(DealRecord d:petSnapshot.picks)if(id.equals(GamePreferenceState.gameId(d.bggId))&&petGameIds.containsKey(d.signature)&&petState.eligible(d.signature))return d;return null;}
@@ -1504,12 +1504,12 @@ private void showFilterSheet(){
     }
     private void renderLudoHunts(){
         LinearLayout host=ludoContent();host.addView(text("Carico le tue cacce…",16,MUTED,Typeface.NORMAL));
-        SharedPreferences prefs=gamePreferencePrefs();SharedPreferences.OnSharedPreferenceChangeListener changed=(p,key)->{if("favorites".equals(key)&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room()))runOnUiThread(()->loadLudoHunts(host));};
+        SharedPreferences prefs=gamePreferencePrefs();SharedPreferences.OnSharedPreferenceChangeListener changed=(p,key)->{if("favorites".equals(key)&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room()))runOnUiThread(()->{recordLudoRoomPosition();loadLudoHunts(host);});};
         host.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){prefs.registerOnSharedPreferenceChangeListener(changed);}public void onViewDetachedFromWindow(View v){prefs.unregisterOnSharedPreferenceChangeListener(changed);}});
         loadLudoHunts(host);
     }
     private void loadLudoHunts(LinearLayout host){
-        int request=++ludoHuntsRequest;Set<String> saved=new TreeSet<>(gamePreferences().favorites());
+        int request=++ludoHuntsRequest;final int restoreY=ludoRoomState().position(LudoRoomState.HUNTS);Set<String> saved=new TreeSet<>(gamePreferences().favorites());
         uiDataIo.execute(()->{List<GameRecord> games=new ArrayList<>();Set<String> missing=new TreeSet<>(saved);String failure=null;
             try{for(String id:saved){GameRecord game=marketStore.gameStatsByBggId(id);if(game!=null){games.add(game);missing.remove(id);}}games.sort((a,b)->String.CASE_INSENSITIVE_ORDER.compare(a.name==null?"":a.name,b.name==null?"":b.name));}catch(RuntimeException e){failure="Non riesco a leggere le tue cacce.";}
             final String error=failure;runOnUiThread(()->{if(isDestroyed()||!"companion".equals(tab)||!LudoRoomState.HUNTS.equals(ludoRoomState().room())||request!=ludoHuntsRequest||host.getParent()==null)return;if(!saved.equals(gamePreferences().favorites())){loadLudoHunts(host);return;}host.removeAllViews();
@@ -1520,6 +1520,7 @@ private void showFilterSheet(){
                 for(GameRecord game:games){if(row==null||row.getChildCount()==columns){row=new LinearLayout(this);row.setGravity(Gravity.TOP);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(14);host.addView(row,rp);}LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,1);if(row.getChildCount()>0)cp.leftMargin=dp(12);row.addView(ludoHuntCard(game),cp);}
                 if(row!=null&&row.getChildCount()<columns)row.addView(new Space(this),new LinearLayout.LayoutParams(0,1,1));
                 for(String id:missing){LinearLayout unavailable=new LinearLayout(this);unavailable.setGravity(Gravity.CENTER_VERTICAL);TextView label=text("Gioco BGG #"+id+" · dati non disponibili",14,MUTED,Typeface.NORMAL);unavailable.addView(label,new LinearLayout.LayoutParams(0,-2,1));unavailable.addView(gameFavoriteButton(id,"BGG #"+id),new LinearLayout.LayoutParams(dp(48),dp(48)));host.addView(unavailable);}
+                host.post(()->{if(scroll!=null&&request==ludoHuntsRequest&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room())&&host.getParent()!=null)scroll.scrollTo(0,restoreY);});
             });
         });
     }
