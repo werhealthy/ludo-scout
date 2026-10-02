@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Decisione UX 20:00 — Catalogo unificato e Bundle
+
+Approvato il nuovo modello informativo del Catalogo. Il Catalogo resta centrato sugli annunci Vinted e perde la separazione primaria `Annunci | Giochi`: una ricerca che corrisponde a un gioco mostra prima l'entità Gioco e poi gli annunci correlati. La scheda Gioco resta disponibile dalla ricerca e dal gesto Annuncio→Gioco già deciso, perché raccoglie dati aggregati/storici e contenuti che appartengono al gioco, non al singolo annuncio.
+
+Bundle diventa workflow primario separato con due sezioni/tab: `Bundle` per quelli già scoperti e `Esplora` per suggerire gli annunci/venditori sui quali vale la pena compiere manualmente l'azione necessaria a scoprire altri giochi dello stesso venditore. Obiettivo UX: rendere no-brain le azioni che non possono essere automatizzate senza aumentare il rischio di blocchi Vinted. Nessuna autorizzazione a nuove scansioni automatiche, schema, filtri o rete.
+
+Questa decisione supersede la precedente navigazione Catalogo Annunci/Giochi come struttura target, ma non richiede ancora codice in questo checkpoint. Frontend7/backend5 aperti.
+Unico prossimo gruppo: definire composizione e stati della ricerca unificata e di `Bundle | Esplora`, poi implementare sul branch frontend dedicato.
+
+
 ## Feedback19:37 — scaffali verticali, scheda leggera e stanze Ludo
 
 Utente apprezza142 ma corregge scroll: scaffali successivi verticali, numero dipendente dalla collezione e capacità viewport, nessun rail orizzontale. Con font grande ridurre scatole per ripiano; tutti i giochi ricercati nello stesso ordine. Root principalmente posseduti; Venduti come archivio secondario accessibile nel menu, non tab pari alla collezione. Storico venduti/rating/prezzi/memoria conservati.

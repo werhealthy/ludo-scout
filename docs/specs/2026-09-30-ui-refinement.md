@@ -1,29 +1,14 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
-## Feedback140 — screenshot e diagnostica18:19Europe/Rome
+## Decisione UX 20:00 — Catalogo unificato e Bundle come workflow
 
-UI browser rifiutata: header troppo alto/affollato e file di pulsanti senza gerarchia. Eliminare Catan/Azul e qualsiasi suggerimento di giochi preimpostato. Categoria Giochi da tavolo nel contesto filtri; solo chip dei filtri selezionati. Eventuali ricerche salvate dall'utente nel pannello, nessuna fila automatica di titoli.
+Decisione approvata dall'utente: eliminare la separazione primaria `Annunci | Giochi` nel Catalogo. Il Catalogo resta centrato sugli annunci Vinted; la ricerca diventa intelligente e, quando la query corrisponde a un gioco, mostra in primo piano l'entità Gioco e in secondo piano gli annunci correlati. La scheda Gioco resta: è raggiungibile dalla ricerca e dalla scheda Annuncio tramite il gesto già deciso dal fondo, e conserva approfondimenti aggregati/storici come panoramica, mercato, meccaniche/autore, simili, tutorial e regolamenti. Non eliminare l'entità Gioco né duplicarne i contenuti dentro ogni annuncio.
 
-Screenshot browser18:12 mostra0acquisiti; diagnostica successiva pageObserved156/acquiredUnique96/price96: istanti e contatori diversi, non156annunci persistiti. catalogWrites0, observations totali0, engineLatestCaptureNONE/IDLE confermano writer ancora assente140. Motore vuoto e1attività globale coerenti con1PENDING VINTED_DEEP distinta dalla ricerca. REMOTE_LIMIT riguarda lavoro remoto residuo, non l'intake assente; ledger180richieste tuttebundle/item e2HTTP403. Non aumentare rete o aggirare il backoff.
+Bundle resta una destinazione primaria distinta perché rappresenta un job centrale di Ludo Scout. La sua UI deve avere due sezioni/tab separate: `Bundle` per i bundle già scoperti/costruiti e `Esplora` per gli annunci/venditori che vale la pena controllare manualmente al fine di generare nuovi bundle, riducendo al minimo il carico cognitivo e il numero di azioni richieste. L'esplorazione deve rispettare il vincolo tecnico attuale: niente scansione automatica massiva dei venditori che aumenti il rischio di blocchi Vinted; Ludo Scout deve prioritizzare dove conviene spendere l'azione manuale.
 
-La140 consegna frontend Hero/movimento, non il milestone browser→Motore. PR173 contiene contratto approvato e piano scritto, nessuna implementazione/APK di questa feature. Non presentare progettazione come implementazione. Feedback recepito nel contratto/Task5, backend5/frontend7 invariati.
+Questa decisione sostituisce la navigazione Catalogo `Annunci/Giochi` precedentemente consegnata, ma non autorizza ancora modifiche tecniche a schema, acquisizione, filtri o rete. Prima dell'implementazione va definita la composizione concreta di: risultati ricerca con hero Gioco + annunci; accesso alla scheda Gioco; tab `Bundle | Esplora`; stati Esplora → bundle trovato / nessun bundle utile.
 
-## Feedback139 — prossima consegna completa browser e intake
-
-Richiesta esplicita: interrompere le consegne di micro-fix, allineare la ricerca Vinted browser al design system reale del Catalogo e collegare tutti gli annunci validati al Motore con lavoro reale. Nessuna accettazione visiva del browser135/139.
-
-Contratto tecnico e UI unificato approvato18:05Europe/Rome in [backend-reliability-recognition.md](backend-reliability-recognition.md), sezione “Contratto approvato — consegna completa ricerca browser → Motore, feedback139”. È parte dei gruppi frontend Wizard/filtri e Motore esistenti, con responsabilità backend sull'intake; non un backlog parallelo.
-
-Cornice nativa: ricerca54dp e filtro con badge, pannello filtri/applica, chip attive rimuovibili, ordinamento compatto, icone coerenti Remus/FontAwesome, padding e safe insets, font grande/target48dp. Ricerche salvate in accesso dedicato. Separare ritorno, paginazione, cattura e accesso Motore per posizione e gerarchia. La WebView mantiene il sito. I filtri Catalogo BGG/sconto/lingua non diventano filtri Vinted senza dati corrispondenti.
-
-Motore: card vuota138 soltanto in assenza reale di ricerca/intake; con candidati mostrare acquisiti persistenti, incompleti, coda, analisi ed esiti. Vecchi job globali separati. Stessa popolazione per conti e liste, nessuna ruota di zeri per dati non salvati. La UI dipende dal writer durevole per ID, non dal report della Activity.
-
-Stato: contratto approvato dall'utente, piano di implementazione scritto per review; nessuna implementazione/APK nuova. Frontend7/backend5 aperti. Prossimo gruppo unico congiunto: browser → Motore completo; prova reset139 dopo riapertura conservata come verifica pendente, non come consegna bloccante separata.
-
-## Feedback17:47 — Hero centrata e Motore con stati/movimento140
-
-Puntini Hero geometrici centrati (font ellissi138 rifiutato), stessa superficie36dp/simbolo18dp/target48dp/gap4dp del cuore neutro. Outline tag “Gioco in evidenza” viola, non teal; piedistallo Home sempre viola. Aiuto Motore nascosto se nessuna richiesta, con lavoro/cronologia preservati. Fasi0–3: grande attività osservata ora, piccolo altre voci in coda dello scroll; Pronti disponibilità, mai PROCESSING al centro. Cerchio intero pulsa4.5% durante attività reale; caption pausa/attesa, ferma in tali stati e con gate lifecycle/focus/attach/visibilità/animazioni. Ripartenza focus automatica entro500ms, callback eliminato su detach. Menu lettura numeri esplicita questa semantica. Query/raggruppamento/drilldown10s/gesto/percorsi esistenti invariati. Numeri/delta storici richiedono fonte backend duratura, non simulati.
-PR172/CI425 e beta161 superati; firma/upload/distribuzione tester distinti verificati, release140(1000161), evidenze in STATE. Accettazione telefono pendente. Nessun intake browser/reset/schema/rete/soglia/filtro modificato. Requisiti consolidati nel gruppo1Motore, nessuna chiusura dell'area. Prossimo gruppo frontend: percorso contestuale risoluzione/ritorno job, coordinato con ingresso dati backend; frontend7/backend5 aperti.
+Frontend7/backend5 aperti. Unico prossimo gruppo raccomandato: progettare e implementare la nuova composizione Catalogo+Bundle preservando dati, ricerca, Back/posizione e gesture Annuncio→Gioco.
 
 
 ## Feedback19:37 — scaffali verticali, scheda leggera e stanze Ludo
