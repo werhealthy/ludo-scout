@@ -1,5 +1,21 @@
 # Ludo Scout — Current state
 
+## Feedback19:37 — scaffali verticali, scheda leggera e stanze Ludo
+
+Utente apprezza142 ma corregge scroll: scaffali successivi verticali, numero dipendente dalla collezione e capacità viewport, nessun rail orizzontale. Con font grande ridurre scatole per ripiano; tutti i giochi ricercati nello stesso ordine. Root principalmente posseduti; Venduti come archivio secondario accessibile nel menu, non tab pari alla collezione. Storico venduti/rating/prezzi/memoria conservati.
+
+Scheda141 non accettata nello screenshot MilleFiori: voto/acquisto sono box troppo pesanti. Cinque cuori personali sempre visibili e selezionabili direttamente; interpretazione proposta: stato non valutato con cinque vuoti e invito discreto, senza grande “Da valutare”/bottone duplicato. Voto per copia/LibraryDatabase distinto dal cuore Preferiti BGG in toolbar. Conservare0 e null distinti, legacy7=3.5su5 e mezzi cuori finché non modificato; evitare tap che azzeri ambiguamente. Pattern proposto: tap sul cuoreN impostaNsu5 tramite write guard; “Rimuovi voto” e voto0 restano nel menu. Non convertire/ripulire rating memorizzati.
+
+Acquisto/saving in riepilogo minimale del linguaggio Catalogo, senza box narrativo grande; prezzo reale principale, risparmio/calcolo/provenienza/dettagli bundle progressivi. Colore locale discreto, non nuova classificazione rarità. BGG barra fissa sul fondo con safe insets; contenuto scrollabile sopra, gesto intenzionale dal fondo verso scheda gioco come Annuncio. Audit: installPullToGame dipende da preparedGameTransitions e identità canonical long; Libreria conserva bggId e non garantisce record canonical. Riutilizzare preparazione/gesture solo con identità reale disponibile, fallback BGG reale e stato indisponibile; nessun gioco inventato/scrittura per rendere la destinazione esistente.
+
+Archivio Sold: prezzo vendita e differenza monetaria fra vendita registrata e costo d'acquisto registrato. Etichetta chiara, null non trattato comezero e nessun margine netto completo inventato quando mancano costi. Negativo resta visibile. Nessuna nuova tabella/schema o decisione pricing. Attuale PurchaseMath e salePriceCents restano fonte.
+
+Idea Ludo+Libreria esplicitamente esplorativa, NON decisione di rimuovere tab/navigation: stanze/scenari orizzontali, Esplorazione con Ludo esploratore/ricerca nuovi giochi e Casa con Ludo/camino/scaffali. Coerenza semantica: orizzontale per cambiare stanza, verticale per vedere gli scaffali dentro Casa. Ipotesi di Libreria come stanza Ludo da presentare come composizione concreta prima di cambiare navigazione e generare/sostituire asset. Ricerca e funzione attuale Preferiti/Gusti/Cacce/memoria da preservare. Non fingere tracking/arrivi/prezzi obiettivo già implementati.
+
+Audit read-only di source corrente: libraryShelves due rail142, libraryPersonalRatingCard box141, openLibraryDetail provider nel contenuto e nessun pull; installPullToGame pronto esistente legato a canonical/preload. Screenshot osservato dalla conversazione; nessuna accettazione della scheda141, solo apprezzamento ripiani con cambi richiesti. Questo checkpoint non cambia codice/APK. Motore resta standby. Feedback consolidato nei gruppi2/4/5/7, frontend7/backend5.
+Unico prossimo gruppo: rifinitura Libreria/scheda secondo questo feedback, definendo la composizione delle stanze come proposta separata prima di modificare la navigazione.
+
+
 ## Frontend — Libreria a due ripiani142
 
 Feedback18:44 chiede riuso scheda prodotto approvata adattata al contesto personale e Libreria skeuomorfica con scatole su due ripiani; “Vai”18:53 autorizza implementazione. PR178 sostituisce righe root con due rail orizzontali: primo ceil(N/2), secondo restante, tutti i giochi filtrati nello stesso ordine senza duplicati. Titoli/voto0–5 (e venduto/prezzo se noto) visibili, tile accessibile/focusabile apre openLibraryDetail141. Ricerca/sezioni Owned/Sold/empty/wizard/azioni e scheda141 già basata sui componenti prodotto conservati: voto personale, acquisto/risparmio/edizione/vendita e conferme. Nessuna nuova unificazione tabelle o identità canonical inventata.
