@@ -1,5 +1,20 @@
 # Ludo Scout — Current state
 
+## Frontend151 — offerte mensili e collezione a coppie, distribuita
+
+Feedback23:52: composizione Ludo148 accettata provvisoriamente; richiesti padding più curati, dato utile al posto di BGG>6 e due giochi grandi su scaffali profondi. Distribuita **5.12.151-ludo-offers-shelves (1000174)**, localCode200. Integrato e preservato backend150; Motore non modificato dal frontend.
+
+Esplorazione conserva i giochi distinti raccolti nel mese e mostra quanti hanno un’Offertona ancora attiva. Candidati mensili in sola lettura con gli stessi gate delle card fidate, prezzo rivalutato dal DealEvaluator esistente (GREAT_BUY), identità BGG deduplicate. Una sola istruzione SQLite mantiene coerenti i due numeri mentre il Motore aggiorna il database; LEFT JOIN conserva lo zero reale se non ci sono offerte. Mese Europe/Rome, dati mancanti/caricamento/errore distinti da zero. Nessuna nuova soglia, filtro, schema, richiesta di rete o dipendenza.
+
+Collezione: massimo due scatole grandi per ripiano verticale, una se viewport/font non consentono due leggibili. Media224dp, proporzioni reali, piano trapezoidale profondo, pareti laterali, bordo/ombra e nomi sotto il piano. Preferiti, rating, acquisti, vendite, ricerca, ordinamento e archivio preservati. Padding stanza/selettore/ricerca e CTA adattivi; metriche impilate con font grande. Nessun asset nuovo.
+
+PR199 HEAD1326837e7c0a16238896909a7cd4e3e9005cd807; merge8ce1a3967922c475f889e1009b95ac0dd5dfd30c. Riallineamento beta backend150 senza conflitti nel MainActivity tramite merge a tre vie; identità release avanzata da150 a151. CI finale37071427103/job111051526801 success con suite regressioni, fixture SQLite mensile/fiducia/snapshot, JVM DealEvaluator/capacità, unit Android/pricing, compile Java e APK. Primo test locale rosso sulla metrica ridondante, poi verde; run37070265158 rosso sulla vecchia aspettativa3scatole, aggiornato a2 mantenendo partizione/ordine/all-games. Review indipendente: race fra le due letture individuata e corretta; nuova review045bfa8 senza problemi residui. Java/Android locali indisponibili; non confondere adapter JVM con un dispositivo Android reale.
+
+Android beta174/run37071877920/job111052968765 success. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-02T22:24:14.0722914Z; upload Firebase151/1000174 confermato22:24:56.8509210Z, distribuzione ai tester/gruppi confermata separatamente22:24:57.8198063Z.
+
+Telefono ancora da verificare: conteggio Offertone rispetto alle card reali, padding e font200%, coppie/scaffali profondi con molte copertine/forme diverse, swipe/scroll/ritorno e azioni collezione. Nessuna accettazione pixel/TalkBack o prestazione dichiarata dalla sola CI. Installare senza cancellare dati. Frontend7/backend5 aperti; il feedback generale148 non chiude le verifiche151. Unico prossimo passo: verificare visivamente151 sul telefono; poi riprendere Catalogo unificato + Bundle/Esplora già approvati.
+
+
 ## Backend150 — code reali e stati Motore coerenti, distribuita
 
 Utente «Risolvi»23:46Europe/Rome autorizza la correzione del report149. Distribuita **5.12.150-engine-state-truth (1000173)**, localCode199. Frontend148 e browser149 preservati.
