@@ -1,5 +1,12 @@
 # Ludo Scout — Current state
 
+## Frontend — rifinitura azioni e sfumature 5.12.131
+
+PR152 frontend/rarity-action-polish: like Home accanto a overflow; area48dp e superficie interna con7dp di spazio come azioni circolari comuni. Overflow scheda annuncio usa helper comune. Titolo Vinted finale rimosso dalla presentazione, dati conservati; riquadro spostato dal riepilogo alla barra lingua/voto/giocatori/durata sotto le foto. Gradient verticale8.6% da dealAccent esistente dietro scatole offerte Home/podio, dettaglio e artwork condiviso; nessuna classificazione aggiunta a giochi senza annuncio. File condiviso MainActivity.java solo UI, versione e scaletta aggiornate. Nessun cambio dati/schema/filtri/backend/rete.
+
+Verifiche PR in corso; nessuna compilazione o resa telefono dichiarata. Distribuzione131 ancora pendente. Prova telefono prevista: like/overflow allineati, barra con box e riepilogo libero, nessun titolo Vinted finale, sfumatura coerente col tag su colori diversi. Frontend7/backend5 aperti. Unico prossimo passo: completare CI e distribuzione verificata della131, quindi accettazione visiva.
+
+
 ## Frontend — proporzioni scheda annuncio e Home 5.12.130, 2026-10-02
 
 Feedback14:22Europe/Rome implementato in PR149 frontend/product-home-proportions. Barra lingua/voto/giocatori/durata ora sotto miniature Vinted e prima del riepilogo. Riquadro titolo gioco/offerta/prezzo conservato; titolo Vinted distinto ripristinato sotto sulla pagina senza ulteriore box, duplicato identico omesso. Titolo gioco max2righe. Altezza artwork annuncio calcolata dal viewport reale sopra azioni provider meno il contenuto misurato, con minimo180dp se serve scroll: testo a capo/foto/stati riducono lo spazio disponibile. Aggiornamento post-layout soltanto quando cambia l'altezza; gesto126 e loghi/riempimenti/capsule127 conservati.
