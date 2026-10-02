@@ -1,5 +1,20 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Audit diagnostiche135 e feedback17:12 — browser scollegato, reset e stato Motore
+
+Fonte: due report completi/estratto ricevuti2026-10-02 17:12Europe/Rome, app5.12.135-browser-navigation; audit sorgente beta a2222530f997a5d57567deb220d2216e1a742e64. Nessuna nuova implementazione/build o prova dispositivo.
+
+Browser pagina4:156ID unici,96con prezzo (circa61,5%); seller/pubblicazione/lingua0, jsonOrInitial0, dom284. DOM284 conta ricezioni, non284annunci diversi. Non dimostra completezza di pagina né disponibilità di payload catalogo; rejected91 è aggregato e non identifica causa. Il report Motore conserva un altro campione browser pagina3/0: non confrontarli come se fossero la stessa pagina/istante. saveReport salva soltanto report/at nelle preferenze vinted_browser_experiment; items è memoria di Activity, resetPage/onDestroy lo svuotano. Nessun writer intake/osservazioni/job: catalogWrites0 è coerente col codice,156catturati non significano156annunci analizzati.
+
+Motore: engineRunIDLE, latestCaptureNONE, observations totali0 e last24h0; intake locale ultimo batch circa6h30prima, scanOptInOFF. Coda:1PENDING VintedDEEP,0PROCESSING,0BGG, heartbeat recente, attesaPACING. Non è una coda completamente vuota e non dimostra che quel job riesca/completi; è lavoro residuo globale separato dallo scroll. Activity snapshotREADY48ms non sostiene un errore di caricamento della UI. renderEngineOverview aggiunge sempre enginePipelineCard anche quando pipelineRun è null: visualizzazione vuota fuorviante dimostrata sul codice.
+
+Reset: engineResetEvidence SQLite registra2026-10-02 12:52:07.666Europe/Rome (1790938327666), jobs1488, observations3269, listings534, deals346, gamesHidden386, snapshots562. mixedOperationCount2368 non è la somma degli annunci/job/osservazioni e non va usato come totale. freshStartLegacyBacklog elimina TUTTI i processing_jobs e observations anteriori al cutoff, archivia annunci incompleti e scrive questo riepilogo; EngineStartupMaintenance.run lo richiama automaticamente se flag preference v5121FreshStartApplied assente/false. L'esecuzione registrata e rimozione delle osservazioni sono evidenza reale; perché il flag abbia permesso quella specifica esecuzione, ripetizioni e attribuzione a una release restano indimostrati. Non attribuire al reset il completamento dei482missingLink.
+
+Priorità proposta da autorizzare: disattivare la chiamata automatica applyFreshStart nel solo startup; conservare metodo/registro, dati attuali e manutenzioni non correlate. Nessun ripristino massivo, riattivazione di job archiviati o migrazione schema. Prima verifica regressione startup senza rimozioni, poi CI/build/distribuzione già autorizzata e diagnostiche prima/dopo riapertura. È modifica del comportamento persistente e richiede decisione esplicita secondo AGENTS. Successivamente definire intake perID browser con provenienza e aggiornamenti conservativi, senza attivare resolver/deep/bundle automatici per compensare campi assenti; data/seller/lingua non inventati. Non collegare semplicemente VintedCard legacy: fingerprint può fondere annunci distinti.
+
+Feedback UI rifiuta browser135: usare gerarchia del Catalogo Ludo, icone, padding e controlli distinti; ordinamento selezionato/chip sintetiche e filtri secondari nascosti invece di sei pulsanti equivalenti; frecce esclusivamente nella paginazione. Browser è Activity nativa: WebView non impedisce estetica coerente. Stato Motore senza ricerca: scheda “Non c’è ancora niente qui” e CTA “Cerca su Vinted”; se esistono job globali, mantenerne indicazione/ingresso distinti e non dichiarare “nessun job”. Errore lettura/caricamento/pausa distinti da vuoto verificato. Requisiti UI consolidati nella scalettafrontend, nessuna nuova organizzazione tab/schema approvata. Backend5/frontend7 aperti.
+
+
 ## Scopo
 Questo è il backlog persistente del workstream `backend`. L'obiettivo è aumentare affidabilità e throughput senza perdere correttezza: meno crash/ANR e lock, meno lavoro remoto inutile, più annunci utili trasformati in giochi corretti, meno review manuale e metriche leggibili.
 
