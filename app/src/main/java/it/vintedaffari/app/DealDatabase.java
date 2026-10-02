@@ -503,6 +503,15 @@ public final class DealDatabase extends SQLiteOpenHelper {
         start=clampEngineStart(start);if(end<start)return 0;int mask=0;try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.active(),new String[]{String.valueOf(start),String.valueOf(end)})){while(c.moveToNext())mask|=1<<c.getInt(0);}return mask;
     }
 
+    /** Busy identities in this scroll, distinct from the current phase stock. */
+    public synchronized int[] enginePipelineActiveCounts(long start,long end){
+        int[] counts=new int[5];start=clampEngineStart(start);if(end<start)return counts;
+        try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.activeCounts(),new String[]{String.valueOf(start),String.valueOf(end)})){
+            while(c.moveToNext()){int phase=c.getInt(0);if(phase>=0&&phase<5)counts[phase]=c.getInt(1);}
+        }
+        return counts;
+    }
+
     public synchronized List<EngineRunItem> engineRunItems(long startAt,long endAt,String filter,int limit){
         List<EngineRunItem> out=new ArrayList<>();startAt=clampEngineStart(startAt);if(endAt<startAt)return out;String mode=filter==null?"all":filter;
         String sql="SELECT l.id,COALESCE(l.game_id,0),COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),"+

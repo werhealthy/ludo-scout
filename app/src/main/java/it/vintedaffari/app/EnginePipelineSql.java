@@ -25,4 +25,5 @@ final class EnginePipelineSql {
     static String query(){return "SELECT phase,COUNT(*) FROM ("+grouped()+") GROUP BY phase";}
     static String items(){return "SELECT identity,signature,game_id,phase,busy,title FROM ("+grouped()+") WHERE (CAST(? AS INTEGER)<0 AND phase<4) OR phase=CAST(? AS INTEGER) ORDER BY title COLLATE NOCASE,identity";}
     static String active(){return "SELECT DISTINCT phase FROM ("+grouped()+") WHERE busy=1";}
+    static String activeCounts(){return "SELECT phase,COUNT(*) FROM ("+grouped()+") WHERE busy=1 GROUP BY phase";}
 }

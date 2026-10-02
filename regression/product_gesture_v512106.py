@@ -11,7 +11,7 @@ def extract(signature):
             depth-=1
             if depth==0:return ui[start:i+1]
     raise ValueError(signature)
-listener=extract("private void installPullToGame(")
+listener=extract("private void installPullToGame(")+"\n"+ (extract("private void installEndPull(") if "private void installEndPull(" in ui else "")
 model=extract("private static final class GamePullGesture") if "private static final class GamePullGesture" in ui else ""
 motion=r"""
 package android.view;
@@ -28,7 +28,7 @@ harness=r"""
 import android.view.MotionEvent;
 public class ProductGestureRegression {
  static class Bundle {}
- static class View {int height=1000;int getHeight(){return height;}
+ static class View {interface OnTouchListener {boolean onTouch(View v,MotionEvent e);}int height=1000;int getHeight(){return height;}
   static class AccessibilityDelegate {
    public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){}
    public boolean performAccessibilityAction(View host,int action,Bundle args){return false;}
@@ -36,20 +36,21 @@ public class ProductGestureRegression {
  }
  interface Touch {boolean on(View v,MotionEvent e);}
  static class ScrollView extends View {
-  int y=500;View child=new View();Touch touch;AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}void setOnKeyListener(TextView.KeyListener l){}
+  int y=500;View child=new View();View.OnTouchListener touch;AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}void setOnKeyListener(TextView.KeyListener l){}
   ScrollView(){height=500;}
   int getScrollY(){return y;}View getChildAt(int i){return child;}
   boolean canScrollVertically(int direction){return direction>0&&y<500;}
-  void setOnTouchListener(Touch t){touch=t;}
+  void setOnTouchListener(View.OnTouchListener t){touch=t;}
   float nativeAnchor;boolean nativeDrag;
   void requestDisallowInterceptTouchEvent(boolean b){}
   boolean onTouchEvent(MotionEvent e){if(e.getActionMasked()==3){nativeDrag=false;return true;}if(e.getActionMasked()==0){nativeAnchor=e.getY();nativeDrag=true;}else if(e.getActionMasked()==2&&nativeDrag){y=Math.max(0,Math.min(500,y+Math.round(nativeAnchor-e.getY())));nativeAnchor=e.getY();}else if(e.getActionMasked()==1){nativeDrag=false;}return true;}
-  void send(int action,float finger){MotionEvent e=new MotionEvent(action,finger,1);if(!touch.on(this,e))onTouchEvent(e);}
+  void send(int action,float finger){MotionEvent e=new MotionEvent(action,finger,1);if(!touch.onTouch(this,e))onTouchEvent(e);}
  }
  static class Animation {Animation alpha(float a){return this;}Animation setDuration(long t){return this;}void start(){}}
  static class KeyEvent {static final int KEYCODE_ENTER=66,KEYCODE_DPAD_CENTER=23,ACTION_UP=1;int getAction(){return ACTION_UP;}}
  static class TextView extends View {interface KeyListener {boolean on(View v,int key,KeyEvent event);}void setOnKeyListener(KeyListener l){}boolean performClick(){return false;}AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}float alpha,progress;void setAlpha(float a){alpha=a;}void setText(String s){}Animation animate(){return new Animation();}}
  static class Dialog {boolean showing=true;boolean isShowing(){return showing;}void dismiss(){showing=false;}}
+ static class RefreshHost {void setEndPullListener(View.OnTouchListener l){}} RefreshHost refreshHost=new RefreshHost();boolean engineHistoryGestureActive;long engineHistoryGestureEpoch;void finishEngineHistoryGesture(){}
  boolean ready=true;int opens;Dialog activeDetailDialog;TextView lastHint; 
  float dp(float v){return v;}int dp(int v){return v;}
  void openGameDetailOverlay(long id){if(id!=42)throw new AssertionError("wrong game");opens++;}
@@ -72,7 +73,7 @@ public class ProductGestureRegression {
  static void finalReleaseRetreatCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.send(1,280);equal(0,n.opens,"retreat at final release");}
  static void closedSourceCannotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);d.showing=false;sc.send(1,200);equal(0,n.opens,"dismissed source");}
  static void unavailablePreloadCannotOpen(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);n.ready=false;sc.send(1,200);equal(0,n.opens,"unavailable preload");}
- static void extraPointerCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.touch.on(sc,new MotionEvent(5,200,2));sc.send(1,200);equal(0,n.opens,"multiple fingers");}
+ static void extraPointerCancels(){ScrollView sc=new ScrollView();Dialog d=new Dialog();ProductGestureRegression n=fixture(sc,d);sc.send(0,300);sc.send(2,200);sc.touch.onTouch(sc,new MotionEvent(5,200,2));sc.send(1,200);equal(0,n.opens,"multiple fingers");}
  public static void main(String[] args){
   int failures=0;Runnable[] tests={ProductGestureRegression::reversingRemainsUnderFinger,ProductGestureRegression::cancelNeverOpens,ProductGestureRegression::arrivingAtBottomDoesNotCountEarlierScroll,ProductGestureRegression::insufficientPullDoesNotOpen,ProductGestureRegression::fullIntentionalPullOpensOnce,ProductGestureRegression::retreatCancels,ProductGestureRegression::closedSourceCannotOpen,ProductGestureRegression::unavailablePreloadCannotOpen,ProductGestureRegression::extraPointerCancels,ProductGestureRegression::finalReleaseRetreatCancels,ProductGestureRegression::shortOldPullDoesNotOpen,ProductGestureRegression::ongoingScrollCannotBecomePull};
   for(Runnable test:tests)try{test.run();System.out.println("PASS product gesture");}catch(AssertionError e){failures++;System.out.println("FAIL "+e.getMessage());}
