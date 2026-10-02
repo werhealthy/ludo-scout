@@ -494,10 +494,10 @@ public final class DealDatabase extends SQLiteOpenHelper {
         return counts;
     }
 
-    public static final class PipelineItem {public String identity,signature,title;public long gameId;public int phase;}
+    public static final class PipelineItem {public String identity,signature,title;public long gameId;public int phase;public boolean busy,queued;}
     public synchronized List<PipelineItem> enginePipelineItems(long start,long end,int phase){
         List<PipelineItem> out=new ArrayList<>();start=clampEngineStart(start);if(end<start)return out;
-        try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.items(),new String[]{String.valueOf(start),String.valueOf(end),String.valueOf(phase),String.valueOf(phase)})){while(c.moveToNext()){PipelineItem item=new PipelineItem();item.identity=c.getString(0);item.signature=c.getString(1);item.gameId=c.getLong(2);item.phase=c.getInt(3);item.title=c.getString(5);out.add(item);}}return out;
+        try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.items(),new String[]{String.valueOf(start),String.valueOf(end),String.valueOf(phase),String.valueOf(phase)})){while(c.moveToNext()){PipelineItem item=new PipelineItem();item.identity=c.getString(0);item.signature=c.getString(1);item.gameId=c.getLong(2);item.phase=c.getInt(3);item.title=c.getString(5);item.busy=c.getInt(4)>0;item.queued=c.getInt(6)>0;out.add(item);}}return out;
     }
     public synchronized int enginePipelineActiveMask(long start,long end){
         start=clampEngineStart(start);if(end<start)return 0;int mask=0;try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.active(),new String[]{String.valueOf(start),String.valueOf(end)})){while(c.moveToNext())mask|=1<<c.getInt(0);}return mask;
@@ -508,6 +508,26 @@ public final class DealDatabase extends SQLiteOpenHelper {
         int[] counts=new int[5];start=clampEngineStart(start);if(end<start)return counts;
         try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.activeCounts(),new String[]{String.valueOf(start),String.valueOf(end)})){
             while(c.moveToNext()){int phase=c.getInt(0);if(phase>=0&&phase<5)counts[phase]=c.getInt(1);}
+        }
+        return counts;
+    }
+
+    /** Executable waiting identities; phase stock alone does not prove queued work. */
+    public synchronized int[] enginePipelineQueuedCounts(long start,long end){
+        int[] counts=new int[5];start=clampEngineStart(start);if(end<start)return counts;
+        try(Cursor c=getReadableDatabase().rawQuery(EnginePipelineSql.queuedCounts(),new String[]{String.valueOf(start),String.valueOf(end)})){
+            while(c.moveToNext()){int phase=c.getInt(0);if(phase>=0&&phase<4)counts[phase]=c.getInt(1);}
+        }
+        return counts;
+    }
+
+    /** Local radar batches run outside processing_jobs; remove only their queued identities. */
+    public synchronized int[] enginePipelineWaitingCounts(long start,long end,MarketStore.RuntimeStatus local,long now){
+        int[] counts=enginePipelineQueuedCounts(start,end);
+        if(counts[0]>0&&local!=null){
+            List<String> queuedScope=new ArrayList<>();
+            for(PipelineItem item:enginePipelineItems(start,end,0))if(item.queued&&!item.busy)queuedScope.add(item.signature);
+            counts[0]=Math.max(0,counts[0]-EngineLocalActivity.activeCount(local.updatedAt,now,local.value,local.detail,queuedScope));
         }
         return counts;
     }

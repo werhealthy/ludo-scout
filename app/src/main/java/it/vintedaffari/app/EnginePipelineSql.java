@@ -28,7 +28,7 @@ final class EnginePipelineSql {
         return "WITH candidates AS ("+candidates+") SELECT c.identity,c.signature,c.title,c.game_id,(SELECT MAX(b.busy) FROM candidates b WHERE b.identity=c.identity) AS busy,c.phase,(SELECT MAX(q.queued) FROM candidates q WHERE q.identity=c.identity) AS queued FROM candidates c WHERE NOT EXISTS(SELECT 1 FROM candidates better WHERE better.identity=c.identity AND (better.phase>c.phase OR (better.phase=c.phase AND (better.signature<c.signature OR (better.signature=c.signature AND better.game_id<c.game_id)))))";
     }
     static String query(){return "SELECT phase,COUNT(*) FROM ("+grouped()+") GROUP BY phase";}
-    static String items(){return "SELECT identity,signature,game_id,phase,busy,title FROM ("+grouped()+") WHERE (CAST(? AS INTEGER)<0 AND phase<4) OR phase=CAST(? AS INTEGER) ORDER BY title COLLATE NOCASE,identity";}
+    static String items(){return "SELECT identity,signature,game_id,phase,busy,title,queued FROM ("+grouped()+") WHERE (CAST(? AS INTEGER)<0 AND phase<4) OR phase=CAST(? AS INTEGER) ORDER BY title COLLATE NOCASE,identity";}
     static String active(){return "SELECT DISTINCT phase FROM ("+grouped()+") WHERE busy=1";}
     static String activeCounts(){return "SELECT phase,COUNT(*) FROM ("+grouped()+") WHERE busy=1 GROUP BY phase";}
     static String queuedCounts(){return "SELECT phase,COUNT(*) FROM ("+grouped()+") WHERE phase<4 AND queued=1 AND busy=0 GROUP BY phase";}

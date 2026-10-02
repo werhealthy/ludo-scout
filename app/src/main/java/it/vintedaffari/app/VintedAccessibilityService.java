@@ -1617,6 +1617,15 @@ public final class VintedAccessibilityService extends AccessibilityService {
         DealDatabase.ObservationSession latestCapture=db.latestObservationSession();
         String latestCaptureSummary=latestCapture==null?"state=NONE":"start="+latestCapture.startAt+";end="+latestCapture.endAt+";observations="+latestCapture.observations+";uniqueSignatures="+latestCapture.uniqueListings+";qualifiedListings="+latestCapture.validListings+";bgg="+latestCapture.bggMatchedListings+";vinted="+latestCapture.vintedLinkedListings+";ready="+latestCapture.completeListings+";held="+latestCapture.heldListings;
         String captureFunnel=latestCapture==null?"state=NONE":db.observationFunnel(latestCapture.startAt,latestCapture.endAt);
+        DealDatabase.ObservationSession phaseScope=engineRun!=null?engineRun:latestCapture;
+        String pipelineSummary="state=NONE";
+        if(phaseScope!=null){
+            int[] stock=db.enginePipelineCounts(phaseScope.startAt,phaseScope.endAt);
+            MarketStore.RuntimeStatus local=marketDiag.diagnosticState("local_analysis");
+            int[] queued=db.enginePipelineWaitingCounts(phaseScope.startAt,phaseScope.endAt,local,engineDiagNow);
+            int[] jobActive=db.enginePipelineActiveCounts(phaseScope.startAt,phaseScope.endAt);
+            pipelineSummary="build=engine-phase-truth-v1;scope=displayed-scroll;start="+phaseScope.startAt+";end="+phaseScope.endAt+";unit=distinct-identities;order=recognition,bgg,link,verification,ready;stock="+java.util.Arrays.toString(stock)+";queued="+java.util.Arrays.toString(queued)+";jobActive="+java.util.Arrays.toString(jobActive)+";ready="+stock[4]+";coreCompleteListings="+phaseScope.completeListings+";localAnalysisStateAgeMs="+(local.updatedAt<=0?-1L:Math.max(0L,engineDiagNow-local.updatedAt))+";contentSettled="+EngineOverviewPresentation.contentSettled(DealDatabase.engineContentSettled(phaseScope),queued);
+        }
         db.close();
         int cachedSellerCatalogs=bundles.sellerCacheCount();int cachedSnapshots=bundles.snapshotCacheCount();int uniqueSellers=bundles.uniqueSellerCount();Map<String,Integer> bundleStates=bundles.statusCounts();long snapshotAnalyzed=bundles.counter("snapshotAnalyzed"),deepExecuted=bundles.counter("deepScanExecuted"),deepAvoided=bundles.counter("deepScanAvoided"),bundleCandidates=bundles.counter("bundleCandidates"),bundleReadyEvents=bundles.counter("bundleReady"),bundleErrors=bundles.counter("errors"),rateLimited=bundles.counter("rateLimited"),cacheHitSnapshot=bundles.counter("cacheHitSnapshot"),cacheHitCatalog=bundles.counter("cacheHitCatalog"),emptySnapshotProbes=bundles.counter("emptySnapshotProbes"),thinSnapshotProbes=bundles.counter("thinSnapshotProbes"),candidateVerifyRequests=bundles.counter("candidateVerifyRequests"),candidateVerifyRejected=bundles.counter("candidateVerifyRejected"),sellerDataProbes=bundles.counter("sellerDataProbes"),sellerDataEmpty=bundles.counter("sellerDataEmpty"),sellerDataCandidates=bundles.counter("sellerDataCandidates"),accessibilitySellerHints=bundles.counter("accessibilitySellerHints");int bundleReadyCurrent=bundleStates.containsKey("BUNDLE_READY")?bundleStates.get("BUNDLE_READY"):0;bundles.close();
 
@@ -1743,6 +1752,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "engineRun={"+engineRunSummary+"}\n"+
                 "engineLatestCapture={"+latestCaptureSummary+"}\n"+
                 "engineCaptureFunnel={"+captureFunnel+"}\n"+
+                "enginePipeline={"+pipelineSummary+"}\n"+
                 "engineCoreRemaining={"+engineCoreRemainingSummary+"}\n"+
                 "engineLocalOnly={"+engineLocalOnlySummary+"}\n"+
                 "engineResetEvidence={"+engineResetEvidence+"}\n"+

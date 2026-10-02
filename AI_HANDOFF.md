@@ -1,5 +1,14 @@
 # Ludo Scout — AI handoff
 
+## 5.12.150 — Motore phase and queue truth
+
+- Classifier-blocked canonical listings and latest terminal raw observations no longer appear as executable recognition work. Genuine pending local analysis remains visible.
+- Phase stock, active work and actual local/durable pending queue are separate read-only metrics. Missing price comparison remains in verification without inventing a queued job; optional deep metadata is excluded, explicit manual recovery preserved.
+- Center completion also checks scoped executable queue, retaining the three-minute observation grouping/ownership behavior. Zero phase stock is current occupancy, not cumulative throughput.
+- Diagnostics expose enginePipeline stock/queued/jobActive, distinct ready identities and core-complete listing count on the same displayed scroll. No schema/data reset/filter/pricing threshold/network change.
+- Tests: SQLite terminal/raw/latest/tied exclusions and local/durable/retry/processing/deep semantics; production Java presentation policy. Full CI, review and phone acceptance tracked in STATE.
+
+
 ## 5.12.92 — Home render and loading correction (2026-10-01)
 - User feedback: default dismissal is announcement-specific; long press opens compact native menu to exclude game, with Undo. Uses v2 preference namespace so legacy broad dismissals do not incorrectly hide games; positive interest remains per game.
 - Hero rebuilds occur after Android layout traversal, fixing hierarchy mutation during onLayout; preserves the beta 2.5D featured-box artwork. Price and Material CTA share footer, square/tall metadata sits beside artwork. Device visual confirmation still required.
