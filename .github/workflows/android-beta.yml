@@ -34,6 +34,9 @@ jobs:
         run: python3 regression/engine_performance_metrics_v51279.py
 
 
+      - name: Run passive Vinted browser capture behavior
+        run: node --test regression/vinted_browser_capture.test.js
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:

@@ -17,7 +17,7 @@
  function normalize(x,source){
   if(!x||typeof x!=='object')return null;
   let u=url(x.url||x.href||''),n=id(x.id)||(u&&id((u.pathname.match(/^\/items\/(\d+)/)||[])[1]));
-  const title=text(x.title||x.name);if(!n||!title)return null;
+  const title=text(x.title||x.name);if(!n||!title||((x.url||x.href)&&!u))return null;
   if(u&&/^\/items\//.test(u.pathname)&&id((u.pathname.match(/^\/items\/(\d+)/)||[])[1])!==n)return null;
   const seller=id(x.user_id)||id(x.seller_id)||id(x.user&&x.user.id)||id(x.seller&&x.seller.id);
   const published=text(x.published_at)||text(x.datePublished);let publication=published?{raw:published,source:source+':'+(x.published_at?'published_at':'datePublished')}:null;
@@ -26,7 +26,7 @@
   const image=photo(x.photo&&x.photo.url||x.image||x.image_url);if(image&&!images.includes(image))images.unshift(image);
   return {id:n,url:'https://www.vinted.it/items/'+n,title,priceCents:cents(x.price||x.offers&&x.offers.price),currency,protectedPriceCents:cents(x.total_item_price),sellerId:seller,sellerName:text(x.user&&x.user.login||x.seller&&x.seller.login,100),expectedSellerMatch:initial.expectedSeller? seller===String(initial.expectedSeller):null,photos:images,brand:text(x.brand_title||x.brand&&x.brand.title,120),condition:text(x.status||x.condition,120),description:text(x.description,2000),language:text(x.language,80),publication,source};
  }
- function keep(item){if(!item)return;const old=records.get(item.id);if(!old&&records.size>=MAX_IDS){stats.dropped++;return;}if(old){for(const k of Object.keys(item))if(item[k]==null||Array.isArray(item[k])&&!item[k].length)item[k]=old[k];}records.set(item.id,item);schedule();}
+ function keep(item){if(!item)return;const old=records.get(item.id);if(!old&&records.size>=MAX_IDS){stats.dropped++;return;}if(old&&item.source==='dom'&&old.source!=='dom'){for(const k of Object.keys(old))if(old[k]!=null&&(!Array.isArray(old[k])||old[k].length))item[k]=old[k];}if(old){for(const k of Object.keys(item))if(item[k]==null||Array.isArray(item[k])&&!item[k].length)item[k]=old[k];}records.set(item.id,item);schedule();}
  function readShape(data,source){let count=0,budget=2000;const visit=(x,depth)=>{if(!x||typeof x!=='object'||depth>7||--budget<0)return;if(Array.isArray(x)){for(const v of x.slice(0,600))visit(v,depth+1);return;}const normalized=normalize(x,source);if(normalized){keep(normalized);count++;return;}for(const key of ['items','item','data','catalog','props','pageProps','initialState','catalogItems','product','offers'])if(x[key])visit(x[key],depth+1);};visit(data,0);if(!count)stats.unknownShapes++;}
  function schedule(){if(scheduled||!enabled&&!oneShot)return;scheduled=true;setTimeout(flush,15);}
  function flush(){scheduled=false;if(!enabled&&!oneShot||!pageAllowed())return;const batch=[];for(const item of records.values()){const key=JSON.stringify(item);if(sent.get(item.id)===key)continue;batch.push(item);}const deliver=items=>{const message=JSON.stringify({schema:1,items,stats:{...stats}});if(new TextEncoder().encode(message).length>MAX_MESSAGE){stats.oversized++;return;}try{window.LudoCapture.postMessage(message);for(const x of items)sent.set(x.id,JSON.stringify(x));}catch(_){stats.readErrors++;}};

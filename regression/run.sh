@@ -19,3 +19,6 @@ python3 "$root_dir/regression/pipeline_integrity_v51242.py"
 
 "${java_dir}javac" -d "$output_dir" "$root_dir/regression/BundleRegression.java" "$root_dir"/app/src/main/java/it/vintedaffari/app/{BundlePlanner,BundleSuggestion,DealRecord,DealPolicy,PhotoIdentity,SearchRanking,RelativeTime}.java
 "${java_dir}java" -cp "$output_dir" BundleRegression
+
+
+node --test "$root_dir/regression/vinted_browser_capture.test.js"

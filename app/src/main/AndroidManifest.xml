@@ -36,6 +36,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".VintedBrowserActivity" android:process=":ui" android:exported="false" />
+
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.photos" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/photo_paths" /></provider>
 
         <receiver
