@@ -1,5 +1,20 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Backend — reset automatico disattivato139, verificato e distribuito
+
+Approvazione esplicita utente «Vai» del2026-10-02 17:22Europe/Rome. PR169 rimuove soltanto applyFreshStart dall'entry point EngineStartupMaintenance.run: l'obsoleto reset5.12.1 non è più invocato automaticamente in presenza di flag assente/false/obsoleto. Helper legacy, metodo MarketStore, registro SQLite e dati attuali conservati; altre manutenzioni e ordine invariati. Nessun ripristino dello storico cancellato, riattivazione massiva di job, schema, filtro, rete o intake browser. MainActivity/DealDatabase/MarketStore non modificati dal backend. Browser rimane sperimentale, catalogWrites0; questa release non rende analizzabili i campioni catturati.
+
+Regressione JVM compila ed esegue la classe reale con confini Android/MarketStore simulati, flag assente/false/true, due riavvii e flag reso obsoleto: reset mai raggiunto, preferenze/evidenza/tasks conservati, manutenzione epoch ancora invocata. Non è prova SQLite sul telefono; le altre cutover sono considerate già eseguite nella fixture. RED CI416/run37026843304/job110904038317 su56cc7e6: flag assente raggiunge reset2volte. La review trova errore newline nel guard statico aggiornato; corretto in22376, py_compile locale dei due script superato. Review indipendente finale senza rilievi aperti, incluse integrazione frontend e versione.
+
+GREEN CI421/run37027525664/job110905838973 su22376 e CI422/run37028028418/job110907531195 su726beed33c73deb8afb291c1a3be784835a69ffa: regressioni complete, browser40/40, unitAndroid, compileJava e reviewAPK superati. Allineato a beta92ef10daf99410154a4eb36fac2ede74c7b8764d/frontend138 prima del merge;6file di diff backend, frontend conservato. PR169 merge8211fbb346701fc3dc2c8ff7e789d455e415ced9.
+
+Beta160/run37028615619/job110909505919 success: regressioni/unitAndroid/build e certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificati. Firebase upload2026-10-02T15:44:53.9553619Z e distribuzione distinta ai tester15:44:54.9537748Z. Release5.12.139-startup-reset-disabled(1000160), localCode188. Nessuna prova telefono o accettazione visiva dichiarata.
+
+Prova telefono: installare139 senza cancellare dati; senza nuove ricerche/reset, inviare diagnostica al primo avvio e dopo chiusura/riapertura. Confrontare engineResetEvidence.recordedAt1790938327666 e riepilogo originario (1488job/3269osservazioni/534listing/346deal/386gamesHidden/562snapshot). Code possono progredire normalmente: non richiedere contatori identici per tutti i job. Nessun nuovo reset nel registro è una prova limitata, non un journal completo delle operazioni. Storico già perso e causa specifica della staleness del flag restano aperti.
+
+Unico prossimo passo backend: ricevere i due report139 e verificare conservazione del registro dopo riapertura; poi definire intake perID browser→Motore con provenienza, senza job Vinted automatici per dati assenti. Browser UI è ancora da riallineare al Catalogo; stato vuoto Motore/UI138 appartiene al frontend e non sostituisce l'intake. Backend5/frontend7 aperti, nessun gruppo chiuso.
+
+
 ## Audit diagnostiche135 e feedback17:12 — browser scollegato, reset e stato Motore
 
 Fonte: due report completi/estratto ricevuti2026-10-02 17:12Europe/Rome, app5.12.135-browser-navigation; audit sorgente beta a2222530f997a5d57567deb220d2216e1a742e64. Nessuna nuova implementazione/build o prova dispositivo.
