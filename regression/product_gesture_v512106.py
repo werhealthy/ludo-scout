@@ -43,7 +43,8 @@ public class ProductGestureRegression {
   void send(int action,float finger){touch.on(this,new MotionEvent(action,finger,1));}
  }
  static class Animation {Animation alpha(float a){return this;}Animation setDuration(long t){return this;}void start(){}}
- static class TextView extends View {AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}float alpha,progress;void setAlpha(float a){alpha=a;}void setText(String s){}Animation animate(){return new Animation();}}
+ static class KeyEvent {static final int KEYCODE_ENTER=66,KEYCODE_DPAD_CENTER=23,ACTION_UP=1;int getAction(){return ACTION_UP;}}
+ static class TextView extends View {interface KeyListener {boolean on(View v,int key,KeyEvent event);}void setOnKeyListener(KeyListener l){}boolean performClick(){return false;}AccessibilityDelegate delegate;void setFocusable(boolean b){}void setAccessibilityDelegate(AccessibilityDelegate d){delegate=d;}float alpha,progress;void setAlpha(float a){alpha=a;}void setText(String s){}Animation animate(){return new Animation();}}
  static class Dialog {boolean showing=true;boolean isShowing(){return showing;}void dismiss(){showing=false;}}
  boolean ready=true;int opens;Dialog activeDetailDialog; 
  float dp(float v){return v;}int dp(int v){return v;}
