@@ -24,6 +24,7 @@ public class LibraryWriteUiRegression {
  LibraryDb libraryDb=new LibraryDb();Queue uiDataIo=new Queue();
  boolean isFinishing(){return false;}boolean isDestroyed(){return false;}
  void runOnUiThread(Runnable r){r.run();}void scheduleRender(int n){renders++;}
+ boolean isLibraryVisible(){return "library".equals(tab)||"companion".equals(tab);}
  void openLibraryDetail(LibraryGame game,int y){if(y!=230)throw new AssertionError("return position lost");opened++;}
  static void check(boolean ok,String msg){if(!ok)throw new AssertionError(msg);}
  static void duplicateClickWritesOnce(){LibraryWriteUiRegression n=new LibraryWriteUiRegression();Dialog sheet=new Dialog(),parent=new Dialog();View button=new View();int[] writes={0};n.saveLibraryChange(new LibraryGame(),()->writes[0]++,sheet,parent,button);n.saveLibraryChange(new LibraryGame(),()->writes[0]++,sheet,parent,button);n.uiDataIo.flush();check(writes[0]==1,"duplicate click performed "+writes[0]+" writes");}
