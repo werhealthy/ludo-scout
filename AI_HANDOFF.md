@@ -1,5 +1,14 @@
 # Ludo Scout — AI handoff
 
+## Frontend150 — offerte utili e scaffali a coppie
+
+Feedback23:52: Ludo148 accettato provvisoriamente nella composizione generale; restano padding e dimensioni/profondità collezione. Rimossa la metrica ridondante BGG>6. Esplorazione mostra giochi distinti raccolti nel mese e giochi con un’Offertona ancora attiva nello stesso insieme mensile, deduplicati per BGG. Query in sola lettura con le condizioni di fiducia delle card; prezzo rivalutato tramite DealEvaluator esistente (GREAT_BUY), senza nuova soglia, schema o rete. Dati mancanti non diventano offerte e caricamento/errore restano distinti da zero.
+
+Collezione: massimo due scatole grandi per ripiano (una su viewport insufficiente/font grande), scaffali verticali, piano trapezoidale profondo, pareti laterali, bordo e ombra. Copertine/ratio, azioni personali e archivio conservati. Padding stanza/selettore e ricerca/CTA adattivi; metriche impilate con font grande. Nessuna nuova illustrazione o dipendenza. MainActivity è il file condiviso necessario al rendering; nessun lavoro sul Motore.
+
+Verifica locale: fixture SQLite reale panoramica/candidati Offertone e sintassi Python passate. Java/Android non disponibili in scratch: affidati alla CI PR, ancora da confermare; test JVM aggiunto per DealEvaluator e capacità ripiani, workflow esistenti aggiornati. Accettazione pixel/TalkBack/font200% e performance telefono pendente. Frontend7/backend5 aperti, nessun gruppo chiuso automaticamente. Prossimo passo unico: verificare e distribuire150, poi controllare panoramica/padding/scaffali sul telefono.
+
+
 ## 5.12.92 — Home render and loading correction (2026-10-01)
 - User feedback: default dismissal is announcement-specific; long press opens compact native menu to exclude game, with Undo. Uses v2 preference namespace so legacy broad dismissals do not incorrectly hide games; positive interest remains per game.
 - Hero rebuilds occur after Android layout traversal, fixing hierarchy mutation during onLayout; preserves the beta 2.5D featured-box artwork. Price and Material CTA share footer, square/tall metadata sits beside artwork. Device visual confirmation still required.
