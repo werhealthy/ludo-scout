@@ -21,6 +21,7 @@ public final class RadarReliabilityRegression {
         check(freshRestart.get("localAnalysisLastBatchAt")==120&&freshRestart.get("localAnalysisLastBatchSize")==1,"restart lost analysis timestamp/size pair");
         check(freshRestart.get("scanAt")==110&&freshRestart.get("lastCardsParsed")==4,"restart lost scan timestamp/card count pair");
         freshRestart.recordEvent(130,64);freshRestart.recordEvent(125,2048);
+        check(freshRestart.get("vintedEvents")==2,"quiet event tail not counted in owner memory");
         freshRestart.recordScan(140,0);freshRestart.recordAnalysis(150,5);freshRestart.persist(freshFile);
         RadarIntakeCounters liveReload=new RadarIntakeCounters();liveReload.initialize(freshFile,freshness,400);
         check(liveReload.get("eventAt")==130&&liveReload.get("eventType")==64,"older callback overwrote event pair");
@@ -33,7 +34,7 @@ public final class RadarReliabilityRegression {
         Map<String,Long> seed=new HashMap<>();seed.put("cardsParsedTotal",14248L);
         RadarIntakeCounters first=new RadarIntakeCounters();first.add("cardsParsedTotal",3);first.initialize(file,seed,1000);check(first.get("cardsParsedTotal")==14251,"events during initialization lost");first.persist(file);
         seed.put("cardsParsedTotal",14019L);RadarIntakeCounters restart=new RadarIntakeCounters();restart.add("cardsParsedTotal",7);restart.initialize(file,seed,2000);check(restart.get("cardsParsedTotal")==14258,"stale prefs rolled back counters");check(restart.metadata().contains("counterEpoch=1000"),"epoch lost");restart.persist(file);
-        seed.put("cardsParsedTotal",15000L);RadarIntakeCounters higher=new RadarIntakeCounters();higher.initialize(file,seed,3000);check(higher.get("cardsParsedTotal")==15000,"authoritative migration floor ignored");
+        seed.put("cardsParsedTotal",15000L);RadarIntakeCounters higher=new RadarIntakeCounters();higher.initialize(file,seed,3000);check(higher.get("cardsParsedTotal")==14258,"stale higher migration seed replaced owner file");
         higher.add("analysisCommitted",2);check(higher.get("analysesStored")==0&&higher.get("analysisCommitted")==2,"attempts confused with commits");
         Files.writeString(file.toPath(),"cardsParsedTotal=bad\nepoch=bad\n");RadarIntakeCounters corrupt=new RadarIntakeCounters();corrupt.initialize(file,seed,4000);check(corrupt.get("cardsParsedTotal")==15000,"corrupt file rejected valid seed");
         RadarPersistence lane=new RadarPersistence();CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1),finished=new CountDownLatch(1);AtomicInteger order=new AtomicInteger();String caller=Thread.currentThread().getName();
