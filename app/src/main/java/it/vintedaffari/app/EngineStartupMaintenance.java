@@ -17,7 +17,8 @@ final class EngineStartupMaintenance {
     private EngineStartupMaintenance() {}
 
     static void run(Context context, MarketStore market) {
-        applyFreshStart(context, market);
+        // The obsolete 5.12.1 reset deletes queue/history when its preference flag is stale.
+        // Never run it automatically; retain its helper and recorded evidence for diagnosis.
         applyOperationalEpoch(context, market);
         applyReviewTurnaround(context, market);
         applyLegacyQueueRepairs(context, market);
