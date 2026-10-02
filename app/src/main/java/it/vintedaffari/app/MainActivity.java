@@ -2469,7 +2469,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         if(snapshot.pipelineRun!=null)body.addView(enginePipelineCard(snapshot));
         else if(EngineOverviewPresentation.showResearchEmpty(false,snapshot.waitingRuns,snapshot.intakeCount))body.addView(engineResearchEmptyCard());
         else body.addView(text("Annunci in attesa di elaborazione",18,TEXT,Typeface.BOLD));
-        if(snapshot.pipelineRun==null&&snapshot.globalWorkCount>0){LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(-1,-2);gp.topMargin=dp(12);body.addView(engineQueueRow(LudoIcons.GEAR,snapshot.globalWorkCount+(snapshot.globalWorkCount==1?" attività in coda":" attività in coda"),MUTED,()->showEngineGlobalWork(snapshot)),gp);}
+        if(snapshot.pipelineRun==null&&snapshot.globalWorkCount>0){LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(-1,-2);gp.topMargin=dp(12);body.addView(engineQueueRow(LudoIcons.GEAR,snapshot.globalWorkCount+" attività del Motore",MUTED,()->showEngineGlobalWork(snapshot)),gp);}
         if(snapshot.waitingRuns>0||snapshot.intakeCount>0){LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(-1,-2);qp.topMargin=dp(16);body.addView(engineIntakeCard(snapshot),qp);}
         {LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=dp(16);body.addView(engineAttentionCard(snapshot.recoveryCount),ap);}
         installEngineHistoryPull();
@@ -2485,7 +2485,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
         Button search=productPrimaryButton("Cerca su Vinted",LudoIcons.SEARCH,CYAN,()->openVintedBrowserExperiment("https://www.vinted.it/catalog","SEARCH",""));card.addView(search,new LinearLayout.LayoutParams(-1,dp(56)));return card;
     }
     private void showEngineGlobalWork(EngineOverviewSnapshot snapshot){
-        Dialog sheet=bottomSheet("Lavoro in coda");LinearLayout box=sheet.findViewById(SHEET_ID);
+        Dialog sheet=bottomSheet("Lavoro del Motore");LinearLayout box=sheet.findViewById(SHEET_ID);
         TextView scope=text("Attività di tutte le ricerche, separate dallo scroll corrente.",13,MUTED,Typeface.NORMAL);scope.setPadding(0,0,0,dp(12));box.addView(scope);
         for(MarketStore.Job job:snapshot.globalJobs)box.addView(persistentJobCard(job,false));
         if(snapshot.globalWorkCount>snapshot.globalJobs.size())box.addView(text("Mostro le prime "+snapshot.globalJobs.size()+" attività. La coda continua ad aggiornarsi.",13,MUTED,Typeface.NORMAL));
