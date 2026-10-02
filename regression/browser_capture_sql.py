@@ -32,8 +32,10 @@ class BrowserSqlTest(unittest.TestCase):
             self.db.execute("INSERT INTO browser_candidates(item_id,url,title,price_cents,revision,observed_at,state) VALUES(?,?,?,1000,1,10,'QUEUED')",(item,'https://www.vinted.it/items/'+item,'Azul'))
             self.db.execute(self.sql['UPSERT_MEMBERSHIP'],(1,item,1,10,10,1,'{}'))
             self.db.execute(self.sql['UPSERT_MEMBERSHIP'],(1,item,1,10,20,1,'{}'))
+            self.db.execute(self.sql['UPDATE_MEMBERSHIP'],(1,20,1,'{}',1,item))
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM browser_candidates').fetchone()[0],2)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM browser_capture_items').fetchone()[0],2)
+        self.assertEqual(self.db.execute('SELECT MAX(last_observed_at) FROM browser_capture_items').fetchone()[0],20)
 
     def test_stale_completion_cannot_finish_new_revision_or_lease(self):
         self.assertIn('COMPLETE_CURRENT',self.sql,'revision guard missing')

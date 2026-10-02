@@ -10,7 +10,7 @@ import java.util.*;
 
 public final class DealDatabase extends SQLiteOpenHelper {
     private static final String DB_NAME="vinted_affari.db";
-    private static final int DB_VERSION=21;
+    private static final int DB_VERSION=22;
     private static final String COLS="id,signature,first_seen,last_seen,seen_count,vinted_title,brand,item_condition,item_price_cents,protected_price_cents,favorites,analysis_status,bgg_id,game_name,display_name,rating,bgg_rank,voters,quality_score,tier,tier_label,total_cents,benchmark_cents,offer_cents,shipping_cents,discount,language_code,match_reason,lifecycle,confirmed,listing_type,verification_state,verification_reason,vinted_url,resolved_at,shipping_verified_cents,vinted_item_id,image_url,link_confidence,link_reason,published_label,bgg_image_url,bgg_categories,bgg_minplayers,bgg_maxplayers,bgg_weight,bgg_playtime,seller_id,seller_name,listing_photos_csv";
 
     public static final class MissingCounts { public int published, metadata, link, bgg; }
@@ -119,6 +119,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         db.execSQL("CREATE INDEX idx_deals_bgg ON deals(bgg_id)");
         db.execSQL("CREATE INDEX idx_deals_seller ON deals(seller_id)");
         MarketStore.createSchema(db);
+        BrowserCaptureSql.create(db);
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV){
         if(oldV<2){safeAlter(db,"ALTER TABLE observations ADD COLUMN listing_type TEXT");safeAlter(db,"ALTER TABLE observations ADD COLUMN verification_state TEXT");safeAlter(db,"ALTER TABLE observations ADD COLUMN verification_reason TEXT");safeAlter(db,"ALTER TABLE deals ADD COLUMN listing_type TEXT");safeAlter(db,"ALTER TABLE deals ADD COLUMN verification_state TEXT");safeAlter(db,"ALTER TABLE deals ADD COLUMN verification_reason TEXT");}
@@ -141,6 +142,7 @@ public final class DealDatabase extends SQLiteOpenHelper {
         if(oldV<19){MarketStore.upgradeV18ToV19(db);}
         if(oldV<20){MarketStore.upgradeV19ToV20(db);}
         if(oldV<21){MarketStore.upgradeV20ToV21(db);}
+        if(oldV<22){BrowserCaptureSql.create(db);}
     }
     private static void safeAlter(SQLiteDatabase db,String sql){try{db.execSQL(sql);}catch(Exception ignored){}}
 
@@ -638,4 +640,3 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public synchronized int inferMissingLanguages(){int changed=0;SQLiteDatabase db=getWritableDatabase();try(Cursor c=db.rawQuery("SELECT signature,vinted_title FROM deals WHERE language_code IS NULL OR TRIM(language_code)=''",null)){while(c.moveToNext()){String code=inferLanguage(c.getString(1));if(code.isEmpty())continue;ContentValues v=new ContentValues();v.put("language_code",code);changed+=db.update("deals",v,"signature=?",new String[]{c.getString(0)});}}return changed;}
     public static String signature(VintedCard c){return normalize(c.title)+"|"+normalize(c.brand)+"|"+cents(c.itemPrice);}private static String normalize(String v){if(v==null)return"";String n=Normalizer.normalize(v,Normalizer.Form.NFD).replaceAll("\\p{M}+","");return n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim();}private static int cents(double v){return(int)Math.round(v*100.0);}private static Integer ni(Cursor c,int i){return c.isNull(i)?null:c.getInt(i);}private static Double nd(Cursor c,int i){return c.isNull(i)?null:c.getDouble(i);}private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
-

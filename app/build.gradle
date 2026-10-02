@@ -7,11 +7,14 @@ plugins {
 android {
     namespace 'it.vintedaffari.app'
     compileSdk 35
+    useLibrary 'android.test.runner'
+    useLibrary 'android.test.base'
 
     defaultConfig {
         applicationId 'it.vintedaffari.app'
         minSdk 28
         targetSdk 35
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
 
         // Local builds keep the source baseline. CI supplies a monotonic build number
         // via LUDO_VERSION_CODE so every distributed beta can update the previous one.
