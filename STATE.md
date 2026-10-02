@@ -1,5 +1,20 @@
 # Ludo Scout — Current state
 
+## Frontend — scheda Libreria contestualizzata141
+
+“Vai”18:25Europe/Rome approva la proposta18:20: stessa grammatica prodotto, dati personali in evidenza e azioni secondarie progressive. PR176 riusa toolbar48dp con cuore perBGG e menu, artwork productMediaHeight, quick facts BGG/giocatori/durata/complessità, linea e titolo26sp senza limite di righe. Stato collezione/venduto ed edizione reale (o non specificata) espliciti. Il tuo gusto0–5 resta separato dal BGG; acquisto con totale/calcolo originale, qualità/riferimento, data reale e provenienza, bundle e totale bundle preservati. Vendita visibile solo per Sold, prezzo null/zero/date/motivo e azione modifica invariati. Rank/categorie/Ludo secondari nel disclosure.
+
+Modifica acquisto, segna venduto/ripristino e elimina confermato nel menu; callback esistenti, guard Sold, saveLibraryChange asincrono/single-flight e restoreY/insets conservati. Menu chiuso prima di aprire percorso successivo, parent conservato per vendita/ripristino/rimozione; modifica mantiene comportamento precedente di ingresso nel wizard. BGG originale resta esterno quando noto; nessun collegamento interno inventato o unificazione delle tabelle. Query YouTube include “gioco tutorial ITA”, ricerca non video verificato.
+
+Motore resta standby UI per blocchi backend: nessuna modifica pipeline/code/ingresso, annuncio/Home già accettati conservati. Nessuno schema/dato/filtro/soglia/dipendenza/servizio modificato. MainActivity condiviso limitato alla composizione Libreria, menu e stringa tutorial. Diff3file verificata.
+
+Regressione library_write_ui_v512107 estesa con harness compilato sul vero showLibraryProductActions: route Owned/Sold, dati gioco/edizione nel wizard, delete via conferma, restore annullato senza scrittura/conferma via saveLibraryChange; stub di confine, non dispatch Android. Harness async esistente e fixture SQLite/rating/prezzi/migrazioni conservati. CI430/run37034308613/job110928598884 sullo headfec82e58fff7db84557db757ceb19592681708da: success: regressioni complete/browser40/unitAndroid/compile/reviewAPK. Allineato a beta e0a321 prima merge; PR176 merge97dade163520314613711880d57a2faf38583f08. Nessun fallimento sullo head finale.
+Beta162/run37034859458/job110930423492 success con test/build e certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato. Firebase upload2026-10-02T16:38:24.7023471Z e distribuzione distinta tester16:38:25.6800841Z. Release5.12.141-library-product(1000162), localCode190. Nessuna accettazione visiva/lifecycle/touch sul telefono dedotta dai confini simulati.
+
+Prova telefono: Owned/Sold, titoli lunghi/testo grande/artwork e insets; voto personale distinto dal BGG, prezzi mancanti/zero, edizione/acquisto/vendita; menu, annullamento restore/delete e ritorno/posizione dopo voto/vendita. Non serve nuova diagnostica backend per questo intervento. Scheda comune tecnica/ingresso canonical interno restano da valutare, foto MarraCash aperta. Frontend7/backend5 aperti.
+Unico prossimo gruppo frontend raccomandato:3 Catalogo, relazione annunci/giochi e visibilità bundle, iniziando da audit dei dati/percorsi reali e mantenendo la navigazione105 già approvata. Motore resta standby.
+
+
 ## Priorità18:20 — Motore in standby; gruppo2 Schede prodotto attivo
 
 Utente chiede di fermare il lavoro frontend sul Motore per blocchi backend e passare allo step successivo. Standby del workstream UI, non comando di pausa delle code nell'app; requisiti aperti e consegna140 restano conservati. Non riprendere percorso risoluzione/storico/numeri finché il blocco non è superato o l'utente lo riattiva. Unico gruppo frontend attivo raccomandato:2 Schede prodotto e loro relazione. Frontend7/backend5 aperti; nessun gruppo chiuso.
