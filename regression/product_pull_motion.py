@@ -16,14 +16,16 @@ def extract(signature):
             if depth == 0: return source[start:i+1]
     raise ValueError(signature)
 
+assert "box.addView(pullHint" not in source, "resting pull indicator must not reserve scroll content space"
+
 harness = r'''
 public class ProductPullMotion {
  static class View {float translation;int height=160;View parent;boolean attached=true;boolean isAttachedToWindow(){return attached;}Animation animation=new Animation(this);
-  View getParent(){return parent;}void setTranslationY(float y){translation=y;}float getTranslationY(){return translation;}
+  static final int VISIBLE=0,GONE=8;void setVisibility(int v){} View getParent(){return parent;}void setTranslationY(float y){translation=y;}float getTranslationY(){return translation;}
   Animation animate(){return animation;}}
  static class Animation {View view;Animation(View v){view=v;}void cancel(){}Animation translationY(float v){view.translation=v;return this;}Animation setDuration(long t){return this;}Animation setInterpolator(Object i){return this;}void start(){}}
  static class Drawable {}
- static class GamePullProgress extends Drawable {float progress;ValueAnimator returning;void setProgress(float p){progress=p;}void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}}
+ static class GamePullProgress extends Drawable {float progress;ValueAnimator returning;View content;TextView retry;void setProgress(float p){progress=p;}void cancelReturn(){if(returning!=null){ValueAnimator old=returning;returning=null;old.cancel();}}}
  static class TextView extends View {String text="",description;float alpha;Drawable[] drawables={null,new GamePullProgress(),null,null};
   Drawable[] getCompoundDrawables(){return drawables;}String getText(){return text;}void setText(String t){text=t;}boolean isClickable(){return false;}void setAlpha(float a){alpha=a;}void setContentDescription(String s){description=s;}}
  static class ValueAnimator extends android.animation.Animator {
@@ -46,19 +48,19 @@ public class ProductPullMotion {
   eq(.5f,gesture.move(190,true,220),"half pull fills half ring");
   eq(.75f,gesture.move(135,true,220),"three quarters remain continuous");
   eq(0,gesture.move(300,true,220),"retreat clears progress");
-  ProductPullMotion app=new ProductPullMotion();TextView hint=new TextView();View content=new View();hint.parent=content;
-  app.updateGamePullHint(hint,.25f,true);eq(-18,content.translation,"quarter pull lifts content");
-  app.updateGamePullHint(hint,.5f,true);eq(-36,content.translation,"half pull lifts content");
-  app.updateGamePullHint(hint,.75f,true);eq(-54,content.translation,"continuous lift");
+  ProductPullMotion app=new ProductPullMotion();TextView hint=new TextView();View content=new View();hint.parent=new View();((GamePullProgress)hint.drawables[1]).content=content;
+  app.updateGamePullHint(hint,.25f,true);eq(72,hint.translation,"indicator emerges from below");eq(.25f,hint.alpha,"indicator fades with pull");eq(-24,content.translation,"quarter pull lifts content");
+  app.updateGamePullHint(hint,.5f,true);eq(-48,content.translation,"half pull lifts content");
+  app.updateGamePullHint(hint,.75f,true);eq(-72,content.translation,"continuous lift");
   app.updateGamePullHint(hint,0,true);
   GamePullProgress ring=(GamePullProgress)hint.drawables[1];
-  eq(.75f,ring.progress,"cancel must not immediately hide ring");eq(-54,content.translation,"cancel must retain initial position until next frame");
+  eq(.75f,ring.progress,"cancel must not immediately hide ring");eq(-72,content.translation,"cancel must retain initial position until next frame");
   ValueAnimator reverse=ValueAnimator.latest;if(reverse==null)throw new AssertionError("missing reverse animator");
-  reverse.frame(.5f);eq(.375f,ring.progress,"reverse midpoint ring");eq(-27,content.translation,"reverse midpoint content");
+  reverse.frame(.5f);eq(.375f,ring.progress,"reverse midpoint ring");eq(-36,content.translation,"reverse midpoint content");
   if(hint.text.isEmpty())throw new AssertionError("caption vanishes before reverse ends");
   reverse.frame(1);eq(0,ring.progress,"reverse completes ring");eq(0,content.translation,"reverse completes content");
   app.updateGamePullHint(hint,.6f,true);app.updateGamePullHint(hint,0,true);ValueAnimator interrupted=ValueAnimator.latest;interrupted.frame(.25f);
-  app.updateGamePullHint(hint,.4f,true);interrupted.frame(1);eq(.4f,ring.progress,"obsolete return must not erase new gesture");eq(-28.8f,content.translation,"new gesture controls content");
+  app.updateGamePullHint(hint,.4f,true);interrupted.frame(1);eq(.4f,ring.progress,"obsolete return must not erase new gesture");eq(-38.4f,content.translation,"new gesture controls content");
   ValueAnimator.enabled=false;app.updateGamePullHint(hint,0,true);eq(0,ring.progress,"disabled animations clear immediately");eq(0,content.translation,"disabled animations restore content");ValueAnimator.enabled=true;
   app.updateGamePullHint(hint,.8f,true);app.updateGamePullHint(hint,0,true);ValueAnimator detached=ValueAnimator.latest;hint.attached=false;detached.frame(.5f);eq(0,ring.progress,"detached view clears return");eq(0,content.translation,"detached view resets content");if(ring.returning!=null)throw new AssertionError("detached return leaks animator");
   eq(160,content.height,"gesture leaves measured scroll extent unchanged");
