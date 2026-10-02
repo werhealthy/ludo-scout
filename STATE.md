@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Frontend — classifica, colore e identità annuncio136 verificati/distribuiti
+
+Feedback16:32Europe/Rome: riquadri nelle foto della classifica, colore prodotto ancora troppo tenue, annuncio escluso dall’evidenza che ricompare. PR162 rimuove background dall’area rankedBoxArtwork (card e renderer scatola conservati), aumenta productPageBackground da34%/16% a58%/30% mantenendo discountAccent, layout133 e azioni134. FeaturedDismissalSession usa ID Vinted quando noto e fallback firma; arricchimento dell’ID viene memorizzato durante la selezione. Firma legacy DealDatabase.signature dipende da titolo/brand/prezzo: cambio di questi campi non deve riproporre lo stesso ID. Annunci con ID diversi restano distinti, nessuna esclusione permanente per BGG, stessa durata sessione/Annulla/clear. Quattro nuovi test unitari verificano cambio titolo/prezzo, promozione ID, distinzione annunci e undo/clear. Corretto questo caso di identità; la causa specifica osservata sul telefono resta da confermare (può essere altro annuncio dello stesso gioco o riapertura app).
+
+PR162 head a326b29cfe9691531d8ecbf7762e399754267faf, CI410/run37021265809/job110884654969 success su regressioni, browser, test Android, compile e review APK. Diff verificata: file condiviso MainActivity solo quattro interventi UI/interazione; backend135 e checkpoint backend preservati. Merge a8d2bc8012a718166696fa1bee24f5459573cea0 da beta3ef58e9df392fde995f8322a98bc3e73d06c733e.
+Beta157/run37021732481/job110886225630 success con test/build e certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato. Firebase upload2026-10-02T14:46:07.2445761Z e distribuzione distinta tester14:46:08.1884122Z. Release5.12.136-home-artwork-dismissal(1000157). Nessuna accettazione visiva136 dichiarata.
+Prova telefono: classifica senza riquadri nell’artwork, annuncio verde/blu con sfondo più presente; Non mi interessa, cambio pagina/ritorno Home nella stessa sessione e Annulla. Se torna, confrontare ID Vinted per distinguere stessa inserzione da altro venditore. Prossimo gruppo frontend: Motore, scope e percorsi dei job con screenshot/report attuali. Frontend7/backend5 aperti.
+
 ## Backend — browser135, pagine e dati delle card, 2026-10-02
 
 Approvazione in chat16:08Europe/Rome. PR160 conserva frontend134 e modifica soltanto VintedBrowserActivity, captureJS, fixture e versione135. Toolbar nativa Remus/FontAwesome/superfici Ludo, Chiudi/Pausa/Cattura e menuDati, frecce1–10 solo al tocco; chip categoria Giochi da tavolo4881, Catan/Azul e fino a6ricerche salvate. Ordinamenti nuovi/rilevanza/prezzo↑/↓; minimo±1€ in centesimi, pagina1 e prezzo crescente, altri filtri conservati. Nessuna navigazione/scroll/retry autonomi.
