@@ -2972,7 +2972,7 @@ public final class MarketStore {
                 "FROM market_listings l JOIN games g ON g.id=l.game_id LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) LEFT JOIN processing_jobs j ON j.id=(SELECT jj.id FROM processing_jobs jj WHERE jj.listing_id=l.id AND jj.job_type=? ORDER BY jj.updated_at DESC,jj.id DESC LIMIT 1) "+
                 "WHERE l.lifecycle='ACTIVE' AND g.database_visible=1 AND g.rating>=? AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' "+
                 "AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?) "+
-                "AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(l.enrichment_state,'')<>'NEEDS_REVIEW' AND COALESCE(l.match_state,'')<>'BGG_VARIANT_REVIEW' "+
+                "AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(l.enrichment_state,'') NOT IN ('NEEDS_REVIEW','LOCAL_ONLY') AND COALESCE(l.match_state,'')<>'BGG_VARIANT_REVIEW' "+
                 "AND COALESCE(d.verification_state,'') NOT IN ('BGG_VARIANT_REVIEW','MATCH_UNCERTAIN','PRICE_ANOMALY','EXPANSION_CHECK') "+
                 "AND (l.vinted_item_id IS NULL OR l.vinted_item_id='' OR l.vinted_url IS NULL OR l.vinted_url='') ORDER BY l.last_seen ASC LIMIT 8";
         try(Cursor x=db.rawQuery(sql,new String[]{JOB_VINTED,String.valueOf(DealPolicy.MIN_BGG_RATING),String.valueOf(run.startAt),String.valueOf(run.endAt)})){
