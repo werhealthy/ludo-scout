@@ -1,5 +1,16 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Decisione UX 20:00 — Catalogo unificato e Bundle come workflow
+
+Decisione approvata dall'utente: eliminare la separazione primaria `Annunci | Giochi` nel Catalogo. Il Catalogo resta centrato sugli annunci Vinted; la ricerca diventa intelligente e, quando la query corrisponde a un gioco, mostra in primo piano l'entità Gioco e in secondo piano gli annunci correlati. La scheda Gioco resta: è raggiungibile dalla ricerca e dalla scheda Annuncio tramite il gesto già deciso dal fondo, e conserva approfondimenti aggregati/storici come panoramica, mercato, meccaniche/autore, simili, tutorial e regolamenti. Non eliminare l'entità Gioco né duplicarne i contenuti dentro ogni annuncio.
+
+Bundle resta una destinazione primaria distinta perché rappresenta un job centrale di Ludo Scout. La sua UI deve avere due sezioni/tab separate: `Bundle` per i bundle già scoperti/costruiti e `Esplora` per gli annunci/venditori che vale la pena controllare manualmente al fine di generare nuovi bundle, riducendo al minimo il carico cognitivo e il numero di azioni richieste. L'esplorazione deve rispettare il vincolo tecnico attuale: niente scansione automatica massiva dei venditori che aumenti il rischio di blocchi Vinted; Ludo Scout deve prioritizzare dove conviene spendere l'azione manuale.
+
+Questa decisione sostituisce la navigazione Catalogo `Annunci/Giochi` precedentemente consegnata, ma non autorizza ancora modifiche tecniche a schema, acquisizione, filtri o rete. Prima dell'implementazione va definita la composizione concreta di: risultati ricerca con hero Gioco + annunci; accesso alla scheda Gioco; tab `Bundle | Esplora`; stati Esplora → bundle trovato / nessun bundle utile.
+
+Frontend7/backend5 aperti. Unico prossimo gruppo raccomandato: progettare e implementare la nuova composizione Catalogo+Bundle preservando dati, ricerca, Back/posizione e gesture Annuncio→Gioco.
+
+
 ## Feedback19:37 — scaffali verticali, scheda leggera e stanze Ludo
 
 Utente apprezza142 ma corregge scroll: scaffali successivi verticali, numero dipendente dalla collezione e capacità viewport, nessun rail orizzontale. Con font grande ridurre scatole per ripiano; tutti i giochi ricercati nello stesso ordine. Root principalmente posseduti; Venduti come archivio secondario accessibile nel menu, non tab pari alla collezione. Storico venduti/rating/prezzi/memoria conservati.
