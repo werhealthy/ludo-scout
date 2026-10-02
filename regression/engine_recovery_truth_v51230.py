@@ -58,7 +58,7 @@ checks=[
     ("bundle page distinguishes real bundles from seller exploration",
      '"Bundle confermati · "' in ui and
      ('"Da controllare · "' in ui or '"Da esplorare · "' in ui) and
-     'openVintedBrowserExperiment(d.url,"BUNDLE",d.sellerId)' in ui),
+     'openVintedBrowserExperiment(d.vintedUrl,"BUNDLE",d.sellerId)' in ui),
     ("bundle exploration intent is bounded",
      "TTL_MS=10L*60_000L" in explore and
      "bundleExploreHintsThisIntent>=40" in radar),
