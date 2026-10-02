@@ -798,7 +798,7 @@ private void applyDiscoverChrome(){
         placeholder.setVisibility(View.VISIBLE);image.setImageDrawable(iconDrawable(LudoIcons.IMAGE,MUTED,24));final Object request=new Object();image.setTag(request);
         galleryNet.execute(()->{
             synchronized(featuredPedestalLock){if(!featuredPedestalChecked){featuredPedestalChecked=true;try{int id=getResources().getIdentifier("featured_game_pedestal","drawable",getPackageName());if(id!=0){BitmapFactory.Options options=new BitmapFactory.Options();options.inScaled=false;options.inPreferredConfig=Bitmap.Config.ARGB_8888;BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeResource(getResources(),id,bounds);options.inSampleSize=1;while(bounds.outWidth/options.inSampleSize>1200)options.inSampleSize*=2;Bitmap candidate=BitmapFactory.decodeResource(getResources(),id,options);if(candidate!=null&&candidate.hasAlpha()&&Color.alpha(candidate.getPixel(0,0))==0)featuredPedestal=candidate;}}catch(RuntimeException|OutOfMemoryError ignored){featuredPedestal=null;}}}
-            File file=TextUtils.isEmpty(bggId)?null:ArtworkStore.displayFile(this,bggId);Bitmap bitmap=file!=null&&file.exists()?decodeLocalBitmap(file,600,700):null;
+            File file=TextUtils.isEmpty(bggId)?null:ArtworkStore.displayFile(this,bggId);boolean shelf=identity!=null&&identity.startsWith("shelf:");Bitmap bitmap=file!=null&&file.exists()?(shelf?decodeLocalBitmap(file,320,480):decodeLocalBitmap(file,600,700)):null;
             String remote=sourceUrl;if(TextUtils.isEmpty(remote)&&!TextUtils.isEmpty(bggId)){try{GameRecord game=marketStore.gameStatsByBggId(bggId);if(game!=null)remote=TextUtils.isEmpty(game.imageUrl)?game.thumbnailUrl:game.imageUrl;}catch(RuntimeException ignored){}}
             final String url=remote;
             runOnUiThread(()->{if(isDestroyed()||isFinishing()||image.getTag()!=request)return;if(bitmap!=null&&!bitmap.isRecycled()){image.setImageBitmap(bitmap);loaded.run();return;}
@@ -927,7 +927,7 @@ private void applyDiscoverChrome(){
 
     private final class FeaturedBoxView extends View{
         private final Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG),fillPaint=new Paint(Paint.ANTI_ALIAS_FLAG),edgePaint=new Paint(Paint.ANTI_ALIAS_FLAG),shadowPaint=new Paint(Paint.ANTI_ALIAS_FLAG),reflectionPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
-        private final boolean homeScene,preview;
+        private final boolean homeScene,preview;private boolean shelfGrounded;
         private final Matrix coverMatrix=new Matrix(),reflectionMatrix=new Matrix();private final Path frontPath=new Path(),topPath=new Path(),sidePath=new Path(),metalBodyPath=new Path(),reflectionPath=new Path();private final FeaturedBoxGeometry geometry=new FeaturedBoxGeometry();private final RectF flatBounds=new RectF(),ambient=new RectF(),contact=new RectF(),pedestalBounds=new RectF(),metalTopBounds=new RectF();private final float[] source=new float[8],reflectionPoints=new float[8];
         private Bitmap cover,pedestal;private int edgeColor,pedestalAccent;private boolean prepared,failed;private LinearGradient sideLight,topLight,frontLight,metalBodyLight,metalTopLight;private android.graphics.RadialGradient contactLight,ambientLight;
         FeaturedBoxView(){this(false,false);}
@@ -966,6 +966,7 @@ private void applyDiscoverChrome(){
             super.onDraw(canvas);if(cover==null||cover.isRecycled())return;
             if(!prepared){canvas.drawBitmap(cover,null,flatBounds,bitmapPaint);return;}
             int save=canvas.save();try{
+                if(shelfGrounded)canvas.translate(0,getHeight()-dp(4)-geometry.bottom);
                 if(!preview){
                     if(homeScene){
                         int ground=canvas.save();canvas.translate(pedestalBounds.centerX(),pedestalBounds.bottom);canvas.scale(pedestalBounds.width()*.54f,Math.max(1,pedestalBounds.width()*.028f));shadowPaint.setShader(ambientLight);canvas.drawCircle(0,0,1,shadowPaint);canvas.restoreToCount(ground);
@@ -1646,7 +1647,7 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
         List<LibraryGame> shown=new ArrayList<>("sold".equals(libraryScope)?sold:owned);if(!libraryQuery.trim().isEmpty()){String q=libraryQuery.trim().toLowerCase(Locale.ROOT);shown.removeIf(g->g==null||TextUtils.isEmpty(g.name)||!g.name.toLowerCase(Locale.ROOT).contains(q));}
         TextView section=text(("sold".equals(libraryScope)?"Venduti":"Collezione")+" · "+shown.size(),15,MUTED,Typeface.BOLD);section.setPadding(0,dp(12),0,dp(9));body.addView(section);
         if(shown.isEmpty()){LinearLayout e=verticalCard();e.setPadding(dp(16),dp(14),dp(16),dp(14));e.addView(text(libraryQuery.trim().isEmpty()?"Niente qui per ora":"Nessun gioco corrisponde alla ricerca",15,MUTED,Typeface.BOLD));body.addView(e);return;}
-        for(LibraryGame g:shown)body.addView(libraryRow(g));
+        body.addView(libraryShelves(shown));
     }
     private View librarySummaryCard(List<LibraryGame> games){
         int spent=0,rated=0,market=0,marketKnown=0;for(LibraryGame g:games){if(g.personalRating!=null)rated++;if(g.paidCents!=null){Integer total=PurchaseMath.total(g.paidCents,g.shippingCents,g.feeCents);spent+=total==null?g.paidCents:total;}Integer ref=libraryMarketReference(g);if(ref!=null&&ref>0){market+=ref;marketKnown++;}}
@@ -1657,6 +1658,50 @@ private View statCard(String icon,String value,String label){LinearLayout c=vert
     private View librarySearchBar(){LinearLayout box=new LinearLayout(this);box.setGravity(Gravity.CENTER_VERTICAL);box.setPadding(dp(14),0,dp(8),0);box.setBackground(round(SURFACE2,18,1,OUTLINE));TextView icon=appIcon(LudoIcons.SEARCH,14,MUTED);box.addView(icon,new LinearLayout.LayoutParams(dp(32),dp(32)));EditText q=new EditText(this);q.setSingleLine(true);q.setHint("Cerca nella tua collezione");q.setHintTextColor(MUTED);q.setTextColor(TEXT);q.setTextSize(15);q.setText(libraryQuery);q.setBackgroundColor(Color.TRANSPARENT);q.setPadding(dp(6),0,dp(4),0);q.setOnEditorActionListener((v,a,e)->{libraryQuery=v.getText().toString();render();return true;});box.addView(q,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,14,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(TextUtils.isEmpty(libraryQuery)?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{libraryQuery="";render();});box.addView(clear,new LinearLayout.LayoutParams(dp(36),dp(36)));return box;}
     private View libraryScopeTabs(int owned,int sold){LinearLayout tabs=new LinearLayout(this);tabs.setPadding(dp(4),dp(4),dp(4),dp(4));tabs.setBackground(round(SURFACE2,16,1,OUTLINE));addLibraryScopeTab(tabs,"Collezione · "+owned,"owned");addLibraryScopeTab(tabs,"Venduti · "+sold,"sold");return tabs;}
     private void addLibraryScopeTab(LinearLayout tabs,String label,String value){boolean on=value.equals(libraryScope);TextView t=text(label,13,on?TEXT:MUTED,Typeface.BOLD);t.setGravity(Gravity.CENTER);t.setBackground(round(on?LIME:Color.TRANSPARENT,12,0,0));t.setOnClickListener(v->{libraryScope=value;render();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);if(tabs.getChildCount()>0)lp.leftMargin=dp(4);tabs.addView(t,lp);}
+
+    private String libraryShelfPositionKey="";private final int[] libraryShelfPositions={0,0};
+    private View libraryShelves(List<LibraryGame> games){
+        String key=libraryScope+"|"+libraryQuery;if(!key.equals(libraryShelfPositionKey)){libraryShelfPositionKey=key;libraryShelfPositions[0]=libraryShelfPositions[1]=0;}
+        LinearLayout shelves=new LinearLayout(this);shelves.setOrientation(LinearLayout.VERTICAL);
+        int split=(games.size()+1)/2;
+        shelves.addView(libraryShelf(games,0,split,0));
+        LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(-1,-2);second.topMargin=dp(20);shelves.addView(libraryShelf(games,split,games.size(),1),second);
+        return shelves;
+    }
+    private View libraryShelf(List<LibraryGame> games,int start,int end,int shelf){
+        HorizontalScrollView rail=new HorizontalScrollView(this);rail.setHorizontalScrollBarEnabled(true);rail.setFillViewport(true);rail.setClipToPadding(false);
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);row.setPadding(dp(10),0,dp(10),dp(12));row.setMinimumHeight(dp(232));row.setBackground(libraryShelfBackdrop());
+        for(int i=start;i<end;i++){
+            LibraryGame g=games.get(i);LinearLayout tile=new LinearLayout(this);tile.setOrientation(LinearLayout.VERTICAL);tile.setGravity(Gravity.CENTER_HORIZONTAL);
+            int width=getResources().getConfiguration().fontScale>1.3f?156:116;
+            tile.addView(libraryShelfBox(g),new LinearLayout.LayoutParams(-1,dp(164)));
+            TextView name=text(g.name,13,TEXT,Typeface.BOLD);name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setEllipsize(TextUtils.TruncateAt.END);name.setPadding(dp(4),dp(20),dp(4),0);tile.addView(name,new LinearLayout.LayoutParams(-1,-2));
+            TextView vote=text(libraryPersonalRatingLabel(g.personalRating),12,g.personalRating==null?MUTED:PINK,Typeface.NORMAL);vote.setGravity(Gravity.CENTER);vote.setPadding(dp(4),dp(6),dp(4),0);tile.addView(vote,new LinearLayout.LayoutParams(-1,-2));
+            if("sold".equals(g.collectionState)){TextView sale=text(g.salePriceCents==null?"Venduto":"Venduto · "+money(g.salePriceCents),12,ORANGE,Typeface.NORMAL);sale.setGravity(Gravity.CENTER);sale.setPadding(0,dp(4),0,0);tile.addView(sale,new LinearLayout.LayoutParams(-1,-2));}
+            tile.setFocusable(true);tile.setContentDescription(g.name+". Il tuo voto: "+libraryPersonalRatingLabel(g.personalRating)+("sold".equals(g.collectionState)?". Venduto":"")+". Apri il tuo gioco.");
+            for(int child=0;child<tile.getChildCount();child++)tile.getChildAt(child).setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+            tile.setOnClickListener(v->openLibraryDetail(g));LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(dp(width),-2);tp.rightMargin=dp(12);row.addView(tile,tp);
+        }
+        rail.addView(row,new HorizontalScrollView.LayoutParams(-2,-2));
+        final String key=libraryShelfPositionKey;final int savedX=libraryShelfPositions[shelf];final boolean[] restored={false};
+        rail.setOnScrollChangeListener((view,x,y,oldX,oldY)->{if(restored[0]&&key.equals(libraryShelfPositionKey))libraryShelfPositions[shelf]=x;});
+        rail.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->{if(!restored[0]&&r>l){restored[0]=true;rail.scrollTo(savedX,0);}});
+        return rail;
+    }
+    private FrameLayout libraryShelfBox(LibraryGame g){
+        FrameLayout stage=new FrameLayout(this);FeaturedBoxView box=new FeaturedBoxView(true,true);box.shelfGrounded=true;stage.addView(box,new FrameLayout.LayoutParams(-1,-1));
+        TextView missing=text("Copertina non disponibile",11,MUTED,Typeface.NORMAL);missing.setGravity(Gravity.CENTER);stage.addView(missing,new FrameLayout.LayoutParams(-1,-1));
+        ImageView source=new ImageView(this);source.setVisibility(View.INVISIBLE);stage.addView(source,new FrameLayout.LayoutParams(dp(1),dp(1)));
+        setProductArtwork(source,missing,g.bggId,g.imageUrl,"shelf:"+g.bggId,()->{Drawable art=source.getDrawable();if(art instanceof android.graphics.drawable.BitmapDrawable){Bitmap bitmap=((android.graphics.drawable.BitmapDrawable)art).getBitmap();if(bitmap!=null&&!bitmap.isRecycled()){box.setCover(bitmap,null);missing.setVisibility(View.GONE);}}});return stage;
+    }
+    private Drawable libraryShelfBackdrop(){
+        return new Drawable(){
+            final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);LinearGradient wood;
+            @Override protected void onBoundsChange(Rect bounds){wood=new LinearGradient(0,dp(164),0,dp(178),new int[]{Color.rgb(102,72,83),Color.rgb(58,39,54),Color.rgb(36,26,42)},null,Shader.TileMode.CLAMP);}
+            public void draw(Canvas canvas){Rect b=getBounds();paint.setShader(null);paint.setColor(Color.argb(65,37,27,52));canvas.drawRect(b.left,b.top,b.right,dp(164),paint);paint.setShader(wood);canvas.drawRect(b.left,dp(164),b.right,dp(178),paint);paint.setShader(null);paint.setColor(Color.argb(100,191,150,165));canvas.drawRect(b.left,dp(164),b.right,dp(165),paint);paint.setColor(Color.argb(70,0,0,0));canvas.drawRect(b.left,dp(178),b.right,dp(183),paint);}
+            public void setAlpha(int alpha){}public void setColorFilter(ColorFilter filter){}public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+        };
+    }
 
 private View libraryRow(LibraryGame g){
         LinearLayout row=new LinearLayout(this);row.setPadding(dp(12),dp(14),dp(12),dp(14));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(round(SURFACE,18,1,OUTLINE));row.addView(libraryCover(g),new LinearLayout.LayoutParams(dp(94),dp(112)));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(14),0,0,0);TextView title=text(g.name,18,TEXT,Typeface.BOLD);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);copy.addView(title);
