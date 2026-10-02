@@ -1,5 +1,10 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback17:18 — chiusura Hero e Motore senza ricerca
+
+Utente accetta137 salvo coppia azioni del gioco in evidenza: usare ellissi FontAwesome orizzontale centrata, stessa superficie/bordo/colore base del cuore, distanza4dp tra target (36/18dp e area48dp conservati); stato salvato resta distinguibile. Piedistallo Home sempre viola originale; colore sconto solo annuncio, layout e stile del prodotto accettati.
+Avvio Motore secondo feedback17:12 già consolidato: snapshot pronto senza scope/intake/scroll in attesa mostra card semplice “Non c’è ancora niente qui” e CTA SEARCH esistente “Cerca su Vinted”; loading/errore non diventano vuoto. Senza scope ma con raw intake mostra stato in attesa e ingressi esistenti, non una ruota di zeri. Coda globale viene letta nello snapshot su executor da jobSummary e recentJobs24 esistenti: conteggio attività separato da annunci/scroll, sheet con card job esistenti, limite esplicito; richieste manuali/cronologia/refresh conservati. Nessuna scrittura intake dal browser, reset/schema/rete/soglie/filtri invariati. Implementazione138 in verifica, stato vuoto/pulsanti da verificare sul telefono. Prossimo gruppo Motore: risoluzione e lettura dello stato acquisito, browser restyling nel backlog esistente. Frontend7/backend5 aperti.
+
 ## Feedback17:12 — browser135 rifiutato e Motore senza ricerca
 
 Utente rifiuta estetica/densità browser135: testi appiccicati, padding insufficiente, gerarchia assente, azioni tutte simili. Usare il Catalogo Ludo come riferimento concreto di design: icone/superfici/tipografia esistenti, ricerca primaria, chip sintetiche, filtri secondari nascosti e ordinamento con stato selezionato; navigazione pagina precedente/successiva riconoscibile e separata dalle azioni cattura/menu/chiusura. Non è impossibilitàWebView: toolbar è nativaAndroid. Preservare filtri/URL/cattura/paginazione al tocco, senza navigazioni autonome. Accettazione135 negativa; nessuna accettazione visiva dalleCI precedenti.
