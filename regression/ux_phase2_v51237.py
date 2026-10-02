@@ -32,7 +32,8 @@ checks=[
      "body.addView(libraryShelves(shown))" in library and
      "body.addView(librarySummaryCard(owned))" not in library and
      "librarySearchBar()" in library and
-     "libraryScopeTabs(owned.size(),sold.size())" in library),
+     "showLibraryArchiveMenu(sold.size())" in library and
+     "libraryScopeTabs(" not in library),
     ("Ludo has explicit Per me Cacce Profilo spaces",
      'addCompanionTab(tabs,"Per me","for_you")' in companion and
      'addCompanionTab(tabs,"Cacce","hunts")' in companion and
@@ -53,43 +54,56 @@ if failed:
     raise SystemExit("5.12.37 UX phase 2 regression failed: "+", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} 5.12.37 UX phase 2 guards")
 
-# Execute the production shelf partition and context restoration policy.
+# Execute production viewport partition, rating fractions and sale differences.
 import subprocess, tempfile
-start=ui.index("private View libraryShelves(");brace=ui.index("{",start);depth=0
-for i in range(brace,len(ui)):
-    if ui[i]=="{":depth+=1
-    elif ui[i]=="}":
-        depth-=1
-        if depth==0:shelves=ui[start:i+1];break
+def method(name):
+    start=ui.index(name);brace=ui.index("{",start);depth=0
+    for i in range(brace,len(ui)):
+        if ui[i]=="{":depth+=1
+        elif ui[i]=="}":
+            depth-=1
+            if depth==0:return ui[start:i+1]
 harness=r"""
 import java.util.*;
 public class LibraryShelfRegression {
- String libraryScope="owned",libraryQuery="",libraryShelfPositionKey="";
- final int[] libraryShelfPositions={0,0};List<Integer> shown=new ArrayList<>();int rails;
+ List<Integer> shown=new ArrayList<>();int rows;
  static class View {}
  static class LibraryGame {int id;LibraryGame(int value){id=value;}}
  static class LinearLayout extends View {
-  static int VERTICAL=1;LinearLayout(Object context){}void setOrientation(int value){}
-  void addView(View v){}void addView(View v,LayoutParams p){}
+  LinearLayout(Object context){}void removeAllViews(){}void addView(View v,LayoutParams p){}
   static class LayoutParams {int topMargin;LayoutParams(int w,int h){}}
  }
  int dp(int value){return value;}
- View libraryShelf(List<LibraryGame> games,int start,int end,int shelf){if(shelf!=rails++)throw new AssertionError("shelf order");for(int i=start;i<end;i++)shown.add(games.get(i).id);return new View();}
- __METHOD__
+ View libraryShelf(List<LibraryGame> games,int start,int end,int capacity){if(end-start>capacity)throw new AssertionError("overflow");rows++;for(int i=start;i<end;i++)shown.add(games.get(i).id);return new View();}
+ __METHODS__
  static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
  public static void main(String[] args){
-  for(int count:new int[]{0,1,2,3,4,9,100,101}){
-   LibraryShelfRegression n=new LibraryShelfRegression();List<LibraryGame> games=new ArrayList<>();for(int i=0;i<count;i++)games.add(new LibraryGame(i));
-   n.libraryShelves(games);check(n.rails==2,"two shelves required");check(n.shown.size()==count,"lost games");for(int i=0;i<count;i++)check(n.shown.get(i)==i,"order/duplicate");
-   n.libraryShelfPositions[0]=80;n.libraryShelfPositions[1]=130;n.rails=0;n.shown.clear();n.libraryShelves(games);check(n.libraryShelfPositions[0]==80&&n.libraryShelfPositions[1]==130,"refresh lost shelf position");
-   n.libraryScope="sold";n.rails=0;n.libraryShelves(games);check(n.libraryShelfPositions[0]==0&&n.libraryShelfPositions[1]==0,"sold reused owned offset");
-   n.libraryShelfPositions[0]=100;n.libraryQuery="Azul";n.rails=0;n.libraryShelves(games);check(n.libraryShelfPositions[0]==0,"search starts outside result");
+  check(libraryShelfCapacity(320,1f)==2,"narrow screen");check(libraryShelfCapacity(372,1f)==3,"wider phone");check(libraryShelfCapacity(372,1.5f)==2,"large text must reduce density");check(libraryShelfCapacity(0,1f)==1,"zero width");
+  for(int width:new int[]{0,240,320,372,600,1000})for(float font:new float[]{1f,1.5f,2f})for(int count:new int[]{0,1,2,3,4,9,100,101}){
+   LibraryShelfRegression n=new LibraryShelfRegression();List<LibraryGame> games=new ArrayList<>();for(int i=0;i<count;i++)games.add(new LibraryGame(i));int capacity=libraryShelfCapacity(width,font);
+   n.fillLibraryShelves(new LinearLayout(n),games,capacity);check(n.rows==(count+capacity-1)/capacity,"shelf count");check(n.shown.size()==count,"lost games");for(int i=0;i<count;i++)check(n.shown.get(i)==i,"order/duplicate");
   }
-  System.out.println("PASS production shelf partition: all games exactly once, two rails, refresh/scope/search positions");
+  for(int n=1;n<=5;n++){check(libraryHeartFill(null,n)==0,"unrated");check(libraryHeartFill(0,n)==0,"zero");check(libraryHeartFill(10,n)==1,"five hearts");}
+  check(libraryHeartFill(7,3)==1&&libraryHeartFill(7,4)==.5f&&libraryHeartFill(7,5)==0,"legacy half heart");
+  check(librarySaleDifference(null,100)==null&&librarySaleDifference(100,null)==null,"unknown is not zero");check(librarySaleDifference(0,100)==-100L,"zero proceeds");check(librarySaleDifference(100,0)==100L,"free acquisition");check(librarySaleDifference(100,100)==0L,"break even");check(librarySaleDifference(Integer.MAX_VALUE,-1)==2147483648L,"difference overflow");
+  System.out.println("PASS production vertical shelves: all games once, viewport/font capacity; null/zero/half hearts; unknown/negative/zero sale differences");
  }
 }
-""".replace("__METHOD__",shelves)
+""".replace("__METHODS__","\n".join(method(name) for name in ["private static int libraryShelfCapacity(","private void fillLibraryShelves(","private static float libraryHeartFill(","private static Long librarySaleDifference("]))
 with tempfile.TemporaryDirectory() as temp:
     path=Path(temp)/"LibraryShelfRegression.java";path.write_text(harness)
     subprocess.run(["javac","-d",temp,str(path)],check=True)
     subprocess.run(["java","-cp",temp,"LibraryShelfRegression"],check=True)
+
+# Provider stays outside the scroll viewport; original purchase details remain available.
+detail=method("private void openLibraryDetail(LibraryGame g,int")
+assert "footer.addView(bgg" in detail and "addProductSection(box,bgg" not in detail
+assert "safe.bottom" in detail and "page.addView(scrollStage" in detail
+assert "Dettagli dell’acquisto" in detail and "bundleTotalCents" in detail
+assert "librarySaleDifference(g.salePriceCents,total)" in detail
+assert "new EndPullScrollView(this)" in detail
+transition=method("private void prepareLibraryGameTransition(")
+assert transition.index("uiDataIo.execute")<transition.index("gameStatsByBggId")<transition.index("runOnUiThread")
+assert "!source.isShowing()" in transition and "canonical==null||snapshot==null" in transition
+assert "installPullToGame(sc,hint,canonical.id,source)" in transition and "new GameRecord" not in transition
+print("PASS Library pinned provider, preserved details, canonical prepared pull and missing-local fallback")
