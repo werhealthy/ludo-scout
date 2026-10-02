@@ -64,11 +64,10 @@ checks = [
      home.index("heroOpportunityCard") < home.index("addDiscoverCategories") <
      home.index("addDiscoverValueRail") < home.index("addDiscoverTopRatedRail") <
      home.index("addDiscoverFreshRail")),
-    ("bottom navigation uses shared Font Awesome icons",
-     all(x in nav for x in [
+    ("bottom navigation uses shared icons for Home Catalogo and integrated Ludo",
+     'LudoIcons.BOOK_OPEN,"Libreria","library"' not in nav and all(x in nav for x in [
          'LudoIcons.HOUSE,"Home","discover"',
          'LudoIcons.SEARCH,"Catalogo","catalog"',
-         'LudoIcons.BOOK_OPEN,"Libreria","library"',
          'LudoIcons.STAR,"Ludo","companion"'
      ])),
     ("Font Awesome semantic map includes core app actions",
