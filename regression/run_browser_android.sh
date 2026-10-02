@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Runs real SQLite/WebView tests in an SDK emulator; no third-party test library.
+export ANDROID_USER_HOME="$RUNNER_TEMP/ludo-browser-android"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 sdkmanager --install 'system-images;android-35;google_apis;x86_64'
-printf 'no\n' | avdmanager create avd -n ludo-browser-tests -k 'system-images;android-35;google_apis;x86_64' --force
+printf 'no\n' | avdmanager create avd -n ludo-browser-tests -k 'system-images;android-35;google_apis;x86_64' -p "$ANDROID_AVD_HOME/ludo-browser-tests.avd" --force
+test -f "$ANDROID_AVD_HOME/ludo-browser-tests.ini"
+emulator -list-avds
 mkdir -p "$RUNNER_TEMP/ludo-browser-emulator"
 emulator -avd ludo-browser-tests -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/ludo-browser-emulator/emulator.log" 2>&1 &
 emulator_pid=$!
