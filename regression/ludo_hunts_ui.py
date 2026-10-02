@@ -32,7 +32,7 @@ public class LudoHuntsUiRegression {
  static class Resources {Config getConfiguration(){return new Config();}Metrics getDisplayMetrics(){return new Metrics();}}
  static class Preferences {Set<String> saved=new TreeSet<>();Set<String> favorites(){return new TreeSet<>(saved);}}
  static class Market {Map<String,GameRecord> games=new HashMap<>();int reads;GameRecord gameStatsByBggId(String id){reads++;return games.get(id);}}
- static class Scroll {int y;void scrollTo(int x,int value){y=value;}}
+ static class Scroll {int y;int getScrollY(){return y;}void scrollTo(int x,int value){y=value;}}
  int ludoHuntsRequest;String tab="companion";static int MUTED=1,TEXT=2,VINTED_BG=3;
  Queue uiDataIo=new Queue();Preferences prefs=new Preferences();Market marketStore=new Market();Scroll scroll=new Scroll();
  LudoRoomState rooms=new LudoRoomState("hunts",110,800,330);
