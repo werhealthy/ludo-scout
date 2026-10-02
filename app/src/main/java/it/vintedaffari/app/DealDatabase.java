@@ -358,6 +358,15 @@ public final class DealDatabase extends SQLiteOpenHelper {
         int[] out=new int[7];try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(startAt),String.valueOf(endAt)})){if(c.moveToFirst())for(int i=0;i<7;i++)out[i]=c.isNull(i)?0:c.getInt(i);}return out;
     }
 
+    public synchronized String observationFunnel(long startAt,long endAt){
+        Map<String,Integer> buckets=new java.util.TreeMap<>();int unique=0;
+        try(Cursor c=getReadableDatabase().rawQuery(ObservationFunnelSql.rows(),new String[]{String.valueOf(clampEngineStart(startAt)),String.valueOf(endAt)})){
+            while(c.moveToNext()){String reason=c.getString(1);buckets.put(reason,buckets.getOrDefault(reason,0)+1);unique++;}
+        }
+        StringBuilder out=new StringBuilder("build=capture-funnel-v1;unit=observed-signature;view=current-state;excludesPreObservationNonGames=true;start="+startAt+";end="+endAt+";unique="+unique);
+        for(Map.Entry<String,Integer> e:buckets.entrySet())out.append(';').append(e.getKey()).append('=').append(e.getValue());return out.toString();
+    }
+
     private void fillEngineCounts(ObservationSession s){
         if(s==null)return;int[] n=engineRangeCounts(s.startAt,s.endAt);s.validListings=n[0];s.bggMatchedListings=n[1];s.vintedLinkedListings=n[2];s.completeListings=n[3];s.reviewListings=n[4];s.heldListings=n[5];s.coreRemainingListings=n[6];
         // Raw observation rows are historical telemetry and older builds could leave duplicate

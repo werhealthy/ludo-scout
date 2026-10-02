@@ -1,0 +1,34 @@
+package it.vintedaffari.app;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public final class RadarReliabilityRegression {
+    static void check(boolean ok,String msg){if(!ok)throw new AssertionError(msg);}
+    public static void main(String[] args)throws Exception{
+        File dir=Files.createTempDirectory("radar-test").toFile(),file=new File(dir,"intake.properties");
+        Map<String,Long> seed=new HashMap<>();seed.put("cardsParsedTotal",14248L);
+        RadarIntakeCounters first=new RadarIntakeCounters();first.add("cardsParsedTotal",3);first.initialize(file,seed,1000);check(first.get("cardsParsedTotal")==14251,"events during initialization lost");first.persist(file);
+        seed.put("cardsParsedTotal",14019L);RadarIntakeCounters restart=new RadarIntakeCounters();restart.add("cardsParsedTotal",7);restart.initialize(file,seed,2000);check(restart.get("cardsParsedTotal")==14258,"stale prefs rolled back counters");check(restart.metadata().contains("counterEpoch=1000"),"epoch lost");restart.persist(file);
+        seed.put("cardsParsedTotal",15000L);RadarIntakeCounters higher=new RadarIntakeCounters();higher.initialize(file,seed,3000);check(higher.get("cardsParsedTotal")==15000,"authoritative migration floor ignored");
+        higher.add("analysisCommitted",2);check(higher.get("analysesStored")==0&&higher.get("analysisCommitted")==2,"attempts confused with commits");
+        Files.writeString(file.toPath(),"cardsParsedTotal=bad\nepoch=bad\n");RadarIntakeCounters corrupt=new RadarIntakeCounters();corrupt.initialize(file,seed,4000);check(corrupt.get("cardsParsedTotal")==15000,"corrupt file rejected valid seed");
+        RadarPersistence lane=new RadarPersistence();CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1),finished=new CountDownLatch(1);AtomicInteger order=new AtomicInteger();String caller=Thread.currentThread().getName();
+        check(lane.submit(()->{check(!Thread.currentThread().getName().equals(caller),"persist on caller");entered.countDown();try{release.await();}catch(InterruptedException e){throw new RuntimeException(e);}check(order.incrementAndGet()==1,"ordering");}),"first rejected");
+        check(entered.await(3,TimeUnit.SECONDS),"not started");check(lane.submit(()->check(order.incrementAndGet()==2,"second order")),"second rejected");lane.close(()->{check(order.incrementAndGet()==3,"cleanup raced writes");finished.countDown();});
+        check(!lane.submit(()->{}),"work accepted after destroy");check(order.get()==0,"close blocked/drained on caller");release.countDown();check(finished.await(3,TimeUnit.SECONDS),"drain failed");lane.close(()->{throw new AssertionError("double cleanup");});
+        System.out.println("PASS counters restart/migration/corruption and real worker FIFO/nonblocking/drain lifecycle");
+        RadarIntakeCounters finalCounters=new RadarIntakeCounters();finalCounters.initialize(new File(dir,"final.properties"),new HashMap<>(),5000);
+        RadarPersistence finalLane=new RadarPersistence();CountDownLatch drained=new CountDownLatch(1);
+        finalLane.submit(()->finalCounters.add("analysisCommitted",8));
+        finalLane.close(()->{finalCounters.persist(new File(dir,"final.properties"));drained.countDown();});
+        check(drained.await(3,TimeUnit.SECONDS),"final flush did not finish");
+        RadarIntakeCounters restored=new RadarIntakeCounters();restored.initialize(new File(dir,"final.properties"),new HashMap<>(),6000);
+        check(restored.get("analysisCommitted")==8,"destroy lost accepted work counters");
+    }
+}
