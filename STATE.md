@@ -1,5 +1,16 @@
 # Ludo Scout — Current state
 
+## Priorità18:20 — Motore in standby; gruppo2 Schede prodotto attivo
+
+Utente chiede di fermare il lavoro frontend sul Motore per blocchi backend e passare allo step successivo. Standby del workstream UI, non comando di pausa delle code nell'app; requisiti aperti e consegna140 restano conservati. Non riprendere percorso risoluzione/storico/numeri finché il blocco non è superato o l'utente lo riattiva. Unico gruppo frontend attivo raccomandato:2 Schede prodotto e loro relazione. Frontend7/backend5 aperti; nessun gruppo chiuso.
+
+Audit read-only su beta dopo140 di MainActivity: openDetail conserva la pagina annuncio accettata, foto verticali52dp, barra quick facts/linea, prezzo e CTA provider; dettaglio canonical renderDatabaseDetailInto ha toolbar cuore/info/menu, artwork, titolo/fatti e tab Panoramica/Mercato/Scopri con annunci effettivi. openLibraryDetail è distinto: artwork, chip Ludo/qualità acquisto/bundle/venduto prima del titolo, voto personale, vendita, box BGG, acquisto e molti comandi consecutivi; BGG apre il sito esterno, non la scheda interna. Ritorni esistenti diversi: dialog annuncio con parent conservabile, dettaglio gioco con origine/scroll, Libreria con restoreY dopo mutazioni. Non equivalenti tecnicamente, non unificare architettura o query per estetica.
+
+Proposta concreta da validare per la prossima implementazione: usare nella Libreria il linguaggio visivo prodotto già approvato, mantenendo i dati personali centrali; toolbar “Il tuo gioco”, artwork/titolo/fatti coerenti, voto personale distinto da rating BGG, blocco personale con edizione/acquisto e vendita quando presente. Lasciare accessibili modifica acquisto, segna venduto/ripristino e rimozione confermata, rendendo le secondarie progressive. Valutare ingresso esplicito “Scheda gioco” interno solo per identità canonical realmente risolta; non fingere relazione per bggId senza record. Annuncio rimane baseline accettata. Non sono approvati nuovo assetto tab, unificazione tecnica, migrazione dati o perdita di azioni. Tutorial ricerca deve includere “gioco”, come requisito già registrato; non promettere video verificato. Foto MarraCash richiede diagnostica specifica, non inventare risoluzione.
+
+Nessun codice/APK/test eseguito in questo audit; verificati sorgenti e collegamenti attuali. Prossimo passo unico: concordare composizione della scheda Libreria contestualizzata, poi implementare gruppo2 con azioni/Back/dati preservati.
+
+
 ## Frontend — correzioni Hero e movimento Motore140
 
 Feedback17:47Europe/Rome: puntini Hero ancora fuori centro, bordo verde del tag non coerente, nascondere richieste manuali vuote; integrare le specifiche di lettura/movimento Motore. PR172 sostituisce glyph ellissi con tre cerchi geometrici simmetrici, target48dp/superficie36dp/simbolo18dp e gap4dp preservati; stessi colori del cuore neutro. Tag Hero bordo viola112/72/145, piedistallo Home viola originale conservato. Non è accettazione visiva sul telefono.
