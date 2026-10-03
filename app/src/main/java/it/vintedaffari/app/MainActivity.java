@@ -1442,7 +1442,7 @@ private void showFilterSheet(){
         LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(dp(14),0,dp(8),0);copy.addView(materialChip("ESPLORA BUNDLE",SURFACE2,CYAN,true),new LinearLayout.LayoutParams(-2,dp(32)));TextView title=text(name(d),17,TEXT,Typeface.BOLD);title.setMaxLines(2);copy.addView(title);String seller=TextUtils.isEmpty(d.sellerName)?"Venditore Vinted":"@"+d.sellerName;copy.addView(text(seller+" · "+signal,12,MUTED,Typeface.BOLD));TextView reason=text(prospectReason,12,MUTED,Typeface.NORMAL);reason.setMaxLines(2);copy.addView(reason);row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));TextView action=text("Vinted  ›",14,CYAN,Typeface.BOLD);action.setGravity(Gravity.CENTER);row.addView(action,new LinearLayout.LayoutParams(dp(78),dp(48)));card.addView(row);card.setOnClickListener(v->openBundleProspect(d));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);card.setLayoutParams(lp);return card;
     }
 
-    private void openBundleProspect(DealRecord d){if(d==null)return;if(!VintedBrowserPolicy.allowedPage(d.vintedUrl))return;BundleExploration.begin(this,d);recordAction("bundle:browser-test:"+d.signature);openVintedBrowserExperiment(d.vintedUrl,"BUNDLE",d.sellerId);}
+    private void openBundleProspect(DealRecord d){if(d==null)return;if(!VintedBrowserPolicy.allowedPage(d.vintedUrl))return;BundleExploration.markExplored(this,d.sellerId);recordAction("bundle:browser-test:"+d.signature);openVintedBrowserExperiment(d.vintedUrl,"BUNDLE",d.sellerId);}
 
 
     private void sortBundleSources(List<DealRecord> sources){

@@ -49,6 +49,12 @@ public final class BundleExploration {
         return context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong(EXPLORED_PREFIX+sellerId,0L)>0L;
     }
 
+    /** UI memory only: opening the embedded browser must not activate legacy capture. */
+    public static void markExplored(Context context,String sellerId){
+        if(context==null||TextUtils.isEmpty(sellerId))return;
+        context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putLong(EXPLORED_PREFIX+sellerId,System.currentTimeMillis()).apply();
+    }
+
     public static long exploredAt(Context context,String sellerId){
         if(context==null||TextUtils.isEmpty(sellerId))return 0L;
         return context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong(EXPLORED_PREFIX+sellerId,0L);

@@ -22,7 +22,7 @@ assert 'openDatabaseGame(g.id,"catalog")' in method('private void addCatalogGame
 assert 'installPullToGame(sc,pullHint,game.id,dialog)' in ui
 assert 'Bundle trovato' in method('private void renderBundles(')
 assert 'Nessun bundle confermato' in method('private void renderBundles(')
-assert 'BundleExploration.begin(this,d)' in method('private void openBundleProspect(')
+assert 'BundleExploration.markExplored(this,d.sellerId)' in method('private void openBundleProspect(')
 for signature in ['private void saveUiState(', 'private void restoreUiState(', 'private void persistTransientUiSession(', 'private void restoreTransientUiSession(']:
  assert 'bundleSection' in method(signature) and 'bundleScroll_' in method(signature)
 # Execute the production identity SELECT with more matches than the preview can hold.
@@ -44,6 +44,10 @@ assert rows==set(eligible)-{'37','38'}
 assert '39' in rows and '0' not in rows
 assert 'LIMIT' not in helper and 'start+=800' in helper
 print('PASS production SQL alias beyond preview, eligibility, canonical match state, chunked binds')
+exploration=(root/'app/src/main/java/it/vintedaffari/app/BundleExploration.java').read_text()
+mark=exploration[exploration.index('public static void markExplored('):exploration.index('public static long exploredAt(')]
+assert 'EXPLORED_PREFIX+sellerId' in mark and 'expires_at' not in mark and 'source_signature' not in mark
+assert 'BundleExploration.begin(this,d)' not in method('private void openBundleProspect(')
 code=r'''
 import java.util.*;
 class ViewTreeObserver {interface OnGlobalLayoutListener {void onGlobalLayout();}ArrayList<OnGlobalLayoutListener> pending=new ArrayList<>();boolean isAlive(){return true;}void addOnGlobalLayoutListener(OnGlobalLayoutListener r){pending.add(r);}void removeOnGlobalLayoutListener(OnGlobalLayoutListener r){pending.remove(r);}void flush(){for(OnGlobalLayoutListener r:new ArrayList<>(pending))r.onGlobalLayout();}}
