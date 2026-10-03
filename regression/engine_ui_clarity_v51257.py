@@ -41,7 +41,7 @@ checks = [
     ("human attention retains a visible direct inbox",
      "engineAttentionCard(snapshot.recoveryCount)" in overview and
      "Richieste manuali · nessuna" in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and
-     'engineSection="review"' in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")]),
+     'enterEngineDetail("review")' in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and 'tab="activity";engineSection=section' in main),
     ("unfinished scrolls use user-facing waiting states",
      "Altri scroll" in components and "Riprenderà" in components and "In attesa" in components),
     ("run inspector filters by outcome instead of provider lane",
