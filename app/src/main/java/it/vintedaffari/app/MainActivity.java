@@ -1169,7 +1169,7 @@ private void renderDatabase(){
 
     private void renderDatabaseDetail(){
         final long gameId=selectedGameId,epoch=++pageDetailEpoch;final LinearLayout host=body;body.setBackground(productPageBackground());
-        TextView back=secondaryTextAction("‹  Torna al Catalogo");back.setOnClickListener(v->closeDatabaseGame());host.addView(back);host.addView(loadingMoreView("Apro il gioco…"));
+        TextView back=secondaryTextAction("‹  Indietro");back.setOnClickListener(v->closeDatabaseGame());host.addView(back);host.addView(loadingMoreView("Apro il gioco…"));
         uiDataIo.execute(()->{GameRecord game=null;GameDetailData data=null;try{game=marketStore.gameStats(gameId);if(game!=null)data=loadGameDetailData(game);}catch(RuntimeException ignored){}final GameRecord ready=game;final GameDetailData snapshot=data;
             runOnUiThread(()->{if(isDestroyed()||epoch!=pageDetailEpoch||!"database".equals(tab)||selectedGameId!=gameId)return;cancelImageRequests(host);host.removeAllViews();if(ready==null||snapshot==null){host.addView(back);TextView retry=secondaryTextAction("Gioco non disponibile. Riprova");retry.setOnClickListener(v->render());host.addView(retry);return;}renderDatabaseDetailInto(host,ready,this::closeDatabaseGame,snapshot);});
         });
