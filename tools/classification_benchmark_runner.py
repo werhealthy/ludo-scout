@@ -123,6 +123,9 @@ def run(sample, load, save, call, month, operation, monthly='1', batch='.10'):
             rows,log=response(result,[r['listing_id'] for r in records])
         except Exception as error:
             entry.update({'status':'FAILED_OR_INVALID','error_kind':type(error).__name__})
+            # Keep only the numeric HTTP status, never URL, headers or body.
+            if isinstance(error, urllib.error.HTTPError) and type(error.code) is int and 100 <= error.code <= 599:
+                entry['http_status'] = error.code
             save(ledger)
             raise
         entry.update(log);entry['status']='VALIDATED';entry['answers']=rows
