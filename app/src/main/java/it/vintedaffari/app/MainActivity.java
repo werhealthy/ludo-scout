@@ -1627,7 +1627,7 @@ private void showFilterSheet(){
         if(snapshot.loadedAt<engineEnteredAt||now-snapshot.loadedAt>30_000)requestEngineOverviewSnapshot();
         LinearLayout card=verticalCard();card.setPadding(dp(16),dp(16),dp(16),dp(16));
         int work=0;if(snapshot.pipelineRun!=null){for(int i=0;i<4;i++)work+=snapshot.phases[i];}else work=snapshot.globalWorkCount;
-        String state=snapshot.pipelineRun!=null?engineCenterStatus(snapshot):work>0?"Ludo sta elaborando gli annunci":"Pronto a esplorare";
+        String state=snapshot.pipelineRun!=null?engineCenterStatus(snapshot):work>0?"Ludo ha attività da completare":"Pronto a esplorare";
         card.addView(text(state,18,TEXT,Typeface.BOLD));
         if(work>0){TextView pending=text(work+" "+(snapshot.pipelineRun==null?"attività del motore":"giochi da completare nello scroll"),13,MUTED,Typeface.NORMAL);pending.setPadding(0,dp(8),0,0);card.addView(pending);}
         TextView today=text("OGGI",12,MUTED,Typeface.BOLD);today.setPadding(0,dp(16),0,dp(8));card.addView(today);
@@ -1658,7 +1658,7 @@ private void showFilterSheet(){
         int work=0;if(snapshot.pipelineRun!=null)for(int i=0;i<4;i++)work+=snapshot.phases[i];else work=snapshot.globalWorkCount;
         TextView count=text(String.valueOf(work),34,TEXT,Typeface.BOLD);count.setGravity(Gravity.CENTER);center.addView(count);
         TextView unit=text(snapshot.pipelineRun==null?"attività del motore":"da completare nello scroll",11,MUTED,Typeface.NORMAL);unit.setGravity(Gravity.CENTER);center.addView(unit);
-        String state=snapshot.pipelineRun==null?(work>0?"Ludo sta elaborando gli annunci":"Pronto a esplorare"):engineCenterStatus(snapshot);TextView status=text(state,12,TEXT,Typeface.NORMAL);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(8),0,0);center.addView(status);
+        String state=snapshot.pipelineRun==null?(work>0?"Ludo ha attività da completare":"Pronto a esplorare"):engineCenterStatus(snapshot);TextView status=text(state,12,TEXT,Typeface.NORMAL);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(8),0,0);center.addView(status);
         center.setMinimumHeight(dp(48));center.setContentDescription(work+" "+unit.getText()+". "+state+". Apri il lavoro corrente.");center.setOnClickListener(v->{if(snapshot.pipelineRun==null)showEngineGlobalWork(snapshot);else openEnginePhase(-1,snapshot);});return center;
     }
     private View ludoOrbitNode(EngineOverviewSnapshot snapshot,int stage){
