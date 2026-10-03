@@ -45,6 +45,12 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   if(!"PAGE_BLOCKED".equals(get(screen,"state"))||(Boolean)get(screen,"loading"))throw new AssertionError("started block remained loading");
   client.onPageFinished(web,"https://www.vinted.it/inbox");
   if(!"PAGE_BLOCKED".equals(get(screen,"state")))throw new AssertionError("finish cleared block");
+  client.onPageFinished(web,"https://www.vinted.it/catalog/4881-board-games");
+  if(!"PAGE_BLOCKED".equals(get(screen,"state"))||(Boolean)get(screen,"accepting"))throw new AssertionError("stale finish resumed capture");
+  ((View)get(screen,"status")).performClick();
+  if(!"LOADING".equals(get(screen,"state"))||!(Boolean)get(screen,"loading")||(Boolean)get(screen,"pageFailed"))throw new AssertionError("explicit retry did not start allowed search");
+  web.stopLoading();client.onPageStarted(web,"https://www.vinted.it/catalog/4881-board-games",null);
+  if(!"LOADING".equals(get(screen,"state")))throw new AssertionError("new allowed navigation retained blocking state");
  }
  
  @Override public void onStart(){Bundle result=new Bundle();Activity a=null;try{
