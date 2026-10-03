@@ -1,5 +1,9 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Frontend — Ludo semplice e ricerca persistente, 2026-10-03
+
+Feedback22:09 e Vai23:00Europe/Rome: Bundle nel Catalogo, ricerca primaria fissa in basso, prima stanza comprensibile e tre stanze navigabili. Implementazione frontend/ludo-primary-search: rimosso Bundle dalla bottom navigation; accesso contestuale Catalogo e dati/filtri/scroll Bundle preservati. Footer nativo fuori dallo scroll con Esplora/Preferiti/Libreria nominati e CTA unica Trova nuovi giochi; viewport riserva l’altezza effettiva del footer, safe inset del shell conservati. Font grandi impilano le destinazioni. Prima stanza: stato reale, annunci osservati/idonei oggi, attività pendenti e interventi; cinque controlli/delta, coda globale e motivi restano in Dettagli del motore. Controlli giornalieri e coda non sommati. Nessuna prova di velocità del backend: non eliminare la diagnostica sulla base della sola CI. Preferiti, Libreria, memoria, pricing, schema, filtri/soglie, dipendenze, rete e sicurezza invariati. Build/verifiche e accettazione telefono da confermare; frontend7/backend5 aperti.
+
 ## Browser162 — pulsante comprimi/espandi esposto, distribuita
 
 Feedback successivo alla161: caricamento Vinted confermato dall'utente; frecce sempre disabilitate e richiesto un pulsante classico esposto per comprimere/espandere l'interfaccia.162 aggiunge nel header SEARCH il pulsante FontAwesome COMPRESS/EXPAND48dp, con descrizione TalkBack aggiornata e stessa azione del menu. Espanso↔compresso mantiene pagina, token e dati; il contatore riceve parametri corretti quando torna al layout espanso, senza ereditare larghezza zero/peso della riga compressa. Header aggiornato: chiudi/Vinted/comprimi-espandi/overflow. Stati e stile159 preservati.
@@ -747,5 +751,6 @@ User requested immediate grouped corrections on2026-10-01 20:43 Europe/Rome: cre
 - Test-only PR315 reproduced missing durable preferences, and PR318 reproduced missing distinct-game cycle APIs. Final executable Java regression verifies save/remove/reload/identity, canonical cycling and extracted real Activity methods for selection during refresh, removed-offer fallback, recreation and overlay/focus/lifecycle gates. Platform adapters are stubbed; this is not an Android device restart/instrumentation test. Existing pure pet lifecycle harness retains its12 cases.
 - Old UX guard corrected to explicitly inspect Home physical renderer instead of a coincidentally nearby default detail constructor; BGG content/price/route guards retained. Independent re-review of finala3127101338faa69226dc79a52158a88789ec063 found no remaining critical/important issues after duplicate-cycle, refresh-race and overlay-motion corrections.
 Phone acceptance: floor/plinth contact and depth at cover aspect ratios, backdrop crop, full pet/box and readable explanation at large fonts/small screens, Favorites save/remove reflected on multiple listings, return/restart retains last game, unavailable offer fallback, pet touch and pause/resume/disabled animation, scrolling/memory. CI does not prove visual acceptance, actual SharedPreferences process durability or frame time.
+
 
 
