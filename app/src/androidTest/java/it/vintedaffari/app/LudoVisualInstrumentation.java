@@ -24,7 +24,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   return null;
  }
  private void capture(Activity a,String name)throws Exception{
-  waitForIdleSync();getUiAutomation().waitForIdle(500,5000);getUiAutomation().syncInputTransactions();Bitmap original=getUiAutomation().takeScreenshot();if(original==null)throw new AssertionError("no screenshot");
+  waitForIdleSync();getUiAutomation().waitForIdle(500,5000);Bitmap original=getUiAutomation().takeScreenshot();if(original==null)throw new AssertionError("no screenshot");
   Bitmap reduced=Bitmap.createScaledBitmap(original,432,Math.round(original.getHeight()*432f/original.getWidth()),true);
   java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);
   String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);
