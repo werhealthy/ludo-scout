@@ -41,6 +41,14 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   Method report=screen.getClass().getDeclaredMethod("reportLocked");report.setAccessible(true);
   String text=(String)report.invoke(screen);
   if(!text.contains("blockedPage=https://www.vinted.it/login")||text.contains("token=secret"))throw new AssertionError("unsafe/incomplete block report");
+  client.onReceivedError(web,request,new android.webkit.WebResourceError(){public int getErrorCode(){return -1;}public CharSequence getDescription(){return "fixture";}});
+  android.webkit.WebResourceResponse failure=new android.webkit.WebResourceResponse("text/html","UTF-8",null);failure.setStatusCodeAndReasonPhrase(403,"Forbidden");
+  client.onReceivedHttpError(web,request,failure);
+  if(!"PAGE_BLOCKED".equals(get(screen,"state")))throw new AssertionError("late error discarded block");
+  String liveUrl=web.getUrl();set(screen,"navigationUrl","https://www.vinted.it/catalog/other");
+  Method receive=screen.getClass().getDeclaredMethod("receive",String.class,String.class,boolean.class,androidx.webkit.JavaScriptReplyProxy.class);receive.setAccessible(true);
+  receive.invoke(screen,"{\"kind\":\"location\",\"url\":"+org.json.JSONObject.quote(liveUrl)+"}","https://www.vinted.it",true,null);
+  if(!"PAGE_BLOCKED".equals(get(screen,"state"))||!(Boolean)get(screen,"pageFailed")||(Boolean)get(screen,"accepting"))throw new AssertionError("location discarded block");
   client.onPageStarted(web,"https://www.vinted.it/inbox",null);
   if(!"PAGE_BLOCKED".equals(get(screen,"state"))||(Boolean)get(screen,"loading"))throw new AssertionError("started block remained loading");
   client.onPageFinished(web,"https://www.vinted.it/inbox");
@@ -51,7 +59,11 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   if(!"LOADING".equals(get(screen,"state"))||!(Boolean)get(screen,"loading")||(Boolean)get(screen,"pageFailed"))throw new AssertionError("explicit retry did not start allowed search");
   client.onPageFinished(web,"https://www.vinted.it/catalog/old");
   if(!"LOADING".equals(get(screen,"state"))||!(Boolean)get(screen,"loading")||(Boolean)get(screen,"accepting"))throw new AssertionError("stale finish resumed capture during retry");
+  client.onPageFinished(web,"https://www.vinted.it/login");
+  if(!"LOADING".equals(get(screen,"state")))throw new AssertionError("stale blocked finish cancelled retry");
   web.stopLoading();client.onPageStarted(web,"https://www.vinted.it/catalog/4881-board-games?page=1&order=relevance&price_to=25",null);
+  client.onPageFinished(web,"https://www.vinted.it/catalog/old");client.onPageFinished(web,"https://www.vinted.it/login");
+  if(!"LOADING".equals(get(screen,"state"))||(Boolean)get(screen,"accepting"))throw new AssertionError("stale finish crossed started retry");
   if(!"LOADING".equals(get(screen,"state")))throw new AssertionError("new allowed navigation retained blocking state");
  }
  
