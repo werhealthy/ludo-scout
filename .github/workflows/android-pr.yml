@@ -332,7 +332,11 @@ jobs:
           sudo apt-get install -y libpulse0
           sudo chmod 666 /dev/kvm
           sdkmanager "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
-          echo no | avdmanager create avd --force -n ludo-browser -k "system-images;android-35;google_apis;x86_64"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/ludo-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd --force -n ludo-browser -p "$ANDROID_AVD_HOME/ludo-browser.avd" -k "system-images;android-35;google_apis;x86_64"
+          ls -la "$ANDROID_AVD_HOME"
+          "$ANDROID_HOME/emulator/emulator" -list-avds
           trap 'cat emulator.log || true' EXIT
           "$ANDROID_HOME/emulator/emulator" -version
           "$ANDROID_HOME/emulator/emulator" -avd ludo-browser -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > emulator.log 2>&1 &
