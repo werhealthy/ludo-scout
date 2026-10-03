@@ -120,6 +120,12 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
    set(screen,"pageDrained",false);invoke(screen,"refreshStatus");if(((View)get(screen,"next")).isEnabled())throw new AssertionError("unsettled capture bypassed");
   }catch(Exception e){throw new RuntimeException(e);}});
   if(defects.length()>0)throw new AssertionError(defects.toString());
+  // A value discarded by the sanitizing projection must never be counted as durable.
+  org.json.JSONObject malformed=new org.json.JSONObject().put("id",9900000163L).put("url","https://www.vinted.it/items/9900000163").put("title","Malformed fixture");
+  packet.put("page",new org.json.JSONObject().put("url",page).put("observed",2).put("withPrice",0)).put("items",new org.json.JSONArray().put(malformed));
+  parse.invoke(screen,packet.toString(),generation,page,token);waitForIdleSync();
+  runOnMainSync(()->{try{if(((View)get(screen,"next")).isEnabled()||((java.util.Set)get(screen,"persistedSnapshotIds")).size()!=1)throw new AssertionError("unpersisted projection counted as saved");set(screen,"dropped",0);set(screen,"pageObserved",1);}catch(Exception e){throw new RuntimeException(e);}});
+
   runOnMainSync(()->{try{set(screen,"pageDrained",true);invoke(screen,"refreshStatus");}catch(Exception e){throw new RuntimeException(e);}});
  }
 
