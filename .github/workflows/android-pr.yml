@@ -296,12 +296,15 @@ jobs:
 
 
       - name: Build platform-only browser visual test APK
+        if: github.head_ref == 'frontend/vinted-browser-redesign'
         run: ./gradlew --no-daemon :app:assembleDebugAndroidTest
       - name: Render actual browser states on Android emulator
+        if: github.head_ref == 'frontend/vinted-browser-redesign'
         timeout-minutes: 10
         run: |
           sudo chmod 666 /dev/kvm
-          sdkmanager "system-images;android-35;google_apis;x86_64"
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
           echo no | avdmanager create avd --force -n ludo-browser -k "system-images;android-35;google_apis;x86_64"
           "$ANDROID_HOME/emulator/emulator" -avd ludo-browser -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > emulator.log 2>&1 &
           adb wait-for-device
@@ -321,3 +324,8 @@ jobs:
           adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.BrowserVisualInstrumentation | tee browser-visual-result.txt
           adb logcat -d -s LudoVisual:I '*:S'
           rg 'Three actual browser states rendered' browser-visual-result.txt
+          adb shell settings put system font_scale 2.0
+          adb logcat -c
+          adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.BrowserVisualInstrumentation | tee browser-large-result.txt
+          adb logcat -d -s LudoVisual:I '*:S'
+          rg 'Three actual browser states rendered' browser-large-result.txt

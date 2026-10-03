@@ -46,6 +46,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Verify Vinted browser redesign states
+        run: python3 regression/vinted_browser_redesign.py
+
       - name: Verify Ludo daily journey and exploration
         run: |
           python3 regression/ludo_exploration.py

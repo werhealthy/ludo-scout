@@ -1,5 +1,11 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Browser Vinted158 — direzione approvata 2026-10-03, verifica in corso
+
+Il riferimento principale sono le tre immagini fornite nella chat: Esplora espanso con Ordine globale Rilevanti/Nuovi, Sorprendimi, Cacce con cuore, soglia massima attivabile/stepper, chip Giochi da tavolo, contatore reale e pagine centrate; Esplora compresso con sole frecce/contatore/pagina; Match manuale con badge e card «Ludo in pausa — Stai cercando manualmente su Vinted», senza CTA Leggi/Torna. Header chiudi/Vinted/overflow; nessuna uscita dall'app nel menu. Superati Nuova esplorazione, Ricerca e filtri, pannello filtri ridondante e pausa/fotocamera esposti in Esplora. Cacce usa i preferiti BGG esistenti; scegliere un titolo conserva ordine/soglia. Categoria fissa non rimovibile, senza chip di rimozione fittizio.
+
+Branch frontend/vinted-browser-redesign da beta03ea4e48, PR214. Tre stati espliciti, token/Remus/icone e capsule esistenti. Conservati persistenza, contatore per pagina e doppio gate nativo/JS prima di Next; manuale con cattura OFF può navigare. Chrome scrollabile e misurato sullo spazio disponibile, riserva spazio al browser anche con font grandi. Nessuna nuova libreria/schema/servizio. Build e regressioni complete verificati sul primo codice; screenshot Activity reale/emulatore con WebView locale in verifica, non sito live. Accettazione telefono ancora pendente. Frontend7/backend5 aperti; questo feedback consolida il gruppo browser/Wizard esistente.
+
 ## Frontend157 — nuovo universo Ludo e Motore adattabile, distribuita
 
 Richiesta11:49Europe/Rome: usare il pack allegato, rimuovere tutte le precedenti mascotte/illustrazioni e preparare l'app scaricabile. Integrata e distribuita **5.12.157-wizard-universe (1000180)**, localCode206. Questo checkpoint supersede l'attesa del pack registrata nella156; navigazione/cache156 preservate.
