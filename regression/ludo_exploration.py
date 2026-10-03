@@ -67,7 +67,8 @@ else: print('SKIP JVM locally; CI Java17 required')
 main=(root/'app/src/main/java/it/vintedaffari/app/MainActivity.java').read_text()
 assert 'renderLudoJourney()' in main,'Ludo still separated from motor'
 browser=(root/'app/src/main/java/it/vintedaffari/app/VintedBrowserActivity.java').read_text()
-assert 'Nuova esplorazione' in browser and 'Sorprendimi' in browser
+assert 'Nuova esplorazione' not in browser and 'Sorprendimi' in browser
+assert 'BrowserUiState.exploreCollapsed' in browser and 'Dalle mie cacce' in browser
 assert 'LudoIcons.PAUSE' in browser and 'LudoIcons.CAMERA' in browser
 assert 'enterEngineDetail("phase")' in main,'phase click from Ludo does not switch destination tab'
 assert 'enterEngineDetail("review")' in main,'manual help from Ludo does not switch destination tab'
@@ -100,3 +101,4 @@ if shutil.which('javac'):
   subprocess.run(['java','-cp',temp,'it.vintedaffari.app.JourneyRouteCheck'],check=True)
   print('PASS real Activity detail route with UI boundaries replaced')
 assert 'ludoExplorationVisible()' in main.split('private final Runnable activitySnapshotRetry=',1)[1].split(';',1)[0], 'Ludo IO errors must retry'
+
