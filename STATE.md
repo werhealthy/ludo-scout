@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Backend160 — blocco browser diagnosticabile, distribuzione in corso
+
+Feedback19:35Europe/Rome2026-10-03:159 non apre alcuna pagina; browserCapture.PAGE_BLOCKED e toast Ludo, app Vinted ufficiale funzionante.158→159 policy/cookie/settings/URL iniziale invariati. Causa live del reindirizzamento non ancora nota, non attribuita a ban o BGG.
+
+PR217 da betae281794; HEAD0b87090812afcf98b4bf7c8b81e876ba48d585e7, mergeed4e9851c4ce8ad0f4a27cf25c0c131a5a9b103f.160 registra blockedPage senza userinfo/query/fragment (max240caratteri), blockedReason, blockedStage e blockedAt; blocco coerente tra override/start/finish, errori/location tardivi non riattivano cattura. Ricaricamento esplicito riparte dalla ricerca consentita e segue redirect già consentiti. Retry pending e URL correnti limitano finish obsoleti; URL uguali non costituiscono document identity. Allowlist identica, nessun bypass/schema/soglia/dipendenza/rete di cattura/reset. Condivisi Activity/policy, release/workflow PR e spec backend.
+
+CI37142214104 SUCCESS sulHEAD: job111258830097 suite completa SQL/JVM,45/45 cattura, unit Android, compile e APK; job111258830331 callback della Activity reale prima della fixture, late error/location/finish prima e dopo retry, redirect consentito, tre viste font100/200%. RED precedente37141496494:59test,2falliti per diagnostica assente. Test error payload corretto dopo constructor Android non accessibile. Review finale senzaCritical/Important. Lint5errori preesistenti fuori browser/100warning, non soppressi. Nessun Vinted live/telefono verificato.
+
+Release preparata5.12.160-vinted-diagnostics, localCode209. Distribuzione firmata/Firebase ancora da confermare. Merge cumulativo217 ereditava una precedente nota[skip ci] e non ha creato run beta; checkpoint successivo avvia il workflow con codice identico verificato.
+
+Telefono dopo distribuzione confermata: aggiornare senza cancellare dati, Trova nuovi giochi, un tentativo; se bloccato copiare ⋮→Dati della cattura e restituire browserCapture completo160 con blockedPage/reason/stage/at. Frontend7/backend5 gruppi aperti. Unico prossimo passo: completare distribuzione160, poi ottenere il report del blocco sul telefono.
+
+
 ## Frontend159 — browser Vinted ridisegnato, distribuita
 
 Implementata la direzione delle tre immagini della chat: exploreExpanded con ordine globale Rilevanti/Nuovi, Sorprendimi, cuore Cacce, soglia toggle/stepper, chip fisso Giochi da tavolo, contatore reale e frecce/pagina centrate; exploreCollapsed con sole frecce/contatore/pagina; manualMatch con badge e card Ludo in pausa / Stai cercando manualmente su Vinted. Rimossi Nuova esplorazione, Ricerca e filtri, pannello ridondante, pausa/camera da Esplora e uscita dall'app nel menu. Cambio stato nell'overflow; nessuna CTA Leggi/Torna nella card manuale. Cacce usa preferiti BGG reali via worker e conserva ordine/soglia; Sorprendimi rispetta lo stato corrente. Prezzo massimo conserva gli altri filtri nativi; ordini prezzo nativi non sono falsamente marcati Rilevanti.
