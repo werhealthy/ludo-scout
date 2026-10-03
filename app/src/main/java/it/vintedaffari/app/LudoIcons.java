@@ -56,6 +56,8 @@ final class LudoIcons {
     static final String STORE="\uf54e";
     static final String PAUSE="\uf04c";
     static final String PLAY="\uf04b";
+    static final String COMPRESS="\uf066";
+    static final String EXPAND="\uf065";
     static final String SHUFFLE="\uf074";
 
     private static Typeface solid;
