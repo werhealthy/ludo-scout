@@ -46,12 +46,12 @@ checks=[
     ("clearing active bundle capture preserves explored history",
      '.remove("source_signature").remove("item_id").remove("seller_id")' in explore and
      ".clear().apply()" not in explore[explore.index("public static void clear"):]),
-    ("confirmed bundles are visually primary",
-     '"Bundle confermati · "+sources.size()' in bundles and
-     '"Questi sono bundle reali' in bundles and
-     ('"Da controllare · "+prospects.size()' in bundles or '"Da esplorare · "+prospects.size()' in bundles) and
-     bundles.index('"Bundle confermati · "+sources.size()') <
-        (bundles.index('"Da controllare · "+prospects.size()') if '"Da controllare · "+prospects.size()' in bundles else bundles.index('"Da esplorare · "+prospects.size()'))),
+    ("confirmed bundles are the default section and prospects remain separate",
+     'private String bundleSection="bundle"' in ui and
+     'addBundleSection(sections,"Bundle · "+sources.size(),"bundle")' in bundles and
+     'addBundleSection(sections,"Esplora · "+prospects.size(),"explore")' in bundles and
+     'if("bundle".equals(bundleSection))' in bundles and
+     'sources.removeIf(d->bundleDealsForSource(d).size()<2)' in bundles),
     ("bundle sort controls only appear with confirmed bundles",
      "if(!sources.isEmpty())" in bundles and
      bundles.index("addBundleSortChip") > bundles.index("if(!sources.isEmpty())")),
