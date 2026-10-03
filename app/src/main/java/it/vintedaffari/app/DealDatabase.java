@@ -382,6 +382,18 @@ public final class DealDatabase extends SQLiteOpenHelper {
         s.pendingListings=Math.max(0,s.validListings-s.completeListings-s.reviewListings-s.heldListings)+s.analysisPendingListings;
     }
 
+    public static final class JourneyItem {
+        public String identity,signature,title,reason;public boolean manualReview;public long firstAt;public int[] completed=new int[5];
+        public String status(){if(completed[4]>0)return "Pronto · prezzo confrontabile";if(manualReview)return "Richiede una verifica manuale";if(reason.equals("AUTO_FILTERED_NON_GAME"))return "Escluso · non è un gioco da tavolo";if(reason.equals("AUTO_FILTERED_COLLISION"))return "Escluso · identità in conflitto";if(reason.equals("BELOW_RATING"))return "Escluso · voto BGG inferiore a 6";if(reason.equals("BGG_MATCH_REVIEW"))return "Identità BGG da verificare";if(reason.equals("RATING_PENDING"))return "Voto BGG non disponibile";if(reason.equals("SOLD"))return "Annuncio venduto";if(reason.equals("REMOVED")||reason.equals("USER_HIDDEN")||reason.equals("RESET_LEGACY")||reason.equals("UNKNOWN"))return "Annuncio non attivo";if(reason.contains("FILTER")||reason.equals("AUTO_EXCLUDED"))return "Escluso dai controlli automatici";if(reason.equals("BLOCKED_CLASSIFIER"))return "Tipo di oggetto da riconoscere";if(completed[3]>0)return "Confronto prezzo incompleto";if(completed[2]>0)return "Verifica annuncio incompleta";if(completed[1]>0)return "Collegamento da completare";return reason.equals("PENDING_ANALYSIS")?"Da riconoscere":"BGG non qualificato o risultato sospeso";}
+    }
+    public synchronized List<JourneyItem> engineJourneyItems(long start,long end){
+        List<JourneyItem> result=new ArrayList<>();
+        try(Cursor c=getReadableDatabase().rawQuery(EngineJourneySql.rows(),new String[]{String.valueOf(start),String.valueOf(end)})){
+            while(c.moveToNext()){JourneyItem i=new JourneyItem();i.identity=c.getString(0);i.signature=c.getString(1);i.title=c.getString(2);for(int n=0;n<5;n++)i.completed[n]=c.getInt(n+3);i.reason=c.getString(8);i.manualReview=c.getInt(9)>0;i.firstAt=c.getLong(10);result.add(i);}
+        }return result;
+    }
+    public static int[] journeyCounts(List<JourneyItem> items){int[] counts=new int[5];for(JourneyItem i:items)for(int n=0;n<5;n++)counts[n]+=i.completed[n];return counts;}
+    public synchronized String randomExplorationTitle(){try(Cursor c=getReadableDatabase().rawQuery("SELECT canonical_name FROM games WHERE match_state='MATCHED' AND database_visible=1 AND COALESCE(bgg_id,'')<>'' AND LENGTH(canonical_name) BETWEEN 2 AND 100 ORDER BY RANDOM() LIMIT 1",null)){return c.moveToFirst()?c.getString(0):"";}}
     public synchronized ObservationSession latestObservationSession(){List<ObservationSession> x=recentObservationSessions(System.currentTimeMillis()-7L*24L*60L*60_000L,1);return x.isEmpty()?null:x.get(0);}
 
     private synchronized long engineRunCursorStart(){
@@ -658,5 +670,4 @@ public final class DealDatabase extends SQLiteOpenHelper {
     public synchronized int inferMissingLanguages(){int changed=0;SQLiteDatabase db=getWritableDatabase();try(Cursor c=db.rawQuery("SELECT signature,vinted_title FROM deals WHERE language_code IS NULL OR TRIM(language_code)=''",null)){while(c.moveToNext()){String code=inferLanguage(c.getString(1));if(code.isEmpty())continue;ContentValues v=new ContentValues();v.put("language_code",code);changed+=db.update("deals",v,"signature=?",new String[]{c.getString(0)});}}return changed;}
     public static String signature(VintedCard c){if(c!=null&&!c.capturedSignature.isEmpty())return c.capturedSignature;return normalize(c.title)+"|"+normalize(c.brand)+"|"+cents(c.itemPrice);}private static String normalize(String v){if(v==null)return"";String n=Normalizer.normalize(v,Normalizer.Form.NFD).replaceAll("\\p{M}+","");return n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim();}private static int cents(double v){return(int)Math.round(v*100.0);}private static Integer ni(Cursor c,int i){return c.isNull(i)?null:c.getInt(i);}private static Double nd(Cursor c,int i){return c.isNull(i)?null:c.getDouble(i);}private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
-
 

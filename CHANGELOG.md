@@ -1,5 +1,12 @@
 # Ludo Scout — Changelog
 
+## 5.12.153 — Ludo: esplorazione e bilancio
+
+- Ludo integra ricerca Vinted, cerchi giornalieri con controlli completati e delta dalla baseline browser, dettagli dei risultati e lavoro corrente.
+- Preset per rilevanza/novità/prezzo, query casuali dal catalogo locale, intervallo personalizzato, pagine1..10 manuali; pausa/play e cattura secondarie a icone.
+- Preservati frontend151, dati, cattura/sicurezza, pricing/filtri; nessun reset/schema/dipendenza/rete automatica. Verifiche/consegna in STATE, prova telefono ancora necessaria.
+
+
 ## Frontend151 — offerte mensili e collezione a coppie, distribuita
 
 Feedback23:52: composizione Ludo148 accettata provvisoriamente; richiesti padding più curati, dato utile al posto di BGG>6 e due giochi grandi su scaffali profondi. Distribuita **5.12.151-ludo-offers-shelves (1000174)**, localCode200. Integrato e preservato backend150; Motore non modificato dal frontend.
