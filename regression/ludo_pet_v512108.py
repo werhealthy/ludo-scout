@@ -127,7 +127,9 @@ with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)/"LudoSearchDraftRegression.java";p.write_text(draft_harness)
  subprocess.run(["javac","-d",tmp,str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"LudoSearchDraftRegression"],check=True)
-assert 'search.setText(ludoSearchQuery)' in ui and '.putString("search",ludoSearchDraft())' in ui
+assert '.putString("search",ludoSearchDraft())' in ui, "Preserve old drafts across room state migration"
+search_ui=activity_method("private void renderLudoSearch(")
+assert "EditText" not in search_ui and "Trova nuovi giochi" in search_ui, "Engine has one Vinted CTA and no game search field"
 
 month_harness=r'''package it.vintedaffari.app;
 import java.time.*;
