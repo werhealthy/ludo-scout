@@ -51,7 +51,8 @@ if shutil.which('javac'):
    yes(!ExplorationPlan.baselineApplies(10,10,100,250,260,200));
    yes(!ExplorationPlan.baselineApplies(10,9,100,50,150,200));
    long[] day=ExplorationPlan.day(1790982000000L);yes(day[1]-day[0]==86400000L);
-   long[] dst=ExplorationPlan.day(1792882800000L);yes(dst[1]>dst[0]);
+   long[] dst=ExplorationPlan.day(1792879200000L);yes(dst[1]-dst[0]==90000000L);
+   long[] spring=ExplorationPlan.day(1774738800000L);yes(spring[1]-spring[0]==82800000L);
   }}''')
   subprocess.run(['javac','-d',temp,str(plan),str(runner)],check=True)
   subprocess.run(['java','-cp',temp,'it.vintedaffari.app.JourneyCheck'],check=True)
@@ -66,3 +67,29 @@ assert 'enterEngineDetail("phase")' in main,'phase click from Ludo does not swit
 assert 'enterEngineDetail("review")' in main,'manual help from Ludo does not switch destination tab'
 assert 'i.completed[1]==0' not in main.split('private void showJourneyItems',1)[1].split('private void appendJourneyRows',1)[0],'post-BGG daily holds are hidden'
 print('PASS Ludo/browser integration guards')
+
+# Execute the real MainActivity route method with only Android/UI boundaries replaced.
+def method(source,name):
+ start=source.index('    private void '+name+'(')
+ brace=source.index('{',start);depth=1;end=brace+1
+ while depth:
+  depth+=(source[end]=='{')-(source[end]=='}');end+=1
+ return source[start:end]
+if shutil.which('javac'):
+ with tempfile.TemporaryDirectory() as temp:
+  runner=Path(temp)/'JourneyRouteCheck.java'
+  runner.write_text('''package it.vintedaffari.app; import java.util.*;
+  public class JourneyRouteCheck {
+   String tab="companion",engineSection="overview";boolean engineDetailReturnToLudo;
+   int recorded,persisted,nav;Map<String,Integer> tabScrollPositions=new HashMap<>();
+   static class Scroll {int getScrollY(){return 123;}} Scroll scroll=new Scroll();
+   void recordLudoRoomPosition(){recorded++;}void persistTransientUiSession(){persisted++;}void renderNav(){nav++;}
+   '''+method(main,'enterEngineDetail')+'''
+   public static void main(String[] args){JourneyRouteCheck r=new JourneyRouteCheck();r.enterEngineDetail("phase");
+    if(!r.tab.equals("activity")||!r.engineSection.equals("phase")||!r.engineDetailReturnToLudo||r.tabScrollPositions.get("companion")!=123||r.persisted!=1||r.nav!=1)throw new AssertionError("Ludo phase destination");
+    r.scroll=new Scroll(){int getScrollY(){return 999;}};r.enterEngineDetail("review");
+    if(!r.engineSection.equals("review")||r.tabScrollPositions.get("companion")!=123||!r.engineDetailReturnToLudo)throw new AssertionError("nested detail preserves return");
+   }}''')
+  subprocess.run(['javac','-d',temp,str(runner)],check=True)
+  subprocess.run(['java','-cp',temp,'it.vintedaffari.app.JourneyRouteCheck'],check=True)
+  print('PASS real Activity detail route with UI boundaries replaced')

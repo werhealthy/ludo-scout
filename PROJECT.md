@@ -14,6 +14,10 @@ Trasformare un flusso ampio e rumoroso di annunci in informazioni affidabili con
 - Misurare prima/dopo i cambiamenti sostanziali; non scambiare una build riuscita per prova di prestazioni o UX.
 - Conservare preferiti per identità BGG, memoria Ludo, rating personali, navigazione e dati storici.
 
+
+## Percorso Ludo
+Ludo/Esplorazione è il punto comune per cercare annunci su Vinted e controllare i risultati quotidiani. Le metriche dei controlli completati restano leggibili anche quando l'elaborazione è rapida; coda corrente, scarti e interventi manuali sono distinti. Cacce, Libreria e memoria Ludo restano nello stesso contesto.
+
 ## Workstream
 - `frontend`: esperienza, rendering, navigazione, accessibilità e interazioni.
 - `backend`: stabilità, performance, SQLite/code, acquisizione Vinted conforme, matching BGG, riduzione review e osservabilità.
