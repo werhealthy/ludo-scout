@@ -356,9 +356,9 @@ jobs:
           adb logcat -c
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.BrowserVisualInstrumentation | tee browser-visual-result.txt
           adb logcat -d -s LudoVisual:I '*:S'
-          rg 'Three actual browser states rendered' browser-visual-result.txt
+          grep -F 'Three actual browser states rendered' browser-visual-result.txt
           adb shell settings put system font_scale 2.0
           adb logcat -c
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.BrowserVisualInstrumentation | tee browser-large-result.txt
           adb logcat -d -s LudoVisual:I '*:S'
-          rg 'Three actual browser states rendered' browser-large-result.txt
+          grep -F 'Three actual browser states rendered' browser-large-result.txt
