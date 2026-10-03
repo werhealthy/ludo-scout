@@ -1,5 +1,20 @@
 # Ludo Scout — AI handoff
 
+## Backend155 — Ludo integrato e cattura prima dell’avanzamento, distribuita
+
+Feedback02:55Europe/Rome sulla153: composizione collage non accettata, richiesti Ludo al centro dei collegamenti, bilancio in alto, shortcut Motore eliminato, browser leggibile con azioni dirette e grande conteggio progressivo. Distribuita **5.12.155-ludo-capture (1000178)**, localCode204; conservati Catalogo/Bundle154, pricing, identità, dati personali e memoria Ludo.
+
+Ludo: testata Esplorazione compatta, bilancio mensile prima della ricerca, ritratto vettoriale al centro dei cinque controlli con sguardo alla fase attiva. Su viewport stretto/font grande, nodi verticali e sguardo rivolto in basso. Spiegazione dei conteggi nel dettaglio, righe spaziate; shortcut Motore rimosso dalla testata Home. Dati giornalieri/delta e criteri invariati.
+
+Browser: Sorprendimi e Ricerca/filtri subito accessibili; preset e opzioni in sheet custom con icone, titoli/descrizioni, padding e font del sistema. Form scrollabile con prezzi/ordine correnti e radio accessibili. Grande numero dei soli ID salvati, animazione accelerata senza ritardare lettura o scritture; animazioni disabilitate rispettate. Next richiede pagina corrente drenata/persistita, conteggi coerenti e nessun errore/animazione; verifica DOM, richieste pendenti e ack anche al clic. Errori/limiti restano visibili con ricaricamento esplicito. “Completata” riguarda gli annunci già caricati dal sito, non un totale remoto presunto; nuovi dati richiudono il gate. Nessuna attesa BGG, auto-scroll, richiesta aggiuntiva di cattura, reset, migrazione/schema, dipendenza, filtro/soglia o pricing nuovo.
+
+PR208 HEAD3b07976c30b27e7a8c7988fe4ef3035ccab4182a; mergee5200ebfafc5266e30f0246caffd8d80d5cad381 su beta2ccb7bde. File condivisi: MainActivity.java (composizione/shortcut), LudoPetView.java (ritratto/gaze), VintedBrowserActivity.java e vinted-capture.js; helper LudoJourneyFocus, regressioni/workflows/release e documenti aggiornati. Review indipendente ha corretto due Important (nuove card nel debounce DOM→Next, sguardo verticale); review finale senza altri Important. Ulteriore fixture RED→GREEN ha dimostrato/corretto XHR fallita che sembrava drenata.
+
+CI finale37085366235/job111094424637 SUCCESS: suite completa, **45/45 test browser**, predicato nativo/direzioni JVM, fixture SQLite, unit Android/pricing, compile Java e APK review. Java/Android locali indisponibili: test Node eseguiti localmente, verifiche JVM/Android in CI. Android beta178/run37085593863/job111095099943 SUCCESS con suite/unit/APK firmata. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T01:23:19.0862203Z; upload Firebase155/1000178 confermato01:24:12.8879350Z, distribuzione tester/gruppi confermata separatamente01:24:13.8241672Z. Release5001qaghuib8g; artifact11259854739.
+
+Telefono pendente: aggiornare senza cancellare dati; verificare gerarchia Ludo/volto/dettagli, ricerca e ritorno, Sorprendimi/filtri, font200% e TalkBack. Prova2pagine: contatore cresce verso catalogWrites; Next disabilitata durante lettura/salvataggio e abilitata dopo; errori non devono sembrare completamento. Restituire screenshot Ludo/browser e diagnostica browser completa con versione/pagina. CI non prova pixel, fluidità, lifecycle reale o copertura dei contenuti non caricati. Frontend7/backend5 aperti, nessun gruppo chiuso dalla sola consegna. Unico prossimo passo backend: verifica155 sul telefono e correzione degli scostamenti.
+
+
 ## Feedback 02:55 — Ludo integrato, scelte browser e cattura per pagina
 
 La 153 non è accettata visivamente: motore percepito come collage, shortcut Motore in Home superfluo, richiesti Ludo al centro dei collegamenti, bilancio in alto, ricerca primaria e gerarchie/padding migliori. Browser: Sorprendimi e filtri subito accessibili, menu leggibili con icone e descrizioni, font del sistema, grande contatore progressivo dei salvati e Next disabilitato durante acquisizione/salvataggio. Feedback consolidato nei gruppi esistenti: frontend7/backend5, nessun nuovo gruppo.
