@@ -46,6 +46,12 @@ if shutil.which('javac'):
    yes(ExplorationPlan.url("","bad",0,0).isEmpty());
    yes(ExplorationPlan.url("","relevance",500,100).isEmpty());
    yes(ExplorationPlan.delta(7,5).equals("↑ +2"));yes(ExplorationPlan.delta(2,5).equals("↓ −3"));yes(ExplorationPlan.delta(5,5).equals("= 0"));
+   java.util.Map<String,Integer> before=new java.util.HashMap<>(),after=new java.util.HashMap<>();
+   before.put("old-other-run",1);after.put("old-other-run",31);after.put("new",31);before.put("corrected",31);after.put("corrected",1);
+   int[] gain=JourneyDelta.delta(before,after,new java.util.HashSet<>(java.util.Arrays.asList("new","corrected")));
+   yes(java.util.Arrays.equals(gain,new int[]{1,0,0,0,0}));
+   yes(java.util.Arrays.equals(JourneyDelta.delta(before,after,java.util.Collections.singleton("new")),new int[]{1,1,1,1,1}));
+   yes(java.util.Arrays.equals(JourneyDelta.delta(before,after,java.util.Collections.emptySet()),new int[5]));
    yes(ExplorationPlan.baselineApplies(10,10,100,50,150,200));
    yes(!ExplorationPlan.baselineApplies(10,10,100,50,90,200));
    yes(!ExplorationPlan.baselineApplies(10,10,100,250,260,200));
@@ -54,7 +60,7 @@ if shutil.which('javac'):
    long[] dst=ExplorationPlan.day(1792879200000L);yes(dst[1]-dst[0]==90000000L);
    long[] spring=ExplorationPlan.day(1774738800000L);yes(spring[1]-spring[0]==82800000L);
   }}''')
-  subprocess.run(['javac','-d',temp,str(plan),str(runner)],check=True)
+  subprocess.run(['javac','-d',temp,str(plan),str(root/'app/src/main/java/it/vintedaffari/app/JourneyDelta.java'),str(runner)],check=True)
   subprocess.run(['java','-cp',temp,'it.vintedaffari.app.JourneyCheck'],check=True)
   print('PASS JVM exploration URL, signed delta, Rome day')
 else: print('SKIP JVM locally; CI Java17 required')
@@ -93,5 +99,4 @@ if shutil.which('javac'):
   subprocess.run(['javac','-d',temp,str(runner)],check=True)
   subprocess.run(['java','-cp',temp,'it.vintedaffari.app.JourneyRouteCheck'],check=True)
   print('PASS real Activity detail route with UI boundaries replaced')
-
 assert 'ludoExplorationVisible()' in main.split('private final Runnable activitySnapshotRetry=',1)[1].split(';',1)[0], 'Ludo IO errors must retry'

@@ -4,7 +4,7 @@
 
 Richiesta01:40Europe/Rome autorizza integrazione Ludo/Motore e browser orientato a esplorazioni. Spec: docs/specs/2026-10-03-ludo-exploration.md; piano in docs/plans/2026-10-03-ludo-exploration.md. Questa direzione supersede cerchi come sola occupazione e Motore UI standby. Ricerca e risultati sono nella stessa stanza Esplorazione; Cacce/Libreria e panorama mensile151 preservati.
 
-Totali giornalieri per annunci osservati, controlli completati indipendenti e variazioni reali dalla baseline di esplorazione; BGG/link già disponibili contano. Distinguere annunci quotidiani da giochi distinti della vecchia pipeline e da eventi di job. Nessuna somma dei cerchi; nessun progresso inventato. Browser: preset/manual/random, una pagina su gesto fino a10, pausa/play e cattura secondarie coerenti. Nessuna scansione automatica di10pagine o servizi nuovi.
+Totali giornalieri per annunci osservati, controlli completati indipendenti e variazioni dei soli annunci dello scroll dalla baseline per annuncio dell’esplorazione; BGG/link già disponibili contano. Distinguere annunci quotidiani da giochi distinti della vecchia pipeline e da eventi di job. Nessuna somma dei cerchi; nessun progresso inventato. Browser: preset/manual/random, una pagina su gesto fino a10, pausa/play e cattura secondarie coerenti. Nessuna scansione automatica di10pagine o servizi nuovi.
 
 Backlog consolidato frontend7/backend5: Ludo/Motore/browser e osservabilità già aperti includono questo feedback, nessun job duplicato. Prova telefono dopo consegna verificata: due esplorazioni ravvicinate, frecce, dettagli/sospesi, ritorno in Ludo, query casuale/prezzi, font grande. CI/firma/Firebase da registrare in STATE.
 

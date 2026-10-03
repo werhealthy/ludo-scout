@@ -3,7 +3,7 @@
 > For agentic workers: Use superpowers:executing-plans inline, with one final independent review.
 
 **Goal:** Ludo integra ricerca, risultati quotidiani e controllo del lavoro.
-**Architecture:** SQL read-only per annunci/stadi, snapshot asincrono e baseline prefs nel processo UI; policy pura per URL esplorazione; renderer Ludo riusa wheel/layout e dettagli esistenti.
+**Architecture:** SQL read-only per annunci/stadi, snapshot asincrono e baseline per annuncio/controllo in prefs nel processo UI; policy pura per URL esplorazione; renderer Ludo riusa wheel/layout e dettagli esistenti.
 **Tech Stack:** Android Java17/SQLite/WebView, Python regressioni; nessuna dipendenza.
 **Spec:** docs/specs/2026-10-03-ludo-exploration.md
 
