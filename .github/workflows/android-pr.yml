@@ -296,7 +296,7 @@ jobs:
 
 
   browser-visual:
-    if: github.head_ref == 'frontend/vinted-browser-redesign'
+    if: github.head_ref == 'frontend/vinted-browser-redesign' || github.head_ref == 'backend/vinted-browser-block-diagnostics'
     name: Browser Android visual and lint
     runs-on: ubuntu-latest
     timeout-minutes: 12
