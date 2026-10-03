@@ -1,0 +1,219 @@
+{
+  "source": "Manual AI Studio outputs supplied by user 2026-10-03; not ground truth",
+  "sample": [
+    {
+      "listing_id": 41,
+      "title": "Hive - Espansione Onisco",
+      "brand": "gen42",
+      "previous_type": null,
+      "bgg_id": "2655",
+      "bgg_name": "Hive"
+    },
+    {
+      "listing_id": 59,
+      "title": "Mindbug + 2 espansione",
+      "brand": "Pendragon",
+      "previous_type": null,
+      "bgg_id": "345584",
+      "bgg_name": "Mindbug: First Contact"
+    },
+    {
+      "listing_id": 9548,
+      "title": "Le rovine perdute di Arnak - Organizer 3D gioco base + tutte le espansioni",
+      "brand": "Cranio Creations",
+      "previous_type": "ACCESSORY",
+      "bgg_id": null,
+      "bgg_name": null
+    },
+    {
+      "listing_id": 9593,
+      "title": "Gearworks Kickstarter + playmat",
+      "brand": "Piecekeeper",
+      "previous_type": "ACCESSORY",
+      "bgg_id": null,
+      "bgg_name": null
+    },
+    {
+      "listing_id": 6544,
+      "title": "Otto il maialotto",
+      "brand": "Goliath",
+      "previous_type": "BUNDLE",
+      "bgg_id": null,
+      "bgg_name": null
+    },
+    {
+      "listing_id": 8800,
+      "title": "Andor Solo Erweiterung",
+      "brand": "Kosmos",
+      "previous_type": "BASE_GAME",
+      "bgg_id": "127398",
+      "bgg_name": "Legends of Andor"
+    },
+    {
+      "listing_id": 7842,
+      "title": "Too Many Bones Nugget (scatola vuota)",
+      "brand": "",
+      "previous_type": "EMPTY_BOX",
+      "bgg_id": null,
+      "bgg_name": null
+    },
+    {
+      "listing_id": 7595,
+      "title": "Reincarnazione Manuela Pompas libro",
+      "brand": "Hasbro",
+      "previous_type": "NON_GAME",
+      "bgg_id": null,
+      "bgg_name": null
+    }
+  ],
+  "answers": {
+    "gemini-3-flash-preview": [
+      {
+        "listing_id": 41,
+        "category": "EXPANSION",
+        "confidence": 95,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Espansione",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 59,
+        "category": "BUNDLE",
+        "confidence": 90,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Gioco + espansioni",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 9548,
+        "category": "ACCESSORY_COMPONENT",
+        "confidence": 100,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Organizer",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 9593,
+        "category": "BUNDLE",
+        "confidence": 85,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Gioco + playmat",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 6544,
+        "category": "BASE_GAME",
+        "confidence": 90,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Nome del gioco",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 8800,
+        "category": "EXPANSION",
+        "confidence": 95,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Erweiterung",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 7842,
+        "category": "ACCESSORY_COMPONENT",
+        "confidence": 80,
+        "language": "UNKNOWN",
+        "needs_review": true,
+        "evidence": "Scatola vuota",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 7595,
+        "category": "NON_GAME",
+        "confidence": 100,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Libro",
+        "bgg_verdict": "UNKNOWN"
+      }
+    ],
+    "gemini-3.1-flash-lite": [
+      {
+        "listing_id": 41,
+        "category": "EXPANSION",
+        "confidence": 100,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Espansione",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 59,
+        "category": "BUNDLE",
+        "confidence": 100,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Gioco + espansioni",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 9548,
+        "category": "ACCESSORY_COMPONENT",
+        "confidence": 100,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Organizer",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 9593,
+        "category": "BUNDLE",
+        "confidence": 90,
+        "language": "UNKNOWN",
+        "needs_review": true,
+        "evidence": "Gioco + playmat",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 6544,
+        "category": "BASE_GAME",
+        "confidence": 90,
+        "language": "IT",
+        "needs_review": false,
+        "evidence": "Nome del gioco",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 8800,
+        "category": "EXPANSION",
+        "confidence": 100,
+        "language": "DE",
+        "needs_review": false,
+        "evidence": "Erweiterung",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 7842,
+        "category": "ACCESSORY_COMPONENT",
+        "confidence": 90,
+        "language": "UNKNOWN",
+        "needs_review": false,
+        "evidence": "Scatola vuota",
+        "bgg_verdict": "UNKNOWN"
+      },
+      {
+        "listing_id": 7595,
+        "category": "NON_GAME",
+        "confidence": 100,
+        "language": "IT",
+        "needs_review": false,
+        "evidence": "Libro",
+        "bgg_verdict": "UNKNOWN"
+      }
+    ]
+  }
+}

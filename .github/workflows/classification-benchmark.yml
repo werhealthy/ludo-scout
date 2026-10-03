@@ -1,0 +1,18 @@
+name: Offline classification benchmark
+on:
+  pull_request:
+    branches: [beta]
+    paths:
+      - 'tools/classification_benchmark.py'
+      - 'regression/classification_benchmark_test.py'
+      - 'regression/fixtures/classification_smoke.json'
+      - '.github/workflows/classification-benchmark.yml'
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 regression/classification_benchmark_test.py
