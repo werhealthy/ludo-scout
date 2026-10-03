@@ -1,5 +1,11 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Browser Vinted159 — direzione approvata 2026-10-03, verifica in corso
+
+Il riferimento principale sono le tre immagini fornite nella chat: Esplora espanso con Ordine globale Rilevanti/Nuovi, Sorprendimi, Cacce con cuore, soglia massima attivabile/stepper, chip Giochi da tavolo, contatore reale e pagine centrate; Esplora compresso con sole frecce/contatore/pagina; Match manuale con badge e card «Ludo in pausa — Stai cercando manualmente su Vinted», senza CTA Leggi/Torna. Header chiudi/Vinted/overflow; nessuna uscita dall'app nel menu. Superati Nuova esplorazione, Ricerca e filtri, pannello filtri ridondante e pausa/fotocamera esposti in Esplora. Cacce usa i preferiti BGG esistenti; scegliere un titolo conserva ordine/soglia. Categoria fissa non rimovibile, senza chip di rimozione fittizio.
+
+Branch frontend/vinted-browser-redesign da beta03ea4e48, PR214. Tre stati espliciti, token/Remus/icone e capsule esistenti. Conservati persistenza, contatore per pagina e doppio gate nativo/JS prima di Next; manuale con cattura OFF può navigare. Chrome scrollabile e misurato sullo spazio disponibile, riserva spazio al browser anche con font grandi. Nessuna nuova libreria/schema/servizio. Build e regressioni complete verificati sul primo codice; screenshot Activity reale/emulatore con WebView locale in verifica, non sito live. Accettazione telefono ancora pendente. Frontend7/backend5 aperti; questo feedback consolida il gruppo browser/Wizard esistente.
+
 ## Direzione operativa Ludo — stanze pet, 2026-10-03 13:06
 
 Feedback esplicito: gli asset devono essere integrati nell'app, non consegnati come pack separato. Ludo vive in tre piccole stanze adiacenti Motore / Preferiti / Libreria, swipe orizzontale e indicatori; niente tab in alto, hero separate o campo ricerca nella stanza Motore. Ambienti e sprite separati con alpha reale, stanza superiore sfumata nella UI nativa inferiore. Stile cartoon whimsical, semplice e domestico. Card, font, navigation, CTA e scaffali reali dell'app restano il riferimento.
