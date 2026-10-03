@@ -1,5 +1,24 @@
 # Ludo Scout — Current state
 
+## Frontend154 — ricerca live, anteprime coerenti ed Esplora semplice, distribuita
+
+Feedback02:23Europe/Rome:152 non accettata visivamente. Richiesti niente banner Gioco separati, anteprime simili agli annunci senza prezzo, ricerca mentre si scrive già dalla prima lettera, apertura schede meno bloccante ed eliminazione delle frasi confuse dopo esplorazione. Distribuita **5.12.154-live-catalog (1000177)**, localCode203. Ludo/esplorazione153 integrata e preservata; questo feedback supersede la composizione hero152.
+
+Catalogo: editor fuori dal contenitore risultati, aggiornamento live180ms, anche1lettera e svuotamento. Task pendenti cancellati senza interrompere operazioni DB; epoch/query/host/route guard scartano risposte obsolete. Letture annunci, conteggio, identità BGG/alias e preview sul worker; errore con retry separato da zero. Nessuna nuova ricerca di rete. Risultati gioco in griglia con lo stesso renderer degli annunci: copertina, dimensioni, titolo, rating e preferito. Prezzo/sconto/data/edizione solo nel contesto Annuncio; nessun prezzo aggregato sulle anteprime della lista giochi completa. Sorgente catturata per Back verso Catalogo o lista Database. Tolti hero/banner separati.
+
+Audit codice del lag: pagina Gioco leggeva gameStats e dati secondari sul thread UI; overlay spostava solo gameStats. Entrambi ora preparano anche GameDetailData (simili, mercato, storico, annunci e score) sul worker e rendono uno snapshot, con caricamento visibile e Back subito accessibile. Callback obsoleta/destinazione cambiata protette. La fluidità reale non è misurata sul telefono; CI verifica percorsi, non frame Android. Posizione Catalogo ripristinata dopo layout dei risultati.
+
+Bundle conserva selettore Bundle/Esplora, candidati/priorità manuali e memoria UI. Rimossa l’intera lista narrativa «Dopo l’esplorazione» e le frasi venditore/esito: bundle realmente confermati restano nella loro sezione. Preferiti, pricing, filtri di eleggibilità, schemi, Motore, servizi/rete e dati personali invariati.
+
+PR205 HEAD3d141854a2e2ceb0482a98c8f07e3514f1286e4c; merge4e6fca60ae23c0fefef0f240df9417e07dd119dd, beta dietro0. Riallineamento a153 b5890e1 e checkpointc5d282f con merge a tre vie MainActivity senza conflitti; identità iniziale153 avanzata a154. Condiviso MainActivity.java per composizione/letture UI; app/build.gradle e2regressioni aggiornati. Review indipendente finale senza Critical/Important; minor caption origine corretta in «Indietro».
+
+CI37082468759 ha rilevato guard overlay obsoleto, aggiornato a richiedere snapshot preparato prima della callback UI mantenendo apertura diretta. CI finale37082931268/job111087175396 SUCCESS: suite completa compresa153, fixture SQL alias, JVM metodi reali debounce/worker/callback/scroll (A/AB, risposta tardiva, clear, host/route cambiati, errore senza zero finto), unit Android/pricing, compile Java e APK review. Fixture locale SQL/guard passata; Java locale indisponibile.
+
+Android beta177/run37083232739/job111088074481 SUCCESS: suite/unit e APK firmata; certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 confermato2026-10-03T00:47:05.6833661Z; upload Firebase154/1000177 confermato00:48:00.6197532Z, distribuzione tester/gruppi confermata separatamente00:48:01.5630374Z.
+
+Telefono pendente, installare senza cancellare dati: scrivere A→titolo/alias senza invio e cancellare; verificare tastiera/cursore, card Gioco senza prezzo sia nella ricerca che in tutti i risultati; apertura/Back/posizione e lag percepito; Esplora priva della lista di frasi; font200% e TalkBack. Nessuna accettazione pixel/prestazioni dichiarata. Frontend7/backend5 aperti. Unico prossimo passo frontend: verifica154 sul telefono; poi gruppo6 Wizard e filtri nella scaletta unica. Verifiche Ludo153 conservate nel relativo checkpoint.
+
+
 ## Ludo153 — esplorazione e bilancio giornaliero, distribuita
 
 Richiesta01:40Europe/Rome: integrare ricerca e Motore in Ludo, conservare nei cerchi i risultati della giornata e mostrare il contributo dello scroll con frecce, esplorazioni Vinted centrali. Distribuita **5.12.153-ludo-exploration (1000176)**, localCode202. Preservati Ludo151 e Catalogo/Bundle152.
