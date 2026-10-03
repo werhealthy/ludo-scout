@@ -81,6 +81,11 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   String session="https://www.vinted.it/session-refresh?redirect=%2Fcatalog%2F4881-board-games";
   if(client.shouldOverrideUrlLoading(web,pageRequest(session)))throw new AssertionError("session refresh still blocked");
   if((Boolean)get(screen,"accepting"))throw new AssertionError("capture remained active at session transition");
+  client.onPageFinished(web,"https://www.vinted.it/catalog/4881-board-games?page=1");
+  client.onPageFinished(web,(String)get(screen,"navigationUrl"));
+  invoke(screen,"onResume");
+  Method pendingCapture=screen.getClass().getDeclaredMethod("setCapture",boolean.class);pendingCapture.setAccessible(true);pendingCapture.invoke(screen,true);invoke(screen,"captureNow");
+  if((Boolean)get(screen,"accepting")||!"SESSION_REFRESH".equals(get(screen,"state"))||!(Boolean)get(screen,"sessionPending"))throw new AssertionError("stale completion/lifecycle escaped pending session pause");
   client.onPageStarted(web,session,null);client.onPageFinished(web,session);
   if(!"SESSION_REFRESH".equals(get(screen,"state"))||(Boolean)get(screen,"accepting")||(Boolean)get(screen,"pageDrained"))throw new AssertionError("session page captured or marked drained");
   invoke(screen,"onResume");
