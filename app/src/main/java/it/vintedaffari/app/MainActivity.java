@@ -1642,8 +1642,8 @@ private void showFilterSheet(){
     private void showLudoJourneyDetails(EngineOverviewSnapshot snapshot){
         Dialog sheet=bottomSheet("Il percorso di Ludo");LinearLayout details=sheet.findViewById(SHEET_ID);
         details.addView(text("Annunci distinti osservati oggi. Ogni annuncio può completare più controlli: i numeri non si sommano. Le variazioni riguardano l’ultima esplorazione; una diminuzione indica una rettifica.",14,MUTED,Typeface.NORMAL));
-        for(int i=0;i<5;i++){LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,-2);row.topMargin=dp(12);details.addView(ludoJourneyNode(snapshot,i,true),row);}
-        details.addView(ludoOrbitCenter(snapshot));details.addView(ludoOrbitNode(snapshot,-1));
+        for(int i=0;i<5;i++){final int stage=i;View node=ludoJourneyNode(snapshot,i,true);node.setOnClickListener(v->{sheet.dismiss();showJourneyItems(snapshot,stage);});LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,-2);row.topMargin=dp(12);details.addView(node,row);}
+        View work=ludoOrbitCenter(snapshot);work.setOnClickListener(v->{sheet.dismiss();if(snapshot.pipelineRun==null)showEngineGlobalWork(snapshot);else openEnginePhase(-1,snapshot);});details.addView(work);View intake=ludoOrbitNode(snapshot,-1);intake.setOnClickListener(v->{sheet.dismiss();openEnginePhase(-2,snapshot);});details.addView(intake);
         if(snapshot.journeyDelta==null)details.addView(text("Variazione non disponibile per questo scroll.",14,MUTED,Typeface.NORMAL));
         TextView outcomes=secondaryTextAction("Da completare ed esclusi di oggi");outcomes.setMinHeight(dp(48));outcomes.setOnClickListener(v->{sheet.dismiss();showJourneyItems(snapshot,-1);});details.addView(outcomes);sheet.show();
     }
