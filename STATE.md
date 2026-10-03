@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Frontend158 — Ludo abita tre stanze native
+
+Feedback più recente: integrare nell'app il design virtual-pet, senza consegnare soltanto asset. PR215 introduce Motore/Preferiti/Libreria adiacenti, senza tab superiori e senza hero separate. Otto WebP: sfondi senza personaggio, tre pose Ludo con alpha reale e due props separati; cache/executor e lifecycle esistenti. Ambiente full-width con fade verso BG, titolo/menu/frecce/indicatori nativi. Swipe e posizioni indipendenti conservati. Preferiti usa le vere card/identità BGG; Libreria conserva titolo, +, menu, ricerca, scaffali, nomi e rating, con legno più caldo.
+
+Motore circolare misurato dai controlli reali, sei nodi più centro; giornaliero/delta e coda globale restano scope distinti. Lavorazione nello scroll conta fasi incompiute disgiunte; senza scope mostra attività del motore. Font>130% o spazio<280dp usa righe ad altezza naturale. Due metriche mensili reali, non rinominate settimanali. Una CTA Trova nuovi giochi apre la categoria boardgame Vinted; tolto campo ricerca. Dettagli incompiuti/esclusi nel foglio di spiegazione. Pricing, schema, soglie, servizi e rete invariati.
+
+HEADc8159bf1c5dbeb188405369d256cb5450c170d52; mergea096b9235ea1b3844db4c6c56707cdbcd9d84f7e, beta iniziale03ea4e48 e invariata fino al merge. CI37119847823/job111193681564 SUCCESS: suite completa SQL/JVM/browser, unit, compilazione Android e APK review. Asset alpha e geometria orbitale verificati; review indipendente finale senzaCritical/Important dopo correzione del parametro lambda annidato. Primo CI intercettava guard del vecchio campo ricerca, aggiornato al nuovo requisito senza perdere migrazione draft. Nessuna evidenza pixel Android prodotta dalla CI. Condivisi MainActivity.java e workflows; nuovi renderer room/orbit/geometry, otto risorse, regressioni, build e spec. Audit docs/assets/ludo-pet-rooms-158.md.
+
+Distribuita **5.12.158-pet-rooms (1000181)**, localCode207. Android beta181/run37120105088/job111194398044 SUCCESS: suite completa, unit e APK firmata. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T11:39:35.0623260Z. Upload Firebase confermato11:40:15.0843386Z; distribuzione tester/gruppi distinta11:40:16.1010517Z. Release12gcrakj4vugg. Artifact GitHub indisponibile per quota storage esaurita; Firebase riuscito.
+
+Telefono pendente: aggiornare senza cancellare dati; aprire Ludo e fare swipe Motore→Preferiti→Libreria e ritorno; verificare posa/ritaglio/fade, card e scaffali reali, CTA Vinted, dettagli dei contatori e ripristino tornando dalla Home. Font200%/TalkBack, saluto e pausa/ripresa. Restituire screenshot delle tre stanze e versione installata. Frontend7/backend5 aperti. Unico prossimo passo: verifica158 sul telefono; la distribuzione non equivale ad accettazione visiva.
+
 ## Frontend157 — nuovo universo Ludo e Motore adattabile, distribuita
 
 Richiesta11:49Europe/Rome: usare il pack allegato, rimuovere tutte le precedenti mascotte/illustrazioni e preparare l'app scaricabile. Integrata e distribuita **5.12.157-wizard-universe (1000180)**, localCode206. Questo checkpoint supersede l'attesa del pack registrata nella156; navigazione/cache156 preservate.

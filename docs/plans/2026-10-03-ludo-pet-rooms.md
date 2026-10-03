@@ -6,9 +6,9 @@ Architecture: retain LudoRoomState/PullRefreshScrollView, library renderer and p
 
 Spec: latest explicit user brief in this conversation; preserve docs/specs/2026-10-03-ludo-exploration.md data semantics. Existing monthly metrics remain monthly, never relabel as weekly without actual weekly data.
 
-- [ ] Add failing resource/geometry checks for room alpha and measured orbit bounds, including 320–393dp and font200% fallback.
-- [ ] Export 8 WebP resources from supplied generated PNG assets, retaining alpha; add room background rendering with cache/executor guards and lifecycle-controlled actor.
-- [ ] MainActivity: remove top tabs/search, reuse swipe and persistent positions, add accessible page indicators and lateral arrows; native orbit then 2 monthly metrics and Vinted CTA; favourites remain existing cards and Library retains search/add/menu/shelves.
-- [ ] Execute relevant regression suite, CI compile/unit/build, independent code review, align latest beta, merge verified PR and confirm signed Firebase upload and tester distribution.
+- [x] Add failing resource/geometry checks for room alpha and measured orbit bounds, including 320–393dp and font200% fallback.
+- [x] Export 8 WebP resources from supplied generated PNG assets, retaining alpha; add room background rendering with cache/executor guards and lifecycle-controlled actor.
+- [x] MainActivity: remove top tabs/search, reuse swipe and persistent positions, add accessible page indicators and lateral arrows; native orbit then 2 monthly metrics and Vinted CTA; favourites remain existing cards and Library retains search/add/menu/shelves.
+- [x] Execute relevant regression suite, CI compile/unit/build, independent code review, align latest beta, merge verified PR and confirm signed Firebase upload and tester distribution.
 
 Review focus: small width/large type labels; stale async art after navigation; favourites updates while restoring scroll; UI actions and scopes; animation pause/reduced motion. Phone pixel/gesture/visual acceptance remains separate from CI.
