@@ -4,7 +4,7 @@ Source: user supplied ludo_asset_pack_v1.zip, received 2026-10-03. All art is RG
 
 ## Audit and migration
 
-The beta source has 38 legacy Ludo illustration files, including green goblin context art, pink/purple vector blob fallback, old room and launcher variants. Only MainActivity and launcher/search-animation XML reference those illustration resources. The vector fallback in LudoPetView is removed as well. Animation XML with two old frames is removed. All obsolete illustration files and the generic old ic_launcher_foreground.png are deleted after reference migration. Existing anim/ludo_sheet_* resources are transitions, not mascot art, and are retained.
+The beta source has 38 legacy Ludo illustration files, including green goblin context art, pink/purple vector blob fallback, old room and launcher variants. MainActivity, PullRefreshScrollView and launcher/search-animation XML reference those illustration resources. The vector fallback in LudoPetView is removed as well. Animation XML with two old frames is removed. All obsolete illustration files and the generic old ic_launcher_foreground.png are deleted after reference migration. Existing anim/ludo_sheet_* resources are transitions, not mascot art, and are retained.
 
 New resources: idle/hello/search/no_results/sleeping/reward/explorer plus room/tavern and app_icon. hunt_map is byte-identical to room and is intentionally deduplicated. Room/tavern are separate scenic panels in Libreria/Cacce; controls are outside the art. Paper character plates use neutral parchment surfaces. Empty states, Hunt setup and welcome/loading use contextual characters. Game covers keep real BGG art; unavailable covers use a neutral book glyph. Dense bundle cards lose decorative scenic backgrounds.
 
