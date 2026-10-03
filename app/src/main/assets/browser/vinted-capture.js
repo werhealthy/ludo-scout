@@ -1,6 +1,8 @@
 /* Experimental passive capture: never requests, navigates or scrolls. */
 (function () {
  'use strict';
+ // Session refresh may carry session data: do not install capture or network hooks.
+ try{if(new URL(window.location.href).pathname==='/session-refresh')return;}catch(_){return;}
  if (window.LudoCaptureControl || window !== window.top && window.top) return;
  const initial=window.__LudoCaptureInitial||{};
  let enabled=initial.enabled===true,scheduled=false,oneShot=false,observed=false,inFlight=false,activeReads=0,pendingRequests=0,progressDirty=true,sequence=0,pendingSeq=0,snapshot=[],statsDirty=false,captureToken=0,pageToken=0,observedUrl=pageIdentity();

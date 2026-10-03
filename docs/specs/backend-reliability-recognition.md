@@ -1,5 +1,14 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Vinted161 — session-refresh autorizzato, verifica in corso
+
+Diagnostica160 del telefono21:23Europe/Rome2026-10-03 identifica il blocco: https://www.vinted.it/session-refresh, PATH_NOT_ALLOWED, override. Autorizzazione esplicita21:27: consentire solo questo percorso sui domini Vinted già autorizzati, cattura sospesa fino al ritorno agli annunci. Nessuna autorizzazione a login/inbox/altri percorsi, origini esterne, bypass di challenge o modifiche cookie.
+
+Branch backend/vinted-session-refresh da betaf941b18, PR220. Policy separate: allowedNavigation consente allowedPage più sessionTransition esatta; allowedPage/capture resta invariata. JS esce prima di installare controlli/hook sulla pagina session-refresh. Native mette subito in pausa intake/token all'override e conserva SESSION_REFRESH attraverso start/finish, controlli e onResume; ritorno a catalog/items riabilita l'intake. Report espone sessionTransition e accepting. Nessuna migrazione/dipendenza/servizio/soglia/reset/costo.
+
+RED CI37148046066:61test,2fallimenti per policy assente; RED Node locale per controllo/hook installati sulla pagina sessione. GREEN Node locale46/46 dopo guard. Test Activity reale copre catalog→session-refresh→catalog e lifecycle/control in sessione; CI/build/distribuzione161 da confermare. Telefono dopo distribuzione: aggiornare senza cancellare dati, Trova nuovi giochi, verificare caricamento catalogo e un conteggio reale salvato; restituire report browser completo se resta un blocco. Frontend7/backend5 aperti.
+
+
 ## Vinted160 — diagnosi del blocco browser, distribuita
 
 Feedback2026-10-03 19:35Europe/Rome:159 non apre nessuna pagina, toast del browser e browserCapture.PAGE_BLOCKED; app ufficiale funzionante. Confronto158→159: allowlist, cookie, impostazioni WebView e URL iniziale invariati. Causa del reindirizzamento ancora sconosciuta:159 non registra URL/motivo del blocco. Non classificare come ban Vinted o problema BGG.

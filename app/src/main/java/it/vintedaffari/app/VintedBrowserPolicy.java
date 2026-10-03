@@ -5,9 +5,12 @@ public final class VintedBrowserPolicy {
  private VintedBrowserPolicy(){}
  private static URI trusted(String value){try{URI u=new URI(value);return "https".equals(u.getScheme())&&("www.vinted.it".equals(u.getHost())||"vinted.it".equals(u.getHost()))&&u.getRawUserInfo()==null&&(u.getPort()==-1||u.getPort()==443)&&u.getRawPath().indexOf('%')<0?u:null;}catch(Exception e){return null;}}
  public static boolean allowedPage(String value){URI u=trusted(value);if(u==null)return false;String p=u.getPath();return p.isEmpty()||"/".equals(p)||p.matches("/catalog(?:/.*)?")||p.matches("/items/[1-9][0-9]{0,18}(?:-[^/]*|/)?")||p.matches("/members?/[1-9][0-9]{0,18}(?:-[^/]*|/)?");}
+ /** Session transition is navigable, never a capturable content page. */
+ public static boolean sessionTransition(String value){URI u=trusted(value);return u!=null&&"/session-refresh".equals(u.getPath());}
+ public static boolean allowedNavigation(String value){return allowedPage(value)||sessionTransition(value);}
  /** Explain the existing policy; does not expand its allowlist. */
  public static String blockReason(String value){
-  if(allowedPage(value))return "";
+  if(allowedNavigation(value))return "";
   try{URI u=new URI(value);if(u.getScheme()==null||u.getHost()==null)return "INVALID_URL";
    if(!"https".equals(u.getScheme()))return "SCHEME_NOT_ALLOWED";
    if(!("www.vinted.it".equals(u.getHost())||"vinted.it".equals(u.getHost()))||u.getRawUserInfo()!=null||(u.getPort()!=-1&&u.getPort()!=443))return "ORIGIN_NOT_ALLOWED";
