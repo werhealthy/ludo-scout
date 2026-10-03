@@ -1,5 +1,14 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Ludo153 — esplorazione e bilancio giornaliero
+
+Richiesta01:40Europe/Rome autorizza integrazione Ludo/Motore e browser orientato a esplorazioni. Spec: docs/specs/2026-10-03-ludo-exploration.md; piano in docs/plans/2026-10-03-ludo-exploration.md. Questa direzione supersede cerchi come sola occupazione e Motore UI standby. Ricerca e risultati sono nella stessa stanza Esplorazione; Cacce/Libreria e panorama mensile151 preservati.
+
+Totali giornalieri per annunci osservati, controlli completati indipendenti e variazioni dei soli annunci dello scroll dalla baseline per annuncio dell’esplorazione; BGG/link già disponibili contano. Distinguere annunci quotidiani da giochi distinti della vecchia pipeline e da eventi di job. Nessuna somma dei cerchi; nessun progresso inventato. Browser: preset/manual/random, una pagina su gesto fino a10, pausa/play e cattura secondarie coerenti. Nessuna scansione automatica di10pagine o servizi nuovi.
+
+Backlog consolidato frontend7/backend5: Ludo/Motore/browser e osservabilità già aperti includono questo feedback, nessun job duplicato. Prova telefono dopo consegna verificata: due esplorazioni ravvicinate, frecce, dettagli/sospesi, ritorno in Ludo, query casuale/prezzi, font grande. CI/firma/Firebase da registrare in STATE.
+
+
 ## Feedback23:43 — false code Motore149 e correzione150
 
 Utente «Risolvi»23:46 autorizza correzione circoscritta. Diagnostica149:788 firme,19 CLASSIFIER_BLOCKED,12 BGG/URL qualificati,analysisPending0/coreRemaining0,8 core-complete listings; UI19 da riconoscere,5 verifica,3 pronti. Zeri BGG/link sono occupazione corrente, non throughput cumulativo. Codice EnginePipelineSql ammetteva BLOCKED_CLASSIFIER senza gioco nella fase0; phaseState etichettava ogni stock inattivo come coda. engineRunACTIVE entro3min dall’ultima osservazione riflette il raggruppamento, non prova worker attivo.

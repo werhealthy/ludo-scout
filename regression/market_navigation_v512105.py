@@ -59,6 +59,7 @@ public class MarketNavigationRegression extends ScreenBase {
     }
     void persistTransientUiSession(){}
  void openLudoHome(){tab="companion";}
+ void openLudoExploration(){tab="companion";}
  int roomPositionRecords,roomEntries;
     void recordLudoRoomPosition(){if("companion".equals(tab))roomPositionRecords++;}
     void prepareLudoNavigation(String value){if("companion".equals(value)&&!"companion".equals(tab))roomEntries++;}
