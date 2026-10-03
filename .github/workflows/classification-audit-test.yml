@@ -1,0 +1,50 @@
+name: Classification audit export Android
+on:
+  pull_request:
+    branches: [beta]
+jobs:
+  audit:
+    if: github.head_ref == 'backend/classification-audit-export'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Execute SQLite audit selections
+        run: python3 regression/classification_audit_export.py
+      - name: Prepare test signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=Audit Test,O=Ludo Scout,C=IT"
+      - name: Build actual exporter and Android tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon -PLUDO_AUDIT_TEST=true :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Execute Android SQLite and ZIP fixture
+        timeout-minutes: 6
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          sudo apt-get update -qq
+          sudo apt-get install -y libpulse0
+          sudo chmod 666 /dev/kvm
+          sdkmanager "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/ludo-audit-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd --force -n ludo-audit -p "$ANDROID_AVD_HOME/ludo-audit.avd" -k "system-images;android-35;google_apis;x86_64"
+          trap 'cat emulator.log || true' EXIT
+          "$ANDROID_HOME/emulator/emulator" -avd ludo-audit -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > emulator.log 2>&1 &
+          timeout 120 adb wait-for-device
+          for attempt in $(seq 1 60); do
+            if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; then break; fi
+            sleep 2
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          timeout 90 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.AuditExportInstrumentation | tee audit-test-result.txt
+          adb logcat -d -s LudoAudit:I AndroidRuntime:E '*:S'
+          grep -F 'Audit export Android SQLite and ZIP passed' audit-test-result.txt
