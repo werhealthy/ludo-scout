@@ -19,7 +19,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  private void set(Activity a,String name,Object value)throws Exception{Field f=a.getClass().getDeclaredField(name);f.setAccessible(true);f.set(a,value);}
  private void invoke(Activity a,String name)throws Exception{Method m=a.getClass().getDeclaredMethod(name);m.setAccessible(true);m.invoke(a);}
  private TextView text(View root,String label){
-  if(root instanceof TextView && label.contentEquals(((TextView)root).getText()))return (TextView)root;
+  if(root instanceof TextView && (label.contentEquals(((TextView)root).getText()) || label.equals(root.getContentDescription()==null?null:root.getContentDescription().toString())))return (TextView)root;
   if(root instanceof ViewGroup)for(int i=0;i<((ViewGroup)root).getChildCount();i++){TextView result=text(((ViewGroup)root).getChildAt(i),label);if(result!=null)return result;}
   return null;
  }
