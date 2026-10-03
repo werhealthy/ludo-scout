@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Backend162 — frecce e comprimi/espandi, distribuita
+
+Feedback dopo161: l'utente conferma che Vinted carica; segnala frecce sempre disabilitate e chiede un pulsante comprimi/espandi esposto. Consolidato nel gruppo browser esistente, frontend7/backend5 aperti.
+La pagina poteva restare bloccata con una carta senza prezzo: MarketStore salva lo snapshot parziale ma non crea una riga canonica.162 separa snapshot durabili e catalogWrites; contatore/gate usano gli snapshot salvati, prezzi/eligibilità invariati. Identità sanificata rivalidata prima del salvataggio. Next conserva settlement, conteggi, errori/animazione e verifica JS live al clic; precedente resta spenta sulla pagina1.
+Pulsante FontAwesome COMPRESS/EXPAND48dp nel header SEARCH, stessa azione del menu e label TalkBack aggiornate. Espanso↔compresso conserva URL/token/dati; parametri del contatore reimpostati MATCH_PARENT/WRAP/weight0 tornando espanso, correggendo la geometria ereditata. Stati manuale/cattura invariati. Nessuno schema/dipendenza/filtro/soglia/sicurezza/servizio/reset/rete extra di cattura.
+PR222 da betabc8565455a655f24a67601fcd2d90dfbd5526374; HEADa59386f2bbbbce963a7ab63288b4d0a7c0cd1801, merge4ffef0daab65ed94a08615fc2d050e2a0313670f. Condivisi VintedBrowserActivity/LudoIcons; test, workflow PR e release.
+RED37150063795 riproduce blocco dopo snapshot parziale e pulsante assente. Node locale46/46. CI finale37151334172 SUCCESS: job111285689865 suite SQL/JVM, Android unit, Java/APK;111285689921 Activity+SQLite reale, blocco prima del settlement, nessun prezzo canonico inventato, proiezione invalida, toggle senza reset e geometria roundtrip, tre stati font100/200%. Sequenza della fixture corretta dopo timeout locale; ispezione visiva ha rilevato/corretto il contatore scomparso al ritorno espanso. Review finale sullo stesso HEAD senza findings. Lint5errori preesistenti fuori browser/100warning invariati; nessuna accettazione Vinted live/telefono dedotta dalla CI.
+
+Distribuita **5.12.162-vinted-controls (1000185)**, localCode211. Android beta185/run37151712844/job111286793299 SUCCESS sul merge: suite/unit/APK firmata. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T20:34:21.3846139Z; upload Firebase20:34:59.2545535Z e distribuzione tester/gruppi distinta20:35:00.1727199Z. Release4b50mi23ss5dg. Artifact GitHub indisponibile per quota storage, Firebase riuscito.
+
+Telefono: aggiornare da App Tester senza cancellare dati, aprire Trova nuovi giochi, attendere il salvataggio e provare pagina1→2→1; su pagina1 precedente resta correttamente spenta. Comprimere ed espandere col pulsante in alto: pagina e conteggio restano uguali, contatore visibile al ritorno espanso. A font200% i controlli espansi restano scrollabili nel limite55%; usare compressione per vedere subito le frecce. Se Next resta bloccata, restituire ⋮→Dati della cattura→Copia report completo162 (pageObserved/pageSnapshotsSaved/catalogWrites/pageDrained/nextEnabled/errori). Frontend7/backend5 gruppi aperti. Unico prossimo passo raccomandato: prova162 sul telefono di due pagine e del toggle.
+
+
 ## Backend161 — session-refresh consentito senza cattura, distribuita
 
 Report160 del telefono21:23Europe/Rome2026-10-03 identifica https://www.vinted.it/session-refresh, PATH_NOT_ALLOWED, override. Autorizzazione esplicita21:27: solo questo percorso sui domini Vinted già consentiti, cattura sospesa fino al ritorno agli annunci.
