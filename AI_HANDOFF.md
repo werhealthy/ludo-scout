@@ -1,5 +1,16 @@
 # Ludo Scout — AI handoff
 
+## Feedback 02:55 — Ludo integrato, scelte browser e cattura per pagina
+
+La 153 non è accettata visivamente: motore percepito come collage, shortcut Motore in Home superfluo, richiesti Ludo al centro dei collegamenti, bilancio in alto, ricerca primaria e gerarchie/padding migliori. Browser: Sorprendimi e filtri subito accessibili, menu leggibili con icone e descrizioni, font del sistema, grande contatore progressivo dei salvati e Next disabilitato durante acquisizione/salvataggio. Feedback consolidato nei gruppi esistenti: frontend7/backend5, nessun nuovo gruppo.
+
+Branch backend/ludo-capture-progress da beta2ccb7bde (154): composizione compatta, panorama mensile prima della ricerca, ritratto vettoriale Ludo con sguardo alla fase realmente attiva e adattamento alla vista verticale. Shortcut Home rimosso, numeri e criteri invariati. Browser con scelte custom, Sorprendimi/filtri diretti e conteggio animato accelerato dei soli ID realmente persistiti. Next richiede checkpoint della pagina corrente, conteggi coerenti, nessun errore/animazione in corso e seconda verifica JS del DOM al clic. Lettura/risposte del sito e ack di salvataggio separati dal semplice WebView load. Nessuna attesa dei job BGG; nessuna richiesta aggiuntiva/scroll automatico/reset/schema/dipendenza/soglia nuova.
+
+Completamento riguarda gli annunci già caricati e riconosciuti nella pagina, non un totale remoto presunto: se il sito carica nuovi annunci, il gate si richiude. Errori/limiti esposti con ricaricamento esplicito. Contatore disattiva movimento se Android lo richiede; cattura e scritture non vengono ritardate dall’animazione.
+
+Verifiche branch: 43 test Node passati; review indipendente ha individuato DOM mutation→Next e sguardo nella vista verticale, corretti con test DOM aggiuntivo. Test JVM del predicato nativo e direzioni preparato per CI (Java locale indisponibile). Build/CI e distribuzione da confermare. Telefono ancora da verificare: percorso Ludo, font200%/TalkBack, contatore pagina1→2, Next durante lettura/retry e dopo salvataggio, Sorprendimi/filtri. Nessuna accettazione visiva/prestazioni dichiarata.
+
+
 ## Ludo153 — esplorazione e bilancio giornaliero, distribuita
 
 Richiesta01:40Europe/Rome: integrare ricerca e Motore in Ludo, conservare nei cerchi i risultati della giornata e mostrare il contributo dello scroll con frecce, esplorazioni Vinted centrali. Distribuita **5.12.153-ludo-exploration (1000176)**, localCode202. Preservati Ludo151 e Catalogo/Bundle152.
@@ -678,4 +689,5 @@ Il processo UI non deve invocare MarketStore.reconcileQueue né sweep/cleanup su
 ## 5.12.45 Activity snapshot recovery (2026-09-22)
 
 Invariante UI: renderEngineOverview ed engineCurrentRunHero non devono accedere direttamente a DealDatabase o MarketStore. Tutte le letture per Attività passano da EngineOverviewSnapshot caricato su uiDataIo con single-flight; il main thread mostra un placeholder e renderizza solo dati già pronti.
+
 

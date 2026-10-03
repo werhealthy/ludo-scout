@@ -1,5 +1,16 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Feedback 02:55 — Ludo integrato, scelte browser e cattura per pagina
+
+La 153 non è accettata visivamente: motore percepito come collage, shortcut Motore in Home superfluo, richiesti Ludo al centro dei collegamenti, bilancio in alto, ricerca primaria e gerarchie/padding migliori. Browser: Sorprendimi e filtri subito accessibili, menu leggibili con icone e descrizioni, font del sistema, grande contatore progressivo dei salvati e Next disabilitato durante acquisizione/salvataggio. Feedback consolidato nei gruppi esistenti: frontend7/backend5, nessun nuovo gruppo.
+
+Branch backend/ludo-capture-progress da beta2ccb7bde (154): composizione compatta, panorama mensile prima della ricerca, ritratto vettoriale Ludo con sguardo alla fase realmente attiva e adattamento alla vista verticale. Shortcut Home rimosso, numeri e criteri invariati. Browser con scelte custom, Sorprendimi/filtri diretti e conteggio animato accelerato dei soli ID realmente persistiti. Next richiede checkpoint della pagina corrente, conteggi coerenti, nessun errore/animazione in corso e seconda verifica JS del DOM al clic. Lettura/risposte del sito e ack di salvataggio separati dal semplice WebView load. Nessuna attesa dei job BGG; nessuna richiesta aggiuntiva/scroll automatico/reset/schema/dipendenza/soglia nuova.
+
+Completamento riguarda gli annunci già caricati e riconosciuti nella pagina, non un totale remoto presunto: se il sito carica nuovi annunci, il gate si richiude. Errori/limiti esposti con ricaricamento esplicito. Contatore disattiva movimento se Android lo richiede; cattura e scritture non vengono ritardate dall’animazione.
+
+Verifiche branch: 43 test Node passati; review indipendente ha individuato DOM mutation→Next e sguardo nella vista verticale, corretti con test DOM aggiuntivo. Test JVM del predicato nativo e direzioni preparato per CI (Java locale indisponibile). Build/CI e distribuzione da confermare. Telefono ancora da verificare: percorso Ludo, font200%/TalkBack, contatore pagina1→2, Next durante lettura/retry e dopo salvataggio, Sorprendimi/filtri. Nessuna accettazione visiva/prestazioni dichiarata.
+
+
 ## Frontend154 — ricerca live, anteprime coerenti ed Esplora semplice, distribuita
 
 Feedback02:23Europe/Rome:152 non accettata visivamente. Richiesti niente banner Gioco separati, anteprime simili agli annunci senza prezzo, ricerca mentre si scrive già dalla prima lettera, apertura schede meno bloccante ed eliminazione delle frasi confuse dopo esplorazione. Distribuita **5.12.154-live-catalog (1000177)**, localCode203. Ludo/esplorazione153 integrata e preservata; questo feedback supersede la composizione hero152.
@@ -666,4 +677,5 @@ User requested immediate grouped corrections on2026-10-01 20:43 Europe/Rome: cre
 - Test-only PR315 reproduced missing durable preferences, and PR318 reproduced missing distinct-game cycle APIs. Final executable Java regression verifies save/remove/reload/identity, canonical cycling and extracted real Activity methods for selection during refresh, removed-offer fallback, recreation and overlay/focus/lifecycle gates. Platform adapters are stubbed; this is not an Android device restart/instrumentation test. Existing pure pet lifecycle harness retains its12 cases.
 - Old UX guard corrected to explicitly inspect Home physical renderer instead of a coincidentally nearby default detail constructor; BGG content/price/route guards retained. Independent re-review of finala3127101338faa69226dc79a52158a88789ec063 found no remaining critical/important issues after duplicate-cycle, refresh-race and overlay-motion corrections.
 Phone acceptance: floor/plinth contact and depth at cover aspect ratios, backdrop crop, full pet/box and readable explanation at large fonts/small screens, Favorites save/remove reflected on multiple listings, return/restart retains last game, unavailable offer fallback, pet touch and pause/resume/disabled animation, scrolling/memory. CI does not prove visual acceptance, actual SharedPreferences process durability or frame time.
+
 
