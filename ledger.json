@@ -1,1 +1,1 @@
-{"version": 1, "disabled": false, "months": {}}
+{"version": 1, "disabled": false, "months": {"2026-10": {"reserved_eur": ".01", "calls_reserved": 1, "operations": {"37162021933": {"reserved_eur": ".01", "calls_reserved": 1, "responses": [{"status": "RESERVED_REQUEST_UNKNOWN", "model": "gemini-3.1-flash-lite", "actual_billed_eur": null}]}}}}}
