@@ -1,0 +1,36 @@
+name: Opt-in free Gemini benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_free_tier:
+        description: 'Confirm this API key project has no paid billing. 64 records / 8 calls / expected EUR0; conservative reserved ceiling EUR0.08.'
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: classification-ai-ledger
+  cancel-in-progress: false
+jobs:
+  benchmark:
+    if: github.ref == 'refs/heads/beta' && inputs.confirm_free_tier && vars.AI_BENCHMARK_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline tests (no provider credentials)
+        run: |
+          python3 regression/classification_benchmark_test.py
+          python3 regression/classification_runner_test.py
+      - name: Bounded manual benchmark (no retries)
+        env:
+          AI_BENCHMARK_ENABLED: ${{ vars.AI_BENCHMARK_ENABLED }}
+          CONFIRM_FREE_TIER: ${{ inputs.confirm_free_tier }}
+          AI_MONTHLY_BUDGET_EUR: ${{ vars.AI_MONTHLY_BUDGET_EUR || '1' }}
+          AI_BATCH_BUDGET_EUR: ${{ vars.AI_BATCH_BUDGET_EUR || '.10' }}
+          GH_TOKEN: ${{ github.token }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python3 tools/classification_benchmark_runner.py

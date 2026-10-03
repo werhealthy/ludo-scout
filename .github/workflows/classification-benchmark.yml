@@ -3,7 +3,10 @@ on:
   pull_request:
     branches: [beta]
     paths:
-      - 'tools/classification_benchmark.py'
+      - 'tools/classification*.py'
+      - 'regression/classification_runner_test.py'
+      - 'regression/fixtures/classification_*64.json'
+      - '.github/workflows/classification-ai-benchmark.yml'
       - 'regression/classification_benchmark_test.py'
       - 'regression/fixtures/classification_smoke.json'
       - '.github/workflows/classification-benchmark.yml'
@@ -16,3 +19,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 regression/classification_benchmark_test.py
+      - run: python3 regression/classification_runner_test.py
