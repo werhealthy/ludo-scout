@@ -1,5 +1,20 @@
 # Ludo Scout — Current state
 
+## Backend AI — runner gratuito protetto integrato, prova provider ancora da avviare
+
+PR229 HEAD8d544baeea859be54acc9035de070aa923d7062d, merge2d59e69fd194086543dffbc0e8ef11b89cc89f21 da betae7f126ec. Runner/workflow separati dall’app, manuali e spenti per default, Gemini3.1FlashLite fisso. Solo64 titoli/brand/ID al provider,8call massimo per operazione **e mese**, nessun retry/fallback/search/foto/Vinted/database/catalog write. SecretGEMINI_API_KEY solo Actions, mai letto da questa chat. Richiede variableAI_BENCHMARK_ENABLED=true e confermaFreeTier nel dispatch; key vuota blocca prima del ledger. Nessun servizio pagato attivato né richiestaGemini eseguita.
+
+Budget1EUR/mese iniziale, batch0.10EUR (configurabili solo verso il basso); riserva0.01EUR/call, max0.08EUR per64, preflight intero batch. FreeTier utente→0EUR attesi, billing non verificabile dal runner. Usage/stima if-billed separati da actualinvoice=null. Ledger branchai-benchmark-ledger conCAS prima di ogni tentativo, fallimenti/interruzioni conservano riserva, assenza/corruzione su branch esistente blocca. Bootstrap nuovo ledger durabile. Kill ledgerdisabled=true prima della prossima call;CancelActions interrompe run;variablefalse solo nuove run. Concurrencyglobale/timeout10min. Nessun hardstop provider attivato; pipeline runtime AI resta futura.
+
+Campione64 controllato: fixtureinput soloID/titolo/brand; fixture reference conserva il contesto precedente offline, mai inviato al provider.44 riferimenti di tipo sul testo (produttore ove disponibile),20PENDING esclusi dal punteggio. Non ground truth contenuto fisico/edizione/BGG; linguaUNKNOWN, confidence non calibrata. Report conserva vecchio/proposto/review/evidenza/usage e scope metriche44; accuracy globale=null. Nessuna identitàBGGvalidata,99% o costo reale misurato. Archivio originale invariato SHA256b3862e7b71a3d64c44dd28c9f5b0e16cc769447aa19d46f9276689b716a9f9b2; audit9705 listings ancora valido, nessunmassbatch autorizzato.
+
+Verifica reale:18 test locali(9runner+9compare),compilePython e SQLexporter readonly passati. Reviewindipendente ha corretto bootstrap iniziale e verificato finale senzaCritical/Important; usage numerico conservato anche su risposte invalide, corpi errori/secret non loggati. CI37160634690 offline SUCCESS; CI37160634532/job111313155698 SUCCESS suite regressioniSQL/JVM/browser,unitpricing,Java/APKreview. Visual/lint jobs saltati per scope; providerHTTP/persistenzaGitHublive non ancora esercitati. NessunAPK/versionbump/distribuzione nuova necessaria; merge[skipci] evita duplicati.
+
+PR230 registra solo lo stesso workflow sul defaultbranchmain per rendere disponibile il pulsanteRunWorkflow (GitHub richiede file suldefaultbranch):HEAD4dbe832f,mergea69807359f9d1fc7d11ec1bcdf234a9566e9cd39. Unico file,nessuna promozioneapp/beta inmain; job bloccato se ref nonbeta. Eccezione operativa di registrazione, implementazione e fonteoperativa restano beta. Fonte https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow .
+
+Frontend7/backend6 gruppi aperti. Nessuna prova telefono richiesta. Unico prossimo passo: guidare abilitazione manuale Variables, quindi una sola prova gratuita confermata su64; esaminare errori/UNKNOWN e limiti dei riferimenti prima di qualsiasi integrazione o bonifica completa. Se keynonpresente, inserimento manuale inGitHubSecret, mai inchat/APK. Le sezioni precedenti con runner/ledger da implementare sono supersedute da questo checkpoint.
+
+
 ## Backend AI — comparatore offline integrato, benchmark64 pendente
 
 PR227 HEAD8ab19f4dd4688bd060ae327c045bc79075493945, merge830705850e5abedc29ecaf03a3e78cf06a6ea526 da beta2369a9e. Tool Python senza provider/API/key/rete/SQLite/apply, fixture normalizzata8 annunci delle risposte manuali AI Studio e workflow di verifica. Campione privato64 selezionato e prompt titolo/brand senza precedenti match preparato solo nel workspace; archivio/dataset privato non committati. Nessuna chiamataAI di questa consegna o costo, nessunAPK/version bump.
