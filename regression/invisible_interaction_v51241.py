@@ -48,13 +48,13 @@ checks=[
      "installPullToGame(sc,pullHint,game.id,dialog)" in detail and
      '"Rilascia per aprire la scheda gioco"' in ui),
     ("game detail opens directly without catalog routing",
-     "uiDataIo.execute" in overlay and
+     "detailIo.execute" in overlay and
      'tab="database"' not in overlay and
      "renderDatabaseDetailInto(host,ready,dialog::dismiss,snapshot)" in overlay and
      overlay.index("loadGameDetailData(g)") < overlay.index("runOnUiThread")),
-    ("UI data has dedicated executor",
+    ("UI data and game detail have separate dedicated executors",
      "ExecutorService uiDataIo=Executors.newSingleThreadExecutor()" in ui and
-     "uiDataIo.shutdownNow()" in ui),
+     "uiDataIo.shutdownNow()" in ui and "detailIo.shutdownNow()" in ui),
     ("Activity indicator never queries SQLite on the main thread",
      "marketStore.jobSummary()" not in indicator and
      "marketStore.vintedReviewCount()" not in indicator and

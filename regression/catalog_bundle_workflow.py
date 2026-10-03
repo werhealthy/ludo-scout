@@ -138,3 +138,37 @@ print('PASS shared game/listing card grammar, listing-only price, worker detail 
 assert 'return catalogGameCard(g)' in method('private View databaseGameCard(')
 assert 'openDatabaseGame(gameId,gameSource)' in shared
 print('PASS complete game results reuse the same price-free cards and source-aware Back')
+
+# Local mutations must invalidate before the reference-refresh early return.
+refresh=method('private void refreshMarketReferencesAsync(')
+assert refresh.index('invalidateReadSnapshots()') < refresh.index('if(marketReferenceRefreshInFlight')
+assert 'recordLudoRoomPosition();renderInProgress=true' in method('private void render(')
+assert 'recordScroll(scroll.getScrollY())' not in method('private void renderCompanion(')
+assert 'persistTransientUiSession();queueCatalogSearch(180)' in method('private void renderCatalog(')
+assert '"all".equals(preset)){navigate("catalog");return;}' in method('private void openCatalogPreset(')
+assert 'productSectionPositions.put(key,selected)' in method('private void addProductTabs(')
+assert 'productSection_' in method('private void addProductTabs(')
+
+# Execute real top-level navigation and Ludo scroll capture, rather than asserting
+# fields simply exist. Explicit presets are separate actions from returning home.
+navigation=r'''
+package it.vintedaffari.app;
+import java.util.*;
+class TextUtils {static boolean isEmpty(String s){return s==null||s.isEmpty();}}
+public class RetainedNavigationRegression {
+ String tab="companion",renderedLudoRoom=LudoRoomState.HOME,query="Carcassonne",sort="price",returnTab="discover",engineSection="overview",databaseDetailReturnTab="";
+ long selectedGameId,engineEnteredAt;boolean openingPreset;int catalogVisible=72;
+ LudoRoomState ludoRooms=new LudoRoomState(LudoRoomState.HOME,12,34,345);
+ Map<String,Integer> tabScrollPositions=new HashMap<>();ArrayDeque<String> tabHistory=new ArrayDeque<>();Scroll scroll=new Scroll();Handler uiUpdates=new Handler();int exploreOpens;
+ static class Scroll {int y=345;int getScrollY(){return y;}void scrollTo(int x,int y){this.y=y;}}
+ static class Handler {void postDelayed(Runnable r,long delay){r.run();}}
+ LudoRoomState ludoRoomState(){return ludoRooms;}void saveLudoRooms(){}void openLudoExploration(){exploreOpens++;}void openLudoHome(){}void closeDatabaseGame(){}void recordAction(String s){}void requestEngineOverviewSnapshot(){}void persistTransientUiSession(){}void renderNav(){}void updateActivityIndicator(){}void scheduleRender(long delay){}
+ static void eq(Object a,Object b){if(!Objects.equals(a,b))throw new AssertionError(a+" != "+b);}
+ public static void main(String[] args){RetainedNavigationRegression n=new RetainedNavigationRegression();n.navigate("discover");eq(LudoRoomState.HOME,n.ludoRooms.room());eq(345,n.ludoRooms.position(LudoRoomState.HOME));n.navigate("catalog");eq("Carcassonne",n.query);eq("price",n.sort);eq(72,n.catalogVisible);n.scroll.y=987;n.navigate("discover");n.navigate("catalog");eq(987,n.scroll.y);eq("Carcassonne",n.query);n.navigate("companion");eq(LudoRoomState.HOME,n.ludoRooms.room());eq(345,n.scroll.y);n.navigate("companion");eq(LudoRoomState.HOME,n.ludoRooms.room());eq(0,n.exploreOpens);System.out.println("PASS Ludo Library/Home/Ludo, Catalog query/filter/page/scroll through Home, repeated current tab");}
+ __METHODS__
+}
+'''.replace('__METHODS__',method('private void navigate(')+'\n'+method('private void prepareLudoNavigation(')+'\n'+method('private void recordLudoRoomPosition('))
+with tempfile.TemporaryDirectory() as temp:
+ p=Path(temp)/'RetainedNavigationRegression.java';p.write_text(navigation)
+ subprocess.run(['javac','-d',temp,str(p),str(root/'app/src/main/java/it/vintedaffari/app/LudoRoomState.java')],check=True)
+ subprocess.run(['java','-cp',temp,'it.vintedaffari.app.RetainedNavigationRegression'],check=True)
