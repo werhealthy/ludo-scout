@@ -50,7 +50,8 @@ checks=[
     ("game detail opens directly without catalog routing",
      "uiDataIo.execute" in overlay and
      'tab="database"' not in overlay and
-     "renderDatabaseDetailInto(host,ready,dialog::dismiss)" in overlay),
+     "renderDatabaseDetailInto(host,ready,dialog::dismiss,snapshot)" in overlay and
+     overlay.index("loadGameDetailData(g)") < overlay.index("runOnUiThread")),
     ("UI data has dedicated executor",
      "ExecutorService uiDataIo=Executors.newSingleThreadExecutor()" in ui and
      "uiDataIo.shutdownNow()" in ui),
