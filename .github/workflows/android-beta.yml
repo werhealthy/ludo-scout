@@ -275,6 +275,8 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Run unified catalog and bundle workflow regression
+        run: python3 regression/catalog_bundle_workflow.py
       - name: Run pricing unit tests
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 
