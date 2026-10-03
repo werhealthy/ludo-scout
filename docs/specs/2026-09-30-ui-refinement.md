@@ -1,5 +1,16 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Browser162 — pulsante comprimi/espandi esposto, distribuita
+
+Feedback successivo alla161: caricamento Vinted confermato dall'utente; frecce sempre disabilitate e richiesto un pulsante classico esposto per comprimere/espandere l'interfaccia.162 aggiunge nel header SEARCH il pulsante FontAwesome COMPRESS/EXPAND48dp, con descrizione TalkBack aggiornata e stessa azione del menu. Espanso↔compresso mantiene pagina, token e dati; il contatore riceve parametri corretti quando torna al layout espanso, senza ereditare larghezza zero/peso della riga compressa. Header aggiornato: chiudi/Vinted/comprimi-espandi/overflow. Stati e stile159 preservati.
+
+Frecce: Next usa tutti gli snapshot realmente salvati, inclusi quelli parziali senza prezzo; catalogWrites continua a indicare le righe canoniche, nessun prezzo/criterio inventato. Gate nativo e JS/settlement/errori restano richiesti. Precedente spenta solo al limite pagina1 nelle condizioni normali.
+
+PR222, HEADa59386f, merge4ffef0d; CI37151334172 SUCCESS: regressioni/unit/Java/APK, Activity+SQLite, pulsante/nessun reset/geometria, rendering100/200% locale. Review finale senza findings. Lint5errori preesistenti fuori browser/100warning. Distribuita5.12.162(1000185) su Firebase, upload20:34:59UTC e distribuzione distinta20:35:00UTC2026-10-03, beta185/run37151712844 con firma attesa verificata. Dettagli inSTATE.md; non dichiarato Vinted live dai test.
+
+Telefono: aggiornare senza cancellare dati, due pagine avanti/indietro e roundtrip comprimi/espandi, conteggio/pagina invariati e contatore visibile al ritorno espanso; font grandi, controlli espansi scrollabili. Se bloccato, report completo162 da menu Dati della cattura. Frontend7/backend5 aperti: consolidato nel gruppo browser/Wizard, nessun nuovo gruppo. Unico prossimo passo: accettazione162 sul telefono.
+
+
 ## Browser Vinted159 — direzione approvata, implementata e distribuita
 
 Il riferimento principale sono le tre immagini fornite nella chat: Esplora espanso con Ordine globale Rilevanti/Nuovi, Sorprendimi, Cacce con cuore, soglia massima attivabile/stepper, chip Giochi da tavolo, contatore reale e pagine centrate; Esplora compresso con sole frecce/contatore/pagina; Match manuale con badge e card «Ludo in pausa — Stai cercando manualmente su Vinted», senza CTA Leggi/Torna. Header chiudi/Vinted/overflow; nessuna uscita dall'app nel menu. Superati Nuova esplorazione, Ricerca e filtri, pannello filtri ridondante e pausa/fotocamera esposti in Esplora. Cacce usa i preferiti BGG esistenti; scegliere un titolo conserva ordine/soglia. Categoria fissa non rimovibile, senza chip di rimozione fittizio.
