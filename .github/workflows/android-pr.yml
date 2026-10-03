@@ -44,7 +44,9 @@ jobs:
           cache: gradle
 
       - name: Verify Ludo daily journey and exploration
-        run: python3 regression/ludo_exploration.py
+        run: |
+          python3 regression/ludo_exploration.py
+          python3 regression/browser_page_progress.py
 
       - name: Verify durable browser engine intake
         run: |
@@ -279,6 +281,7 @@ jobs:
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=PR Review,O=Ludo Scout,C=IT"
       - name: Build review APK
         run: ./gradlew --no-daemon :app:assembleDebug
+
 
 
 
