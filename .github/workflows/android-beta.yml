@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Verify supplied Ludo visual universe
+        run: python3 regression/ludo_visual_universe.py
       - name: Run featured pedestal regression
         run: python3 regression/featured_pedestal_v51296.py
       - name: Run Home reference and waiting scroll regression
@@ -47,6 +49,7 @@ jobs:
       - name: Verify Ludo daily journey and exploration
         run: |
           python3 regression/ludo_exploration.py
+          python3 regression/ludo_journey_layout.py
           python3 regression/browser_page_progress.py
 
       - name: Verify durable browser engine intake
@@ -330,6 +333,7 @@ jobs:
             --app "$FIREBASE_APP_ID" \
             --testers "$FIREBASE_TESTERS" \
             --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+
 
 
 

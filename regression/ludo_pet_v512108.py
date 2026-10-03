@@ -68,7 +68,7 @@ assert 'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui
 assert 'addLudoRoomTab(tabs,"Libreria",LudoRoomState.HOME)' in ui
 assert 'addLudoRoomTab(tabs,"Cacce",LudoRoomState.HUNTS)' in ui
 assert 'refreshHost.setRoomSwipeHandler' in ui
-assert 'actorView.setIllustration(art)' in ui and 'ludoFireplaceBackground()' in ui
+assert 'actor.setIllustrations(art)' in ui and 'sceneAsset(LudoArt.image(mood))' in ui, 'Supplied pet states must use the existing cached decoder'
 assert 'Avvia nuove ricerche · test' not in ui
 assert 'https://www.vinted.it/catalog?search_text=catan' not in ui
 print("PASS Ludo composition: preserved library route, real collection, three selector tabs and themed scenes")
