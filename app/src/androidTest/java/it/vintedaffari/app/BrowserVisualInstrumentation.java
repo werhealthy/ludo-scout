@@ -27,13 +27,16 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   for(int offset=0,index=0;offset<encoded.length();offset+=3000,index++)android.util.Log.i("LudoVisual","VISUAL "+(a.getResources().getConfiguration().fontScale>1.3f?"large_":"normal_")+name+" "+index+" "+encoded.substring(offset,Math.min(offset+3000,encoded.length())));
   original.recycle();reduced.recycle();
  }
- private void checkRealNavigationClient(Activity screen)throws Exception{
-  WebView web=(WebView)get(screen,"web");web.stopLoading();WebViewClient client=web.getWebViewClient();
-  android.webkit.WebResourceRequest request=new android.webkit.WebResourceRequest(){
-   public android.net.Uri getUrl(){return android.net.Uri.parse("https://www.vinted.it/login?token=secret#secret");}
+ private android.webkit.WebResourceRequest pageRequest(String url){
+  return new android.webkit.WebResourceRequest(){
+   public android.net.Uri getUrl(){return android.net.Uri.parse(url);}
    public boolean isForMainFrame(){return true;}public boolean isRedirect(){return true;}public boolean hasGesture(){return false;}
    public String getMethod(){return "GET";}public java.util.Map<String,String> getRequestHeaders(){return java.util.Collections.emptyMap();}
   };
+ }
+ private void checkRealNavigationClient(Activity screen)throws Exception{
+  WebView web=(WebView)get(screen,"web");web.stopLoading();WebViewClient client=web.getWebViewClient();
+  android.webkit.WebResourceRequest request=pageRequest("https://www.vinted.it/login?token=secret#secret");
   if(!client.shouldOverrideUrlLoading(web,request))throw new AssertionError("blocked route escaped policy");
   if(!"PAGE_BLOCKED".equals(get(screen,"state")))throw new AssertionError("real override did not record PAGE_BLOCKED");
   if((Boolean)get(screen,"loading")||(Boolean)get(screen,"accepting")||(Boolean)get(screen,"pageDrained"))throw new AssertionError("blocked page remained active");
@@ -65,6 +68,12 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   client.onPageFinished(web,"https://www.vinted.it/catalog/old");client.onPageFinished(web,"https://www.vinted.it/login");
   if(!"LOADING".equals(get(screen,"state"))||(Boolean)get(screen,"accepting"))throw new AssertionError("stale finish crossed started retry");
   if(!"LOADING".equals(get(screen,"state")))throw new AssertionError("new allowed navigation retained blocking state");
+  client.shouldOverrideUrlLoading(web,request);((View)get(screen,"status")).performClick();
+  String redirected="https://vinted.it/catalog/4881-board-games?page=1";
+  if(client.shouldOverrideUrlLoading(web,pageRequest(redirected)))throw new AssertionError("permitted redirect was blocked");
+  client.onPageStarted(web,redirected,null);client.onPageFinished(web,redirected);
+  if((Boolean)get(screen,"retryPending")||(Boolean)get(screen,"loading")||(Boolean)get(screen,"pageFailed"))throw new AssertionError("allowed redirect stalled retry");
+  web.stopLoading();
  }
  
  @Override public void onStart(){Bundle result=new Bundle();Activity a=null;try{
