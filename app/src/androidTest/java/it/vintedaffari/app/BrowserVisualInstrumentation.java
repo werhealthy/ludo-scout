@@ -19,7 +19,7 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
  private void invoke(Activity a,String name)throws Exception{Method m=a.getClass().getDeclaredMethod(name);m.setAccessible(true);m.invoke(a);}
  @SuppressWarnings({"unchecked","rawtypes"}) private void state(Activity a,String name)throws Exception{Field f=a.getClass().getDeclaredField("uiState");f.setAccessible(true);f.set(a,Enum.valueOf((Class)f.getType(),name));set(a,"enabled",!name.equals("manualMatch"));invoke(a,"refreshStatus");}
  private void capture(Activity a,String name)throws Exception{
-  waitForIdleSync();Bitmap original=getUiAutomation().takeScreenshot();if(original==null)throw new AssertionError("no screenshot");
+  waitForIdleSync();getUiAutomation().waitForIdle(200,5000);Bitmap original=getUiAutomation().takeScreenshot();if(original==null)throw new AssertionError("no screenshot");
   Bitmap reduced=Bitmap.createScaledBitmap(original,432,Math.round(original.getHeight()*432f/original.getWidth()),true);
   java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);
   String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);
