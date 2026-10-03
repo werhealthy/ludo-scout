@@ -1,5 +1,19 @@
 # Ludo Scout — Current state
 
+## Backend AI — comparatore offline integrato, benchmark64 pendente
+
+PR227 HEAD8ab19f4dd4688bd060ae327c045bc79075493945, merge830705850e5abedc29ecaf03a3e78cf06a6ea526 da beta2369a9e. Tool Python senza provider/API/key/rete/SQLite/apply, fixture normalizzata8 annunci delle risposte manuali AI Studio e workflow di verifica. Campione privato64 selezionato e prompt titolo/brand senza precedenti match preparato solo nel workspace; archivio/dataset privato non committati. Nessuna chiamataAI di questa consegna o costo, nessunAPK/version bump.
+
+Audit archivio163 ricevuto:9705 listings/569ACTIVE,6077 testo acquisito non necessariamente descrizione completa,3702 ID/URL,386 listings con1460 URL foto distinti non verificati;3954 snapshot/656 ID aggiuntivi, senza foto/descrizioni esportate. Fonti osservazioni/legacy non sommate al canonical. Screenshot/risposte utente: Gemini3FlashPreview ThinkingHigh, poi SearchOFF e Gemini3.1FlashLite SearchOFF. Categorie8/8 concordanti NON accuracy; tre lingueIT/DE/IT prive di evidenza del prodotto inFlashLite. Nessuna verifica identitàBGG né benchmark64 eseguito. Spec backend contiene audit/scope/uso, i riferimenti precedenti 'archivio non ricevuto' sono superati da questa sezione.
+
+Compare conserva classi precedenti osservazioni, UNKNOWN/missing/unrecognized distinti, confidenzaautodichiarata non calibrata, proposte e flagreview, BGGverificato=false, costo=null senzausage. Questa versione titolo/brand forza linguaUNKNOWN anche davanti a dichiarazioni testuali esplicite: supporto evidenza prodotto/OCR/vision futuro. Matriceconfusione, precision/accuracy solo con annotazioni indipendenti; senza annotazioni restano null. Fileanswers non può essere usato come references (resolve/samefile); indipendenza di file distinti resta dichiarazione del fornitore, non verificata. Output esclusivo, mai sovrascriveinputs. Nessun cambiamento a produzione/classifier/soglie/schema/privacy/dipendenze.
+
+Verifica reale: RED9casi poi GREEN9test locali, regression exporter SQL invariato. Review indipendente ha corretto UNKNOWN conteggiato come classe conosciuta e autovalutazione answers=references; finale senzaCritical/Important. CI37157174737 comparator SUCCESS; CI37157174722/job111302840246 SUCCESS regressioni complete SQL/JVM/browser, unitAndroid, Java eAPKreview. Jobvisual/lint e instrumentation exporter saltati per scope; nessuna prova telefono/provider64/precision misurata dichiarata. Merge [skip ci] evita distribuzioneAPKduplicata con codiceAndroid invariato.
+
+Il budget1EUR/mese è ancora proposto, Gemini secret mai letto/usato dal codice. Runner/API, ledger persistente, hardstop/retrylimit e consenso batch pagato restano da implementare PRIMA delle chiamate. Nessuna bonifica o massbatch autorizzato/eseguito. Frontend7/backend6 gruppi aperti. Nessuna azione sul telefono richiesta.
+Unico prossimo passo: costruire riferimenti verificabili del campione64 (tipo e identitàBGG), poi eseguire confronto provider gratuito con contabilizzazione e limiti; non confondere output di dueLLM con ground truth.
+
+
 ## Frontend164 — Ludo semplice e ricerca fissa, distribuita
 
 Feedback e «Vai» del 2026-10-03: Bundle nel Catalogo; ricerca primaria persistente; prima stanza più comprensibile; tre stanze navigabili con gerarchia, padding e controlli del design system. PR225, branch frontend/ludo-primary-search riallineato al backend163; HEAD6d76fedc30f26b02a72894056cdb666992447559, merge bff246bb534d7ae1be30b9a28e360de5b0e273df. Export audit163 preservato.
