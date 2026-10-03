@@ -13,15 +13,17 @@ def method(signature):
  raise AssertionError(signature)
 header=method('private void addMarketHeader(')
 assert 'addMarketTab(tabs,"Annunci"' not in header
-assert 'addCatalogGameResults();' in method('private void renderCatalog(')
-assert 'catalogMatchesGame(d)' in method('private void renderCatalog(')
+assert 'search.addTextChangedListener(new TextWatcher()' in method('private void renderCatalog(')
+assert 'queueCatalogSearch(180)' in method('private void renderCatalog(')
+assert 'render();' not in method('private void queueCatalogSearch(')
+assert 'catalogMatchesGame(d)' in method('private void renderCatalogResults(')
 assert 'epoch!=catalogGameEpoch' in method('private void addCatalogGameResults(')
 assert 'requested.equals(query)' in method('private void addCatalogGameResults(')
 assert '"verified",false,null,null,"alpha"' in method('private void addCatalogGameResults(')
-assert 'openDatabaseGame(g.id,"catalog")' in method('private void addCatalogGameResults(')
+assert 'return catalogProductCard(d,g.id)' in method('private View catalogGameCard(')
 assert 'installPullToGame(sc,pullHint,game.id,dialog)' in ui
-assert 'Bundle trovato' in method('private void renderBundles(')
-assert 'Nessun bundle confermato' in method('private void renderBundles(')
+assert 'Dopo l’esplorazione' not in method('private void renderBundles(')
+assert 'Map<String,DealRecord> explored' not in method('private void renderBundles(')
 assert 'BundleExploration.markExplored(this,d.sellerId)' in method('private void openBundleProspect(')
 for signature in ['private void saveUiState(', 'private void restoreUiState(', 'private void persistTransientUiSession(', 'private void restoreTransientUiSession(']:
  assert 'bundleSection' in method(signature) and 'bundleScroll_' in method(signature)
@@ -79,3 +81,58 @@ with tempfile.TemporaryDirectory() as temp:
  p=Path(temp)/'CatalogBundleRegression.java';p.write_text(code)
  subprocess.run(['javac','-d',temp,str(p)],check=True)
  subprocess.run(['java','-cp',temp,'CatalogBundleRegression'],check=True)
+
+# Execute the real debounce/request/callback methods. Workers and the UI queue are
+# deliberately separate so an obsolete response can arrive after a newer input.
+live=r'''
+import java.util.*;import java.util.concurrent.*;import java.util.function.*;
+class View {Object parent=new Object();Object getParent(){return parent;} }
+class LinearLayout extends View {int count;void removeAllViews(){count=0;}void addView(View v){count++;}}
+class TextView extends View {Consumer<View> click;void setOnClickListener(Consumer<View> c){click=c;}}
+class DealRecord {String bggId="1";}
+class GameRecord {}
+class TextUtils {static boolean isEmpty(String s){return s==null||s.isEmpty();}}
+public class LiveCatalogRegression {
+ String query="",tab="catalog",catalogGameQuery="",catalogGameError;long catalogGameEpoch;int catalogRestoreY=900;
+ LinearLayout catalogContentHost=new LinearLayout(),catalogResultsHost;List<DealRecord> catalogResultSnapshot=new ArrayList<>();List<GameRecord> catalogGames=new ArrayList<>();Set<String> catalogMatchedIds=new HashSet<>();
+ Runnable catalogLiveSearch;Future<?> catalogSearchFuture;Handler uiUpdates=new Handler();Executor uiDataIo=new Executor();ArrayDeque<Runnable> callbacks=new ArrayDeque<>();DB db=new DB();Market marketStore=new Market();int renders;String rendered="";
+ static class Handler {ArrayList<Runnable> tasks=new ArrayList<>();void removeCallbacks(Runnable r){tasks.remove(r);}void postDelayed(Runnable r,long delay){tasks.add(r);}void flush(){for(Runnable r:new ArrayList<>(tasks)){tasks.remove(r);r.run();}}}
+ static class Executor {ArrayDeque<FutureTask<Void>> tasks=new ArrayDeque<>();Future<?> submit(Runnable r){FutureTask<Void> task=new FutureTask<>(r,null);tasks.add(task);return task;}void flush(){while(!tasks.isEmpty())tasks.remove().run();}}
+ static class DB {int reads;boolean fail;List<DealRecord> getDeals(String scope,int limit){reads++;if(fail)throw new IllegalStateException();return new ArrayList<>(Arrays.asList(new DealRecord()));}int countDeals(Object ignored){return 1;}}
+ static class Market {Set<String> catalogGameMatches(String q,Set<String> ids){return ids;}List<GameRecord> searchGamesAdvanced(String q,int limit,String scope,boolean active,Object rating,Object price,String order){return new ArrayList<>(Arrays.asList(new GameRecord()));}}
+ boolean isDestroyed(){return false;}void runOnUiThread(Runnable r){callbacks.add(r);}void flushUi(){while(!callbacks.isEmpty())callbacks.remove().run();}void cancelImageRequests(View v){}View loadingMoreView(String s){return new View();}TextView secondaryTextAction(String s){return new TextView();}
+ void renderCatalogResults(LinearLayout h,List<DealRecord> deals,int total){renders++;rendered=query;}
+ void restoreCatalogResultsPosition(LinearLayout h,long epoch){}
+ static void eq(Object a,Object b){if(!Objects.equals(a,b))throw new AssertionError(a+" != "+b);}
+ public static void main(String[] args){
+  LiveCatalogRegression n=new LiveCatalogRegression();LinearLayout editorSibling=n.catalogContentHost;n.query="A";n.queueCatalogSearch(180);n.query="AB";n.queueCatalogSearch(180);eq(1,n.uiUpdates.tasks.size());eq(0,n.catalogRestoreY);n.uiUpdates.flush();n.uiDataIo.flush();n.flushUi();eq(1,n.db.reads);eq("AB",n.rendered);eq(editorSibling,n.catalogContentHost);
+  n.query="A";n.queueCatalogSearch(180);n.uiUpdates.flush();n.uiDataIo.flush();n.query="Az";n.queueCatalogSearch(180);n.flushUi();eq(1,n.renders);n.uiUpdates.flush();n.uiDataIo.flush();n.flushUi();eq("Az",n.rendered);eq(2,n.renders);
+  n.query="";n.queueCatalogSearch(180);n.uiUpdates.flush();n.uiDataIo.flush();n.flushUi();eq("",n.rendered);eq(0,n.catalogGames.size());eq(0,n.catalogMatchedIds.size());
+  n.query="A";n.queueCatalogSearch(180);n.uiUpdates.flush();n.tab="companion";n.uiDataIo.flush();n.flushUi();eq(3,n.renders);
+  n.tab="catalog";n.queueCatalogSearch(180);n.uiUpdates.flush();n.catalogContentHost=new LinearLayout();n.uiDataIo.flush();n.flushUi();eq(3,n.renders);
+  n.queueCatalogSearch(180);n.uiUpdates.flush();n.catalogContentHost.parent=null;n.uiDataIo.flush();n.flushUi();eq(3,n.renders);
+  n.catalogContentHost=new LinearLayout();n.db.fail=true;n.queueCatalogSearch(180);n.uiUpdates.flush();n.uiDataIo.flush();n.flushUi();eq(3,n.renders);eq("Ricerca non disponibile. Riprova.",n.catalogGameError);eq(1,n.catalogContentHost.count);
+  System.out.println("PASS live A/AB, debounce, stale callback, clear, route/host guard, error without fake zero, editor host retained");
+ }
+ __METHODS__
+}
+'''.replace('__METHODS__',method('private void queueCatalogSearch(')+'\n'+method('private void addCatalogGameResults('))
+with tempfile.TemporaryDirectory() as temp:
+ p=Path(temp)/'LiveCatalogRegression.java';p.write_text(live)
+ subprocess.run(['javac','-d',temp,str(p)],check=True)
+ subprocess.run(['java','-cp',temp,'LiveCatalogRegression'],check=True)
+# Hydration must finish on the worker before any UI rendering of page or overlay.
+for signature in ['private void renderDatabaseDetail(', 'private void openGameDetailOverlay(']:
+ detail=method(signature)
+ assert detail.index('uiDataIo.execute') < detail.index('loadGameDetailData') < detail.index('runOnUiThread')
+ assert 'snapshot);' in detail
+shared=method('private View catalogProductCard(DealRecord d,long gameId)')
+assert 'if(gameId<=0){LinearLayout priceRow' in shared
+assert 'addGameFavorite(artwork' in shared
+assert 'catalogGameCard(catalogGames.get(index))' in method('private void renderCatalogResults(')
+assert 'Il gioco che cerchi' not in ui and 'Panoramica, mercato e come si gioca' not in ui
+print('PASS shared game/listing card grammar, listing-only price, worker detail hydration, no separate game banners')
+
+assert 'return catalogGameCard(g)' in method('private View databaseGameCard(')
+assert 'openDatabaseGame(gameId,gameSource)' in shared
+print('PASS complete game results reuse the same price-free cards and source-aware Back')
