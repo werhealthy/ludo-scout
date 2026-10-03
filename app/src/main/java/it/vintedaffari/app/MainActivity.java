@@ -170,7 +170,7 @@ private View makeCompanionFab(){
     private void render(){
         if("library".equals(tab)){ludoRoomState().switchTo(LudoRoomState.HOME,ludoRoomState().position(ludoRoomState().room()));tab="companion";renderedLudoRoom="";}
         if(body==null||renderInProgress)return;if(engineHistoryGestureActive&&"activity".equals(tab)&&"overview".equals(engineSection)){engineHistoryRenderDeferred=true;return;}if(activePetPanel!=null&&activePetPanel.isShowing()){refreshPetPanel();return;}if(scroll!=null&&"catalog".equals(tab)&&catalogContentHost!=null&&catalogContentHost.getParent()!=null&&catalogResultsHost!=null)tabScrollPositions.put("catalog",scroll.getScrollY());recordLudoRoomPosition();renderInProgress=true;long started=System.currentTimeMillis();
-        try{if(ludoRoomDots!=null)ludoRoomDots.setVisibility("companion".equals(tab)?View.VISIBLE:View.GONE);clearEngineHistoryPull();applyDiscoverChrome();if(!"activity".equals(tab))updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp("discover".equals(tab)?20:18),dp("discover".equals(tab)?7:"activity".equals(tab)?16:4),dp("discover".equals(tab)?20:18),"discover".equals(tab)?dp(32):dp(24));if(activityButton!=null)activityButton.setVisibility(View.GONE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
+        try{clearLudoFooter();clearEngineHistoryPull();applyDiscoverChrome();if(!"activity".equals(tab))updateActivityIndicator();renderNav();cancelImageRequests(body);body.removeAllViews();body.setPadding(dp("discover".equals(tab)?20:18),dp("discover".equals(tab)?7:"activity".equals(tab)?16:4),dp("discover".equals(tab)?20:18),"discover".equals(tab)?dp(32):dp(24));if(activityButton!=null)activityButton.setVisibility(View.GONE);if(companionFab!=null)companionFab.setVisibility(View.GONE);if("discover".equals(tab))renderDiscover();else if("catalog".equals(tab))renderCatalog();else if("bundles".equals(tab))renderBundles();else if("database".equals(tab)){if(selectedGameId>0)renderDatabaseDetail();else renderDatabase();}else if("companion".equals(tab))renderCompanion();else if("activity".equals(tab))renderOperationsPage();else renderLibrary();}
         finally{renderInProgress=false;long elapsed=System.currentTimeMillis()-started;getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putLong("uiLastRenderMs",elapsed).putString("uiLastRenderTab",tab).apply();}
     }
     private void cancelImageRequests(View view){if(view==null)return;if(view instanceof ImageView)view.setTag(new Object());if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)cancelImageRequests(group.getChildAt(i));}}
@@ -179,7 +179,6 @@ private View makeCompanionFab(){
         boolean home=true;nav.setBackgroundColor(home?Color.BLACK:SURFACE);nav.removeAllViews();
         nav.addView(navItem(LudoIcons.HOUSE,"Home","discover"),navLp());
         nav.addView(navItem(LudoIcons.SEARCH,"Catalogo","catalog"),navLp());
-        nav.addView(navItem(LudoIcons.GIFT,"Bundle","bundles"),navLp());
         nav.addView(navItem(LudoIcons.STAR,"Ludo","companion"),navLp());
         
     }
@@ -1547,22 +1546,32 @@ private void showFilterSheet(){
         if(scroll!=null)scroll.post(()->{if("companion".equals(tab)&&target.equals(rooms.room())){scroll.scrollTo(0,y);scroll.announceForAccessibility(rooms.isHome()?"Libreria":LudoRoomState.HUNTS.equals(rooms.room())?"Preferiti":"Motore");}});
     }
     private View ludoRoomDots;
+    private void clearLudoFooter(){
+        if(ludoRoomDots!=null){mainScrollStage.removeView(ludoRoomDots);ludoRoomDots=null;}
+        FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)refreshHost.getLayoutParams();lp.bottomMargin=0;refreshHost.setLayoutParams(lp);
+    }
     private void showLudoRoomIndicators(){
-        if(ludoRoomDots!=null)mainScrollStage.removeView(ludoRoomDots);
-        LinearLayout dots=new LinearLayout(this);dots.setGravity(Gravity.CENTER);dots.setBackgroundColor(BG);
-        String[] keys={LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME};String[] labels={"Motore","Preferiti","Libreria"};
-        for(int i=0;i<keys.length;i++){final String key=keys[i];FrameLayout target=new FrameLayout(this);target.setFocusable(true);target.setSelected(key.equals(ludoRoomState().room()));target.setContentDescription(labels[i]+", stanza "+(i+1)+" di 3"+(target.isSelected()?", selezionata":""));target.setOnClickListener(v->switchLudoRoom(key));View dot=new View(this);dot.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);dot.setBackground(round(target.isSelected()?TEXT:OUTLINE,99,0,0));target.addView(dot,new FrameLayout.LayoutParams(dp(6),dp(6),Gravity.CENTER));dots.addView(target,new LinearLayout.LayoutParams(dp(48),dp(48)));}
-        ludoRoomDots=dots;FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM);mainScrollStage.addView(dots,lp);
+        LinearLayout footer=new LinearLayout(this);footer.setOrientation(LinearLayout.VERTICAL);footer.setPadding(dp(16),dp(8),dp(16),dp(12));footer.setBackgroundColor(BG);
+        LinearLayout rooms=new LinearLayout(this);boolean large=getResources().getConfiguration().fontScale>1.3f;rooms.setOrientation(large?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+        String[] keys={LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME};String[] labels={"Esplora","Preferiti","Libreria"};
+        for(int i=0;i<keys.length;i++){final String key=keys[i];boolean selected=key.equals(ludoRoomState().room());TextView target=text(labels[i],14,selected?TEXT:MUTED,selected?Typeface.BOLD:Typeface.NORMAL);target.setGravity(Gravity.CENTER);target.setMinHeight(dp(48));target.setPadding(dp(8),dp(8),dp(8),dp(8));target.setSelected(selected);target.setBackground(round(selected?SURFACE2:BG,12,selected?1:0,OUTLINE));target.setContentDescription(labels[i]+", stanza "+(i+1)+" di 3"+(selected?", selezionata":""));target.setOnClickListener(v->switchLudoRoom(key));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(large?-1:0,-2,large?0:1);if(i>0){if(large)rp.topMargin=dp(4);else rp.leftMargin=dp(8);}rooms.addView(target,rp);}
+        footer.addView(rooms,new LinearLayout.LayoutParams(-1,-2));
+        renderLudoSearch(footer);
+        ludoRoomDots=footer;mainScrollStage.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        footer.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(ludoRoomDots!=footer||!"companion".equals(tab))return;FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)refreshHost.getLayoutParams();if(lp.bottomMargin!=footer.getHeight()){lp.bottomMargin=footer.getHeight();refreshHost.setLayoutParams(lp);}});
+    }
+    private void renderLudoSearch(LinearLayout footer){
+        Button browse=productPrimaryButton("Trova nuovi giochi",LudoIcons.SEARCH,LIME,()->{saveLudoRooms();openVintedBrowserExperiment(ExplorationPlan.url("","relevance",0,0),"SEARCH","");});browse.setMinHeight(dp(56));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=dp(8);footer.addView(browse,bp);
     }
     private void renderLudoHomeScene(){renderLudoEnvironment(LudoRoomState.HOME);}
     private void renderCompanion(){
         LudoRoomState rooms=ludoRoomState();ludoSearchQuery=ludoSearchDraft();ludoSearchInput=null;renderedLudoRoom=rooms.room();final String displayedRoom=rooms.room();final int roomY=rooms.position(displayedRoom);
         if(scroll!=null)scroll.post(()->{if("companion".equals(tab)&&displayedRoom.equals(ludoRoomState().room()))scroll.scrollTo(0,roomY);});
-        requestPetSnapshot();body.setPadding(0,0,0,dp(76));body.setBackgroundColor(BG);showLudoRoomIndicators();
+        requestPetSnapshot();body.setPadding(0,0,0,dp(24));body.setBackgroundColor(BG);showLudoRoomIndicators();
         if(rooms.isHome()){renderLudoHomeScene();renderLibrary();return;}
         renderLudoEnvironment(rooms.room());
         if(LudoRoomState.HUNTS.equals(rooms.room())){renderLudoHunts();return;}
-        renderLudoJourney();renderLudoOverview();renderLudoSearch();
+        renderLudoJourney();renderLudoOverview();
     }
 
     private Integer ludoMonthGames,ludoMonthGreatBuys;private boolean ludoOverviewLoading;private long ludoOverviewAt,ludoOverviewMonth;private String ludoOverviewError;private int ludoHuntsRequest;
@@ -1611,25 +1620,32 @@ private void showFilterSheet(){
         if(ludoOverviewError!=null){TextView retry=secondaryTextAction("Riprova");retry.setMinHeight(dp(48));retry.setOnClickListener(v->{ludoOverviewAt=0;requestLudoOverview();});content.addView(retry);}
     }
     private View ludoMetric(Integer number,String label){LinearLayout metric=new LinearLayout(this);metric.setOrientation(LinearLayout.VERTICAL);metric.addView(text(number==null?"—":String.valueOf(number),26,TEXT,Typeface.BOLD));TextView caption=text(label,13,MUTED,Typeface.NORMAL);caption.setPadding(0,dp(4),0,0);metric.addView(caption);return metric;}
-    private void renderLudoSearch(){
-        LinearLayout content=ludoContent();Button browse=button("Trova nuovi giochi",VINTED_BG);browse.setTextColor(TEXT);browse.setMinHeight(dp(56));browse.setPadding(dp(16),dp(12),dp(16),dp(12));browse.setOnClickListener(v->{saveLudoRooms();openVintedBrowserExperiment(ExplorationPlan.url("","relevance",0,0),"SEARCH","");});content.addView(browse,new LinearLayout.LayoutParams(-1,-2));
-    }
     private void renderLudoJourney(){
-        LinearLayout host=ludoContent();host.addView(text("Motore",26,TEXT,Typeface.BOLD));host.addView(text("Dall’osservazione ai giochi pronti",14,MUTED,Typeface.NORMAL));TextView day=text("OGGI · CONTROLLI COMPLETATI",11,LIME,Typeface.BOLD);day.setPadding(0,dp(12),0,dp(4));host.addView(day);
-        EngineOverviewSnapshot snapshot=engineOverviewSnapshot;long now=System.currentTimeMillis();if(snapshot==null||snapshot.journeyDay!=ExplorationPlan.day(now)[0]){host.addView(text(TextUtils.isEmpty(engineOverviewLoadError)?"Carico il bilancio…":"Bilancio non disponibile · riprovo",14,MUTED,Typeface.NORMAL));requestEngineOverviewSnapshot();return;}if(snapshot.loadedAt<engineEnteredAt||now-snapshot.loadedAt>30_000)requestEngineOverviewSnapshot();
-        TextView scope=text(snapshot.journeyCapture==null?"Inizia una nuova esplorazione":"Ultimo scroll · "+engineScopeLabel(snapshot.journeyCapture),12,MUTED,Typeface.NORMAL);host.addView(scope);
-        int availableDp=Math.round((getResources().getDisplayMetrics().widthPixels-dp(36))/getResources().getDisplayMetrics().density);
-        if(LudoOrbitGeometry.useRows(availableDp,getResources().getConfiguration().fontScale)){
-            host.addView(ludoOrbitCenter(snapshot));host.addView(ludoOrbitNode(snapshot,-1));
-            for(int i=0;i<5;i++){LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,-2);row.topMargin=dp(12);host.addView(ludoJourneyNode(snapshot,i,true),row);}
-        }else{
-            LudoOrbitView orbit=new LudoOrbitView(this);orbit.addView(ludoOrbitNode(snapshot,-1));for(int i=0;i<5;i++)orbit.addView(ludoOrbitNode(snapshot,i));orbit.addView(ludoOrbitCenter(snapshot));host.addView(orbit,new LinearLayout.LayoutParams(-1,-2));
-        }
-        TextView explain=secondaryTextAction("Come leggere i risultati");explain.setMinHeight(dp(48));explain.setOnClickListener(explainView->{Dialog help=bottomSheet("Il percorso di Ludo");LinearLayout details=help.findViewById(SHEET_ID);details.addView(text("Ogni numero conta annunci distinti osservati oggi. Un annuncio può aver completato più controlli: i cerchi non si sommano. Le frecce mostrano il contributo degli annunci dell’ultima esplorazione; una diminuzione indica una rettifica.",16,TEXT,Typeface.NORMAL));if(snapshot.journeyDelta==null)details.addView(text("Variazione non disponibile per questo scroll.",14,MUTED,Typeface.NORMAL));TextView outcomes=secondaryTextAction("Da completare ed esclusi di oggi");outcomes.setMinHeight(dp(48));outcomes.setOnClickListener(v->{help.dismiss();showJourneyItems(snapshot,-1);});details.addView(outcomes);if(snapshot.phases[3]>0){TextView issues=secondaryTextAction(snapshot.phases[3]+" giochi con dati incompleti");issues.setMinHeight(dp(48));issues.setOnClickListener(v->{help.dismiss();openEnginePhase(3,snapshot);});details.addView(issues);}help.show();});host.addView(explain);
-        
-        if(snapshot.recoveryCount>0){TextView all=text("Verifiche manuali · tutte le ricerche",12,MUTED,Typeface.NORMAL);all.setPadding(0,dp(16),0,dp(8));host.addView(all);host.addView(engineAttentionCard(snapshot.recoveryCount));}if(snapshot.waitingRuns>0)host.addView(engineQueueRow(LudoIcons.CLOCK,snapshot.waitingRuns+" altri scroll da completare",MUTED,()->{enterEngineDetail("waiting");render();}));
+        LinearLayout host=ludoContent();host.addView(text("Le tue esplorazioni",22,TEXT,Typeface.BOLD));
+        EngineOverviewSnapshot snapshot=engineOverviewSnapshot;long now=System.currentTimeMillis();
+        if(snapshot==null||snapshot.journeyDay!=ExplorationPlan.day(now)[0]){TextView pending=text(TextUtils.isEmpty(engineOverviewLoadError)?"Ludo prepara i risultati…":"Risultati temporaneamente non disponibili",14,MUTED,Typeface.NORMAL);pending.setPadding(0,dp(12),0,0);host.addView(pending);requestEngineOverviewSnapshot();return;}
+        if(snapshot.loadedAt<engineEnteredAt||now-snapshot.loadedAt>30_000)requestEngineOverviewSnapshot();
+        LinearLayout card=verticalCard();card.setPadding(dp(16),dp(16),dp(16),dp(16));
+        int work=0;if(snapshot.pipelineRun!=null){for(int i=0;i<4;i++)work+=snapshot.phases[i];}else work=snapshot.globalWorkCount;
+        String state=snapshot.pipelineRun!=null?engineCenterStatus(snapshot):work>0?"Ludo ha attività da completare":"Pronto a esplorare";
+        card.addView(text(state,18,TEXT,Typeface.BOLD));
+        if(work>0){TextView pending=text(work+" "+(snapshot.pipelineRun==null?"attività del motore":"giochi da completare nello scroll"),13,MUTED,Typeface.NORMAL);pending.setPadding(0,dp(8),0,0);card.addView(pending);}
+        TextView today=text("OGGI",12,MUTED,Typeface.BOLD);today.setPadding(0,dp(16),0,dp(8));card.addView(today);
+        LinearLayout results=new LinearLayout(this);boolean large=getResources().getConfiguration().fontScale>1.3f;results.setOrientation(large?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+        for(int stage:new int[]{0,4}){final int selected=stage;View metric=ludoMetric(snapshot.journeyCounts[stage],stage==0?"annunci osservati":"annunci idonei");metric.setMinimumHeight(dp(48));metric.setFocusable(true);metric.setContentDescription(snapshot.journeyCounts[stage]+(stage==0?" annunci osservati oggi":" annunci idonei oggi")+". Apri gli annunci.");metric.setOnClickListener(v->showJourneyItems(snapshot,selected));LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(large?-1:0,-2,large?0:1);if(stage==4){if(large)mp.topMargin=dp(16);else mp.leftMargin=dp(16);}results.addView(metric,mp);}card.addView(results);
+        TextView details=secondaryTextAction("Dettagli del motore");details.setMinHeight(dp(48));details.setPadding(0,dp(12),0,0);details.setOnClickListener(v->showLudoJourneyDetails(snapshot));card.addView(details);host.addView(card);
+        if(snapshot.recoveryCount>0)host.addView(engineAttentionCard(snapshot.recoveryCount));
+        if(snapshot.waitingRuns>0)host.addView(engineQueueRow(LudoIcons.CLOCK,snapshot.waitingRuns+" altri scroll da completare",MUTED,()->{enterEngineDetail("waiting");render();}));
         uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,snapshot.phases[0]>0||snapshot.activeMask!=0?2_000L:10_000L);
         if(ludoShowResults){ludoShowResults=false;host.post(()->{if(ludoExplorationVisible()&&scroll!=null)scroll.smoothScrollTo(0,host.getTop());});}
+    }
+    private void showLudoJourneyDetails(EngineOverviewSnapshot snapshot){
+        Dialog sheet=bottomSheet("Il percorso di Ludo");LinearLayout details=sheet.findViewById(SHEET_ID);
+        details.addView(text("Annunci distinti osservati oggi. Ogni annuncio può completare più controlli: i numeri non si sommano. Le variazioni riguardano l’ultima esplorazione; una diminuzione indica una rettifica.",14,MUTED,Typeface.NORMAL));
+        for(int i=0;i<5;i++){final int stage=i;View node=ludoJourneyNode(snapshot,i,true);node.setOnClickListener(v->{sheet.dismiss();showJourneyItems(snapshot,stage);});LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,-2);row.topMargin=dp(12);details.addView(node,row);}
+        View work=ludoOrbitCenter(snapshot);work.setOnClickListener(v->{sheet.dismiss();if(snapshot.pipelineRun==null)showEngineGlobalWork(snapshot);else openEnginePhase(-1,snapshot);});details.addView(work);View intake=ludoOrbitNode(snapshot,-1);intake.setOnClickListener(v->{sheet.dismiss();openEnginePhase(-2,snapshot);});details.addView(intake);
+        if(snapshot.journeyDelta==null)details.addView(text("Variazione non disponibile per questo scroll.",14,MUTED,Typeface.NORMAL));
+        TextView outcomes=secondaryTextAction("Da completare ed esclusi di oggi");outcomes.setMinHeight(dp(48));outcomes.setOnClickListener(v->{sheet.dismiss();showJourneyItems(snapshot,-1);});details.addView(outcomes);sheet.show();
     }
     private void loadLudoActor(LudoPetView actor){
         galleryNet.execute(()->{Map<LudoPetMood,Bitmap> art=new java.util.EnumMap<>(LudoPetMood.class);
@@ -1642,7 +1658,7 @@ private void showFilterSheet(){
         int work=0;if(snapshot.pipelineRun!=null)for(int i=0;i<4;i++)work+=snapshot.phases[i];else work=snapshot.globalWorkCount;
         TextView count=text(String.valueOf(work),34,TEXT,Typeface.BOLD);count.setGravity(Gravity.CENTER);center.addView(count);
         TextView unit=text(snapshot.pipelineRun==null?"attività del motore":"da completare nello scroll",11,MUTED,Typeface.NORMAL);unit.setGravity(Gravity.CENTER);center.addView(unit);
-        String state=snapshot.pipelineRun==null?"Pronto a esplorare":engineCenterStatus(snapshot);TextView status=text(state,12,TEXT,Typeface.NORMAL);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(8),0,0);center.addView(status);
+        String state=snapshot.pipelineRun==null?(work>0?"Ludo ha attività da completare":"Pronto a esplorare"):engineCenterStatus(snapshot);TextView status=text(state,12,TEXT,Typeface.NORMAL);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(8),0,0);center.addView(status);
         center.setMinimumHeight(dp(48));center.setContentDescription(work+" "+unit.getText()+". "+state+". Apri il lavoro corrente.");center.setOnClickListener(v->{if(snapshot.pipelineRun==null)showEngineGlobalWork(snapshot);else openEnginePhase(-1,snapshot);});return center;
     }
     private View ludoOrbitNode(EngineOverviewSnapshot snapshot,int stage){
@@ -1677,7 +1693,7 @@ private void showFilterSheet(){
             final String error=failure;runOnUiThread(()->{if(isDestroyed()||!"companion".equals(tab)||!LudoRoomState.HUNTS.equals(ludoRoomState().room())||request!=ludoHuntsRequest||host.getParent()==null)return;if(!saved.equals(gamePreferences().favorites())){loadLudoHunts(host);return;}host.removeAllViews();
                 if(error!=null){host.addView(text(error,16,MUTED,Typeface.NORMAL));TextView retry=secondaryTextAction("Riprova");retry.setMinHeight(dp(48));retry.setOnClickListener(v->loadLudoHunts(host));host.addView(retry);return;}
                 host.addView(text(saved.size()+" giochi",15,MUTED,Typeface.BOLD));
-                if(saved.isEmpty()){TextView empty=text("Salva qui i giochi che desideri.",22,TEXT,Typeface.BOLD);empty.setPadding(0,dp(14),0,dp(18));host.addView(empty);Button explore=button("Trova nuovi giochi",VINTED_BG);explore.setTextColor(TEXT);explore.setOnClickListener(v->switchLudoRoom(LudoRoomState.EXPLORE));host.addView(explore);host.post(()->{if(scroll!=null&&request==ludoHuntsRequest&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room())&&host.getParent()!=null){ludoRoomState().finishHuntsRestore();ludoRoomState().recordScroll(scroll.getScrollY());}});return;}
+                if(saved.isEmpty()){TextView empty=text("Salva qui i giochi che desideri.",22,TEXT,Typeface.BOLD);empty.setPadding(0,dp(14),0,dp(18));host.addView(empty);host.post(()->{if(scroll!=null&&request==ludoHuntsRequest&&"companion".equals(tab)&&LudoRoomState.HUNTS.equals(ludoRoomState().room())&&host.getParent()!=null){ludoRoomState().finishHuntsRestore();ludoRoomState().recordScroll(scroll.getScrollY());}});return;}
                 int columns=getResources().getConfiguration().fontScale>1.25f||getResources().getDisplayMetrics().widthPixels<dp(340)?1:2;LinearLayout row=null;
                 for(GameRecord game:games){if(row==null||row.getChildCount()==columns){row=new LinearLayout(this);row.setGravity(Gravity.TOP);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(14);host.addView(row,rp);}LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,1);if(row.getChildCount()>0)cp.leftMargin=dp(12);row.addView(ludoHuntCard(game),cp);}
                 if(row!=null&&row.getChildCount()<columns)row.addView(new Space(this),new LinearLayout.LayoutParams(0,1,1));
@@ -3867,6 +3883,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
 }
+
 
 
 

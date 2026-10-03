@@ -52,6 +52,7 @@ jobs:
 
       - name: Verify Ludo daily journey and exploration
         run: |
+          python3 regression/ludo_primary_search.py
           python3 regression/ludo_pet_rooms.py
           python3 regression/ludo_exploration.py
           python3 regression/ludo_journey_layout.py
@@ -363,3 +364,73 @@ jobs:
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.BrowserVisualInstrumentation | tee browser-large-result.txt
           adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
           grep -F 'Three actual browser states rendered' browser-large-result.txt
+
+
+  ludo-visual:
+    if: github.head_ref == 'frontend/ludo-primary-search'
+    name: Ludo Android visual and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Create review-only test signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 2 -dname "CN=PR Review,O=Ludo Scout,C=IT"
+      - name: Build actual browser and platform test APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Android lint
+        # Existing repo-wide lint debt is reported explicitly; no browser lint errors found.
+        continue-on-error: true
+        run: |
+          if ! ./gradlew --no-daemon :app:lintDebug; then
+            cat app/build/reports/lint-results-debug.txt
+            exit 1
+          fi
+      - name: Render actual browser states
+        timeout-minutes: 5
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          sudo apt-get update -qq
+          sudo apt-get install -y libpulse0
+          sudo chmod 666 /dev/kvm
+          sdkmanager "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/ludo-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd --force -n ludo-browser -p "$ANDROID_AVD_HOME/ludo-browser.avd" -k "system-images;android-35;google_apis;x86_64"
+          ls -la "$ANDROID_AVD_HOME"
+          "$ANDROID_HOME/emulator/emulator" -list-avds
+          trap 'cat emulator.log || true' EXIT
+          "$ANDROID_HOME/emulator/emulator" -version
+          "$ANDROID_HOME/emulator/emulator" -avd ludo-browser -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > emulator.log 2>&1 &
+          timeout 120 adb wait-for-device
+          for attempt in $(seq 1 60); do
+            if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; then break; fi
+            sleep 2
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          adb shell wm size 1080x1920
+          adb shell wm density 440
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell pm grant it.vintedaffari.app android.permission.POST_NOTIFICATIONS
+          adb logcat -c
+          timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.LudoVisualInstrumentation | tee browser-visual-result.txt
+          adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
+          grep -F 'Ludo actual rooms, fixed footer and Catalog Bundle verified' browser-visual-result.txt
+          adb shell settings put system font_scale 2.0
+          adb logcat -c
+          timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.LudoVisualInstrumentation | tee browser-large-result.txt
+          adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
+          grep -F 'Ludo actual rooms, fixed footer and Catalog Bundle verified' browser-large-result.txt
+
