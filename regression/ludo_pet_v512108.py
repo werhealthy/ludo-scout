@@ -64,14 +64,14 @@ ui=(root/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text()
 assert 'navItem(LudoIcons.BOOK_OPEN,"Libreria","library")' not in ui
 assert 'if("library".equals(value)){openLudoHome();return;}' in ui
 assert 'renderLudoHomeScene();renderLibrary();return;' in ui
-assert 'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui
-assert 'addLudoRoomTab(tabs,"Libreria",LudoRoomState.HOME)' in ui
-assert 'addLudoRoomTab(tabs,"Cacce",LudoRoomState.HUNTS)' in ui
+assert 'showLudoRoomIndicators()' in ui
+assert 'String[] keys={LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME}' in ui
+assert 'ludoRoomTabs()' not in ui, 'Rooms must not become top selector tabs'
 assert 'refreshHost.setRoomSwipeHandler' in ui
 assert 'actor.setIllustrations(art)' in ui and 'sceneAsset(LudoArt.image(mood))' in ui, 'Supplied pet states must use the existing cached decoder'
 assert 'Avvia nuove ricerche · test' not in ui
 assert 'https://www.vinted.it/catalog?search_text=catan' not in ui
-print("PASS Ludo composition: preserved library route, real collection, three selector tabs and themed scenes")
+print("PASS Ludo composition: preserved library route, real collection, three page indicators and layered rooms")
 import runpy
 runpy.run_path(str(root/"regression/ludo_monthly_overview.py"))
 runpy.run_path(str(root/"regression/ludo_hunts_ui.py"))

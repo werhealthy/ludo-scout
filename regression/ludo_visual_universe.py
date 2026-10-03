@@ -2,6 +2,7 @@ from pathlib import Path
 import re
 root=Path(__file__).resolve().parents[1]
 allowed={'ludo_idle','ludo_hello','ludo_deal_search','ludo_treasure_reward','ludo_no_results','ludo_sleeping','ludo_room','ludo_tavern_hub','ludo_hunt_explorer','ludo_app_icon'}
+allowed.update({'ludo_room_engine_background','ludo_engine_character','ludo_engine_secondary_props','ludo_room_hunts_background','ludo_hunts_character','ludo_hunts_prop','ludo_room_library_background','ludo_library_character'})
 res=root/'app/src/main/res'
 actual={p.stem for p in res.rglob('*') if p.is_file() and p.stem.startswith('ludo_') and p.suffix in {'.png','.webp'}}
 assert actual==allowed, f'Legacy or missing Ludo art: {actual ^ allowed}'

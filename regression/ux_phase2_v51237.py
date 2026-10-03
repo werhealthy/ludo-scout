@@ -35,9 +35,9 @@ checks=[
      "showLibraryArchiveMenu(sold.size())" in library and
      "libraryScopeTabs(" not in library),
     ("Ludo uses three immersive rooms with existing collection and secondary hunt settings",
-     'addLudoRoomTab(tabs,"Esplorazione",LudoRoomState.EXPLORE)' in ui and
-     'addLudoRoomTab(tabs,"Libreria",LudoRoomState.HOME)' in ui and
-     'addLudoRoomTab(tabs,"Cacce",LudoRoomState.HUNTS)' in ui and
+     'showLudoRoomIndicators()' in ui and
+     'String[] keys={LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME}' in ui and
+     'ludoRoomTabs()' not in ui and
      'renderLudoHomeScene();renderLibrary();return;' in companion and
      'openPetSpace(true)' in companion and 'openPetSpace(false)' in companion),
     ("Ludo root page no longer exposes a back affordance",
@@ -142,3 +142,4 @@ with tempfile.TemporaryDirectory() as temp:
     subprocess.run(["javac","-d",temp,str(path)],check=True)
     subprocess.run(["java","-cp",temp,"LibraryPullReadinessRegression"],check=True)
 assert "libraryDetailDialogs.add(d)" in detail and "libraryDetailDialogs.remove(d)" in detail
+

@@ -48,6 +48,7 @@ jobs:
 
       - name: Verify Ludo daily journey and exploration
         run: |
+          python3 regression/ludo_pet_rooms.py
           python3 regression/ludo_exploration.py
           python3 regression/ludo_journey_layout.py
           python3 regression/browser_page_progress.py
