@@ -10,7 +10,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8726,
@@ -20,7 +22,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9593,
@@ -30,7 +34,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9402,
@@ -40,7 +46,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9596,
@@ -50,7 +58,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 6925,
@@ -60,7 +70,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9371,
@@ -70,7 +82,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9541,
@@ -80,7 +94,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "ACCESSORY",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7665,
@@ -90,7 +106,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "COMPONENTS",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7752,
@@ -100,7 +118,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "COMPONENTS",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8795,
@@ -110,7 +130,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "COMPONENTS",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 6568,
@@ -120,7 +142,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "COMPONENTS",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 6606,
@@ -130,7 +154,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "COMPONENTS",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7842,
@@ -140,7 +166,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EMPTY_BOX",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 6540,
@@ -150,7 +178,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "COMPONENTS",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8599,
@@ -160,7 +190,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "COMPONENTS",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 101,
@@ -170,7 +202,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "714"
     },
     {
       "listing_id": 7904,
@@ -180,7 +214,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BUNDLE",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 59,
@@ -190,7 +226,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "345584"
     },
     {
       "listing_id": 8298,
@@ -200,7 +238,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BUNDLE",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7760,
@@ -210,7 +250,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BUNDLE",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 6544,
@@ -220,7 +262,9 @@
       "source_url": "https://www.goliathgames.it/product/otto-il-maialotto-che-fa-il-botto-xxl/",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BUNDLE",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 6923,
@@ -230,7 +274,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BUNDLE",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8695,
@@ -240,7 +286,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EXPANSION",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9341,
@@ -250,7 +298,9 @@
       "source_url": "https://ledergames.com/collections/games",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EXPANSION",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9331,
@@ -260,7 +310,9 @@
       "source_url": "https://ledergames.com/pages/resources",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EXPANSION",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 41,
@@ -270,7 +322,9 @@
       "source_url": "https://www.gen42.com/product/pillbug-expansion/",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "2655"
     },
     {
       "listing_id": 9366,
@@ -280,7 +334,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EXPANSION",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8512,
@@ -290,7 +346,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9337,
@@ -300,7 +358,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EXPANSION",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9704,
@@ -310,7 +370,9 @@
       "source_url": "https://blog.amigo-spiele.de/saboteur-reihe/",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EXPANSION",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 9270,
@@ -320,7 +382,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "EXPANSION",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7595,
@@ -330,7 +394,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7583,
@@ -340,7 +406,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8235,
@@ -350,7 +418,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7598,
@@ -360,7 +430,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7574,
@@ -370,7 +442,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7947,
@@ -380,7 +454,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8425,
@@ -390,7 +466,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 7573,
@@ -400,7 +478,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "NON_GAME",
+      "previous_bgg_id": null
     },
     {
       "listing_id": 8800,
@@ -410,7 +490,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "127398"
     },
     {
       "listing_id": 4143,
@@ -420,7 +502,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "118048"
     },
     {
       "listing_id": 4142,
@@ -430,7 +514,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "264797"
     },
     {
       "listing_id": 5324,
@@ -440,7 +526,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "362700"
     },
     {
       "listing_id": 3587,
@@ -450,7 +538,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "416851"
     },
     {
       "listing_id": 3534,
@@ -460,7 +550,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "180241"
     },
     {
       "listing_id": 5383,
@@ -470,7 +562,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "164354"
     },
     {
       "listing_id": 5430,
@@ -480,7 +574,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "256170"
     },
     {
       "listing_id": 6726,
@@ -490,7 +586,9 @@
       "source_url": "https://www.ravensburger.de/de-DE/produkte/spiele/kinderspiele/kakerlakak--20800",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "171424"
     },
     {
       "listing_id": 5728,
@@ -500,7 +598,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "411567"
     },
     {
       "listing_id": 9720,
@@ -510,7 +610,9 @@
       "source_url": "https://www.amigo-spiele.de/saboteur_4900_1122",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "9220"
     },
     {
       "listing_id": 7144,
@@ -520,7 +622,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "1308"
     },
     {
       "listing_id": 1172,
@@ -530,7 +634,9 @@
       "source_url": "https://www.rprod.com/en/games",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "403250"
     },
     {
       "listing_id": 5481,
@@ -540,7 +646,9 @@
       "source_url": "https://www.kosmos.de/products/ubongo-classic",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "16986"
     },
     {
       "listing_id": 6793,
@@ -550,7 +658,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "1117"
     },
     {
       "listing_id": 9539,
@@ -560,7 +670,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "258474"
     },
     {
       "listing_id": 9686,
@@ -570,7 +682,9 @@
       "source_url": "https://www.daysofwonder.com/game/ticket-to-ride-europe/",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "14996"
     },
     {
       "listing_id": 9790,
@@ -580,7 +694,9 @@
       "source_url": "https://www.amigo-spiele.de/saboteur_4900_1122",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "9220"
     },
     {
       "listing_id": 55,
@@ -590,7 +706,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "159675"
     },
     {
       "listing_id": 9438,
@@ -600,7 +718,9 @@
       "source_url": "https://www.libellud.com/game/mysterium-park/",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "301767"
     },
     {
       "listing_id": 6773,
@@ -610,7 +730,9 @@
       "source_url": "https://www.kidstablebg.com/maplevalley",
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "361958"
     },
     {
       "listing_id": 9380,
@@ -620,7 +742,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "66188"
     },
     {
       "listing_id": 8848,
@@ -630,7 +754,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": "BASE_GAME",
+      "previous_bgg_id": "25248"
     },
     {
       "listing_id": 4532,
@@ -640,7 +766,9 @@
       "source_url": null,
       "physical_contents_verified": false,
       "bgg_identity_verified": false,
-      "language": "UNKNOWN"
+      "language": "UNKNOWN",
+      "previous_type": null,
+      "previous_bgg_id": "282954"
     }
   ]
 }

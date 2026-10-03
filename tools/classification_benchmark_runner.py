@@ -178,6 +178,7 @@ def main():
         raise ValueError('AI disabled or Free Tier not confirmed')
     if os.environ.get('GITHUB_REF')!='refs/heads/beta':raise ValueError('benchmark runs only on beta')
     key=os.environ['GEMINI_API_KEY']
+    if not key.strip():raise ValueError('missing API key')
     root=Path(__file__).parents[1]
     sample=json.loads((root/'regression/fixtures/classification_input64.json').read_text())['records']
     ledger=GitHubLedger()
@@ -192,9 +193,11 @@ def main():
     # data branch together with usage. Never write them into app/catalog data.
     saved=ledger.load();operation=saved['months'][month]['operations'][os.environ['GITHUB_RUN_ID']]
     from classification_benchmark import compare
-    operation['report']={'model':MODEL,'records':compare(sample,answers),'accuracy':None,
-                         'scope':'TEXT_ONLY_NOT_PHYSICAL_OR_BGG_VALIDATION'}
     refs=json.loads((root/'regression/fixtures/classification_reference64.json').read_text())['records']
+    context={r['listing_id']:r for r in refs}
+    enriched=[dict(r,previous_type=context[r['listing_id']].get('previous_type'),bgg_id=context[r['listing_id']].get('previous_bgg_id')) for r in sample]
+    operation['report']={'model':MODEL,'records':compare(enriched,answers),'accuracy':None,
+                         'scope':'TEXT_ONLY_NOT_PHYSICAL_OR_BGG_VALIDATION'}
     from classification_benchmark import metrics
     operation['report']['text_reference_metrics']=metrics(operation['report']['records'],[r for r in refs if r['reference_status']=='TEXT_REFERENCE'])
     operation['report']['text_reference_metrics']['scope']='ENGINEER_REVIEWED_TITLE_REFERENCES_NOT_PHYSICAL_GROUND_TRUTH'
