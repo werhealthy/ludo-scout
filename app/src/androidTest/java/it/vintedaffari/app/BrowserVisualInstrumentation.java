@@ -49,7 +49,9 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   if(!"PAGE_BLOCKED".equals(get(screen,"state"))||(Boolean)get(screen,"accepting"))throw new AssertionError("stale finish resumed capture");
   ((View)get(screen,"status")).performClick();
   if(!"LOADING".equals(get(screen,"state"))||!(Boolean)get(screen,"loading")||(Boolean)get(screen,"pageFailed"))throw new AssertionError("explicit retry did not start allowed search");
-  web.stopLoading();client.onPageStarted(web,"https://www.vinted.it/catalog/4881-board-games",null);
+  client.onPageFinished(web,"https://www.vinted.it/catalog/old");
+  if(!"LOADING".equals(get(screen,"state"))||!(Boolean)get(screen,"loading")||(Boolean)get(screen,"accepting"))throw new AssertionError("stale finish resumed capture during retry");
+  web.stopLoading();client.onPageStarted(web,"https://www.vinted.it/catalog/4881-board-games?page=1&order=relevance&price_to=25",null);
   if(!"LOADING".equals(get(screen,"state")))throw new AssertionError("new allowed navigation retained blocking state");
  }
  
