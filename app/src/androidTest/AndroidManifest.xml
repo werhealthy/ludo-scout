@@ -1,0 +1,1 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"><instrumentation android:name="it.vintedaffari.app.BrowserVisualInstrumentation" android:targetPackage="it.vintedaffari.app" android:targetProcesses="it.vintedaffari.app:ui"/></manifest>

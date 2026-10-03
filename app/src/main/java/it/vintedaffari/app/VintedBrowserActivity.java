@@ -55,7 +55,7 @@ public final class VintedBrowserActivity extends Activity {
  private WebView web;private TextView status,previous,next;
  private enum BrowserUiState {exploreExpanded,exploreCollapsed,manualMatch}
  private BrowserUiState uiState=BrowserUiState.exploreExpanded;
- private ScrollView controlsHost;private LinearLayout expandedControls,manualCard,counterRow,paginationHost,pagesRow;private BrowserUiState renderedPagination;
+ private LinearLayout controlsHost;private LinearLayout expandedControls,manualCard,counterRow,paginationHost,pagesRow;private BrowserUiState renderedPagination;
  private TextView pageIndicator,relevant,newest,priceValue;
  private android.widget.Switch priceToggle;
  private TextView surpriseButton,huntsButton,priceMinus,pricePlus;
@@ -93,7 +93,9 @@ public final class VintedBrowserActivity extends Activity {
  private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);return v;}
  private LinearLayout row(){LinearLayout v=new LinearLayout(this);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
  private void section(LinearLayout host,String title){TextView t=label(title,13);t.setTextColor(MUTED);t.setPadding(dp(4),dp(8),dp(4),dp(4));host.addView(t);}
- private void buildBrowserChrome(LinearLayout root){
+ private void buildBrowserChrome(LinearLayout outer){
+  LinearLayout root=column();ScrollView chrome=new ScrollView(this){@Override protected void onMeasure(int widthSpec,int heightSpec){int available=View.MeasureSpec.getSize(heightSpec);int limit=Math.round(available*.55f);super.onMeasure(widthSpec,View.MeasureSpec.makeMeasureSpec(limit,View.MeasureSpec.AT_MOST));}};
+  chrome.setFillViewport(false);chrome.addView(root);outer.addView(chrome,new LinearLayout.LayoutParams(-1,-2));
   expandedControls=column();expandedControls.setPadding(dp(16),0,dp(16),dp(8));
   section(expandedControls,"Ordine");LinearLayout orders=row();
   LinearLayout selector=row();selector.setBackground(capsule());selector.setPadding(dp(3),dp(3),dp(3),dp(3));
@@ -115,9 +117,8 @@ public final class VintedBrowserActivity extends Activity {
   stepper.addView(priceMinus,new LinearLayout.LayoutParams(dp(48),dp(48)));priceValue=label("25 €",18);priceValue.setGravity(Gravity.CENTER);priceValue.setTypeface(appTypeface,Typeface.BOLD);priceValue.setMinWidth(dp(64));priceValue.setPadding(dp(4),dp(8),dp(4),dp(8));stepper.addView(priceValue,new LinearLayout.LayoutParams(narrow?0:dp(76),-2,narrow?1:0));stepper.addView(pricePlus,new LinearLayout.LayoutParams(dp(48),dp(48)));
   threshold.addView(priceRow);threshold.addView(stepper);expandedControls.addView(threshold);
   section(expandedControls,"Filtri attivi");TextView category=label("Giochi da tavolo",14);category.setCompoundDrawablesWithIntrinsicBounds(LudoIcons.drawable(this,LudoIcons.TAG,TEXT,dp(18)),null,null,null);category.setCompoundDrawablePadding(dp(8));category.setPadding(dp(12),dp(10),dp(12),dp(10));category.setBackground(capsule());category.setContentDescription("Filtro attivo: Giochi da tavolo");expandedControls.addView(category,new LinearLayout.LayoutParams(-2,-2));
-  // Bound the expanded chrome so larger accessibility fonts never consume the WebView.
-  controlsHost=new ScrollView(this){@Override protected void onMeasure(int widthSpec,int heightSpec){int limit=Math.round(getResources().getDisplayMetrics().heightPixels*.38f);super.onMeasure(widthSpec,View.MeasureSpec.makeMeasureSpec(limit,View.MeasureSpec.AT_MOST));}};
-  controlsHost.setFillViewport(false);controlsHost.addView(expandedControls);root.addView(controlsHost,new LinearLayout.LayoutParams(-1,-2));
+  // The outer chrome scrolls within the available window, reserving space for Vinted.
+  controlsHost=expandedControls;root.addView(controlsHost,new LinearLayout.LayoutParams(-1,-2));
   manualCard=column();manualCard.setPadding(dp(16),dp(4),dp(16),dp(8));TextView badge=label("Match manuale",14);badge.setTextColor(Color.rgb(184,164,255));badge.setPadding(dp(12),dp(8),dp(12),dp(8));badge.setBackground(capsule());badge.setCompoundDrawablesWithIntrinsicBounds(LudoIcons.drawable(this,LudoIcons.USER,Color.rgb(184,164,255),dp(18)),null,null,null);badge.setCompoundDrawablePadding(dp(8));manualCard.addView(badge,new LinearLayout.LayoutParams(-2,-2));
   LinearLayout paused=row();paused.setPadding(dp(16),dp(16),dp(16),dp(16));paused.setBackground(capsule());TextView pause=label(LudoIcons.PAUSE,24);pause.setTypeface(LudoIcons.solid(this));pause.setTextColor(Color.rgb(164,151,255));paused.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout copy=column();copy.setPadding(dp(12),0,0,0);TextView heading=label("Ludo in pausa",20);heading.setTypeface(appTypeface,Typeface.BOLD);copy.addView(heading);TextView detail=label("Stai cercando manualmente su Vinted.",14);detail.setTextColor(MUTED);detail.setPadding(0,dp(4),0,0);copy.addView(detail);paused.addView(copy,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams card=new LinearLayout.LayoutParams(-1,-2);card.topMargin=dp(12);manualCard.addView(paused,card);root.addView(manualCard);
   counterRow=row();if(getResources().getConfiguration().fontScale>1.3f)counterRow.setOrientation(LinearLayout.VERTICAL);counterRow.setGravity(Gravity.CENTER);counterRow.setPadding(dp(16),dp(4),dp(16),dp(4));progressSummary=counterRow;counterRow.setFocusable(true);counter=label("0",32);counter.setTypeface(appTypeface,Typeface.BOLD);counter.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);counterRow.addView(counter);TextView caption=label("annunci salvati",14);caption.setTextColor(MUTED);caption.setPadding(dp(8),0,0,0);counterRow.addView(caption);paginationHost=column();root.addView(paginationHost);
