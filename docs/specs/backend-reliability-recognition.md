@@ -1,5 +1,16 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Vinted160 — diagnosi del blocco browser, verifica in corso
+
+Feedback2026-10-03 19:35Europe/Rome:159 non apre nessuna pagina, toast del browser e browserCapture.PAGE_BLOCKED; app ufficiale funzionante. Confronto158→159: allowlist, cookie, impostazioni WebView e URL iniziale invariati. Causa del reindirizzamento ancora sconosciuta:159 non registra URL/motivo del blocco. Non classificare come ban Vinted o problema BGG.
+
+Branch backend/vinted-browser-block-diagnostics da betae281794, PR217.160 registra pagina senza credenziali/query/fragment, motivo/stage/timestamp del blocco; callback tardivi non devono riabilitare la cattura; ricaricamento esplicito riparte dalla ricerca consentita e segue redirect consentiti. Allowlist invariata, nessun bypass/login automatico, richiesta aggiuntiva di cattura, schema, soglia o dati modificati. Condivisi Activity/policy, release e workflow PR; test JUnit e callback della Activity reale prima della sostituzione con pagina locale.
+
+RED unit in CI37141496494:59test,2 falliti per metodi diagnostici assenti. GREEN/build/distribuzione da confermare. La prova callback include errori/location dopo blocco, finish tardivi prima/dopo retry e redirect consentito. Lint5errori preesistenti fuori browser da riportare. Non dichiarare navigazione Vinted live risolta dalla CI.
+
+Dopo distribuzione verificata: aggiornare senza cancellare dati, aprire Trova nuovi giochi e fare un solo tentativo; se bloccato copiare ⋮→Dati della cattura. Restituire browserCapture completo con160, blockedPage/reason/stage/at. Frontend7/backend5 gruppi aperti: consolidato nel browser/acquisizione esistente.
+
+
 ## Backend155 — Ludo integrato e cattura prima dell’avanzamento, distribuita
 
 Feedback02:55Europe/Rome sulla153: composizione collage non accettata, richiesti Ludo al centro dei collegamenti, bilancio in alto, shortcut Motore eliminato, browser leggibile con azioni dirette e grande conteggio progressivo. Distribuita **5.12.155-ludo-capture (1000178)**, localCode204; conservati Catalogo/Bundle154, pricing, identità, dati personali e memoria Ludo.
