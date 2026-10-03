@@ -1,6 +1,6 @@
 # Ludo Scout — Current state
 
-## Backend160 — blocco browser diagnosticabile, distribuzione in corso
+## Backend160 — blocco browser diagnosticabile, distribuita
 
 Feedback19:35Europe/Rome2026-10-03:159 non apre alcuna pagina; browserCapture.PAGE_BLOCKED e toast Ludo, app Vinted ufficiale funzionante.158→159 policy/cookie/settings/URL iniziale invariati. Causa live del reindirizzamento non ancora nota, non attribuita a ban o BGG.
 
@@ -8,9 +8,9 @@ PR217 da betae281794; HEAD0b87090812afcf98b4bf7c8b81e876ba48d585e7, mergeed4e985
 
 CI37142214104 SUCCESS sulHEAD: job111258830097 suite completa SQL/JVM,45/45 cattura, unit Android, compile e APK; job111258830331 callback della Activity reale prima della fixture, late error/location/finish prima e dopo retry, redirect consentito, tre viste font100/200%. RED precedente37141496494:59test,2falliti per diagnostica assente. Test error payload corretto dopo constructor Android non accessibile. Review finale senzaCritical/Important. Lint5errori preesistenti fuori browser/100warning, non soppressi. Nessun Vinted live/telefono verificato.
 
-Release preparata5.12.160-vinted-diagnostics, localCode209. Distribuzione firmata/Firebase ancora da confermare. Merge cumulativo217 ereditava una precedente nota[skip ci] e non ha creato run beta; checkpoint successivo avvia il workflow con codice identico verificato.
+Distribuita **5.12.160-vinted-diagnostics (1000183)**, localCode209. Android beta183/run37142697174/job111260230159 SUCCESS: suite/unit/APK firmata. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T18:05:27.0367375Z. Upload Firebase confermato18:06:03.3920073Z; distribuzione tester/gruppi distinta18:06:03.8255993Z. Release5r3c33fab43p0. Artifact GitHub indisponibile per quota storage esaurita, Firebase riuscito. Merge cumulativo217 aveva ereditato una nota[skip ci]; checkpoint PR218/merge3c7229f688f8a7c3e586724e8b69dc6bdbb24ca7 ha avviato il workflow con codice identico verificato.
 
-Telefono dopo distribuzione confermata: aggiornare senza cancellare dati, Trova nuovi giochi, un tentativo; se bloccato copiare ⋮→Dati della cattura e restituire browserCapture completo160 con blockedPage/reason/stage/at. Frontend7/backend5 gruppi aperti. Unico prossimo passo: completare distribuzione160, poi ottenere il report del blocco sul telefono.
+Telefono dopo distribuzione confermata: aggiornare senza cancellare dati, Trova nuovi giochi, un tentativo; se bloccato copiare ⋮→Dati della cattura e restituire browserCapture completo160 con blockedPage/reason/stage/at. Frontend7/backend5 gruppi aperti. Unico prossimo passo: ottenere il report browserCapture160 del blocco sul telefono e identificare il reindirizzamento effettivo; Vinted live non dichiarato risolto.
 
 
 ## Frontend159 — browser Vinted ridisegnato, distribuita
