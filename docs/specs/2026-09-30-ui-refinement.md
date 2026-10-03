@@ -1,10 +1,18 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
-## Browser Vinted158 — direzione approvata 2026-10-03, verifica in corso
+## Browser Vinted159 — direzione approvata 2026-10-03, verifica in corso
 
 Il riferimento principale sono le tre immagini fornite nella chat: Esplora espanso con Ordine globale Rilevanti/Nuovi, Sorprendimi, Cacce con cuore, soglia massima attivabile/stepper, chip Giochi da tavolo, contatore reale e pagine centrate; Esplora compresso con sole frecce/contatore/pagina; Match manuale con badge e card «Ludo in pausa — Stai cercando manualmente su Vinted», senza CTA Leggi/Torna. Header chiudi/Vinted/overflow; nessuna uscita dall'app nel menu. Superati Nuova esplorazione, Ricerca e filtri, pannello filtri ridondante e pausa/fotocamera esposti in Esplora. Cacce usa i preferiti BGG esistenti; scegliere un titolo conserva ordine/soglia. Categoria fissa non rimovibile, senza chip di rimozione fittizio.
 
 Branch frontend/vinted-browser-redesign da beta03ea4e48, PR214. Tre stati espliciti, token/Remus/icone e capsule esistenti. Conservati persistenza, contatore per pagina e doppio gate nativo/JS prima di Next; manuale con cattura OFF può navigare. Chrome scrollabile e misurato sullo spazio disponibile, riserva spazio al browser anche con font grandi. Nessuna nuova libreria/schema/servizio. Build e regressioni complete verificati sul primo codice; screenshot Activity reale/emulatore con WebView locale in verifica, non sito live. Accettazione telefono ancora pendente. Frontend7/backend5 aperti; questo feedback consolida il gruppo browser/Wizard esistente.
+
+## Direzione operativa Ludo — stanze pet, 2026-10-03 13:06
+
+Feedback esplicito: gli asset devono essere integrati nell'app, non consegnati come pack separato. Ludo vive in tre piccole stanze adiacenti Motore / Preferiti / Libreria, swipe orizzontale e indicatori; niente tab in alto, hero separate o campo ricerca nella stanza Motore. Ambienti e sprite separati con alpha reale, stanza superiore sfumata nella UI nativa inferiore. Stile cartoon whimsical, semplice e domestico. Card, font, navigation, CTA e scaffali reali dell'app restano il riferimento.
+
+Branch frontend/ludo-pet-rooms da beta03ea4e48. Integra otto risorse WebP, composizione nativa a layer, frecce e indicatori accessibili, Motore circolare misurato con fallback a righe per font grandi. Conteggi/delta giornalieri e destinazioni preservati; intake globale e lavoro dello scroll separati. Due metriche restano mensili secondo la sorgente esistente, senza inventare una settimana. CTA unica verso Vinted; preferiti e Library conservano dati e renderer. Nessuna dipendenza/schema/soglia/servizio nuovo. Mapping docs/assets/ludo-pet-rooms-158.md.
+
+Questo feedback supersede la composizione a righe come default e le tavole/attore in riquadri introdotti in157; conserva navigazione/cache156 e semantica153. Integrazione in corso, build/distribuzione e accettazione telefono non ancora confermate. Frontend7/backend5 gruppi aperti, consolidato nei gruppi Ludo/Motore esistenti.
 
 ## Frontend157 — nuovo universo Ludo e Motore adattabile, distribuita
 
