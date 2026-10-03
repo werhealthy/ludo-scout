@@ -1,5 +1,32 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## AI — confronto offline preparato, 2026-10-03
+Archivio163 ricevuto e letto senza modifiche: 9705 listings (569 ACTIVE), 6077 con observed_text, 3702 ID/URL Vinted, 386 listings con 1460 URL foto distinti. Foto non scaricate/verificate. Snapshot browser3954:656 ID non presenti nel canonical, nessuna descrizione/foto nel payload esportato. Osservazioni3429 e legacy1128 hanno firme già presenti nel canonical; non sommarli come annunci aggiuntivi. Lingue concrete323: provenienza non ancora verificata.
+
+Campione privato64 selezionato (8 per accessori/componenti/bundle/espansioni/fuori tema/matching dubbio/titoli poveri/controlli),59 ACTIVE,15 con riferimenti foto. Non è un campione casuale di prevalenza: non estrapolare percentuali all'archivio. Dati privati e ZIP non caricati su GitHub.
+Smoke test manuali in AI Studio: gemini-3-flash-preview (Thinking High, Search disattivato dopo la prima prova) e gemini-3.1-flash-lite. Le due risposte senza Search concordano8/8 sulle categorie; non sono ground truth. Flash-Lite attribuisce IT/DE/IT senza prova del prodotto ai casi5/6/8. Tool offline mantiene linguaUNKNOWN e flagUNSUPPORTED_LANGUAGE; questa versione titolo/brand non valuta neppure eventuali dichiarazioni esplicite, OCR o foto. Fixture conserva campi normalizzati e motivazioni abbreviate, non la risposta verbatim/token usage. Nessuna BGG identity verificata dalle prove. I due modelli propongono3 cambi di tipo sulle6 classi precedenti conosciute;2 record senza classe precedente delle osservazioni restano null, non inferiti dai BGG match. Le classi precedenti nella fixture sono ultime osservazioni del campione; la bonifica completa deve ancora riconciliare anche legacy e override.
+
+Regola di confronto: EMPTY_BOX/ACCESSORY/COMPONENTS→ACCESSORY_COMPONENT, mantenendo raw previous_type; GAME→BASE_GAME, UNCERTAIN→UNKNOWN. Espansioni conservate nell'archivio, escluse dal catalogo automatico base-game secondo comportamento attuale, nessuna modifica runtime.
+Tool tools/classification_benchmark.py: compare(sample, answers) produce proposta/confidenza grezza non calibrata/motivo/flag/prior/matchBGG grezzo non verificato/costo null; missing answer→UNKNOWN. Nessun apply, rete/API/key/SQLite/download. needs_review è proposta offline, non autorizzazione applicativa. Solo riferimenti annotati indipendenti consentono metrics; accuracy/precision null senza riferimenti; false negatives separati dalle abstentionUNKNOWN; confusion matrix. Costo per record null finché non esiste usage/costo misurato. --output non può sovrascrivere input o file esistente. La verifica BGG e le metriche lingua restano da implementare.
+
+Piano del task circoscritto (native, autorizzazione utente «Vai»; riferimento operativo qui, nessuna scaletta parallela):
+- [x] Test RED su strumento assente.
+- [x] Comparatore offline, schema risposte e metriche con abstention separate.
+- [x] Fixture8 annunci delle risposte fornite, senza foto/testo libero venditore.
+- [x] TestGREEN locali9: invalidi/duplicati/missing, lingua senza evidenza, priors, metriche e overwrite; UNKNOWN/missing/unrecognized priors separati, reference file distinto dagli answers anche via alias, provenienza dichiarata non verificata.
+- [ ] Review indipendente, regressioni/build esistenti su PR e merge con checkpoint.
+- [ ] Riferimenti annotati indipendenti sui64 e risposte controllate del provider: benchmark ancora NON eseguito.
+Non introdotto adapter provider, costo/budget ledger, hard stop o mass batch: necessari prima delle chiamate API. SecretGEMINI_API_KEY non letto/usato; budget proposto1EUR/mese, nessun paid/full batch autorizzato. Nessuna nuovaAPK necessaria per tool offline. Frontend7/backend6 aperti.
+
+Uso sviluppatore:
+```sh
+python3 regression/classification_benchmark_test.py
+python3 tools/classification_benchmark.py --sample private-sample.json --answers private-answers.json --model gemini-3.1-flash-lite --output private-report.json
+```
+Sample JSON: {"records":[{"listing_id":1,"previous_type":"BASE_GAME","bgg_id":"127398"}]}.
+Answers JSON array: listing_id integer, category enum6, confidence0..100 o null, evidence non vuota, needs_review boolean, language (soloUNKNOWN supportato per questo test), bgg_verdictSUPPORTED|CONFLICT|UNKNOWN. --references accetta array listing_id/category da annotazione indipendente.
+Prossimo passo: annotazione del campione per categoria/identità, poi runner gratuito protetto; nessuna elaborazione massiva.
+
 ## AI — audit archivio autorizzato, 2026-10-03
 Richiesta esplicita: AI solo sui casi ambigui, budget proposto 1 EUR/mese, nessun servizio pagato né batch completo senza successiva approvazione. Gemini API key salvata dall'utente come GEMINI_API_KEY in GitHub Secrets; progetto Free Tier dichiarato dall'utente. In questa fase la chiave non viene letta né usata.
 Diagnostica161: market_listings 9667 righe per lifecycle, 563 ACTIVE e 3664 con URL salvato; conteggi di righe, non garanzia di deduplicazione globale o URL disponibili. Archivio completo non ancora ricevuto. I contatori analisi non misurano accuracy.
