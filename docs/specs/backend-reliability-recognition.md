@@ -1,12 +1,12 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
-## Vinted160 — diagnosi del blocco browser, verifica in corso
+## Vinted160 — diagnosi del blocco browser, distribuita
 
 Feedback2026-10-03 19:35Europe/Rome:159 non apre nessuna pagina, toast del browser e browserCapture.PAGE_BLOCKED; app ufficiale funzionante. Confronto158→159: allowlist, cookie, impostazioni WebView e URL iniziale invariati. Causa del reindirizzamento ancora sconosciuta:159 non registra URL/motivo del blocco. Non classificare come ban Vinted o problema BGG.
 
 Branch backend/vinted-browser-block-diagnostics da betae281794, PR217.160 registra pagina senza credenziali/query/fragment, motivo/stage/timestamp del blocco; callback tardivi non devono riabilitare la cattura; ricaricamento esplicito riparte dalla ricerca consentita e segue redirect consentiti. Allowlist invariata, nessun bypass/login automatico, richiesta aggiuntiva di cattura, schema, soglia o dati modificati. Condivisi Activity/policy, release e workflow PR; test JUnit e callback della Activity reale prima della sostituzione con pagina locale.
 
-RED unit in CI37141496494:59test,2 falliti per metodi diagnostici assenti. GREEN/build/distribuzione da confermare. La prova callback include errori/location dopo blocco, finish tardivi prima/dopo retry e redirect consentito. Lint5errori preesistenti fuori browser da riportare. Non dichiarare navigazione Vinted live risolta dalla CI.
+RED unit in CI37141496494:59test,2 falliti per metodi diagnostici assenti. GREEN CI37142214104: suite completa/unit/Java/APK e callback reali/render100/200% passati. Review finale senzaCritical/Important. Beta183/run37142697174 SUCCESS: firma verificata18:05:27UTC, upload Firebase18:06:03.392UTC e distribuzione18:06:03.825UTC distinti;5.12.160(1000183), release5r3c33fab43p0. La prova callback include errori/location dopo blocco, finish tardivi prima/dopo retry e redirect consentito. Lint5errori preesistenti fuori browser da riportare. Non dichiarare navigazione Vinted live risolta dalla CI.
 
 Dopo distribuzione verificata: aggiornare senza cancellare dati, aprire Trova nuovi giochi e fare un solo tentativo; se bloccato copiare ⋮→Dati della cattura. Restituire browserCapture completo con160, blockedPage/reason/stage/at. Frontend7/backend5 gruppi aperti: consolidato nel browser/acquisizione esistente.
 
