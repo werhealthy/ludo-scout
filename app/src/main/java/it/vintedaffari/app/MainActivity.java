@@ -92,7 +92,7 @@ public final class MainActivity extends Activity {
             if("activity".equals(tab)&&now-lastQueueUiRenderAt>=minUiGap){if("overview".equals(engineSection))requestEngineOverviewSnapshot();lastQueueUiRenderAt=now;uiUpdates.removeCallbacks(refreshData);uiUpdates.postDelayed(refreshData,220);}
             return;
         }
-        invalidateReadSnapshots();reconcileResolvedOperationErrorsAsync();
+        invalidateBackgroundReadSnapshots();reconcileResolvedOperationErrorsAsync();
         long minUiGap="run".equals(engineSection)?12_000L:6_000L;
         if("activity".equals(tab)&&now-lastQueueUiRenderAt>=minUiGap){if("overview".equals(engineSection))requestEngineOverviewSnapshot();lastQueueUiRenderAt=now;uiUpdates.removeCallbacks(refreshData);uiUpdates.postDelayed(refreshData,280);}
         // Database ordering/content does not need to repaint for each background job completion.
@@ -216,7 +216,9 @@ private View makeCompanionFab(){
         final GameRecord game;final GameDetailData detail;
         GameReadSnapshot(GameRecord game,GameDetailData detail){this.game=game;this.detail=detail;}
     }
-    private void invalidateReadSnapshots(){catalogReadCache.invalidate();gameReadCache.invalidate();}
+    private long readMutationEpoch;
+    private void invalidateBackgroundReadSnapshots(){catalogReadCache.invalidate();gameReadCache.invalidate();}
+    private void invalidateReadSnapshots(){readMutationEpoch++;invalidateBackgroundReadSnapshots();}
     private boolean showCachedCatalog(LinearLayout host,long epoch){
         CatalogReadSnapshot cached=catalogReadCache.get(query,System.currentTimeMillis());if(cached==null)return false;
         catalogGameQuery=query;catalogGames=new ArrayList<>(cached.games);catalogMatchedIds=new HashSet<>(cached.matches);catalogGameError=null;
@@ -305,7 +307,7 @@ private View makeCompanionFab(){
         if(since<20_000L){
             if(!operationReconcilePending){
                 operationReconcilePending=true;
-                uiUpdates.postDelayed(()->{operationReconcilePending=false;invalidateReadSnapshots();reconcileResolvedOperationErrorsAsync();},Math.max(1_000L,20_000L-since));
+                uiUpdates.postDelayed(()->{operationReconcilePending=false;invalidateBackgroundReadSnapshots();reconcileResolvedOperationErrorsAsync();},Math.max(1_000L,20_000L-since));
             }
             return;
         }
@@ -317,7 +319,7 @@ private View makeCompanionFab(){
             }catch(Throwable ignored){}
             finally{
                 operationReconcileInFlight=false;
-                if(operationReconcilePending&&!isDestroyed())runOnUiThread(()->{operationReconcilePending=false;invalidateReadSnapshots();reconcileResolvedOperationErrorsAsync();});
+                if(operationReconcilePending&&!isDestroyed())runOnUiThread(()->{operationReconcilePending=false;invalidateBackgroundReadSnapshots();reconcileResolvedOperationErrorsAsync();});
             }
         });
     }
@@ -1187,9 +1189,9 @@ private void renderDatabase(){
     private void renderDatabaseDetail(){
         final long gameId=selectedGameId,epoch=++pageDetailEpoch;final LinearLayout host=body;body.setBackground(productPageBackground());
         TextView back=secondaryTextAction("‹  Indietro");back.setOnClickListener(v->closeDatabaseGame());GameReadSnapshot cached=gameReadCache.get(gameId,System.currentTimeMillis());if(cached!=null){renderDatabaseDetailInto(host,cached.game,this::closeDatabaseGame,cached.detail);return;}
-        final long generation=gameReadCache.generation();host.addView(back);host.addView(brandedLoadingState("Ludo prepara il gioco per te…"));
+        final long generation=gameReadCache.generation(),mutationEpoch=readMutationEpoch;host.addView(back);host.addView(brandedLoadingState("Ludo prepara il gioco per te…"));
         detailIo.execute(()->{GameRecord game=null;GameDetailData data=null;try{game=marketStore.gameStats(gameId);if(game!=null)data=loadGameDetailData(game);}catch(RuntimeException ignored){}final GameRecord ready=game;final GameDetailData snapshot=data;
-            runOnUiThread(()->{if(isDestroyed()||epoch!=pageDetailEpoch||!"database".equals(tab)||selectedGameId!=gameId)return;cancelImageRequests(host);host.removeAllViews();if(ready==null||snapshot==null){host.addView(back);TextView retry=secondaryTextAction("Gioco non disponibile. Riprova");retry.setOnClickListener(v->render());host.addView(retry);return;}if(!gameReadCache.put(gameId,new GameReadSnapshot(ready,snapshot),System.currentTimeMillis(),generation)){scheduleRender(0);return;}renderDatabaseDetailInto(host,ready,this::closeDatabaseGame,snapshot);});
+            runOnUiThread(()->{if(isDestroyed()||epoch!=pageDetailEpoch||!"database".equals(tab)||selectedGameId!=gameId)return;cancelImageRequests(host);host.removeAllViews();if(ready==null||snapshot==null){host.addView(back);TextView retry=secondaryTextAction("Gioco non disponibile. Riprova");retry.setOnClickListener(v->render());host.addView(retry);return;}if(!gameReadCache.put(gameId,new GameReadSnapshot(ready,snapshot),System.currentTimeMillis(),generation)&&mutationEpoch!=readMutationEpoch){scheduleRender(0);return;}renderDatabaseDetailInto(host,ready,this::closeDatabaseGame,snapshot);});
         });
     }
 
@@ -1219,26 +1221,26 @@ private void renderDatabase(){
         List<MarketStore.PricePoint> series=snapshot==null?marketStore.priceHistory(g.id,90):snapshot.series;if(series.size()>=2){TextView chartTitle=text("Storico prezzi",17,TEXT,Typeface.BOLD);chartTitle.setPadding(0,dp(20),0,dp(8));market.addView(chartTitle);PriceHistoryView graph=new PriceHistoryView(this,series);graph.setBackground(round(SURFACE,18,1,OUTLINE));market.addView(graph,new LinearLayout.LayoutParams(-1,dp(180)));}
 
         List<MarketListingRecord> active=snapshot==null?marketStore.listingsForGame(g.id,true,80):snapshot.active;LinearLayout listHead=new LinearLayout(this);listHead.setGravity(Gravity.CENTER_VERTICAL);listHead.setPadding(0,dp(30),0,dp(10));listHead.addView(text("Annunci di questo gioco",20,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));listHead.addView(text(active.size()+" attivi",12,MUTED,Typeface.NORMAL));market.addView(listHead);
-        if(active.isEmpty()){LinearLayout empty=verticalCard();empty.setPadding(dp(16),dp(16),dp(16),dp(16));empty.addView(text("Nessun annuncio attivo osservato",16,TEXT,Typeface.BOLD));empty.addView(text("La scheda gioco resta disponibile con storico, tag e giochi simili.",13,MUTED,Typeface.NORMAL));market.addView(empty);}else for(MarketListingRecord l:active)market.addView(snapshot==null?marketListingCard(g,l):marketListingCard(g,l,snapshot.listingScores.get(l)));
-        addProductTabs(host,"game:"+g.id,new String[]{"Panoramica","Mercato","Scopri"},new LinearLayout[]{panorama,market,discover});
+        Runnable buildMarketListings=()->{if(active.isEmpty()){LinearLayout empty=verticalCard();empty.setPadding(dp(16),dp(16),dp(16),dp(16));empty.addView(text("Nessun annuncio attivo osservato",16,TEXT,Typeface.BOLD));empty.addView(text("La scheda gioco resta disponibile con storico, tag e giochi simili.",13,MUTED,Typeface.NORMAL));market.addView(empty);}else for(MarketListingRecord l:active)market.addView(snapshot==null?marketListingCard(g,l):marketListingCard(g,l,snapshot.listingScores.get(l)));};
+        addProductTabs(host,"game:"+g.id,new String[]{"Panoramica","Mercato","Scopri"},new LinearLayout[]{panorama,market,discover},new Runnable[]{null,buildMarketListings,null});
     }
     private void openProductResource(String url){
         persistTransientUiSession();try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(android.content.ActivityNotFoundException unavailable){Toast.makeText(this,"Nessuna app disponibile per aprire il collegamento",Toast.LENGTH_SHORT).show();}
     }
-    private void addProductTabs(LinearLayout host,String key,String[] labels,LinearLayout[] sections){
+    private void addProductTabs(LinearLayout host,String key,String[] labels,LinearLayout[] sections,Runnable[] initializers){
         int remembered=productSectionPositions.getOrDefault(key,getSharedPreferences(PREF_UI_SESSION,MODE_PRIVATE).getInt("productSection_"+key,0));final int initial=Math.max(0,Math.min(labels.length-1,remembered));
         LinearLayout tabs=new LinearLayout(this);tabs.setPadding(0,dp(16),0,dp(8));tabs.setOrientation(getResources().getConfiguration().fontScale>1.3f?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);TextView[] controls=new TextView[labels.length];
         for(int i=0;i<labels.length;i++){final int selected=i;TextView control=text(labels[i],14,i==initial?TEXT:MUTED,Typeface.BOLD);control.setGravity(Gravity.CENTER);control.setMinHeight(dp(48));control.setPadding(dp(8),dp(8),dp(8),dp(8));control.setSelected(i==initial);control.setBackground(round(i==initial?SURFACE2:BG,12,1,i==initial?CYAN:OUTLINE));control.setContentDescription(labels[i]+(i==initial?", selezionato":""));controls[i]=control;
-            control.setOnClickListener(v->{productSectionPositions.put(key,selected);getSharedPreferences(PREF_UI_SESSION,MODE_PRIVATE).edit().putInt("productSection_"+key,selected).apply();for(int k=0;k<sections.length;k++){sections[k].setVisibility(k==selected?View.VISIBLE:View.GONE);controls[k].setSelected(k==selected);controls[k].setTextColor(k==selected?TEXT:MUTED);controls[k].setBackground(round(k==selected?SURFACE2:BG,12,1,k==selected?CYAN:OUTLINE));controls[k].setContentDescription(labels[k]+(k==selected?", selezionato":""));}});
+            control.setOnClickListener(v->{if(initializers[selected]!=null){initializers[selected].run();initializers[selected]=null;}productSectionPositions.put(key,selected);getSharedPreferences(PREF_UI_SESSION,MODE_PRIVATE).edit().putInt("productSection_"+key,selected).apply();for(int k=0;k<sections.length;k++){sections[k].setVisibility(k==selected?View.VISIBLE:View.GONE);controls[k].setSelected(k==selected);controls[k].setTextColor(k==selected?TEXT:MUTED);controls[k].setBackground(round(k==selected?SURFACE2:BG,12,1,k==selected?CYAN:OUTLINE));controls[k].setContentDescription(labels[k]+(k==selected?", selezionato":""));}});
             LinearLayout.LayoutParams lp=tabs.getOrientation()==LinearLayout.VERTICAL?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);if(i>0){lp.leftMargin=tabs.getOrientation()==LinearLayout.VERTICAL?0:dp(6);lp.topMargin=tabs.getOrientation()==LinearLayout.VERTICAL?dp(6):0;}tabs.addView(control,lp);
         }
-        host.addView(tabs,new LinearLayout.LayoutParams(-1,-2));for(int i=0;i<sections.length;i++){sections[i].setVisibility(i==initial?View.VISIBLE:View.GONE);host.addView(sections[i],new LinearLayout.LayoutParams(-1,-2));}
+        host.addView(tabs,new LinearLayout.LayoutParams(-1,-2));for(int i=0;i<sections.length;i++){if(i==initial&&initializers[i]!=null){initializers[i].run();initializers[i]=null;}sections[i].setVisibility(i==initial?View.VISIBLE:View.GONE);host.addView(sections[i],new LinearLayout.LayoutParams(-1,-2));}
     }
     private void openGameDetailOverlay(long gameId){
         if(gameId<=0)return;if(activeGameOverlay!=null&&activeGameOverlay.isShowing())activeGameOverlay.dismiss();Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);activeGameOverlay=dialog;ScrollView sc=new ScrollView(this);sc.setBackground(productPageBackground());LinearLayout host=new LinearLayout(this);host.setOrientation(LinearLayout.VERTICAL);host.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(host);
-        GameReadSnapshot cached=gameReadCache.get(gameId,System.currentTimeMillis());final long generation=gameReadCache.generation();if(cached==null)host.addView(brandedLoadingState("Ludo prepara il gioco per te…"));else renderDatabaseDetailInto(host,cached.game,dialog::dismiss,cached.detail);
+        GameReadSnapshot cached=gameReadCache.get(gameId,System.currentTimeMillis());final long generation=gameReadCache.generation(),mutationEpoch=readMutationEpoch;if(cached==null)host.addView(brandedLoadingState("Ludo prepara il gioco per te…"));else renderDatabaseDetailInto(host,cached.game,dialog::dismiss,cached.detail);
         sc.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);host.setPadding(dp(20)+safe.left,dp(16)+safe.top,dp(20)+safe.right,dp(24)+safe.bottom);return insets;});dialog.setOnDismissListener(v->{if(activeGameOverlay==dialog)activeGameOverlay=null;syncPetVisibility();});dialog.setContentView(sc);dialog.show();syncPetVisibility();sc.requestApplyInsets();Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
-        if(cached!=null)return;detailIo.execute(()->{GameRecord g=null;GameDetailData data=null;try{g=marketStore.gameStats(gameId);if(g!=null)data=loadGameDetailData(g);}catch(RuntimeException ignored){}final GameRecord ready=g;final GameDetailData snapshot=data;runOnUiThread(()->{if(!dialog.isShowing())return;host.removeAllViews();if(ready==null||snapshot==null){TextView error=text("Gioco non disponibile",18,TEXT,Typeface.BOLD);host.addView(error);return;}if(!gameReadCache.put(gameId,new GameReadSnapshot(ready,snapshot),System.currentTimeMillis(),generation)){dialog.dismiss();openGameDetailOverlay(gameId);return;}renderDatabaseDetailInto(host,ready,dialog::dismiss,snapshot);sc.post(()->sc.scrollTo(0,0));});});
+        if(cached!=null)return;detailIo.execute(()->{GameRecord g=null;GameDetailData data=null;try{g=marketStore.gameStats(gameId);if(g!=null)data=loadGameDetailData(g);}catch(RuntimeException ignored){}final GameRecord ready=g;final GameDetailData snapshot=data;runOnUiThread(()->{if(!dialog.isShowing())return;host.removeAllViews();if(ready==null||snapshot==null){TextView error=text("Gioco non disponibile",18,TEXT,Typeface.BOLD);host.addView(error);return;}if(!gameReadCache.put(gameId,new GameReadSnapshot(ready,snapshot),System.currentTimeMillis(),generation)&&mutationEpoch!=readMutationEpoch){dialog.dismiss();openGameDetailOverlay(gameId);return;}renderDatabaseDetailInto(host,ready,dialog::dismiss,snapshot);sc.post(()->sc.scrollTo(0,0));});});
     }
 
     private View marketListingCard(GameRecord g,MarketListingRecord l){return marketListingCard(g,l,marketStore.dealScore(g.id,l.currentPriceCents));}
@@ -1333,7 +1335,7 @@ private void renderCatalog(){
         return catalogMatchedIds.contains(d.bggId);
     }
     private void addCatalogGameResults(){
-        final String requested=query;final LinearLayout host=catalogContentHost;final long epoch=++catalogGameEpoch;final long generation=catalogReadCache.generation();
+        final String requested=query;final LinearLayout host=catalogContentHost;final long epoch=++catalogGameEpoch;final long generation=catalogReadCache.generation(),mutationEpoch=readMutationEpoch;
         if(host==null)return;
         catalogSearchFuture=uiDataIo.submit(()->{
             List<DealRecord> deals=new ArrayList<>();List<GameRecord> games=new ArrayList<>();Set<String> matches=new HashSet<>();String failure=null;int stored=0;
@@ -1341,7 +1343,7 @@ private void renderCatalog(){
             final List<DealRecord> result=deals;final List<GameRecord> found=games;final Set<String> matched=matches;final String error=failure;final int total=stored;
             runOnUiThread(()->{
                 if(isDestroyed()||epoch!=catalogGameEpoch||!"catalog".equals(tab)||!requested.equals(query)||host!=catalogContentHost||host.getParent()==null)return;
-                if(error==null&&!catalogReadCache.put(requested,new CatalogReadSnapshot(result,found,matched,total),System.currentTimeMillis(),generation)){queueCatalogSearch(0);return;}catalogGameQuery=requested;catalogGames=found;catalogMatchedIds=matched;catalogGameError=error;
+                if(error==null&&!catalogReadCache.put(requested,new CatalogReadSnapshot(result,found,matched,total),System.currentTimeMillis(),generation)&&mutationEpoch!=readMutationEpoch){queueCatalogSearch(0);return;}catalogGameQuery=requested;catalogGames=found;catalogMatchedIds=matched;catalogGameError=error;
                 if(error!=null){host.removeAllViews();TextView retry=secondaryTextAction(error);retry.setOnClickListener(v->queueCatalogSearch(0));host.addView(retry);return;}
                 renderCatalogResults(host,result,total);restoreCatalogResultsPosition(host,epoch);
             });
@@ -1367,7 +1369,7 @@ private void renderCatalog(){
         FrameLayout more=new FrameLayout(this);TextView dots=appIcon(LudoIcons.ELLIPSIS_VERTICAL,14,TEXT);dots.setGravity(Gravity.CENTER);dots.setBackground(round(Color.argb(185,10,11,20),999,0,0));dots.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);more.addView(dots,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));more.setContentDescription("Azioni annuncio");more.setFocusable(true);more.setOnClickListener(v->showListingActions(d));FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.END);mp.topMargin=dp(1);mp.rightMargin=dp(1);artwork.addView(more,mp);}
         addGameFavorite(artwork,d.bggId,name(d),Gravity.BOTTOM|Gravity.END);
         TextView title=discoverTextWeight(name(d),16,DISCOVER_TEXT,700);title.setLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setGravity(Gravity.TOP);title.setPadding(0,dp(10),0,0);title.setMinHeight(dp(48));card.addView(title,new LinearLayout.LayoutParams(-1,-2));
-        LinearLayout meta=new LinearLayout(this);boolean stackMeta=getResources().getConfiguration().fontScale>1.15f;meta.setOrientation(stackMeta?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);meta.setGravity(Gravity.CENTER_VERTICAL);meta.setPadding(0,dp(3),0,0);LinearLayout score=new LinearLayout(this);score.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout meta=new LinearLayout(this);boolean stackMeta=getResources().getConfiguration().fontScale>1.15f||getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density<380;meta.setOrientation(stackMeta?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);meta.setGravity(Gravity.CENTER_VERTICAL);meta.setPadding(0,dp(3),0,0);LinearLayout score=new LinearLayout(this);score.setGravity(Gravity.CENTER_VERTICAL);
         score.setPadding(dp(6),dp(3),dp(6),dp(3));score.setBackground(round(SURFACE2,8,0,0));score.addView(appIcon(LudoIcons.STAR,16,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(18),dp(24)));TextView rating=discoverTextWeight(d.rating==null?"BGG n/d":String.format(Locale.ITALY,"%.1f BGG",d.rating),16,DISCOVER_TEXT,700);rating.setSingleLine(true);score.addView(rating);meta.addView(score);
         if(gameId<=0){View edition=discoverLanguageIndicator(d);LinearLayout.LayoutParams elp=new LinearLayout.LayoutParams(-2,-2);elp.leftMargin=stackMeta?0:dp(6);meta.addView(edition,elp);}
         card.addView(meta,new LinearLayout.LayoutParams(-1,-2));

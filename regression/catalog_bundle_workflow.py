@@ -94,7 +94,7 @@ class DealRecord {String bggId="1";}
 class GameRecord {}
 class TextUtils {static boolean isEmpty(String s){return s==null||s.isEmpty();}}
 public class LiveCatalogRegression {
- String query="",tab="catalog",catalogGameQuery="",catalogGameError;long catalogGameEpoch;int catalogRestoreY=900;
+ String query="",tab="catalog",catalogGameQuery="",catalogGameError;long catalogGameEpoch,readMutationEpoch;int catalogRestoreY=900;
  LinearLayout catalogContentHost=new LinearLayout(),catalogResultsHost;List<DealRecord> catalogResultSnapshot=new ArrayList<>();List<GameRecord> catalogGames=new ArrayList<>();Set<String> catalogMatchedIds=new HashSet<>();
  UiSnapshotCache<String,CatalogReadSnapshot> catalogReadCache=new UiSnapshotCache<>(8,60000);static class CatalogReadSnapshot{final List<DealRecord> deals;final List<GameRecord> games;final Set<String> matches;final int total;CatalogReadSnapshot(List<DealRecord>d,List<GameRecord>g,Set<String>m,int t){deals=new ArrayList<>(d);games=new ArrayList<>(g);matches=new HashSet<>(m);total=t;}}Runnable catalogLiveSearch;Future<?> catalogSearchFuture;Handler uiUpdates=new Handler();Executor uiDataIo=new Executor();ArrayDeque<Runnable> callbacks=new ArrayDeque<>();DB db=new DB();Market marketStore=new Market();int renders;String rendered="";
  static class Handler {ArrayList<Runnable> tasks=new ArrayList<>();void removeCallbacks(Runnable r){tasks.remove(r);}void postDelayed(Runnable r,long delay){tasks.add(r);}void flush(){for(Runnable r:new ArrayList<>(tasks)){tasks.remove(r);r.run();}}}
@@ -114,7 +114,9 @@ public class LiveCatalogRegression {
   n.queueCatalogSearch(180);n.uiUpdates.flush();n.catalogContentHost.parent=null;n.uiDataIo.flush();n.flushUi();eq(3,n.renders);
   n.catalogContentHost=new LinearLayout();n.db.fail=true;n.queueCatalogSearch(180);n.uiUpdates.flush();n.uiDataIo.flush();n.flushUi();eq(3,n.renders);eq("Ricerca non disponibile. Riprova.",n.catalogGameError);eq(1,n.catalogContentHost.count);
   LiveCatalogRegression warm=new LiveCatalogRegression();warm.query="Carcassonne";warm.queueCatalogSearch(0);warm.uiUpdates.flush();warm.uiDataIo.flush();warm.flushUi();eq(1,warm.db.reads);warm.tab="discover";warm.catalogContentHost=new LinearLayout();warm.tab="catalog";warm.queueCatalogSearch(0);eq(1,warm.db.reads);eq(2,warm.renders);eq("Carcassonne",warm.rendered);eq(0,warm.uiUpdates.tasks.size());warm.catalogReadCache.invalidate();warm.queueCatalogSearch(0);warm.uiUpdates.flush();warm.uiDataIo.flush();warm.flushUi();eq(2,warm.db.reads);
-  System.out.println("PASS warm return without new read, invalidation reload; live A/AB, debounce, stale callback, clear, route/host guard, error without fake zero, editor host retained");
+  LiveCatalogRegression slow=new LiveCatalogRegression();slow.query="Slow game";slow.queueCatalogSearch(0);slow.uiUpdates.flush();slow.catalogReadCache.invalidate();slow.catalogReadCache.invalidate();slow.uiDataIo.flush();slow.catalogReadCache.invalidate();slow.flushUi();eq(1,slow.renders);eq(1,slow.db.reads);eq(0,slow.uiUpdates.tasks.size());
+  LiveCatalogRegression corrected=new LiveCatalogRegression();corrected.query="Changed game";corrected.queueCatalogSearch(0);corrected.uiUpdates.flush();corrected.catalogReadCache.invalidate();corrected.readMutationEpoch++;corrected.uiDataIo.flush();corrected.flushUi();eq(0,corrected.renders);eq(1,corrected.uiUpdates.tasks.size());corrected.uiUpdates.flush();corrected.uiDataIo.flush();corrected.flushUi();eq(1,corrected.renders);eq(2,corrected.db.reads);
+  System.out.println("PASS heartbeat during slow read completes without endless retry, explicit mutation retries; warm return without new read, invalidation reload; live A/AB, debounce, stale callback, clear, route/host guard, error without fake zero, editor host retained");
  }
  __METHODS__
 }
