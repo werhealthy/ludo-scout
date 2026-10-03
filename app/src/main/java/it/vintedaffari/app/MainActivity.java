@@ -200,6 +200,11 @@ private View makeCompanionFab(){
     private long catalogGamesAt=0,catalogGameEpoch=0,bundleSectionEpoch=0;
     private boolean bundleSectionRestorePending=false;
     private Set<String> catalogMatchedIds=new HashSet<>();
+    private LinearLayout catalogContentHost;
+    private Runnable catalogLiveSearch;
+    private Future<?> catalogSearchFuture;
+    private int catalogRestoreY=0;
+    private long pageDetailEpoch=0;
 
     private void addMarketHeader(String active){
         if("bundles".equals(active)){LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);head.setPadding(0,dp(12),0,dp(18));TextView back=appIcon(LudoIcons.CHEVRON_LEFT,22,TEXT);back.setContentDescription("Torna alla schermata precedente");back.setOnClickListener(v->onBackPressed());head.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));head.addView(discoverTextWeight("Bundle",30,DISCOVER_TEXT,700),new LinearLayout.LayoutParams(0,-2,1));body.addView(head,new LinearLayout.LayoutParams(-1,-2));return;}
@@ -1163,7 +1168,11 @@ private void renderDatabase(){
     }
 
     private void renderDatabaseDetail(){
-        GameRecord g=marketStore.gameStats(selectedGameId);if(g==null){selectedGameId=0;renderDatabase();return;}body.setBackground(productPageBackground());renderDatabaseDetailInto(body,g,this::closeDatabaseGame);
+        final long gameId=selectedGameId,epoch=++pageDetailEpoch;final LinearLayout host=body;body.setBackground(productPageBackground());
+        TextView back=secondaryTextAction("‹  Torna al Catalogo");back.setOnClickListener(v->closeDatabaseGame());host.addView(back);host.addView(loadingMoreView("Apro il gioco…"));
+        uiDataIo.execute(()->{GameRecord game=null;GameDetailData data=null;try{game=marketStore.gameStats(gameId);if(game!=null)data=loadGameDetailData(game);}catch(RuntimeException ignored){}final GameRecord ready=game;final GameDetailData snapshot=data;
+            runOnUiThread(()->{if(isDestroyed()||epoch!=pageDetailEpoch||!"database".equals(tab)||selectedGameId!=gameId)return;cancelImageRequests(host);host.removeAllViews();if(ready==null||snapshot==null){host.addView(back);TextView retry=secondaryTextAction("Gioco non disponibile. Riprova");retry.setOnClickListener(v->render());host.addView(retry);return;}renderDatabaseDetailInto(host,ready,this::closeDatabaseGame,snapshot);});
+        });
     }
 
     private void renderDatabaseDetailInto(LinearLayout host,GameRecord g,Runnable backAction){renderDatabaseDetailInto(host,g,backAction,null);}
@@ -1210,7 +1219,7 @@ private void renderDatabase(){
         if(gameId<=0)return;if(activeGameOverlay!=null&&activeGameOverlay.isShowing())activeGameOverlay.dismiss();Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);activeGameOverlay=dialog;ScrollView sc=new ScrollView(this);sc.setBackground(productPageBackground());LinearLayout host=new LinearLayout(this);host.setOrientation(LinearLayout.VERTICAL);host.setPadding(dp(20),dp(6),dp(20),dp(28));sc.addView(host);
         LinearLayout loading=new LinearLayout(this);loading.setGravity(Gravity.CENTER_VERTICAL);ProgressBar p=new ProgressBar(this);loading.addView(p,new LinearLayout.LayoutParams(dp(28),dp(28)));TextView t=text("Apro il gioco…",14,MUTED,Typeface.BOLD);t.setPadding(dp(12),0,0,0);loading.addView(t);host.addView(loading,new LinearLayout.LayoutParams(-1,dp(72)));
         sc.setOnApplyWindowInsetsListener((view,insets)->{Rect safe=contentSafeInsets(insets);host.setPadding(dp(20)+safe.left,dp(16)+safe.top,dp(20)+safe.right,dp(24)+safe.bottom);return insets;});dialog.setOnDismissListener(v->{if(activeGameOverlay==dialog)activeGameOverlay=null;syncPetVisibility();});dialog.setContentView(sc);dialog.show();syncPetVisibility();sc.requestApplyInsets();Window w=dialog.getWindow();if(w!=null){w.setLayout(-1,-1);w.setStatusBarColor(BG);w.setNavigationBarColor(BG);}
-        uiDataIo.execute(()->{GameRecord g=null;try{g=marketStore.gameStats(gameId);}catch(Throwable ignored){}final GameRecord ready=g;runOnUiThread(()->{if(!dialog.isShowing())return;host.removeAllViews();if(ready==null){TextView error=text("Gioco non disponibile",18,TEXT,Typeface.BOLD);host.addView(error);return;}renderDatabaseDetailInto(host,ready,dialog::dismiss);sc.post(()->sc.scrollTo(0,0));});});
+        uiDataIo.execute(()->{GameRecord g=null;GameDetailData data=null;try{g=marketStore.gameStats(gameId);if(g!=null)data=loadGameDetailData(g);}catch(RuntimeException ignored){}final GameRecord ready=g;final GameDetailData snapshot=data;runOnUiThread(()->{if(!dialog.isShowing())return;host.removeAllViews();if(ready==null||snapshot==null){TextView error=text("Gioco non disponibile",18,TEXT,Typeface.BOLD);host.addView(error);return;}renderDatabaseDetailInto(host,ready,dialog::dismiss,snapshot);sc.post(()->sc.scrollTo(0,0));});});
     }
 
     private View marketListingCard(GameRecord g,MarketListingRecord l){return marketListingCard(g,l,marketStore.dealScore(g.id,l.currentPriceCents));}
@@ -1265,7 +1274,7 @@ private int catalogCategory=-1;private String catalogTextDependence="all";
 private void renderCatalog(){
         catalogResultsHost=null;catalogResultSnapshot=new ArrayList<>();
         addMarketHeader("catalog");
-        LinearLayout searchBox=new LinearLayout(this);searchBox.setGravity(Gravity.CENTER_VERTICAL);searchBox.setPadding(dp(14),0,dp(8),0);searchBox.setBackground(round(DISCOVER_SURFACE,999,1,DISCOVER_OUTLINE));TextView si=appIcon(LudoIcons.SEARCH,15,MUTED);searchBox.addView(si,new LinearLayout.LayoutParams(dp(34),dp(34)));EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Cerca un gioco");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setText(query);search.setTextSize(16);search.setBackgroundColor(Color.TRANSPARENT);search.setPadding(dp(6),0,dp(4),0);search.setOnEditorActionListener((v,a,e)->{query=v.getText().toString().trim();catalogVisible=24;render();return true;});searchBox.addView(search,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,15,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);clear.setOnClickListener(v->{query="";render();});searchBox.addView(clear,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout searchRow=new LinearLayout(this);searchRow.setGravity(Gravity.CENTER_VERTICAL);searchRow.addView(searchBox,new LinearLayout.LayoutParams(0,dp(54),1));TextView filters=appIcon(LudoIcons.SLIDERS,20,TEXT);filters.setGravity(Gravity.CENTER);filters.setBackground(round(SURFACE,999,1,OUTLINE));filters.setContentDescription("Filtri catalogo · "+activeFilterCount()+" attivi");filters.setOnClickListener(v->showFilterSheet());LinearLayout.LayoutParams flp=new LinearLayout.LayoutParams(dp(54),dp(54));flp.leftMargin=dp(10);FrameLayout filterButton=new FrameLayout(this);filterButton.addView(filters,new FrameLayout.LayoutParams(-1,-1));int filterTotal=activeFilterCount();if(filterTotal>0){TextView number=discoverTextWeight(String.valueOf(filterTotal),10,Color.BLACK,700);number.setGravity(Gravity.CENTER);number.setBackground(round(CYAN,999,0,0));filterButton.addView(number,new FrameLayout.LayoutParams(dp(18),dp(18),Gravity.TOP|Gravity.END));}filterButton.setContentDescription("Filtri catalogo · "+filterTotal+" attivi");filterButton.setOnClickListener(v->showFilterSheet());searchRow.addView(filterButton,flp);body.addView(searchRow);
+        LinearLayout searchBox=new LinearLayout(this);searchBox.setGravity(Gravity.CENTER_VERTICAL);searchBox.setPadding(dp(14),0,dp(8),0);searchBox.setBackground(round(DISCOVER_SURFACE,999,1,DISCOVER_OUTLINE));TextView si=appIcon(LudoIcons.SEARCH,15,MUTED);searchBox.addView(si,new LinearLayout.LayoutParams(dp(34),dp(34)));EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Cerca un gioco");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setText(query);search.setTextSize(16);search.setBackgroundColor(Color.TRANSPARENT);search.setPadding(dp(6),0,dp(4),0);search.setOnEditorActionListener((v,a,e)->{queueCatalogSearch(0);return true;});searchBox.addView(search,new LinearLayout.LayoutParams(0,-1,1));TextView clear=appIcon(LudoIcons.XMARK,15,MUTED);clear.setGravity(Gravity.CENTER);clear.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);clear.setOnClickListener(v->search.setText(""));searchBox.addView(clear,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout searchRow=new LinearLayout(this);searchRow.setGravity(Gravity.CENTER_VERTICAL);searchRow.addView(searchBox,new LinearLayout.LayoutParams(0,dp(54),1));TextView filters=appIcon(LudoIcons.SLIDERS,20,TEXT);filters.setGravity(Gravity.CENTER);filters.setBackground(round(SURFACE,999,1,OUTLINE));filters.setContentDescription("Filtri catalogo · "+activeFilterCount()+" attivi");filters.setOnClickListener(v->showFilterSheet());LinearLayout.LayoutParams flp=new LinearLayout.LayoutParams(dp(54),dp(54));flp.leftMargin=dp(10);FrameLayout filterButton=new FrameLayout(this);filterButton.addView(filters,new FrameLayout.LayoutParams(-1,-1));int filterTotal=activeFilterCount();if(filterTotal>0){TextView number=discoverTextWeight(String.valueOf(filterTotal),10,Color.BLACK,700);number.setGravity(Gravity.CENTER);number.setBackground(round(CYAN,999,0,0));filterButton.addView(number,new FrameLayout.LayoutParams(dp(18),dp(18),Gravity.TOP|Gravity.END));}filterButton.setContentDescription("Filtri catalogo · "+filterTotal+" attivi");filterButton.setOnClickListener(v->showFilterSheet());searchRow.addView(filterButton,flp);body.addView(searchRow);
 
         HorizontalScrollView categories=new HorizontalScrollView(this);categories.setHorizontalScrollBarEnabled(false);LinearLayout tiles=new LinearLayout(this);String[] labels=DiscoverCategories.labels();
         for(int i=0;i<labels.length;i++){final int index=i;View tile=discoverCategoryTile(labels[i],i);tile.setSelected(catalogCategory==i);tile.setAlpha(catalogCategory<0||catalogCategory==i?1f:.6f);tile.setOnClickListener(v->{catalogCategory=catalogCategory==index?-1:index;catalogVisible=24;render();});tiles.addView(tile);}categories.addView(tiles);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.topMargin=dp(16);cp.bottomMargin=dp(6);body.addView(categories,cp);
@@ -1273,15 +1282,29 @@ private void renderCatalog(){
 
         LinearLayout selectedRow=new LinearLayout(this);selectedRow.setGravity(Gravity.CENTER_VERTICAL);if(catalogCategory>=0)addFilterChip(selectedRow,DiscoverCategories.labels()[catalogCategory],()->catalogCategory=-1);if(!"all".equals(catalogTextDependence))addFilterChip(selectedRow,"IND".equals(catalogTextDependence)?"Indipendente":"DEP".equals(catalogTextDependence)?"Dipendente":"Testo non verificato",()->catalogTextDependence="all");if(catalogBatchSignatures!=null&&!catalogBatchSignatures.isEmpty()){addFilterChip(selectedRow,catalogBatchLabel,()->{catalogBatchSignatures=null;catalogBatchLabel="";});}if(!"all".equals(catalogPreset))addFilterChip(selectedRow,catalogPresetLabel(),()->{catalogPreset="all";urgentSnapshot=null;});if(catalogMinRatingFilter!=null)addFilterChip(selectedRow,"BGG "+catalogMinRatingFilter.intValue()+"+",()->catalogMinRatingFilter=null);if(catalogMinDiscountFilter!=null)addFilterChip(selectedRow,"−"+catalogMinDiscountFilter+"%+",()->catalogMinDiscountFilter=null);if(!"all".equals(languageFilter))addFilterChip(selectedRow,filterLanguageSummary(languageFilter),()->languageFilter="all");if(maxPriceFilter!=null)addFilterChip(selectedRow,"≤ "+money(maxPriceFilter),()->maxPriceFilter=null);if(filterBundle)addFilterChip(selectedRow,"Bundle",()->filterBundle=false);if(filterShipping)addFilterChip(selectedRow,"Spedizione ≤ 3 €",()->filterShipping=false);if(filterVerify)addFilterChip(selectedRow,"Da verificare",()->filterVerify=false);if(!"all".equals(linkFilter))addFilterChip(selectedRow,"Dati Vinted",()->linkFilter="all");if(!"all".equals(typeFilter))addFilterChip(selectedRow,"base".equals(typeFilter)?"Base":"Espansione",()->typeFilter="all");if(selectedRow.getChildCount()>0){HorizontalScrollView activeFilters=new HorizontalScrollView(this);activeFilters.setHorizontalScrollBarEnabled(false);activeFilters.addView(selectedRow);LinearLayout.LayoutParams afp=new LinearLayout.LayoutParams(-1,dp(48));afp.topMargin=dp(8);body.addView(activeFilters,afp);}
 
-        addCatalogGameResults();
-        // Catalog population contract: "eligible" is exactly the base query used to render this
-        // surface. "visible" is that same population after the user's current view constraints.
-        List<DealRecord> list=db.getDeals("trusted_any_price",800);
-        final int catalogEligible=list.size();
-        final int catalogStoredAll=db.countDeals(null);
+        catalogRestoreY=tabScrollPositions.getOrDefault("catalog",scroll==null?0:scroll.getScrollY());catalogContentHost=new LinearLayout(this);catalogContentHost.setOrientation(LinearLayout.VERTICAL);body.addView(catalogContentHost,new LinearLayout.LayoutParams(-1,-2));
+        search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence value,int start,int count,int after){}public void onTextChanged(CharSequence value,int start,int before,int count){}public void afterTextChanged(Editable value){query=value.toString().trim();catalogVisible=24;clear.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);queueCatalogSearch(180);}});
+        queueCatalogSearch(0);
+    }
+    private void queueCatalogSearch(long delay){
+        if(catalogLiveSearch!=null)uiUpdates.removeCallbacks(catalogLiveSearch);
+        if(catalogSearchFuture!=null)catalogSearchFuture.cancel(false);
+        if(delay>0)catalogRestoreY=0;
+        ++catalogGameEpoch;catalogResultsHost=null;catalogResultSnapshot=new ArrayList<>();
+        final LinearLayout host=catalogContentHost;
+        if(host==null)return;cancelImageRequests(host);host.removeAllViews();host.addView(loadingMoreView("Cerco giochi e annunci…"));
+        catalogLiveSearch=()->{if("catalog".equals(tab)&&host==catalogContentHost&&host.getParent()!=null)addCatalogGameResults();};
+        uiUpdates.postDelayed(catalogLiveSearch,delay);
+    }
+    private void renderCatalogResults(LinearLayout host,List<DealRecord> list,int catalogStoredAll){
+        LinearLayout body=host;cancelImageRequests(host);host.removeAllViews();final int catalogEligible=list.size();
+        if(!query.isEmpty()&&!catalogGames.isEmpty()){
+            TextView heading=text("Giochi",15,TEXT,Typeface.BOLD);heading.setPadding(0,dp(18),0,dp(10));body.addView(heading);
+            for(int i=0;i<catalogGames.size();i+=2){LinearLayout row=new LinearLayout(this);for(int col=0;col<2;col++){int index=i+col;View card=index<catalogGames.size()?catalogGameCard(catalogGames.get(index)):new Space(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(col==1)lp.leftMargin=dp(12);row.addView(card,lp);}LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.bottomMargin=dp(14);body.addView(row,rp);}
+            if(catalogGames.size()==24){TextView more=secondaryTextAction("Vedi tutti i giochi trovati");more.setOnClickListener(v->{databaseQuery=query;databaseScope="verified";databaseCategory=-1;databaseActiveOnly=false;databaseMinRating=null;databaseMaxPrice=null;databaseVisible=24;navigate("database");});body.addView(more);}
+        }
         applyCatalogPreset(list);applyCatalogFilter(list);if(catalogCategory>=0)list.removeIf(d->!DiscoverCategories.matches(catalogCategory,d.bggCategories));if(catalogBatchSignatures!=null&&!catalogBatchSignatures.isEmpty())list.removeIf(d->d==null||!catalogBatchSignatures.contains(d.signature));if(!query.isEmpty()){String q=query.toLowerCase(Locale.ROOT);list.removeIf(d->!(name(d).toLowerCase(Locale.ROOT).contains(q)||(d.brand!=null&&d.brand.toLowerCase(Locale.ROOT).contains(q))||catalogMatchesGame(d)));}sortDeals(list);
         getSharedPreferences("va_v3_diag",MODE_PRIVATE).edit().putInt("catalogStoredAll",catalogStoredAll).putInt("catalogEligible",catalogEligible).putInt("catalogVisible",list.size()).putString("catalogPreset",catalogPreset).apply();
-        if(!query.isEmpty()&&!query.equals(catalogGameQuery)&&catalogGameError==null){catalogResultsHost=null;catalogResultSnapshot=new ArrayList<>();body.addView(loadingMoreView("Cerco il gioco e i suoi annunci…"));return;}
         LinearLayout titleRow=new LinearLayout(this);titleRow.setGravity(Gravity.CENTER_VERTICAL);titleRow.setPadding(0,dp(18),0,dp(10));titleRow.addView(text(list.size()+" annunci",15,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));TextView count=text(list.size()+" di "+catalogEligible+" pronti",12,MUTED,Typeface.NORMAL);count.setGravity(Gravity.END);TextView sortControl=discoverTextWeight(sortLabel()+" ↓",12,TEXT,400);sortControl.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);sortControl.setMinHeight(dp(48));sortControl.setPadding(dp(12),0,0,0);sortControl.setOnClickListener(v->showSortMenu(sortControl));titleRow.addView(sortControl);body.addView(titleRow);
         if(list.isEmpty()){String detail=catalogEligible>0?catalogEligible+" annunci pronti nel Catalogo; questa ricerca o questi filtri non ne trovano nessuno.":"Nessun annuncio è ancora pronto per il Catalogo.";body.addView(emptyState("Nessun annuncio in questa vista",detail,R.drawable.ludo_refresh));TextView reset=secondaryTextAction("Azzera filtri");reset.setOnClickListener(v->{catalogPreset=filterMode=languageFilter=linkFilter=typeFilter="all";maxPriceFilter=null;catalogMinRatingFilter=null;catalogMinDiscountFilter=null;filterShipping=filterBundle=filterVerify=false;catalogTextDependence="all";catalogCategory=-1;query="";urgentSnapshot=null;render();});body.addView(reset);return;}
         catalogResultSnapshot=new ArrayList<>(list);LinearLayout results=new LinearLayout(this);results.setOrientation(LinearLayout.VERTICAL);catalogResultsHost=results;body.addView(results,new LinearLayout.LayoutParams(-1,-2));appendCatalogCards(results,list,0,Math.min(catalogVisible,list.size()));if(list.size()>catalogVisible)addLoadMoreHint(results,"Scorri per caricare altri "+(list.size()-catalogVisible)+" annunci…");
@@ -1291,45 +1314,47 @@ private void renderCatalog(){
         return catalogMatchedIds.contains(d.bggId);
     }
     private void addCatalogGameResults(){
-        if(TextUtils.isEmpty(query))return;
-        final String requested=query;
-        if(!requested.equals(catalogGameRequest)&&(!requested.equals(catalogGameQuery)||System.currentTimeMillis()-catalogGamesAt>30_000L)){
-            catalogGameRequest=requested;catalogGameError=null;final long epoch=++catalogGameEpoch;
-            maintenanceIo.execute(()->{
-                List<GameRecord> found=new ArrayList<>();Set<String> matches=new HashSet<>();String failure=null;
-                try{Set<String> eligibleIds=new HashSet<>();for(DealRecord d:db.getDeals("trusted_any_price",800))if(d!=null&&!TextUtils.isEmpty(d.bggId))eligibleIds.add(d.bggId);matches=marketStore.catalogGameMatches(requested,eligibleIds);found=marketStore.searchGamesAdvanced(requested,4,"verified",false,null,null,"alpha");}catch(Exception e){failure="Ricerca giochi non disponibile. Riprova.";}
-                final List<GameRecord> result=found;final Set<String> matched=matches;final String error=failure;
-                runOnUiThread(()->{if(isDestroyed()||epoch!=catalogGameEpoch)return;catalogGameRequest="";catalogGameQuery=requested;catalogGames=result;catalogMatchedIds=matched;catalogGameError=error;catalogGamesAt=System.currentTimeMillis();if("catalog".equals(tab)&&requested.equals(query))scheduleRender(0);});
+        final String requested=query;final LinearLayout host=catalogContentHost;final long epoch=++catalogGameEpoch;
+        if(host==null)return;
+        catalogSearchFuture=uiDataIo.submit(()->{
+            List<DealRecord> deals=new ArrayList<>();List<GameRecord> games=new ArrayList<>();Set<String> matches=new HashSet<>();String failure=null;int stored=0;
+            try{deals=db.getDeals("trusted_any_price",800);stored=db.countDeals(null);if(!requested.isEmpty()){Set<String> eligibleIds=new HashSet<>();for(DealRecord d:deals)if(d!=null&&!TextUtils.isEmpty(d.bggId))eligibleIds.add(d.bggId);matches=marketStore.catalogGameMatches(requested,eligibleIds);games=marketStore.searchGamesAdvanced(requested,24,"verified",false,null,null,"alpha");}}catch(Exception e){failure="Ricerca non disponibile. Riprova.";}
+            final List<DealRecord> result=deals;final List<GameRecord> found=games;final Set<String> matched=matches;final String error=failure;final int total=stored;
+            runOnUiThread(()->{
+                if(isDestroyed()||epoch!=catalogGameEpoch||!"catalog".equals(tab)||!requested.equals(query)||host!=catalogContentHost||host.getParent()==null)return;
+                catalogGameQuery=requested;catalogGames=found;catalogMatchedIds=matched;catalogGameError=error;
+                if(error!=null){host.removeAllViews();TextView retry=secondaryTextAction(error);retry.setOnClickListener(v->queueCatalogSearch(0));host.addView(retry);return;}
+                renderCatalogResults(host,result,total);restoreCatalogResultsPosition(host,epoch);
             });
-        }
-        if(!requested.equals(catalogGameQuery))return;
-        if(catalogGameError!=null){TextView retry=secondaryTextAction(catalogGameError);retry.setOnClickListener(v->{catalogGamesAt=0;catalogGameQuery="";catalogGameError=null;render();});body.addView(retry);return;}
-        if(catalogGames.isEmpty())return;
-        TextView heading=text(catalogGames.size()==1?"Il gioco che cerchi":"Giochi trovati",20,TEXT,Typeface.BOLD);heading.setPadding(0,dp(18),0,dp(10));body.addView(heading);
-        for(int i=0;i<Math.min(3,catalogGames.size());i++){
-            GameRecord g=catalogGames.get(i);LinearLayout card=verticalCard();card.setPadding(dp(16),dp(16),dp(16),dp(16));
-            LinearLayout row=new LinearLayout(this);row.setOrientation(getResources().getConfiguration().fontScale>1.3f?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);
-            FrameLayout artwork=new FrameLayout(this);ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.FIT_CENTER);setGameArtwork(cover,g);artwork.addView(cover,new FrameLayout.LayoutParams(-1,-1));addGameFavorite(artwork,g.bggId,g.name,Gravity.TOP|Gravity.END);row.addView(artwork,new LinearLayout.LayoutParams(row.getOrientation()==LinearLayout.VERTICAL?-1:dp(112),dp(148)));
-            LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(row.getOrientation()==LinearLayout.VERTICAL?0:dp(16),dp(8),0,0);copy.addView(text(g.name,23,TEXT,Typeface.BOLD));
-            if(g.rating!=null)copy.addView(text("★ "+String.format(Locale.ITALY,"%.1f",g.rating)+" BGG",14,YELLOW,Typeface.BOLD));
-            TextView detail=text("Panoramica, mercato e come si gioca",13,MUTED,Typeface.NORMAL);detail.setPadding(0,dp(8),0,dp(8));copy.addView(detail);TextView action=secondaryTextAction("Apri scheda gioco  ›");action.setOnClickListener(v->openDatabaseGame(g.id,"catalog"));copy.addView(action,new LinearLayout.LayoutParams(-1,-2));row.addView(copy,row.getOrientation()==LinearLayout.VERTICAL?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));card.addView(row);card.setOnClickListener(v->openDatabaseGame(g.id,"catalog"));body.addView(card,new LinearLayout.LayoutParams(-1,-2));
-        }
-        if(catalogGames.size()>3){TextView more=secondaryTextAction("Vedi tutti i giochi trovati");more.setOnClickListener(v->{databaseQuery=query;databaseScope="verified";databaseCategory=-1;databaseActiveOnly=false;databaseMinRating=null;databaseMaxPrice=null;databaseVisible=24;navigate("database");});body.addView(more);}
+        });
     }
-
-    private View catalogProductCard(DealRecord d){
+    private void restoreCatalogResultsPosition(LinearLayout host,long epoch){
+        if(scroll==null)return;final int target=catalogRestoreY;
+        host.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener(){public void onGlobalLayout(){
+            if(host.getViewTreeObserver().isAlive())host.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+            if(epoch==catalogGameEpoch&&"catalog".equals(tab)&&host==catalogContentHost){scroll.scrollTo(0,target);tabScrollPositions.put("catalog",scroll.getScrollY());}
+        }});host.requestLayout();
+    }
+    private View catalogGameCard(GameRecord g){
+        DealRecord d=new DealRecord();d.signature="game:"+g.bggId;d.bggId=g.bggId;d.gameName=g.name;d.displayName=g.name;d.bggImageUrl=TextUtils.isEmpty(g.imageUrl)?g.thumbnailUrl:g.imageUrl;d.rating=g.rating;d.rank=g.rank;d.voters=g.voters;
+        return catalogProductCard(d,g.id);
+    }
+    private View catalogProductCard(DealRecord d){return catalogProductCard(d,0L);}
+    private View catalogProductCard(DealRecord d,long gameId){
         LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(10),dp(10),dp(10),dp(10));card.setBackground(round(DISCOVER_SURFACE,16,1,DISCOVER_OUTLINE));card.setClipToOutline(true);
         FrameLayout artwork=(FrameLayout)discoverBggCover(d,-1,dp(148),11,true);card.addView(artwork,new LinearLayout.LayoutParams(-1,dp(148)));
         card.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{int side=r-l-card.getPaddingLeft()-card.getPaddingRight();if(side>0&&artwork.getLayoutParams().height!=side)artwork.post(()->{artwork.getLayoutParams().height=side;artwork.requestLayout();});});
-        String published=TextUtils.isEmpty(ageLabel(d))?"?":publicationDisplay(d);TextView date=discoverTextWeight(published,10,TEXT,600);date.setSingleLine(true);date.setEllipsize(TextUtils.TruncateAt.END);date.setGravity(Gravity.CENTER);date.setPadding(dp(8),0,dp(8),0);date.setBackground(round(Color.argb(205,10,11,20),999,0,0));date.setContentDescription("?".equals(published)?"Data di pubblicazione sconosciuta":"Pubblicato "+published);FrameLayout.LayoutParams dlp=new FrameLayout.LayoutParams(-2,dp(28),Gravity.TOP|Gravity.START);dlp.topMargin=dp(7);dlp.leftMargin=dp(7);artwork.addView(date,dlp);
-        FrameLayout more=new FrameLayout(this);TextView dots=appIcon(LudoIcons.ELLIPSIS_VERTICAL,14,TEXT);dots.setGravity(Gravity.CENTER);dots.setBackground(round(Color.argb(185,10,11,20),999,0,0));dots.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);more.addView(dots,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));more.setContentDescription("Azioni annuncio");more.setFocusable(true);more.setOnClickListener(v->showListingActions(d));FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.END);mp.topMargin=dp(1);mp.rightMargin=dp(1);artwork.addView(more,mp);addGameFavorite(artwork,d.bggId,name(d),Gravity.BOTTOM|Gravity.END);
+        if(gameId<=0){String published=TextUtils.isEmpty(ageLabel(d))?"?":publicationDisplay(d);TextView date=discoverTextWeight(published,10,TEXT,600);date.setSingleLine(true);date.setEllipsize(TextUtils.TruncateAt.END);date.setGravity(Gravity.CENTER);date.setPadding(dp(8),0,dp(8),0);date.setBackground(round(Color.argb(205,10,11,20),999,0,0));date.setContentDescription("?".equals(published)?"Data di pubblicazione sconosciuta":"Pubblicato "+published);FrameLayout.LayoutParams dlp=new FrameLayout.LayoutParams(-2,dp(28),Gravity.TOP|Gravity.START);dlp.topMargin=dp(7);dlp.leftMargin=dp(7);artwork.addView(date,dlp);
+        FrameLayout more=new FrameLayout(this);TextView dots=appIcon(LudoIcons.ELLIPSIS_VERTICAL,14,TEXT);dots.setGravity(Gravity.CENTER);dots.setBackground(round(Color.argb(185,10,11,20),999,0,0));dots.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);more.addView(dots,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));more.setContentDescription("Azioni annuncio");more.setFocusable(true);more.setOnClickListener(v->showListingActions(d));FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.END);mp.topMargin=dp(1);mp.rightMargin=dp(1);artwork.addView(more,mp);}
+        addGameFavorite(artwork,d.bggId,name(d),Gravity.BOTTOM|Gravity.END);
         TextView title=discoverTextWeight(name(d),16,DISCOVER_TEXT,700);title.setLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setGravity(Gravity.TOP);title.setPadding(0,dp(10),0,0);title.setMinHeight(dp(48));card.addView(title,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout meta=new LinearLayout(this);boolean stackMeta=getResources().getConfiguration().fontScale>1.15f;meta.setOrientation(stackMeta?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);meta.setGravity(Gravity.CENTER_VERTICAL);meta.setPadding(0,dp(3),0,0);LinearLayout score=new LinearLayout(this);score.setGravity(Gravity.CENTER_VERTICAL);
         score.addView(appIcon(LudoIcons.STAR,13,DISCOVER_YELLOW),new LinearLayout.LayoutParams(dp(18),dp(24)));TextView rating=discoverTextWeight(d.rating==null?"BGG n/d":String.format(Locale.ITALY,"%.1f",d.rating),13,DISCOVER_TEXT,600);rating.setSingleLine(true);score.addView(rating);meta.addView(score);
-        View edition=discoverLanguageIndicator(d);LinearLayout.LayoutParams elp=new LinearLayout.LayoutParams(-2,-2);elp.leftMargin=stackMeta?0:dp(6);meta.addView(edition,elp);card.addView(meta,new LinearLayout.LayoutParams(-1,-2));
-        LinearLayout priceRow=new LinearLayout(this);priceRow.setGravity(Gravity.CENTER_VERTICAL);priceRow.setPadding(0,dp(6),0,0);TextView price=discoverTextWeight(total(d),21,DISCOVER_TEXT,700);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(13,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);price.setMinHeight(dp(34));priceRow.addView(price,new LinearLayout.LayoutParams(0,-2,1));
-        TextView saving=discoverDiscountBadge(d,12);if(saving!=null)priceRow.addView(saving,new LinearLayout.LayoutParams(-2,-2));priceRow.setMinimumHeight(dp(40));card.addView(priceRow,new LinearLayout.LayoutParams(-1,-2));
-        card.setContentDescription(name(d)+", "+total(d)+", "+publicationDisplay(d));card.setOnClickListener(v->openDetail(d));return card;
+        if(gameId<=0){View edition=discoverLanguageIndicator(d);LinearLayout.LayoutParams elp=new LinearLayout.LayoutParams(-2,-2);elp.leftMargin=stackMeta?0:dp(6);meta.addView(edition,elp);}
+        card.addView(meta,new LinearLayout.LayoutParams(-1,-2));
+        if(gameId<=0){LinearLayout priceRow=new LinearLayout(this);priceRow.setGravity(Gravity.CENTER_VERTICAL);priceRow.setPadding(0,dp(6),0,0);TextView price=discoverTextWeight(total(d),21,DISCOVER_TEXT,700);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(13,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);price.setMinHeight(dp(34));priceRow.addView(price,new LinearLayout.LayoutParams(0,-2,1));
+        TextView saving=discoverDiscountBadge(d,12);if(saving!=null)priceRow.addView(saving,new LinearLayout.LayoutParams(-2,-2));priceRow.setMinimumHeight(dp(40));card.addView(priceRow,new LinearLayout.LayoutParams(-1,-2));}
+        card.setContentDescription(gameId>0?name(d)+", apri la scheda gioco":name(d)+", "+total(d)+", "+publicationDisplay(d));card.setOnClickListener(v->{if(gameId>0)openDatabaseGame(gameId,"catalog");else openDetail(d);});return card;
     }
         private void appendCatalogCards(LinearLayout host,List<DealRecord> deals,int start,int end){
         for(int i=start;i<end;i+=2){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);
@@ -1406,12 +1431,7 @@ private void showFilterSheet(){
             TextView hint=text("Un buon punto di partenza. Apri un venditore e cerca altri giochi da mettere insieme.",14,MUTED,Typeface.NORMAL);hint.setPadding(0,dp(16),0,dp(14));body.addView(hint);
             for(DealRecord d:prospects)body.addView(bundleProspectCard(d));
             if(prospects.isEmpty())body.addView(emptyState("Nessun nuovo venditore da esplorare","Ludo proporrà altri punti di partenza quando raccogli nuovi annunci.",R.drawable.ludo_bundle_gift));
-            Map<String,DealRecord> explored=new LinkedHashMap<>();for(DealRecord d:allBundleDeals)if(d!=null&&!TextUtils.isEmpty(d.sellerId)&&BundleExploration.wasExplored(this,d.sellerId))explored.putIfAbsent(d.sellerId,d);
-            List<DealRecord> recent=new ArrayList<>(explored.values());recent.sort((a,b)->Long.compare(BundleExploration.exploredAt(this,b.sellerId),BundleExploration.exploredAt(this,a.sellerId)));
-            if(!recent.isEmpty()){sectionTitle("Dopo l’esplorazione",null);for(int i=0;i<Math.min(5,recent.size());i++){
-                DealRecord d=recent.get(i);DealRecord confirmed=null;for(DealRecord source:sources)if(d.sellerId.equals(source.sellerId)){confirmed=source;break;}
-                final DealRecord found=confirmed;TextView result=secondaryTextAction((TextUtils.isEmpty(d.sellerName)?"Venditore Vinted":"@"+d.sellerName)+(found!=null?" · Bundle trovato  ›":" · Nessun bundle confermato"));result.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);result.setPadding(dp(12),dp(12),dp(12),dp(12));if(found!=null)result.setOnClickListener(v->openBundleDetail(found));else result.setOnClickListener(v->openBundleProspect(d));body.addView(result,new LinearLayout.LayoutParams(-1,-2));
-            }TextView note=text("Gli esiti si basano sui giochi raccolti: un controllo senza nuovi annunci non prova che il venditore non abbia altri giochi.",12,MUTED,Typeface.NORMAL);note.setPadding(0,dp(8),0,0);body.addView(note);}
+
         }
     }
     private void addBundleSection(LinearLayout row,String label,String key){boolean selected=key.equals(bundleSection);TextView item=text(label,15,selected?TEXT:MUTED,Typeface.BOLD);item.setGravity(Gravity.CENTER);item.setMinHeight(dp(48));item.setPadding(dp(8),dp(12),dp(8),dp(12));item.setSelected(selected);item.setContentDescription(label+(selected?", selezionato":""));item.setBackground(round(selected?SURFACE2:Color.TRANSPARENT,14,0,0));item.setOnClickListener(v->switchBundleSection(key));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(row.getChildCount()>0)lp.leftMargin=dp(4);row.addView(item,lp);}
