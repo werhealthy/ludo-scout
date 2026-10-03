@@ -44,7 +44,7 @@ public final class BrowserVisualInstrumentation extends Instrumentation {
   Method report=screen.getClass().getDeclaredMethod("reportLocked");report.setAccessible(true);
   String text=(String)report.invoke(screen);
   if(!text.contains("blockedPage=https://www.vinted.it/login")||text.contains("token=secret"))throw new AssertionError("unsafe/incomplete block report");
-  client.onReceivedError(web,request,new android.webkit.WebResourceError(){public int getErrorCode(){return -1;}public CharSequence getDescription(){return "fixture";}});
+  client.onReceivedError(web,request,null);
   android.webkit.WebResourceResponse failure=new android.webkit.WebResourceResponse("text/html","UTF-8",null);failure.setStatusCodeAndReasonPhrase(403,"Forbidden");
   client.onReceivedHttpError(web,request,failure);
   if(!"PAGE_BLOCKED".equals(get(screen,"state")))throw new AssertionError("late error discarded block");
