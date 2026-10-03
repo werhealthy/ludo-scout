@@ -131,7 +131,7 @@ public final class VintedBrowserActivity extends Activity {
  private void detach(View v){if(v.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)v.getParent()).removeView(v);}
  private void layoutPagination(){if(renderedPagination==uiState)return;renderedPagination=uiState;
   detach(previous);detach(next);detach(pageIndicator);detach(counterRow);detach(pagesRow);paginationHost.removeAllViews();pagesRow.removeAllViews();
-  if(uiState==BrowserUiState.exploreExpanded)paginationHost.addView(counterRow);
+  if(uiState==BrowserUiState.exploreExpanded)paginationHost.addView(counterRow,new LinearLayout.LayoutParams(-1,-2));
   pagesRow.addView(previous,new LinearLayout.LayoutParams(dp(48),dp(48)));
   if(uiState==BrowserUiState.exploreCollapsed){counterRow.setPadding(dp(4),0,dp(4),0);pagesRow.addView(counterRow,new LinearLayout.LayoutParams(0,-2,1));}
   else{counterRow.setPadding(dp(16),dp(4),dp(16),dp(4));pagesRow.addView(pageIndicator,new LinearLayout.LayoutParams(0,-2,1));}
