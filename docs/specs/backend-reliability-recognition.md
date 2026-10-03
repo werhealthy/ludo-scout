@@ -14,7 +14,7 @@ Piano del task circoscritto (native, autorizzazione utente «Vai»; riferimento 
 - [x] Comparatore offline, schema risposte e metriche con abstention separate.
 - [x] Fixture8 annunci delle risposte fornite, senza foto/testo libero venditore.
 - [x] TestGREEN locali9: invalidi/duplicati/missing, lingua senza evidenza, priors, metriche e overwrite; UNKNOWN/missing/unrecognized priors separati, reference file distinto dagli answers anche via alias, provenienza dichiarata non verificata.
-- [ ] Review indipendente, regressioni/build esistenti su PR e merge con checkpoint.
+- [x] Review indipendente finale senza findings; CI37157174737 e37157174722/job111302840246 SUCCESS; PR227 merge83070585. Nessun APK nuovo.
 - [ ] Riferimenti annotati indipendenti sui64 e risposte controllate del provider: benchmark ancora NON eseguito.
 Non introdotto adapter provider, costo/budget ledger, hard stop o mass batch: necessari prima delle chiamate API. SecretGEMINI_API_KEY non letto/usato; budget proposto1EUR/mese, nessun paid/full batch autorizzato. Nessuna nuovaAPK necessaria per tool offline. Frontend7/backend6 aperti.
 
