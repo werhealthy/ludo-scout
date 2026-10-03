@@ -1,5 +1,12 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## AI — audit archivio autorizzato, 2026-10-03
+Richiesta esplicita: AI solo sui casi ambigui, budget proposto 1 EUR/mese, nessun servizio pagato né batch completo senza successiva approvazione. Gemini API key salvata dall'utente come GEMINI_API_KEY in GitHub Secrets; progetto Free Tier dichiarato dall'utente. In questa fase la chiave non viene letta né usata.
+Diagnostica161: market_listings 9667 righe per lifecycle, 563 ACTIVE e 3664 con URL salvato; conteggi di righe, non garanzia di deduplicazione globale o URL disponibili. Archivio completo non ancora ricevuto. I contatori analisi non misurano accuracy.
+Autorizzata esportazione in sola lettura da Impostazioni: ZIP con listings, legacy_deals, observations, games, aliases, overrides (senza payload arbitrario), browser_snapshots e manifest. Tutti i lifecycle inclusi; snapshot senza prezzo preservati; JSONL UTF-8 streaming. Nome/ID venditore esclusi dai campi espliciti; testo libero può contenere dati personali. Nessun upload automatico, download foto, AI, cambiamento schema/soglie/catalogo. Picker Android per destinazione, I/O su executor, una operazione alla volta, errori espliciti e file parziale eliminato quando possibile.
+Connessione SQLite OPEN_READONLY diretta, senza helper/upgrades; sezioni come letture separate e manifest snapshot_atomic=false, acquisizione concorrente possibile. Non inventare una precedente listing_type canonica: classi esistenti provengono da deals/observations; match_confidence riguarda identità e non una probabilità calibrata del tipo. Foto come riferimenti, disponibilità/cache non verificata.
+Prossimo passo dopo build verificata e distribuita: utente esporta e allega ZIP; audit offline di copertura/dedupe/prima classificazione/candidati deterministici, poi dry run e benchmark. Nessun batch completo autorizzato, Ludo Brain fuori scope. Nuovo gruppo backend AI/audit: frontend7/backend6 aperti.
+
 ## Vinted162 — snapshot parziali e frecce, distribuita
 
 Feedback dopo161: l'utente conferma che Vinted carica; segnala frecce sempre disabilitate e chiede un pulsante comprimi/espandi esposto. Consolidato nel gruppo browser esistente, frontend7/backend5 aperti.
