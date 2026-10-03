@@ -48,7 +48,7 @@ public final class VintedBrowserActivity extends Activity {
  private volatile boolean accepting,closed,resumed;
  private volatile long captureGeneration,pageGeneration;
  private boolean enabled,supported,rendererGone,pageFailed;
- private volatile String blockedPage="",blockedReason="",blockedStage="";private volatile long blockedAt;
+ private volatile String blockedPage="",blockedReason="",blockedStage="";private volatile long blockedAt;private boolean retryPending;private String retryTarget="";
  private String mode,state="STARTING",expectedSeller="",lastReport="",navigationUrl="",lastSearchUrl="https://www.vinted.it/catalog/4881-board-games";
  private int updates,jsonItems,domItems,dropped,unknownShapes,readErrors,oversized;
  private DealDatabase captureDatabase;private MarketStore captureStore;
@@ -80,10 +80,10 @@ public final class VintedBrowserActivity extends Activity {
   web.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){if(!request.isForMainFrame())return false;boolean allowed=VintedBrowserPolicy.allowedPage(request.getUrl().toString());if(!allowed){blockNavigation(request.getUrl().toString(),"override");Toast.makeText(VintedBrowserActivity.this,"Vinted ha aperto una pagina non supportata",Toast.LENGTH_SHORT).show();}return !allowed;}
    @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){observeRoute(request.getUrl());return null;}
-   @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap icon){resetPage(url);loading=true;pageFailed=false;state="LOADING";if(!VintedBrowserPolicy.allowedPage(url)){view.stopLoading();blockNavigation(url,"started");}else refreshStatus();}
-   @Override public void onPageFinished(WebView view,String url){if(closed||rendererGone)return;loading=false;if(!VintedBrowserPolicy.allowedPage(url)){blockNavigation(url,"finished");return;}if(state.equals("PAGE_BLOCKED")){accepting=false;refreshStatus();return;}navigationUrl=url;if(pageFailed){accepting=false;}else{state=supported?(enabled?"CAPTURING":"PAUSED"):"UNSUPPORTED_PROVIDER";accepting=supported&&enabled&&resumed;if(supported)bindPage();}refreshStatus();}
-   @Override public void onReceivedError(WebView view,WebResourceRequest request,android.webkit.WebResourceError error){if(request.isForMainFrame()){loading=false;pageFailed=true;accepting=false;state="PAGE_ERROR";refreshStatus();}}
-   @Override public void onReceivedHttpError(WebView view,WebResourceRequest request,WebResourceResponse response){if(request.isForMainFrame()&&response.getStatusCode()>=400){loading=false;pageFailed=true;accepting=false;state="PAGE_ERROR";refreshStatus();}}
+   @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap icon){if(retryPending&&VintedBrowserPolicy.allowedPage(url)&&!samePage(url,retryTarget))return;retryPending=false;resetPage(url);loading=true;pageFailed=false;state="LOADING";if(!VintedBrowserPolicy.allowedPage(url)){view.stopLoading();blockNavigation(url,"started");}else refreshStatus();}
+   @Override public void onPageFinished(WebView view,String url){if(closed||rendererGone||retryPending)return;loading=false;if(!VintedBrowserPolicy.allowedPage(url)){blockNavigation(url,"finished");return;}if(state.equals("PAGE_BLOCKED")){accepting=false;refreshStatus();return;}navigationUrl=url;if(pageFailed){accepting=false;}else{state=supported?(enabled?"CAPTURING":"PAUSED"):"UNSUPPORTED_PROVIDER";accepting=supported&&enabled&&resumed;if(supported)bindPage();}refreshStatus();}
+   @Override public void onReceivedError(WebView view,WebResourceRequest request,android.webkit.WebResourceError error){if(request.isForMainFrame()&&!state.equals("PAGE_BLOCKED")&&(!retryPending||samePage(request.getUrl().toString(),retryTarget))){retryPending=false;loading=false;pageFailed=true;accepting=false;state="PAGE_ERROR";refreshStatus();}}
+   @Override public void onReceivedHttpError(WebView view,WebResourceRequest request,WebResourceResponse response){if(request.isForMainFrame()&&response.getStatusCode()>=400&&!state.equals("PAGE_BLOCKED")&&(!retryPending||samePage(request.getUrl().toString(),retryTarget))){retryPending=false;loading=false;pageFailed=true;accepting=false;state="PAGE_ERROR";refreshStatus();}}
    @Override public boolean onRenderProcessGone(WebView view,RenderProcessGoneDetail detail){accepting=false;rendererGone=true;state="RENDERER_GONE";((LinearLayout)view.getParent()).removeView(view);view.destroy();web=null;refreshStatus();Toast.makeText(VintedBrowserActivity.this,"Browser interrotto. Chiudi e riapri per riprovare.",Toast.LENGTH_LONG).show();return true;}
   });
   supported=WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)&&WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
@@ -163,18 +163,18 @@ public final class VintedBrowserActivity extends Activity {
  private void navigate(String command,String argument){if(web==null||loading||pageFailed||!supported||("next".equals(command)&&!next.isEnabled()))return;final long token=pageGeneration;final String page=navigationUrl;String gate="next".equals(command)&&uiState!=BrowserUiState.manualMatch?"window.LudoCaptureControl.canAdvance("+token+")&&":"";String script="window.LudoCaptureControl?("+gate+"window.LudoCaptureControl.navigationUrl("+JSONObject.quote(command)+","+JSONObject.quote(argument)+","+JSONObject.quote(lastSearchUrl)+")):null";web.evaluateJavascript(script,result->{if(closed||web==null||loading||token!=pageGeneration||!samePage(page,navigationUrl))return;try{Object value=new org.json.JSONTokener(result).nextValue();if(value instanceof String&&VintedBrowserPolicy.allowedPage((String)value)){loading=true;pageDrained=false;refreshStatus();web.loadUrl((String)value);}else if("next".equals(command)){pageDrained=false;refreshStatus();}}catch(Exception ignored){}});}
  private void blockNavigation(String url,String stage){
   blockedPage=VintedBrowserPolicy.diagnosticPage(url);blockedReason=VintedBrowserPolicy.blockReason(url);blockedStage=stage;blockedAt=System.currentTimeMillis();
-  loading=false;pageFailed=true;accepting=false;pageDrained=false;captureGeneration++;pageGeneration++;cancelCount();state="PAGE_BLOCKED";refreshStatus();
+  retryPending=false;loading=false;pageFailed=true;accepting=false;pageDrained=false;captureGeneration++;pageGeneration++;cancelCount();state="PAGE_BLOCKED";refreshStatus();
  }
  private void retryPage(){
   if(web==null||loading||rendererGone)return;
   if(state.equals("PAGE_BLOCKED")){
    String target=VintedBrowserPolicy.allowedPage(lastSearchUrl)?lastSearchUrl:"https://www.vinted.it/catalog/4881-board-games";
-   loading=true;pageFailed=false;accepting=false;pageDrained=false;state="LOADING";refreshStatus();web.loadUrl(target);
+   retryPending=true;retryTarget=target;loading=true;pageFailed=false;accepting=false;pageDrained=false;state="LOADING";refreshStatus();web.loadUrl(target);
   }else if(pageFailed||!intakeError.isEmpty()||readErrors>0||dropped>0||oversized>0){pageDrained=false;web.reload();}
  }
  private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
  private int statusBarHeight(){int id=getResources().getIdentifier("status_bar_height","dimen","android");return id==0?0:getResources().getDimensionPixelSize(id);}
- private void setCapture(boolean value){if(!supported||web==null)return;captureGeneration++;pageDrained=false;enabled=value;accepting=value&&resumed&&!pageFailed&&VintedBrowserPolicy.allowedPage(navigationUrl);if(!pageFailed&&!state.equals("PAGE_BLOCKED"))state=value?"CAPTURING":"PAUSED";web.evaluateJavascript("window.LudoCaptureControl&&window.LudoCaptureControl.setEnabled("+value+")",null);refreshStatus();}
+ private void setCapture(boolean value){if(!supported||web==null)return;captureGeneration++;pageDrained=false;enabled=value;accepting=value&&resumed&&!loading&&!retryPending&&!pageFailed&&VintedBrowserPolicy.allowedPage(navigationUrl);if(!loading&&!pageFailed&&!state.equals("PAGE_BLOCKED"))state=value?"CAPTURING":"PAUSED";web.evaluateJavascript("window.LudoCaptureControl&&window.LudoCaptureControl.setEnabled("+value+")",null);refreshStatus();}
  private void captureNow(){if(!supported||web==null||!resumed||pageFailed||!VintedBrowserPolicy.allowedPage(web.getUrl()))return;captureGeneration++;pageDrained=false;accepting=true;web.evaluateJavascript("window.LudoCaptureControl&&window.LudoCaptureControl.captureNow("+captureGeneration+")",null);}
  private void resetPage(String url){pageDrained=false;cancelCount();shownCount=0;if(counter!=null)counter.setText("0");accepting=false;captureGeneration++;pageGeneration++;navigationUrl=url;if(Uri.parse(url).getPath()!=null&&Uri.parse(url).getPath().startsWith("/catalog"))lastSearchUrl=url;synchronized(items){items.clear();persistedPageIds.clear();updates=0;jsonItems=0;domItems=0;dropped=0;unknownShapes=0;readErrors=0;oversized=0;pageObserved=0;pagePrices=0;intakeError="";}}
  private void bindPage(){if(web==null||!supported)return;accepting=enabled&&resumed&&!pageFailed;web.evaluateJavascript("if(window.LudoCaptureControl){window.LudoCaptureControl.setPageToken("+pageGeneration+");window.LudoCaptureControl.setEnabled("+(enabled&&resumed)+");}",null);}
@@ -217,7 +217,7 @@ public final class VintedBrowserActivity extends Activity {
  @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else finish();}
  @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("browser_ui",uiState.name());out.putInt("price_limit",priceLimitCents);}
  @Override protected void onPause(){super.onPause();resumed=false;pageDrained=false;cancelCount();captureGeneration++;accepting=false;if(web!=null)web.evaluateJavascript("window.LudoCaptureControl&&window.LudoCaptureControl.setEnabled(false)",null);saveReport();}
- @Override protected void onResume(){super.onResume();resumed=true;sendBroadcast(new android.content.Intent(BrowserCapturePolicy.READY_ACTION).setPackage(getPackageName()));if(web!=null&&supported){accepting=enabled&&resumed&&!pageFailed&&VintedBrowserPolicy.allowedPage(navigationUrl);web.evaluateJavascript("window.LudoCaptureControl&&window.LudoCaptureControl.setEnabled("+(enabled&&resumed)+")",null);}}
+ @Override protected void onResume(){super.onResume();resumed=true;sendBroadcast(new android.content.Intent(BrowserCapturePolicy.READY_ACTION).setPackage(getPackageName()));if(web!=null&&supported){accepting=enabled&&resumed&&!loading&&!retryPending&&!pageFailed&&VintedBrowserPolicy.allowedPage(navigationUrl);web.evaluateJavascript("window.LudoCaptureControl&&window.LudoCaptureControl.setEnabled("+(enabled&&resumed)+")",null);}}
  @Override protected void onDestroy(){closed=true;cancelCount();accepting=false;ingest.shutdown();if(web!=null){web.stopLoading();web.destroy();web=null;}super.onDestroy();}
 }
 
