@@ -1,5 +1,22 @@
 # Ludo Scout — Current state
 
+## Frontend152 — Catalogo unificato e Bundle/Esplora, distribuita
+
+Il feedback «Perfetto, andiamo avanti» dopo151 autorizza il successivo gruppo Catalogo/Bundle approvato20:00. Accettazione generale151 registrata; non equivale a una verifica esaustiva font/TalkBack/prestazioni. Distribuita **5.12.152-catalog-bundle (1000175)**, localCode201; backend150 e Ludo151 preservati.
+
+Catalogo centrato sugli annunci, rimosso selettore primario Annunci/Giochi. Ricerca locale asincrona: fino a3 schede Gioco ampie e accesso a tutti i risultati, poi annunci fidati correlati. Alias/tassonomia riusano la semantica esistente: lookup leggero degli ID BGG limitato ai candidati già eleggibili, senza limite dell’anteprima, bind SQL in blocchi800. Query obsoleta/errore/caricamento distinti; retry, nessuno zero inventato mentre la ricerca è pendente. Scheda Gioco completa, gesture Annuncio→Gioco, database completo e ingressi legacy conservati; Back ripristina Catalogo e posizione.
+
+Bundle nella navigazione principale; sezioni Bundle/Esplora separate, default Bundle. Bundle richiede almeno2 giochi reali attivi dello stesso venditore, calcolo/pricing e ordinamenti esistenti. Esplora riusa selezione e priorità manuali attuali; memoria durevole del venditore aperto senza riattivare intent/cattura legacy. Esiti recenti «Bundle trovato» solo con evidenza reale; «Nessun bundle confermato» non prova assenza di altri giochi. Posizioni indipendenti salvate anche alla ricreazione/ritorno esterno, ripristino dopo layout con target catturato, epoch e protezione dei salvataggi prematuri.
+
+PR202 HEADabcbfbf40695bc5395f62827fe4717fddf37bde5; mergeba4ee5658e7c1e1d269844ba3e707d7bd43e5a62. Beta dietro0 al merge. Condivisi MainActivity.java (UI/navigazione), MarketStore.java (sola lettura ID), BundleExploration.java (sola memoria UI); release/workflow/regressioni aggiornati. Nessuna modifica a schema, soglie, filtri di eleggibilità, pricing, dipendenze, Motore o acquisizione/rete.
+
+Review indipendente:2Important (clamp scroll pre-layout e alias oltre24 risultati) corretti; revisione finale senza Critical/Important. Suite ha rilevato guard di etichette obsolete (run37079783830/37079936436) aggiornati conservando separazione/fiducia e2giochi minimo; run37080187628 ha individuato l’intent legacy, corretto nel codice mantenendo il guard no-capture. Fixture locale esegue SQL reale con alias oltre anteprima, identità candidati/match/hide e bind; JVM esegue metodi reali match/scroll con boundary UI deterministici. Java locale indisponibile.
+
+CI finale37080406698/job111079446999 SUCCESS: suite completa, nuovo harness/fixture, unit Android/pricing, compile Java, APK review. Android beta175/run37080770095/job111080561276 SUCCESS: suite/unit, build firmata, certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T00:12:03.9323038Z; upload Firebase152/1000175 confermato00:12:41.7016096Z, distribuzione tester/gruppi confermata separatamente00:12:42.2709374Z. Release3qfk1t4veaa10.
+
+Telefono da verificare aggiornando senza cancellare dati: ricerca titolo/alias e giochi senza annunci; apertura/Back/posizione dalla scheda Gioco; gesture Annuncio→Gioco; Bundle→Esplora→Bundle con entrambe le sezioni scrollate; venditore aperto e ritorno/esito; font200%, tastiera e TalkBack. CI non prova pixel/prestazioni Android. Frontend7/backend5 aperti; nessun gruppo chiuso dalla sola consegna. Unico prossimo passo frontend: verifica152 sul telefono, poi gruppo6 Wizard e filtri secondo scaletta unica; Motore resta nel suo workstream.
+
+
 ## Frontend151 — offerte mensili e collezione a coppie, distribuita
 
 Feedback23:52: composizione Ludo148 accettata provvisoriamente; richiesti padding più curati, dato utile al posto di BGG>6 e due giochi grandi su scaffali profondi. Distribuita **5.12.151-ludo-offers-shelves (1000174)**, localCode200. Integrato e preservato backend150; Motore non modificato dal frontend.
