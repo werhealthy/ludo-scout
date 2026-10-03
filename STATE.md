@@ -1,5 +1,19 @@
 # Ludo Scout — Current state
 
+## Backend163 — esportazione audit classificazione, distribuita
+
+Autorizzazione «Vai»22:49Europe/Rome2026-10-03: esportare l'intero archivio prima di riclassificare con AI. Account Gemini Free Tier e secret GEMINI_API_KEY dichiarati salvati dall'utente; chiave mai letta/usata da questa consegna. Budget AI proposto1EUR/mese, nessun servizio pagato/batch completo autorizzato. Ludo Brain fuori scope.
+
+PR224 da betaaa3851aaf355ebe703082ef66c960bf728105860; HEAD15345565210bd0fe85213dae1d01c10c690d95f7; mergedfb303ebc8961eaa1b2a2faa613ed9962bab5b25. Impostazioni→Esporta archivio per audit→picker Android. ZIP UTF-8/JSONL streaming con listings (tutti lifecycle), legacy_deals, observations (ripetizioni conservate), games, aliases, override flag/motivo e snapshot browser inclusi quelli senza prezzo. Manifest distingue righe per sorgente da annunci unici e class confidence da identity match_confidence; immagini come soli riferimenti, disponibilità/cache non verificata. Campo venditore esplicito escluso; testo libero può contenere dati personali. Nessun upload automatico, foto scaricata, AI, modifica schema/soglie/catalogo.
+Connessione diretta OPEN_READONLY senza helper/upgrades; letture consistenti per sezione, manifest snapshot_atomic=false per acquisizione concorrente. Selezione destinazione sul thread UI, compressione/copia su executor, guard normale della singola operazione, cancellazione gestita, errori espliciti e cleanup temporanei/destinazione parziale quando supportato. File condivisoMainActivity limitato a impostazioni/result routing, nessunDealDatabase/MarketStore modificato. Spec operativa nel gruppo AI di backend-reliability-recognition.
+
+RED locale: assenza exporter. GREEN SQL locale su schema reale: lifecycle7, snapshot senza prezzo, scope queue_controls e DB invariato. CI37153430016/job111291805593 SUCCESS: suite completa SQL/JVM/browser, unit, Java e APK. CI37153430042/job111291805773 SUCCESS: compilazione APK/test, SQLite Android+ZIP reale, Unicode/newline/null/interi, osservazioni ripetute, snapshot malformed, allowlist campi e cleanup di errore. Review indipendente sullo stessoHEAD senza finding. Picker SAF, provider destinazione, rotazione/process recreation e layout impostazioni non verificati sul telefono; nessuna accettazione visiva dichiarata. Nessuna chiamata aGemini/Vinted dell'export.
+
+Distribuita **5.12.163-classification-audit (1000186)**, localCode212. Android beta186/run37153801463/job111292912702 SUCCESS sul merge: regressioni/unit/APK firmata. Certificato attesoC7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T21:09:14.9732788Z; uploadFirebase21:09:56.5615304Z e distribuzione tester/gruppi distinta21:09:57.6084166Z. Release3j7lqu5t31hko. ArtifactGitHub assente per quota storage; Firebase riuscito.
+
+Diagnostica161 precedente:9667righe canonical,563ACTIVE,3664conURL salvato; non totale deduplicato fra sorgenti né prova di URL/foto disponibili. Dataset completo ancora non ricevuto. FaseA audit record/coprertura, FaseB dryrun, FaseC benchmark misurato e FaseD solo dopo conferma restano da fare. Frontend7/backend6 gruppi aperti; nessun gruppo chiuso dalla solaCI.
+Unico prossimo passo: aggiornare163senza cancellare dati, poi esportare inDownload e allegareZIP per l'audit offline. Nessuna bonifica o AI massiva eseguita.
+
 ## Backend162 — frecce e comprimi/espandi, distribuita
 
 Feedback dopo161: l'utente conferma che Vinted carica; segnala frecce sempre disabilitate e chiede un pulsante comprimi/espandi esposto. Consolidato nel gruppo browser esistente, frontend7/backend5 aperti.
