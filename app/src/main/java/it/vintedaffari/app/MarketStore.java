@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -1793,6 +1794,22 @@ public final class MarketStore {
                 "(SELECT COUNT(*) FROM price_observations p JOIN market_listings l ON l.id=p.listing_id WHERE l.game_id=g.id) "+
                 "FROM games g WHERE "+where+" AND (g.normalized_name LIKE ? OR g.normalized_name LIKE ? OR EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.normalized_alias LIKE ?) OR LOWER(COALESCE(g.categories,'')) LIKE ? OR LOWER(COALESCE(g.mechanics,'')) LIKE ? OR LOWER(COALESCE(g.designers,'')) LIKE ? OR LOWER(COALESCE(g.publishers,'')) LIKE ? OR LOWER(COALESCE(g.families,'')) LIKE ?) ORDER BY "+order+" LIMIT ?";
         List<String> all=new ArrayList<>();all.add(String.valueOf(System.currentTimeMillis()-30L*24*60*60_000L));all.addAll(args);all.add(prefix);all.add(contains);all.add(contains);for(int i=0;i<5;i++)all.add(contains);all.add(String.valueOf(Math.max(1,limit)));List<GameRecord> out=new ArrayList<>();try(Cursor c=helper.getReadableDatabase().rawQuery(sql,all.toArray(new String[0]))){while(c.moveToNext())out.add(readGameWithSummary(c));}return out;
+    }
+
+    /** Read-only identity lookup for the already eligible Catalog population; no preview limit. */
+    public Set<String> catalogGameMatches(String rawQuery,Set<String> eligibleBggIds){
+        Set<String> out=new HashSet<>();if(eligibleBggIds==null||eligibleBggIds.isEmpty())return out;
+        String q=normalize(DiscoverCategories.searchText(rawQuery)),contains="%"+q+"%";
+        List<String> ids=new ArrayList<>(eligibleBggIds);
+        // Keep bound parameters below SQLite's older 999 limit, even for a larger caller.
+        for(int start=0;start<ids.size();start+=800){
+            List<String> args=new ArrayList<>();StringBuilder where=new StringBuilder("g.database_visible=1 AND g.match_state='MATCHED'");where.append(DiscoverCategories.appendFilter(rawQuery,args));
+            where.append(" AND g.bgg_id IN (");int end=Math.min(ids.size(),start+800);for(int i=start;i<end;i++){if(i>start)where.append(',');where.append('?');args.add(ids.get(i));}where.append(')');
+            String sql="SELECT g.bgg_id FROM games g WHERE "+where+" AND (g.normalized_name LIKE ? OR EXISTS(SELECT 1 FROM game_aliases a WHERE a.game_id=g.id AND a.normalized_alias LIKE ?) OR LOWER(COALESCE(g.categories,'')) LIKE ? OR LOWER(COALESCE(g.mechanics,'')) LIKE ? OR LOWER(COALESCE(g.designers,'')) LIKE ? OR LOWER(COALESCE(g.publishers,'')) LIKE ? OR LOWER(COALESCE(g.families,'')) LIKE ?)";
+            for(int i=0;i<7;i++)args.add(contains);
+            try(Cursor c=helper.getReadableDatabase().rawQuery(sql,args.toArray(new String[0]))){while(c.moveToNext())out.add(c.getString(0));}
+        }
+        return out;
     }
 
     public int countVisibleGamesAdvanced(String rawQuery,String scope,boolean activeOnly,Double minRating,Integer maxPrice){return countVisibleGamesAdvanced(rawQuery,scope,activeOnly,minRating,maxPrice,-1);}
@@ -3667,7 +3684,3 @@ public final class MarketStore {
     private static String safe(String s){return s==null?"":(s.length()>600?s.substring(0,600):s);}
     private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Long)v.put(k,(Long)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
-
-
-
-

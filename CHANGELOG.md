@@ -1,6 +1,6 @@
 # Ludo Scout — Changelog
 
-## 5.12.152 — Ludo: esplorazione e bilancio
+## 5.12.153 — Ludo: esplorazione e bilancio
 
 - Ludo integra ricerca Vinted, cerchi giornalieri con controlli completati e delta dalla baseline browser, dettagli dei risultati e lavoro corrente.
 - Preset per rilevanza/novità/prezzo, query casuali dal catalogo locale, intervallo personalizzato, pagine1..10 manuali; pausa/play e cattura secondarie a icone.

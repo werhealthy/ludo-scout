@@ -1,6 +1,6 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
-## Ludo152 — esplorazione e bilancio giornaliero
+## Ludo153 — esplorazione e bilancio giornaliero
 
 Richiesta01:40Europe/Rome autorizza integrazione Ludo/Motore e browser orientato a esplorazioni. Spec: docs/specs/2026-10-03-ludo-exploration.md; piano in docs/plans/2026-10-03-ludo-exploration.md. Questa direzione supersede cerchi come sola occupazione e Motore UI standby. Ricerca e risultati sono nella stessa stanza Esplorazione; Cacce/Libreria e panorama mensile151 preservati.
 

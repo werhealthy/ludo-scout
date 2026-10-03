@@ -8,7 +8,7 @@
 **Spec:** docs/specs/2026-10-03-ludo-exploration.md
 
 ## Global Constraints
-Preservare dati, filtri, pricing, sicurezza/capture, frontend151. Nessun reset/schema/rete background. Unità annunci; giornata Europe/Rome; delta baseline esplicito. Target48dp e font adattivo.
+Preservare dati, filtri, pricing, sicurezza/capture, frontend151 e Catalogo/Bundle152. Nessun reset/schema/rete background. Unità annunci; giornata Europe/Rome; delta baseline esplicito. Target48dp e font adattivo.
 
 ## Review Focus
 - Cambio giorno/DST: finestra calendario e baseline incompatibile non produce delta.
