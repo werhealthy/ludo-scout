@@ -132,3 +132,7 @@ assert 'addGameFavorite(artwork' in shared
 assert 'catalogGameCard(catalogGames.get(index))' in method('private void renderCatalogResults(')
 assert 'Il gioco che cerchi' not in ui and 'Panoramica, mercato e come si gioca' not in ui
 print('PASS shared game/listing card grammar, listing-only price, worker detail hydration, no separate game banners')
+
+assert 'return catalogGameCard(g)' in method('private View databaseGameCard(')
+assert 'openDatabaseGame(gameId,gameSource)' in shared
+print('PASS complete game results reuse the same price-free cards and source-aware Back')

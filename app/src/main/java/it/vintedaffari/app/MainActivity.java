@@ -1157,15 +1157,7 @@ private void renderDatabase(){
     private void addDatabaseGrid(LinearLayout host,List<GameRecord> games,int start){
         for(int i=start;i<games.size();i+=2){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);row.addView(databaseGameCard(games.get(i)),new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(0,-2,1);second.leftMargin=dp(14);row.addView(i+1<games.size()?databaseGameCard(games.get(i+1)):new Space(this),second);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.bottomMargin=dp(14);host.addView(row,rp);}
     }
-    private View databaseGameCard(GameRecord g){
-        LinearLayout card=verticalCard();card.setPadding(dp(11),dp(11),dp(11),dp(14));
-        ImageView art=new ImageView(this);art.setScaleType(ImageView.ScaleType.FIT_CENTER);art.setBackground(round(SURFACE2,12,0,0));setGameArtwork(art,g);int width=(getResources().getDisplayMetrics().widthPixels-dp(50))/2-dp(22);FrameLayout gameArt=new FrameLayout(this);gameArt.addView(art,new FrameLayout.LayoutParams(-1,-1));addGameFavorite(gameArt,g.bggId,g.name,Gravity.TOP|Gravity.END);card.addView(gameArt,new LinearLayout.LayoutParams(-1,(int)(width*1.18f)));
-        TextView title=text(g.name,17,TEXT,Typeface.BOLD);title.setLines(2);title.setEllipsize(TextUtils.TruncateAt.END);title.setPadding(0,dp(10),0,0);card.addView(title);
-        TextView rating=text(g.rating==null?"BGG da verificare":"★ "+String.format(Locale.ITALY,"%.1f",g.rating)+"  BGG",13,g.rating==null?MUTED:YELLOW,Typeface.BOLD);rating.setPadding(0,dp(7),0,0);card.addView(rating);
-        String players=g.minPlayers==null?"Giocatori n/d":g.minPlayers+(g.maxPlayers!=null&&!g.maxPlayers.equals(g.minPlayers)?"–"+g.maxPlayers:"")+" gioc.";TextView facts=text(players+(g.playtime==null?"":" · "+g.playtime+" min"),11,MUTED,Typeface.NORMAL);facts.setSingleLine(true);facts.setEllipsize(TextUtils.TruncateAt.END);facts.setPadding(0,dp(5),0,0);card.addView(facts);
-        TextView price=text(g.currentMinPriceCents==null?"Nessun annuncio":"da "+money(g.currentMinPriceCents),g.currentMinPriceCents==null?13:19,g.currentMinPriceCents==null?MUTED:TEXT,Typeface.BOLD);price.setMinHeight(dp(38));price.setGravity(Gravity.CENTER_VERTICAL);card.addView(price);
-        TextView availability=text(g.activeListingCount>0?g.activeListingCount+" annunci attivi":"Scopri il gioco",11,g.activeListingCount>0?TEAL:MUTED,Typeface.NORMAL);availability.setSingleLine(true);card.addView(availability);card.setOnClickListener(v->openDatabaseGame(g.id,null));return card;
-    }
+    private View databaseGameCard(GameRecord g){return catalogGameCard(g);}
 
     private void renderDatabaseDetail(){
         final long gameId=selectedGameId,epoch=++pageDetailEpoch;final LinearLayout host=body;body.setBackground(productPageBackground());
@@ -1354,7 +1346,7 @@ private void renderCatalog(){
         card.addView(meta,new LinearLayout.LayoutParams(-1,-2));
         if(gameId<=0){LinearLayout priceRow=new LinearLayout(this);priceRow.setGravity(Gravity.CENTER_VERTICAL);priceRow.setPadding(0,dp(6),0,0);TextView price=discoverTextWeight(total(d),21,DISCOVER_TEXT,700);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(13,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);price.setMinHeight(dp(34));priceRow.addView(price,new LinearLayout.LayoutParams(0,-2,1));
         TextView saving=discoverDiscountBadge(d,12);if(saving!=null)priceRow.addView(saving,new LinearLayout.LayoutParams(-2,-2));priceRow.setMinimumHeight(dp(40));card.addView(priceRow,new LinearLayout.LayoutParams(-1,-2));}
-        card.setContentDescription(gameId>0?name(d)+", apri la scheda gioco":name(d)+", "+total(d)+", "+publicationDisplay(d));card.setOnClickListener(v->{if(gameId>0)openDatabaseGame(gameId,"catalog");else openDetail(d);});return card;
+        final String gameSource=tab;card.setContentDescription(gameId>0?name(d)+", apri la scheda gioco":name(d)+", "+total(d)+", "+publicationDisplay(d));card.setOnClickListener(v->{if(gameId>0)openDatabaseGame(gameId,gameSource);else openDetail(d);});return card;
     }
         private void appendCatalogCards(LinearLayout host,List<DealRecord> deals,int start,int end){
         for(int i=start;i<end;i+=2){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);
