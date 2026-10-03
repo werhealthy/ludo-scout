@@ -85,6 +85,7 @@ with tempfile.TemporaryDirectory() as temp:
 # Execute the real debounce/request/callback methods. Workers and the UI queue are
 # deliberately separate so an obsolete response can arrive after a newer input.
 live=r'''
+package it.vintedaffari.app;
 import java.util.*;import java.util.concurrent.*;import java.util.function.*;
 class View {Object parent=new Object();Object getParent(){return parent;} }
 class LinearLayout extends View {int count;void removeAllViews(){count=0;}void addView(View v){count++;}}
@@ -95,12 +96,12 @@ class TextUtils {static boolean isEmpty(String s){return s==null||s.isEmpty();}}
 public class LiveCatalogRegression {
  String query="",tab="catalog",catalogGameQuery="",catalogGameError;long catalogGameEpoch;int catalogRestoreY=900;
  LinearLayout catalogContentHost=new LinearLayout(),catalogResultsHost;List<DealRecord> catalogResultSnapshot=new ArrayList<>();List<GameRecord> catalogGames=new ArrayList<>();Set<String> catalogMatchedIds=new HashSet<>();
- Runnable catalogLiveSearch;Future<?> catalogSearchFuture;Handler uiUpdates=new Handler();Executor uiDataIo=new Executor();ArrayDeque<Runnable> callbacks=new ArrayDeque<>();DB db=new DB();Market marketStore=new Market();int renders;String rendered="";
+ UiSnapshotCache<String,CatalogReadSnapshot> catalogReadCache=new UiSnapshotCache<>(8,60000);static class CatalogReadSnapshot{final List<DealRecord> deals;final List<GameRecord> games;final Set<String> matches;final int total;CatalogReadSnapshot(List<DealRecord>d,List<GameRecord>g,Set<String>m,int t){deals=new ArrayList<>(d);games=new ArrayList<>(g);matches=new HashSet<>(m);total=t;}}Runnable catalogLiveSearch;Future<?> catalogSearchFuture;Handler uiUpdates=new Handler();Executor uiDataIo=new Executor();ArrayDeque<Runnable> callbacks=new ArrayDeque<>();DB db=new DB();Market marketStore=new Market();int renders;String rendered="";
  static class Handler {ArrayList<Runnable> tasks=new ArrayList<>();void removeCallbacks(Runnable r){tasks.remove(r);}void postDelayed(Runnable r,long delay){tasks.add(r);}void flush(){for(Runnable r:new ArrayList<>(tasks)){tasks.remove(r);r.run();}}}
  static class Executor {ArrayDeque<FutureTask<Void>> tasks=new ArrayDeque<>();Future<?> submit(Runnable r){FutureTask<Void> task=new FutureTask<>(r,null);tasks.add(task);return task;}void flush(){while(!tasks.isEmpty())tasks.remove().run();}}
  static class DB {int reads;boolean fail;List<DealRecord> getDeals(String scope,int limit){reads++;if(fail)throw new IllegalStateException();return new ArrayList<>(Arrays.asList(new DealRecord()));}int countDeals(Object ignored){return 1;}}
  static class Market {Set<String> catalogGameMatches(String q,Set<String> ids){return ids;}List<GameRecord> searchGamesAdvanced(String q,int limit,String scope,boolean active,Object rating,Object price,String order){return new ArrayList<>(Arrays.asList(new GameRecord()));}}
- boolean isDestroyed(){return false;}void runOnUiThread(Runnable r){callbacks.add(r);}void flushUi(){while(!callbacks.isEmpty())callbacks.remove().run();}void cancelImageRequests(View v){}View loadingMoreView(String s){return new View();}TextView secondaryTextAction(String s){return new TextView();}
+ boolean isDestroyed(){return false;}void runOnUiThread(Runnable r){callbacks.add(r);}void flushUi(){while(!callbacks.isEmpty())callbacks.remove().run();}void cancelImageRequests(View v){}View loadingMoreView(String s){return new View();}View brandedLoadingState(String s){return new View();}TextView secondaryTextAction(String s){return new TextView();}
  void renderCatalogResults(LinearLayout h,List<DealRecord> deals,int total){renders++;rendered=query;}
  void restoreCatalogResultsPosition(LinearLayout h,long epoch){}
  static void eq(Object a,Object b){if(!Objects.equals(a,b))throw new AssertionError(a+" != "+b);}
@@ -112,19 +113,20 @@ public class LiveCatalogRegression {
   n.tab="catalog";n.queueCatalogSearch(180);n.uiUpdates.flush();n.catalogContentHost=new LinearLayout();n.uiDataIo.flush();n.flushUi();eq(3,n.renders);
   n.queueCatalogSearch(180);n.uiUpdates.flush();n.catalogContentHost.parent=null;n.uiDataIo.flush();n.flushUi();eq(3,n.renders);
   n.catalogContentHost=new LinearLayout();n.db.fail=true;n.queueCatalogSearch(180);n.uiUpdates.flush();n.uiDataIo.flush();n.flushUi();eq(3,n.renders);eq("Ricerca non disponibile. Riprova.",n.catalogGameError);eq(1,n.catalogContentHost.count);
-  System.out.println("PASS live A/AB, debounce, stale callback, clear, route/host guard, error without fake zero, editor host retained");
+  LiveCatalogRegression warm=new LiveCatalogRegression();warm.query="Carcassonne";warm.queueCatalogSearch(0);warm.uiUpdates.flush();warm.uiDataIo.flush();warm.flushUi();eq(1,warm.db.reads);warm.tab="discover";warm.catalogContentHost=new LinearLayout();warm.tab="catalog";warm.queueCatalogSearch(0);eq(1,warm.db.reads);eq(2,warm.renders);eq("Carcassonne",warm.rendered);eq(0,warm.uiUpdates.tasks.size());warm.catalogReadCache.invalidate();warm.queueCatalogSearch(0);warm.uiUpdates.flush();warm.uiDataIo.flush();warm.flushUi();eq(2,warm.db.reads);
+  System.out.println("PASS warm return without new read, invalidation reload; live A/AB, debounce, stale callback, clear, route/host guard, error without fake zero, editor host retained");
  }
  __METHODS__
 }
-'''.replace('__METHODS__',method('private void queueCatalogSearch(')+'\n'+method('private void addCatalogGameResults('))
+'''.replace('__METHODS__',method('private boolean showCachedCatalog(')+'\n'+method('private void queueCatalogSearch(')+'\n'+method('private void addCatalogGameResults('))
 with tempfile.TemporaryDirectory() as temp:
  p=Path(temp)/'LiveCatalogRegression.java';p.write_text(live)
- subprocess.run(['javac','-d',temp,str(p)],check=True)
- subprocess.run(['java','-cp',temp,'LiveCatalogRegression'],check=True)
+ subprocess.run(['javac','-d',temp,str(p),str(root/'app/src/main/java/it/vintedaffari/app/UiSnapshotCache.java')],check=True)
+ subprocess.run(['java','-cp',temp,'it.vintedaffari.app.LiveCatalogRegression'],check=True)
 # Hydration must finish on the worker before any UI rendering of page or overlay.
 for signature in ['private void renderDatabaseDetail(', 'private void openGameDetailOverlay(']:
  detail=method(signature)
- assert detail.index('uiDataIo.execute') < detail.index('loadGameDetailData') < detail.index('runOnUiThread')
+ assert detail.index('detailIo.execute') < detail.index('loadGameDetailData') < detail.index('runOnUiThread')
  assert 'snapshot);' in detail
 shared=method('private View catalogProductCard(DealRecord d,long gameId)')
 assert 'if(gameId<=0){LinearLayout priceRow' in shared
