@@ -35,6 +35,22 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(state['months']['2026-10']['operations']['op']['responses'][0]['status'],'FAILED_OR_INVALID')
         self.assertEqual(state['months']['2026-10']['reserved_eur'],'.01')
 
+    def test_http_failure_records_only_numeric_status_without_retry(self):
+        for code in [429, 503]:
+            state={'months':{}};calls=[]
+            def save(value):state.clear();state.update(copy.deepcopy(value))
+            def call(body):
+                calls.append(body)
+                raise urllib.error.HTTPError('https://example.invalid/?key=SECRET',code,'SECRET',{'X-Secret':'SECRET'},None)
+            with self.assertRaises(urllib.error.HTTPError):
+                self.m.run([{'listing_id':1,'title':'Hive'}],lambda:copy.deepcopy(state),save,call,'2026-10','op')
+            entry=state['months']['2026-10']['operations']['op']['responses'][0]
+            self.assertEqual(entry.get('http_status'),code)
+            self.assertEqual(entry['error_kind'],'HTTPError')
+            self.assertEqual(len(calls),1)
+            self.assertEqual(state['months']['2026-10']['reserved_eur'],'.01')
+            self.assertNotIn('SECRET',json.dumps(state))
+
     def test_invalid_sample_and_oversized_payload_make_no_call(self):
         for sample in [[{'listing_id':1,'title':'x'*5000,'brand':''}],
                        [{'listing_id':1,'title':'x','brand':''}]*2]:
