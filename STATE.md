@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Backend161 — session-refresh consentito senza cattura, distribuita
+
+Report160 del telefono21:23Europe/Rome2026-10-03 identifica https://www.vinted.it/session-refresh, PATH_NOT_ALLOWED, override. Autorizzazione esplicita21:27: solo questo percorso sui domini Vinted già consentiti, cattura sospesa fino al ritorno agli annunci.
+
+PR220, basef941b18d373f3fbf5121447db6a00276e10fddd0, HEAD642c1d61496fe54e559c754860607dd234c9f100; merge6d7cecee6dad2923f08f6657df7d5a5f4ec73796. allowedNavigation separata da allowedPage: session-refresh esatta navigabile, non acquisibile. JS termina prima di installare hook/controlli su quella pagina. Native sospende intake/generation già all'override; sessionPending/target impediscono finish/error/location vecchi e lifecycle/controlli di riabilitare cattura prima dell'avvio consentito; catalog/items riabilitano il normale intake. Report espone sessionTransition/accepting/sessionPending. Cookie/credenziali, login/inbox/altri percorsi e origini non ampliati; nessun bypass/schema/soglia/dipendenza/rete extra di cattura/reset.
+
+CI37148423430 SUCCESS sulHEAD: job111277030027 suite completa SQL/JVM,46/46 cattura, unit Android, Java/APK; job111277030124 callback Activity reale catalog→session→catalog, vecchio finish sull'esatto URL corrente prima della sessione, onResume/setCapture/captureNow in sessione, tre viste font100/200%. Node locale RED→GREEN46/46; Java RED37148046066:61test,2fallimenti per policy assente. Review finale senzaCritical/Important dopo session latch. Lint5errori preesistenti fuori browser/100warning non soppressi. Nessun Vinted live né accettazione telefono dichiarati.
+
+Distribuita **5.12.161-vinted-session (1000184)**, localCode210. Android beta184/run37148785592/job111278091486 SUCCESS: suite/unit/APK firmata. Certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T19:45:54.7352005Z. Upload Firebase19:46:35.3407160Z; distribuzione tester/gruppi distinta19:46:36.0040278Z. Release3cgdb0pha48ro. Artifact GitHub indisponibile per quota storage esaurita; Firebase riuscito.
+
+Telefono: aggiornare senza cancellare dati, Trova nuovi giochi, verificare catalogo visibile e almeno un annuncio salvato; se bloccato restituire ⋮→Dati della cattura→Copia report completo161. Frontend7/backend5 gruppi aperti, nessuno chiuso dalla sola CI. Unico prossimo passo: prova161 su Vinted live per confermare che session-refresh viene superato.
+
+
 ## Backend160 — blocco browser diagnosticabile, distribuita
 
 Feedback19:35Europe/Rome2026-10-03:159 non apre alcuna pagina; browserCapture.PAGE_BLOCKED e toast Ludo, app Vinted ufficiale funzionante.158→159 policy/cookie/settings/URL iniziale invariati. Causa live del reindirizzamento non ancora nota, non attribuita a ban o BGG.
