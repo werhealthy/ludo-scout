@@ -24,7 +24,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   return null;
  }
  private void capture(Activity a,String name)throws Exception{
-  waitForIdleSync();Bitmap original=getUiAutomation().takeScreenshot();if(original==null)throw new AssertionError("no screenshot");
+  waitForIdleSync();getUiAutomation().waitForIdle(500,5000);getUiAutomation().syncInputTransactions();Bitmap original=getUiAutomation().takeScreenshot();if(original==null)throw new AssertionError("no screenshot");
   Bitmap reduced=Bitmap.createScaledBitmap(original,432,Math.round(original.getHeight()*432f/original.getWidth()),true);
   java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);
   String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);
@@ -40,6 +40,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
     runOnMainSync(()->{try{set(a,"tab","companion");set(a,"ludoRooms",new LudoRoomState(room,0,0,0));set(a,"renderedLudoRoom","");invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});
     waitForIdleSync();getUiAutomation().waitForIdle(200,5000);
     runOnMainSync(()->{try{
+     if(!room.equals(((LudoRoomState)get(a,"ludoRooms")).room()))throw new AssertionError("wrong room rendered");
      View footer=(View)get(a,"ludoRoomDots");View refresh=(View)get(a,"refreshHost");View nav=(View)get(a,"nav");
      if(footer==null||footer.getHeight()<=0)throw new AssertionError("footer not measured");
      if(((FrameLayout.LayoutParams)refresh.getLayoutParams()).bottomMargin!=footer.getHeight())throw new AssertionError("footer obscures scroll viewport");
