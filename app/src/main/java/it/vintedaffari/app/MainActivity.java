@@ -69,7 +69,7 @@ public final class MainActivity extends Activity {
     private volatile ActivityIndicatorSnapshot activityIndicatorSnapshot;
     private final AtomicBoolean activityIndicatorLoading=new AtomicBoolean(false);
     private static final class PhotoMatch {BggSearchClient.Game game;double visual,text,score;PhotoMatch(BggSearchClient.Game g,double v,double t,double s){game=g;visual=v;text=t;score=s;}}
-    private final Runnable activitySnapshotRetry=()->{if(!isDestroyed()&&"activity".equals(tab)&&"overview".equals(engineSection))scheduleRender(0);};
+    private final Runnable activitySnapshotRetry=()->{if(!isDestroyed()&&(("activity".equals(tab)&&"overview".equals(engineSection))||ludoExplorationVisible()))scheduleRender(0);};
     private static final class LibrarySearchJob {String id,label;Uri uri;boolean running=true;String error="";final List<BggSearchClient.Game> results=new ArrayList<>();LibrarySearchJob(String i,String l,Uri u){id=i;label=l;uri=u;}}
     private static final List<LibrarySearchJob> librarySearchJobs=Collections.synchronizedList(new ArrayList<>());private String activeLibrarySearchJobId="";private final List<BggSearchClient.Game> wizardBundleGames=new ArrayList<>();private final Set<String> libraryBackfillInFlight=Collections.synchronizedSet(new HashSet<>());private final Set<String> libraryBackfillAttempted=Collections.synchronizedSet(new HashSet<>());
     private static final ExecutorService LIBRARY_SEARCH_NET=Executors.newFixedThreadPool(2);

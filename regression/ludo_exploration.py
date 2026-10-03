@@ -93,3 +93,5 @@ if shutil.which('javac'):
   subprocess.run(['javac','-d',temp,str(runner)],check=True)
   subprocess.run(['java','-cp',temp,'it.vintedaffari.app.JourneyRouteCheck'],check=True)
   print('PASS real Activity detail route with UI boundaries replaced')
+
+assert 'ludoExplorationVisible()' in main.split('private final Runnable activitySnapshotRetry=',1)[1].split(';',1)[0], 'Ludo IO errors must retry'
