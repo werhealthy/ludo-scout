@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Frontend164 — Ludo semplice e ricerca fissa, distribuita
+
+Feedback e «Vai» del 2026-10-03: Bundle nel Catalogo; ricerca primaria persistente; prima stanza più comprensibile; tre stanze navigabili con gerarchia, padding e controlli del design system. PR225, branch frontend/ludo-primary-search riallineato al backend163; HEAD6d76fedc30f26b02a72894056cdb666992447559, merge bff246bb534d7ae1be30b9a28e360de5b0e273df. Export audit163 preservato.
+
+Bottom navigation Home/Catalogo/Ludo; Bundle contestuale nel Catalogo. Footer nativo fuori dallo scroll con Esplora/Preferiti/Libreria e unica CTA Trova nuovi giochi, target48/56dp, viewport ridotto dell’altezza misurata, safe inset esistenti e stacking a font grandi. Footer rimosso uscendo da Ludo. Prima stanza mostra stato reale, osservati/idonei oggi e interventi; cinque controlli/delta, coda globale e motivi restano in Dettagli del motore. Scorte globali non presentate come lavorazione attiva; dettagli chiusi prima di aprire destinazioni. Preferiti/Libreria, memoria e dati conservati. Nessuna modifica a pricing, schema, filtri/soglie, servizi, sicurezza o dipendenze; nessuna velocità del motore misurata o diagnostica eliminata.
+
+RED→GREEN del contratto locale; SQL pipeline/giornaliero/mensile e Node46/46 passati. CI37154929863 sul HEAD finale SUCCESS: job111296267412 suite completa SQL/JVM, unit Android, Java/APK; job111296267617 Activity reale, tre stanze e Catalogo, ricerca fissa dopo scroll, margin misurato e Bundle contestuale a font100/200%. Otto screenshot ispezionati, nessuna sovrapposizione dei controlli. Review indipendente finale senza Critical/Important dopo correzioni di stato globale e routing dei dettagli. Lint5errori preesistenti/100warning non soppressi: job continua il rendering, non lint pulito. Nessuna accettazione telefono, Vinted live o performance dedotta dalla CI.
+
+Distribuita **5.12.164-ludo-navigation (1000187)**, localCode213. Android beta187/run37155329716/job111297443874 SUCCESS sul merge. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato2026-10-03T21:33:32.2835401Z. Upload Firebase21:34:22.8461632Z e distribuzione tester/gruppi distinta21:34:23.6279441Z. Release39ko5pcfqua60. Artifact GitHub assente per quota storage, Firebase riuscito.
+
+Frontend7/backend6 gruppi aperti (audit backend163 incluso); nessun gruppo chiuso dalla sola CI. Unico prossimo passo frontend: aggiornare da App Tester senza cancellare dati e verificare tre stanze, ricerca fissa durante scroll, Dettagli del motore e Bundle nel Catalogo; restituire screenshot/versione se qualcosa non torna. Audit backend163 resta pendente come registrato sotto.
+
 ## Backend163 — esportazione audit classificazione, distribuita
 
 Autorizzazione «Vai»22:49Europe/Rome2026-10-03: esportare l'intero archivio prima di riclassificare con AI. Account Gemini Free Tier e secret GEMINI_API_KEY dichiarati salvati dall'utente; chiave mai letta/usata da questa consegna. Budget AI proposto1EUR/mese, nessun servizio pagato/batch completo autorizzato. Ludo Brain fuori scope.
