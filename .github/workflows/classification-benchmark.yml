@@ -4,6 +4,7 @@ on:
     branches: [beta]
     paths:
       - 'tools/classification*.py'
+      - 'regression/classification_proposals_test.py'
       - 'regression/classification_runner_test.py'
       - 'regression/classification_resume_test.py'
       - 'regression/classification_resume_execute_test.py'
@@ -26,3 +27,5 @@ jobs:
       - run: python3 regression/classification_resume_test.py
 
       - run: python3 regression/classification_resume_execute_test.py
+
+      - run: python3 regression/classification_proposals_test.py
