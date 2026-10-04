@@ -1651,7 +1651,7 @@ private void showFilterSheet(){
         host.addView(engineQueueRow(work>0?LudoIcons.GEAR:LudoIcons.CHECK,status,MUTED,()->showLudoJourneyDetails(snapshot)));
         if(snapshot.recoveryCount>0)host.addView(engineQueueRow(LudoIcons.INFO,snapshot.recoveryCount+" annunci da confermare",ORANGE,()->{enterEngineDetail("review");render();}));
         if(snapshot.waitingRuns>0)host.addView(engineQueueRow(LudoIcons.CLOCK,snapshot.waitingRuns+" esplorazioni in attesa",MUTED,()->{enterEngineDetail("waiting");render();}));
-        TextView details=secondaryTextAction("Motore");details.setCompoundDrawables(iconDrawable(LudoIcons.GEAR,LIME,16),null,iconDrawable(LudoIcons.CHEVRON_RIGHT,MUTED,14),null);details.setCompoundDrawablePadding(dp(8));details.setMinHeight(dp(48));details.setOnClickListener(v->showLudoJourneyDetails(snapshot));host.addView(details);
+        host.addView(engineQueueRow(LudoIcons.GEAR,"Motore",LIME,()->showLudoJourneyDetails(snapshot)));
     }
 
     private void showLudoJourneyDetails(EngineOverviewSnapshot snapshot){
