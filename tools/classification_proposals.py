@@ -38,7 +38,7 @@ def proposals(sample, source_input, answers, model, contract):
         rows.append(dict(listing_id=key,status=status,content_key=content_key(item,model,contract),
                          preserved_type=item.get('previous_type'),proposed_type=usable['category'] if usable else None,
                          runtime_type=None,needs_review=True,apply_authorized=False,
-                         confidence=usable['confidence'] if usable else None,
+                         confidence=usable.get('confidence') if usable else None,
                          confidence_kind='MODEL_SELF_REPORT_UNCALIBRATED',
                          evidence=usable['evidence'] if usable else None,
                          language='UNKNOWN',bgg_verified=False))
