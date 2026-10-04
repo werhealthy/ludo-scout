@@ -25,13 +25,19 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  }
  private void capture(Activity a,String name)throws Exception{
   awaitActivityFrame(a);
+  final int[][] navBounds=new int[3][4];
+  runOnMainSync(()->{try{
+   ViewGroup nav=(ViewGroup)get(a,"nav");
+   if(nav.getChildCount()!=3)throw new AssertionError("navigation destinations missing before capture");
+   for(int i=0;i<3;i++){View item=nav.getChildAt(i);if(!item.isShown()||item.getWidth()<=0||item.getHeight()<=0)throw new AssertionError("navigation item not laid out before capture");int[] position=new int[2];item.getLocationInWindow(position);navBounds[i]=new int[]{position[0],position[1],item.getWidth(),item.getHeight()};}
+  }catch(Exception e){throw new RuntimeException(e);}});
   Bitmap original=null;
   for(int attempt=0;attempt<3;attempt++){
    awaitActivityFrame(a);original=getUiAutomation().takeScreenshot();
-   if(original!=null&&hasSceneContent(original))break;
+   if(original!=null&&hasSceneContent(original)&&hasNavigationContent(original,navBounds))break;
    if(original!=null){original.recycle();original=null;}
   }
-  if(original==null)throw new AssertionError("blank or obscured Activity screenshot: "+name);
+  if(original==null)throw new AssertionError("blank scene or navigation in Activity screenshot: "+name);
   Bitmap reduced=Bitmap.createScaledBitmap(original,432,Math.round(original.getHeight()*432f/original.getWidth()),true);
   java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);
   String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);
@@ -39,6 +45,15 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   original.recycle();reduced.recycle();
  }
 
+ private boolean hasNavigationContent(Bitmap image,int[][] bounds){
+  // Navigation has a black surface: every destination must draw its bright glyph/label.
+  for(int[] item:bounds){int bright=0;
+   for(int y=Math.max(0,item[1]);y<Math.min(image.getHeight(),item[1]+item[3]);y+=3)
+    for(int x=Math.max(0,item[0]);x<Math.min(image.getWidth(),item[0]+item[2]);x+=3){int color=image.getPixel(x,y);if(Math.max(android.graphics.Color.red(color),Math.max(android.graphics.Color.green(color),android.graphics.Color.blue(color)))>180)bright++;}
+   if(bright<10)return false;
+  }
+  return true;
+ }
  private boolean hasSceneContent(Bitmap image){
   // Sample the central app viewport: system bars alone must never satisfy the capture.
   int first=0,distinct=0;boolean initialized=false;
@@ -100,8 +115,21 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  }
 
  private void compactFrameContracts(Activity a)throws Exception{
-  LudoRoomFrame stage=(LudoRoomFrame)get(a,"ludoStage");float density=a.getResources().getDisplayMetrics().density;
-  int ow=stage.getWidth(),oh=stage.getHeight(),footer=((View)get(a,"ludoRoomDots")).getHeight();
+  // Measure the real frame class without changing the attached Activity hierarchy.
+  // Manually measuring a live child at foreign dimensions can disturb sibling traversal.
+  float density=a.getResources().getDisplayMetrics().density;
+  LudoRoomFrame stage=new LudoRoomFrame(a,false);
+  stage.addView(new View(a));stage.addView(new View(a));stage.addView(new android.widget.Space(a));
+  android.widget.LinearLayout commandBox=new android.widget.LinearLayout(a);commandBox.setOrientation(android.widget.LinearLayout.VERTICAL);
+  android.widget.LinearLayout sections=new android.widget.LinearLayout(a);
+  android.widget.LinearLayout.LayoutParams sectionParams=new android.widget.LinearLayout.LayoutParams(-1,-2);sectionParams.topMargin=Math.round(12*density);commandBox.addView(sections,sectionParams);
+  for(String label:new String[]{"Esplora","Preferiti","Libreria"}){
+   android.widget.LinearLayout target=new android.widget.LinearLayout(a);target.setOrientation(android.widget.LinearLayout.VERTICAL);
+   target.addView(new View(a),new android.widget.LinearLayout.LayoutParams(Math.round(56*density),Math.round(56*density)));
+   TextView text=new TextView(a);text.setText(label);text.setTextSize(12);target.addView(text,new android.widget.LinearLayout.LayoutParams(-1,-2));
+   sections.addView(target,new android.widget.LinearLayout.LayoutParams(0,-2,1));
+  }
+  stage.addView(commandBox);TextView chrome=new TextView(a);chrome.setHeight(((LudoRoomFrame)get(a,"ludoStage")).getChildAt(4).getHeight());stage.addView(chrome);
   for(int[] size:new int[][]{{700,280},{400,300},{300,400}}){
    int w=Math.round(size[0]*density),h=Math.round(size[1]*density),inset=Math.round(84*density);
    stage.setHeightBudget(h);stage.setControlsInset(inset);stage.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));stage.layout(0,0,w,h);
@@ -110,7 +138,6 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    if(commands.getBottom()>h-inset||commands.getRight()>w)throw new AssertionError("compact commands hidden by footer");
    if(actor.getRight()>commands.getLeft()&&actor.getLeft()<commands.getRight()&&actor.getBottom()>commands.getTop())throw new AssertionError("compact actor behind controls");
   }
-  stage.setHeightBudget(oh);stage.setControlsInset(footer);stage.measure(View.MeasureSpec.makeMeasureSpec(ow,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(oh,View.MeasureSpec.EXACTLY));stage.layout(0,0,ow,oh);invoke(a,"placeLudoStage");
  }
  private void awaitRoomBackground(Activity a)throws Exception{
   long deadline=android.os.SystemClock.uptimeMillis()+5000;
@@ -140,6 +167,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  private void rendererContracts(){
   Bitmap blank=Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888);blank.eraseColor(android.graphics.Color.GRAY);
   if(hasSceneContent(blank))throw new AssertionError("blank screenshot accepted");
+  if(hasNavigationContent(blank,new int[][]{{0,0,30,100},{30,0,30,100},{60,0,30,100}}))throw new AssertionError("blank navigation accepted");
   new android.graphics.Canvas(blank).drawRect(20,20,80,80,new android.graphics.Paint(){{setColor(android.graphics.Color.GREEN);}});
   if(!hasSceneContent(blank))throw new AssertionError("visible content rejected");blank.recycle();
   Bitmap target=Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888),red=Bitmap.createBitmap(10,10,Bitmap.Config.ARGB_8888),blue=Bitmap.createBitmap(10,10,Bitmap.Config.ARGB_8888);
@@ -225,6 +253,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      ((android.widget.ScrollView)get(a,"scroll")).scrollTo(0,99999);
      int[] after=new int[2];footer.getLocationInWindow(after);if(after[1]!=pos[1])throw new AssertionError("search scrolls out of view");
      if(text(nav,"Bundle")!=null||((ViewGroup)nav).getChildCount()!=3)throw new AssertionError("Bundle still in main navigation");
+     for(int i=0;i<3;i++){View item=((ViewGroup)nav).getChildAt(i);if(!item.isShown()||item.getWidth()<=0||item.getHeight()<=0)throw new AssertionError("navigation item not laid out");}
     }catch(Exception e){throw new RuntimeException(e);}});
     android.util.Log.i("LudoVisual","CONTRACT geometry "+room);
     if(LudoRoomState.EXPLORE.equals(room))awaitRoomRig(a);
