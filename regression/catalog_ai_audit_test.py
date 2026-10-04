@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +139,17 @@ class CatalogAuditTest(unittest.TestCase):
         before = output.read_bytes()
         self.assertNotEqual(subprocess.run(cmd + ['--output', str(output)], capture_output=True).returncode, 0)
         self.assertEqual(output.read_bytes(), before)
+
+    def test_changed_archive_is_rejected_instead_of_wrong_fingerprint(self):
+        path = self.archive([self.row()])
+        original = self.m.load_archive
+        def changed(source):
+            result = original(source)
+            with path.open('ab') as file:
+                file.write(b'changed-after-parse')
+            return result
+        with patch.object(self.m, 'load_archive', changed), self.assertRaises(ValueError):
+            self.m.audit(path, 10)
 
 
 if __name__ == '__main__':

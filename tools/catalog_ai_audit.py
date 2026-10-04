@@ -58,15 +58,22 @@ def body_size(rows):
                          ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
 
 
-def audit(path, calls_reserved):
-    if type(calls_reserved) is not int or not 0 <= calls_reserved <= 100:
-        raise ValueError('declared reservations must be an integer from 0 to 100')
-    path = Path(path)
+def archive_digest(path):
     digest = hashlib.sha256()
     with path.open('rb') as source:
         for block in iter(lambda: source.read(1024 * 1024), b''):
             digest.update(block)
+    return digest.hexdigest()
+
+
+def audit(path, calls_reserved):
+    if type(calls_reserved) is not int or not 0 <= calls_reserved <= 100:
+        raise ValueError('declared reservations must be an integer from 0 to 100')
+    path = Path(path)
+    digest = archive_digest(path)
     manifest, sections = load_archive(path)
+    if archive_digest(path) != digest:
+        raise ValueError('archive changed during audit; use a completed export')
     games = {row['id']: row for row in sections['games']}
     legacy_signatures, legacy_items, items = defaultdict(list), defaultdict(list), defaultdict(list)
     for row in sections['legacy_deals']:
@@ -144,7 +151,7 @@ def audit(path, calls_reserved):
     batches = all_batches[:remaining]
     planned = sum(len(b['records']) for b in batches)
     counts = Counter(row.get('lifecycle') or 'UNSPECIFIED' for row in sections['listings'])
-    return {'format': 'ludo-catalog-ai-audit-v1', 'archive_sha256': digest.hexdigest(),
+    return {'format': 'ludo-catalog-ai-audit-v1', 'archive_sha256': digest,
             'source_completed_at': manifest.get('completed_at'),
             'snapshot_atomic': manifest.get('snapshot_atomic') is True,
             'scope': 'SUPPLIED_EXPORT_NOT_LIVE_PHONE',
