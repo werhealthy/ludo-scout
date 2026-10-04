@@ -51,10 +51,10 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    }
   return distinct>20;
  }
- private void awaitActivityFrame(Activity a)throws Exception{
+ private void awaitActivityFrame(Activity a)throws Exception{awaitViewFrame(a.getWindow().getDecorView());}
+ private void awaitViewFrame(View decor)throws Exception{
   java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
   runOnMainSync(()->{
-   View decor=a.getWindow().getDecorView();
    android.view.ViewTreeObserver.OnDrawListener listener=new android.view.ViewTreeObserver.OnDrawListener(){
     @Override public void onDraw(){
      if(decor.hasWindowFocus()&&decor.isShown()){
@@ -73,7 +73,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    overlay[0]=new android.app.Dialog(a);TextView label=new TextView(a);label.setText("Ludo overlay fixture");overlay[0].setContentView(label);
    set(a,"activeGameOverlay",overlay[0]);overlay[0].show();invoke(a,"syncPetVisibility");
   }catch(Exception e){throw new RuntimeException(e);}});
-  waitForIdleSync();getUiAutomation().waitForIdle(200,5000);
+  waitForIdleSync();awaitViewFrame(overlay[0].getWindow().getDecorView());
   runOnMainSync(()->{try{
    if(!overlay[0].isShowing()||!overlay[0].getWindow().getDecorView().hasWindowFocus())throw new AssertionError("overlay did not acquire real focus");
    LudoPetView actor=(LudoPetView)get(a,"petView");
