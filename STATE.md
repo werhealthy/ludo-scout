@@ -1,5 +1,9 @@
 # Ludo Scout — Current state
 
+## Backend AI — cutover legacy completato, seed preparato
+
+2026-10-04 11:03UTC: GitHubMobile conferma proprietario completata; UI repository variables verifica AI_BENCHMARK_ENABLED=false salvato13:02EuropeRome. Vecchio workflow confermato disabled_manually,2run storici conclusi/nessunattivo. Ledger fresco ai-benchmark-ledger/ledger.json SHAedf6b7412ea8e48e941045657619a2e390219c36 invariato, ottobre8/.08. Script bootstrap corrente eseguito localmente, seed-cutover.json0600 validato8/80000micro; non ancora importato sul Worker. Servizio pubblicato ancoraOFF. ChiaveGitHub non letta/trasferita, enrollment non creato,nessunprovider call/billing. Unico prossimo step: confermare associazione della GEMINI_API_KEY GitHub al progetto GoogleAIStudioLudo scout/gen-lang-client-0614558181 Free/no billing; poi provisioning serverOFF + credenziale privata e status autenticato. Nessuna nuova approvazione budget/architettura richiesta. Frontend7/backend6.
+
 ## Backend AI — Cloudflare pubblicato OFF, 2026-10-04
 
 Utente conferma WorkersFree e chiede avvio delegato. Run manuale37196709262 su beta829b834992e924c809f09e3d5643f2ab181e9095 SUCCESS; job111420006046:19/19test, assertOFF, dryrun e deploy passano. Upload10:51:59UTC e trigger10:51:59UTC; Worker https://ludo-ai-beta.havas-html-to-figma.workers.dev versione6fa5e8e6-d3d2-4eed-847d-b285eb0c4b63. Token/accountGitHub accettati dal deploy, valori mai letti. ENABLED=false/FREE_TIER_VALID_UNTIL=0 forzati. WorkersFree è conferma proprietario, non auditAPI billing. Nessuna callGemini/liveAI, seedimport, enrollment o secretGemini trasferito; status autenticato/telefono ancora pendenti.
