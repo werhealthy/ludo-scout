@@ -13,6 +13,16 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class AiBetaInstrumentation extends Instrumentation {
  @Override public void onCreate(Bundle arguments){super.onCreate(arguments);start();}
  private View find(View v,String text){if(v instanceof TextView&&text.equals(((TextView)v).getText().toString()))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View found=find(g.getChildAt(i),text);if(found!=null)return found;}}return null;}
+ private android.view.accessibility.AccessibilityNodeInfo findNode(android.view.accessibility.AccessibilityNodeInfo node,String text,boolean exact){
+  if(node==null)return null;CharSequence value=node.getText();if(value!=null&&(exact?value.toString().equals(text):value.toString().contains(text)))return node;
+  for(int i=0;i<node.getChildCount();i++){android.view.accessibility.AccessibilityNodeInfo found=findNode(node.getChild(i),text,exact);if(found!=null)return found;}return null;
+ }
+ private android.view.accessibility.AccessibilityNodeInfo waitForNode(String text,boolean exact)throws Exception {
+  for(int i=0;i<50;i++){getUiAutomation().waitForIdle(100,1000);android.view.accessibility.AccessibilityNodeInfo node=findNode(getUiAutomation().getRootInActiveWindow(),text,exact);if(node!=null)return node;Thread.sleep(100);}throw new AssertionError("local evidence UI absent: "+text);
+ }
+ private void capture(String name)throws Exception {
+  Bitmap screenshot=getUiAutomation().takeScreenshot();if(screenshot==null)throw new AssertionError("evidence screenshot absent");Bitmap reduced=Bitmap.createScaledBitmap(screenshot,432,Math.round(screenshot.getHeight()*432f/screenshot.getWidth()),true);java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);for(int offset=0,index=0;offset<encoded.length();offset+=3000,index++)android.util.Log.i("LudoVisual","VISUAL "+name+" "+index+" "+encoded.substring(offset,Math.min(offset+3000,encoded.length())));screenshot.recycle();reduced.recycle();
+ }
  @Override public void onStart(){Bundle result=new Bundle();Activity a=null;try{
   AiBetaRealChecks.run();
   String fixture;try(java.io.InputStream in=getTargetContext().getAssets().open("ai-beta/sample8.json");java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[2048];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);fixture=new org.json.JSONArray(out.toString("UTF-8")).toString();}AiBetaSettings settings=new AiBetaSettings(getTargetContext());org.json.JSONObject saved=new org.json.JSONObject().put("enabled",false).put("last_display","Prova disattivata · nessuna chiamata AI").put("last_display_key",AiBetaProtocol.fingerprint(fixture,AiBetaProtocol.MODEL,AiBetaProtocol.CONTRACT)).put("last_display_at",System.currentTimeMillis());settings.save(saved);if(settings.load().optBoolean("enabled",true))throw new AssertionError("disabled setting lost");
@@ -80,6 +90,15 @@ public final class AiBetaInstrumentation extends Instrumentation {
   boolean loaded=false;for(int i=0;i<50;i++){waitForIdleSync();AtomicReference<Boolean> seen=new AtomicReference<>(false);runOnMainSync(()->{View root=real.getWindow().getDecorView();View button=find(root,"Segna confronto come revisionato");seen.set(button!=null&&button.isEnabled());});if(seen.get()){loaded=true;break;}Thread.sleep(100);}if(!loaded)throw new AssertionError("real cached comparison not rendered");
   runOnMainSync(()->{View root=real.getWindow().getDecorView();View analyze=find(root,"Chiedi proposte AI");if(analyze==null||analyze.isEnabled())throw new AssertionError("real analysis allowed while OFF");});
   getUiAutomation().waitForIdle(200,5000);Bitmap screenshot=getUiAutomation().takeScreenshot();if(screenshot==null)throw new AssertionError("real comparison screenshot absent");java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();Bitmap reduced=Bitmap.createScaledBitmap(screenshot,432,Math.round(screenshot.getHeight()*432f/screenshot.getWidth()),true);reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);String name=a.getResources().getConfiguration().fontScale>1.3f?"large_real_ai":"normal_real_ai";for(int offset=0,index=0;offset<encoded.length();offset+=3000,index++)android.util.Log.i("LudoVisual","VISUAL "+name+" "+index+" "+encoded.substring(offset,Math.min(offset+3000,encoded.length())));screenshot.recycle();reduced.recycle();
+  String unchanged=settings.load().toString();
+  runOnMainSync(()->{View button=find(real.getWindow().getDecorView(),"Esamina dati locali");if(button==null||!button.isEnabled())throw new AssertionError("inspection unavailable while AI OFF");button.performClick();});
+  android.view.accessibility.AccessibilityNodeInfo choice=waitForNode("Organizer Catan",true);
+  if(!choice.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))throw new AssertionError("saved announcement cannot be inspected");
+  waitForNode("Solo organizer; descrizione locale",false);waitForNode("Kosmos",false);
+  capture(a.getResources().getConfiguration().fontScale>1.3f?"large_local_evidence":"normal_local_evidence");
+  sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);waitForIdleSync();
+  if(!unchanged.equals(settings.load().toString()))throw new AssertionError("inspection mutated private cache/review/request state");
+  if(!AiBetaRealListings.current(getTargetContext(),snapshot))throw new AssertionError("inspection changed catalog");
   runOnMainSync(()->find(real.getWindow().getDecorView(),"Segna confronto come revisionato").performClick());
   boolean reviewed=false;for(int i=0;i<50;i++){if(snapshot.localKey().equals(settings.load().optString("real_review_key"))){reviewed=true;break;}Thread.sleep(100);}if(!reviewed)throw new AssertionError("explicit review not persisted");
   if(!AiBetaRealListings.current(getTargetContext(),snapshot))throw new AssertionError("review modified catalog rows");

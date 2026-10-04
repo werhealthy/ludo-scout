@@ -17,7 +17,7 @@ public final class AiBetaRealDialog {
  private final Activity activity;
  private final AiBetaSettings settings;
  private final TextView status;
- private final Button prepare, analyze, review;
+ private final Button prepare, analyze, review, inspect;
  private final AlertDialog dialog;
  private AiBetaRealListings.Snapshot snapshot;
  private boolean enabled, validProposal;
@@ -27,12 +27,13 @@ public final class AiBetaRealDialog {
   LinearLayout box=new LinearLayout(a);box.setOrientation(LinearLayout.VERTICAL);
   int pad=Math.round(20*a.getResources().getDisplayMetrics().density);box.setPadding(pad,pad,pad,pad);box.setBackgroundColor(Color.rgb(27,24,39));
   prepare=new Button(a);prepare.setText("Prepara fino a 8 annunci reali");box.addView(prepare);
+  inspect=new Button(a);inspect.setText("Esamina dati locali");inspect.setEnabled(false);box.addView(inspect);
   analyze=new Button(a);analyze.setText("Chiedi proposte AI");analyze.setEnabled(false);box.addView(analyze);
   review=new Button(a);review.setText("Segna confronto come revisionato");review.setEnabled(false);box.addView(review);
   status=new TextView(a);status.setTextColor(Color.rgb(225,223,236));status.setTextSize(15);status.setPadding(0,pad,0,pad);status.setText("Caricamento…");box.addView(status);
   ScrollView scroll=new ScrollView(a);scroll.addView(box);
   dialog=new AlertDialog.Builder(a).setTitle("Annunci reali · confronto AI").setView(scroll).setNegativeButton("Chiudi",null).create();dialog.show();
-  prepare.setOnClickListener(v->prepare());analyze.setOnClickListener(v->analyze());review.setOnClickListener(v->review());
+  prepare.setOnClickListener(v->prepare());inspect.setOnClickListener(v->inspect());analyze.setOnClickListener(v->analyze());review.setOnClickListener(v->review());
   prepare.setEnabled(false);
   AiBetaTestDialog.IO.execute(()->{
    try {
@@ -49,11 +50,37 @@ public final class AiBetaRealDialog {
  public static AlertDialog show(Activity a){return new AiBetaRealDialog(a).dialog;}
  private boolean visible(){return !activity.isFinishing()&&!activity.isDestroyed()&&dialog.isShowing();}
  private void update(AiBetaRealListings.Snapshot next,String message,boolean proposed) {
-  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(message);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);review.setEnabled(idle&&proposed);});
+  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(message);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);inspect.setEnabled(idle&&next!=null&&next.rows.length()>0);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);review.setEnabled(idle&&proposed);});
  }
  private boolean begin(String message) {
   if(!AiBetaTestDialog.BUSY.compareAndSet(false,true))return false;
-  prepare.setEnabled(false);analyze.setEnabled(false);review.setEnabled(false);status.setText(message);return true;
+  prepare.setEnabled(false);inspect.setEnabled(false);analyze.setEnabled(false);review.setEnabled(false);status.setText(message);return true;
+ }
+ private void inspect() {
+  final AiBetaRealListings.Snapshot chosen=snapshot;
+  if(chosen==null||!begin("Controllo dei dati locali…"))return;
+  AiBetaTestDialog.IO.execute(()->{
+   JSONObject saved=null;String error=null;final String[] titles=new String[chosen.local.length()],details=new String[chosen.local.length()];
+   try {
+    saved=settings.load();
+    if(!AiBetaRealListings.current(activity,chosen))error="Gli annunci sono cambiati. Prepara nuovamente il confronto prima di esaminarli.";
+    else for(int i=0;i<chosen.local.length();i++){JSONObject row=chosen.local.getJSONObject(i);titles[i]=row.getString("title");details[i]=AiBetaListings.evidence(row);}
+   }catch(Exception e){error="Dati locali non disponibili. Nessuna analisi avviata.";}finally{AiBetaTestDialog.BUSY.set(false);}
+   if(error!=null){update(null,error,false);return;}
+   try {
+    show(chosen,saved);
+    activity.runOnUiThread(()->{
+     if(!visible())return;
+     new AlertDialog.Builder(activity).setTitle("Scegli l’annuncio da esaminare").setItems(titles,(d,which)->{
+      if(!visible())return;
+      TextView text=new TextView(activity);text.setText(details[which]);text.setTextSize(16);text.setTextColor(Color.rgb(225,223,236));text.setTextIsSelectable(true);
+      int pad=Math.round(20*activity.getResources().getDisplayMetrics().density);text.setPadding(pad,pad,pad,pad);text.setBackgroundColor(Color.rgb(27,24,39));
+      ScrollView scroll=new ScrollView(activity);scroll.addView(text);
+      new AlertDialog.Builder(activity).setTitle("Evidenze locali").setView(scroll).setNegativeButton("Chiudi",null).show();
+     }).setNegativeButton("Chiudi",null).show();
+    });
+   }catch(Exception e){update(chosen,"Confronto non disponibile. Catalogo invariato.",false);}
+  });
  }
  private void prepare() {
   if(!begin("Preparazione degli annunci locali…"))return;
