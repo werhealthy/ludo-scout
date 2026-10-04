@@ -1,0 +1,185 @@
+# Free-plan cloud build. Approval prevents builds on every push.
+# Project variables: BGG_TOKEN, ANDROID_DEBUG_KEYSTORE_BASE64,
+# FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_APP_ID, FIREBASE_TESTERS.
+version: 2.1
+jobs:
+  build-and-distribute:
+    docker:
+      - image: cimg/android:2025.01-node
+    resource_class: medium
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2048m -Dorg.gradle.workers.max=2"
+    steps:
+      - checkout
+      - run:
+          name: Validate configuration and preserve signing identity
+          command: |
+            set -euo pipefail
+            for variable in BGG_TOKEN ANDROID_DEBUG_KEYSTORE_BASE64 FIREBASE_SERVICE_ACCOUNT_JSON FIREBASE_APP_ID FIREBASE_TESTERS; do
+              test -n "${!variable:-}" || { echo "Missing project variable: $variable"; exit 1; }
+            done
+            java -version
+            test -d "$ANDROID_HOME/platforms/android-35"
+            test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+            mkdir -p "$HOME/.android"
+            umask 077
+            printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+            expected=C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710
+            actual=$(keytool -exportcert -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android | sha256sum | cut -d ' ' -f 1 | tr '[:lower:]' '[:upper:]')
+            test "$actual" = "$expected" || { echo "Signing key does not match installed Ludo"; exit 1; }
+      - restore_cache:
+          keys:
+            - gradle-v1-{{ checksum "app/build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - run:
+          name: Existing Android beta regression checks
+          command: |
+            set -euo pipefail
+            mkdir -p .regression-build
+            python3 regression/ludo_visual_universe.py
+            python3 regression/featured_pedestal_v51296.py
+            python3 regression/home_engine_reference_v51295.py
+            python3 regression/engine_join_plan_v51294.py
+            python3 regression/home_render_v51290.py
+            python3 regression/discover_visual_polish_v51276.py
+            python3 regression/queue_liveness_diagnostics_v51277.py
+            python3 regression/engine_performance_metrics_v51279.py
+            node --test regression/catalog_identity_context.test.js regression/catalog_identity_assets.test.js
+            node --test regression/vinted_browser_capture.test.js
+            python3 regression/vinted_browser_redesign.py
+            python3 regression/ludo_fullscreen_pet.py
+            python3 regression/ludo_primary_search.py
+            python3 regression/ludo_pet_rooms.py
+            python3 regression/ludo_exploration.py
+            python3 regression/ludo_journey_layout.py
+            python3 regression/browser_page_progress.py
+            python3 regression/browser_engine_intake.py
+            python3 regression/browser_engine_boundary.py
+            python3 regression/engine_local_activity.py
+            python3 regression/startup_reset_disabled.py
+            python3 regression/photo_cache_reuse.py
+            python3 regression/radar_reliability.py
+            python3 regression/db_contention_trace.py
+            python3 regression/game_preferences_v512110.py
+            python3 regression/product_customization_v512113.py
+            python3 regression/premium_scene_v512111.py
+            python3 regression/home_box_v512109.py
+            python3 regression/ludo_pet_v512108.py
+            python3 regression/ludo_monthly_overview.py
+            python3 regression/ludo_offers_shelves.py
+            python3 regression/library_data_v512107.py
+            python3 regression/library_write_ui_v512107.py
+            python3 regression/home_media_v512119.py
+            python3 regression/engine_reset_evidence.py
+            python3 regression/engine_diagnostic_local_only.py
+            python3 regression/engine_live_counts.py
+            python3 regression/engine_overview_presentation.py
+            python3 regression/product_pull_motion.py
+            python3 regression/refresh_end_pull.py
+            python3 regression/product_gesture_v512106.py
+            python3 regression/market_navigation_v512105.py
+            javac -d .regression-build app/src/main/java/it/vintedaffari/app/EnginePerformanceMetrics.java regression/EnginePerformanceMetricsRegression.java
+            java -cp .regression-build EnginePerformanceMetricsRegression
+            python3 regression/discover_category_sql_v51284.py
+            python3 regression/engine_intake_sql_v51294.py
+            python3 regression/engine_pipeline_sql_v51286.py
+            python3 regression/performance_stability_v5124.py
+            python3 regression/bgg_identity_provenance_v5125.py
+            python3 regression/historical_bgg_revalidation_v5126.py
+            python3 regression/bgg_local_index_performance_v5128.py
+            python3 regression/historical_bgg_drain_scheduling_v5129.py
+            python3 regression/bgg_fuzzy_index_performance_v51210.py
+            python3 regression/bgg_state_monotonicity_v51211.py
+            python3 regression/bgg_review_write_accountability_v51212.py
+            python3 regression/bgg_cold_index_singleflight_v51213.py
+            python3 regression/bgg_version_affinity_v51214.py
+            python3 regression/bgg_sqlite_state_machine_v51215.py
+            python3 regression/process_crash_diagnostics_v51215.py
+            python3 regression/engine_ui_clarity_v51257.py
+            python3 regression/vinted_alternate_title_photo_proof_v51258.py
+            python3 regression/startup_processing_lease_recovery_v51259.py
+            python3 regression/vinted_missing_breakdown_v51260.py
+            python3 regression/catalog_visibility_breakdown_v51261.py
+            python3 regression/catalog_canonical_bridge_v51262.py
+            python3 regression/catalog_bridge_type_evidence_v51262.py
+            python3 regression/catalog_bridge_backfill_v51262.py
+            python3 regression/opened_vinted_verification_priority_v51263.py
+            python3 regression/vinted_request_efficiency_v51264.py
+            python3 regression/manual_vinted_ui_anr_v51265.py
+            python3 regression/engine_epoch_progress_stability_v51216.py
+            python3 regression/engine_acquisition_crash_stability_v51217.py
+            python3 regression/workmanager_mainthread_stability_v51218.py
+            python3 regression/queue_stall_recovery_v51267.py
+            python3 regression/queue_single_owner_engine_order_v51219.py
+            python3 regression/engine_runtime_cross_process_v51220.py
+            python3 regression/product_turnaround_sla_trust_v51221.py
+            python3 regression/bgg_exact_index_no_timeout_review_v51222.py
+            python3 regression/review_fuzzy_queue_truth_v51223.py
+            python3 regression/engine_adaptive_timing_v51224.py
+            python3 regression/engine_adaptive_fairness_v51225.py
+            python3 regression/recovery_review_price_gates_v51226.py
+            python3 regression/queue_liveness_catalog_truth_v51227.py
+            python3 regression/regression_deferred_run_truth_v51278.py
+            python3 regression/queue_retry_diagnostics_v51273.py
+            python3 regression/queue_notification_truth_v51274.py
+            python3 regression/catalog_freshness_bundle_health_eta_v51228.py
+            python3 regression/motore_network_priority_v51229.py
+            python3 regression/engine_recovery_truth_v51230.py
+            python3 regression/review_actions_bundle_memory_v51231.py
+            python3 regression/sold_reconcile_next_action_v51232.py
+            python3 regression/catalog_truth_card_layout_bundle_memory_v51233.py
+            python3 regression/global_rating_sweep_v51234.py
+            python3 regression/pricing_bundle_decisions_v51235.py
+            python3 regression/safe_mode_quality_scan_v51268.py
+            python3 regression/single_owner_startup_maintenance_v51269.py
+            python3 regression/ux_phase2_v51237.py
+            python3 regression/home_manual_sold_v51238.py
+            python3 regression/ux_system_v1_v51239.py
+            python3 regression/connected_product_graph_v51240.py
+            python3 regression/invisible_interaction_v51241.py
+            python3 regression/ai_real_listings.py
+            python3 regression/catalog_bundle_workflow.py
+      - run:
+          name: Unit tests and signed APK
+          command: |
+            set -euo pipefail
+            chmod +x gradlew
+            # Reserve a higher range than the last GitHub beta versionCode.
+            export LUDO_VERSION_CODE=$((2000 + CIRCLE_BUILD_NUM))
+            ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
+            expected=C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710
+            actual=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:lower:]' '[:upper:]')
+            test "$actual" = "$expected"
+      - save_cache:
+          key: gradle-v1-{{ checksum "app/build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          paths:
+            - ~/.gradle/caches
+            - ~/.gradle/wrapper
+      - run:
+          name: Distribute to existing Firebase testers
+          command: |
+            set -euo pipefail
+            umask 077
+            credential_file=$(mktemp)
+            trap 'rm -f "$credential_file" "$HOME/.android/debug.keystore"' EXIT
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$credential_file"
+            export GOOGLE_APPLICATION_CREDENTIALS="$credential_file"
+            npx --yes firebase-tools@latest appdistribution:distribute app/build/outputs/apk/debug/app-debug.apk \
+              --app "$FIREBASE_APP_ID" --testers "$FIREBASE_TESTERS" \
+              --release-notes "Ludo beta - CircleCI #$CIRCLE_BUILD_NUM ($CIRCLE_SHA1)"
+      - run:
+          name: Remove temporary credentials
+          when: always
+          command: rm -f "$HOME/.android/debug.keystore"
+workflows:
+  manual-beta:
+    jobs:
+      - approve-beta-build:
+          type: approval
+          filters:
+            branches:
+              only:
+                - beta
+                - work/circleci-beta
+      - build-and-distribute:
+          requires:
+            - approve-beta-build
