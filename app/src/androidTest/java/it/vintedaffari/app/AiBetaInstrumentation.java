@@ -33,6 +33,7 @@ public final class AiBetaInstrumentation extends Instrumentation {
  }
  @Override public void onStart(){Bundle result=new Bundle();Activity a=null;try{
   AiBetaRealChecks.run();
+  AiEngineChecks.run(getTargetContext());
   String fixture;try(java.io.InputStream in=getTargetContext().getAssets().open("ai-beta/sample8.json");java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[2048];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);fixture=new org.json.JSONArray(out.toString("UTF-8")).toString();}AiBetaSettings settings=new AiBetaSettings(getTargetContext());org.json.JSONObject saved=new org.json.JSONObject().put("enabled",false).put("last_display","Prova disattivata · nessuna chiamata AI").put("last_display_key",AiBetaProtocol.fingerprint(fixture,AiBetaProtocol.MODEL,AiBetaProtocol.CONTRACT)).put("last_display_at",System.currentTimeMillis());settings.save(saved);if(settings.load().optBoolean("enabled",true))throw new AssertionError("disabled setting lost");
   if(!new java.io.File(getTargetContext().getNoBackupFilesDir(),"ai-beta.private").isFile())throw new AssertionError("settings not excluded from backup");
   a=startActivitySync(new Intent().setClassName(getTargetContext(),"it.vintedaffari.app.MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));final Activity screen=a;AtomicReference<AlertDialog> opened=new AtomicReference<>();runOnMainSync(()->opened.set(AiBetaTestDialog.show(screen)));AlertDialog dialog=opened.get();

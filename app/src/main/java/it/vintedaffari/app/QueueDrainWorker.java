@@ -30,6 +30,7 @@ public final class QueueDrainWorker extends Worker {
     @NonNull @Override public Result doWork() {
         Context context = getApplicationContext();
         QueueWorkScheduler.ensureRecovery(context);
+        AiEngineRunner.schedule(context);
         // During service cold start there is no safe second owner yet. Once startup has finished,
         // however, RUNNING alone is not proof of liveness: Android can leave the Service process alive
         // while a consumer/control executor is stalled. WorkManager therefore checks SQLite-backed lane

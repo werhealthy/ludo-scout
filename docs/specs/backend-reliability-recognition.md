@@ -1,5 +1,54 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Automatic AI engine: implementation and verification scope
+The owner explicitly authorized autonomous integration, using existing enabled
+configuration with an explicit automatic-engine label. No separate runtime opt-in
+or default credential was invented; unconfigured/disabled phones remain disabled.
+Server deployment remains OFF and its accounting is not reset. Current authenticated
+service status and phone execution are not inferred from fake transport tests.
+
+Session, SQLite adapter and separate leased runner check current ACTIVE catalog.
+AI negative category discrepancies can withdraw automatic OK trust, never promote
+identity/quality or alter BGG/pricing/preferences. Existing user overrides win.
+Reanalysis preserves a prior AI hold only for unchanged title/brand/BGG; a different
+product or identity follows existing recognition. This is asynchronous additional
+checking; first-display prevalidation and100%/99% remain unverified.
+
+Verification ledger:
+- Actual local policy test failed when the automatic policy was missing, then10checks passed.
+- Existing57offline tests and6contained-identity tests passed locally.
+- First native Android run37229768667/job111516801865 compiled successfully,
+  then failed with "automatic reanalysis erased the AI hold". This is an observed
+  failure, not a passing run. The targeted transaction/upsert preservation fix follows.
+- Independent review found exhausted-budget recovery, mixed-cache resubmission and
+  terminal-failure head-of-line blocking. Native regressions are added before the
+  fix commit, with server request/cache ordering and FAILED semantics confirmed in
+  services/ai-beta/src/budget-object.js. Terminal provider failures are charged and
+  remain unresolved; they cannot monopolize unrelated work. New reservations stay
+  blocked at100; same-ID recovery can retrieve a previously reserved result.
+- Cached-only checks preserve the original proposal expiry and never allocate a
+  new remote request. Cached results are processed separately from uncached groups.
+- Cross-process behavior and actual phone lifecycle were reviewed from code;
+  instrumented SQLite/JSON tests do not prove physical phone performance.
+
+Native review regressions were then executed against the unfixed session:
+run37230313755/job111518417368 compiled successfully and failed with all three
+independent assertions: reserved request cannot recover at budget100; cached row
+consumed a new remote batch; terminal failure blocks unrelated work. Legacy AI hold
+preservation passed far enough to reach these assertions. Final fixes follow these
+observed failures; final green Android run pending.
+
+## Automatic AI engine implementation — approved autonomous execution, 2026-10-04
+
+Goal: integrate the existing title/brand AI service into foreground and recovery queue owners, automatically checking current ACTIVE listings. No schema, dependency, service, budget or pricing changes.
+Architecture: AiEngineSession is an injectable bounded pass; AiEngineRunner owns a separate encrypted journal and a cross-process file lease. Existing enabled configuration authorizes the owner-requested automatic checks; UI explicitly labels automatic engine use. Server OFF and malformed/exhausted budget prevent submission.
+Tasks:
+- [ ] Policy and session tests RED→GREEN: OFF, budget100, changed input, cached IDs, uncertain/negative proposal, malformed response and transport ambiguity; maximum8 rows/4096bytes, same pending ID on recovery.
+- [ ] Android adapter and queue hooks: real SQLite checks before and within transactional holds; only ACTIVE legacy OK associations may become MATCH_UNCERTAIN. USER_CONFIRMED, hidden/sold, quality filters, BGG identities, prices, preferences and manual overrides protected. AI agreement never promotes a result. Raw context stays local.
+- [ ] Run existing offline/unit/Android AI instrumentation, independent whole-branch review, merge and signed beta distribution; record actual results in STATE.
+Review focus: cross-process duplicate submission, crash after reservation, description edit outside excerpt, manual confirmation between submit/apply, historical lookup overwrite. Tests use fake transport: zero provider calls. No100%/99% claim.
+Ruling: existing enabled owner configuration is reused under the explicit request to integrate AI automatically; label changes expose the behavior and disabling the existing switch stops future passes. Service OFF remains authoritative. All uncertainty is retained; proposals cannot certify BGG or language.
+
 ## Backend — identity context guard174 verified and distributed, 2026-10-04
 
 PR262 HEAD09aee5883f0f6434f680e90be4acc2ee61897779 merged squash3029ca0625656329ba1316a58ef0d0eb34122549 implements a contained-name identity guard in catalog-match.js. When the seller title contains a complete BGG name but leaves distinctive words unexplained, publisher boosts and score margins cannot authorize automatic matching. Candidates remain available; exact names/authoritative aliases, marketplace fillers, known edition modifiers and manual search preserve their existing routes. No title blacklist or hardcoded product-to-BGG reassignment. This prevents future partial identities from reaching the bridge's priced game result; it does not repair historical saved associations.

@@ -67,8 +67,10 @@ public final class QueueKeepAliveService extends Service {
             DealDatabase.ObservationSession activeRun=db==null?null:db.activeObservationSession();
             recordEnginePerformance(activeRun,now);
             maybeNotifyNextRunComplete(now);
+            AiEngineRunner.schedule(getApplicationContext());
             int active=market==null?1:market.jobSummary().active()+market.bggMatchRequiredCount()+market.deferredVintedReadyCount(now)+market.historicalBggRevalidationPendingCount();
             if(activeRun!=null)active++;
+            if(AiEngineRunner.hasPending())active++;
             if(active<=0){if(++idleNotificationPulses>=3){stopSelf();return;}}else idleNotificationPulses=0;
             NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);nm.notify(NOTIFICATION_ID,notification());
         }catch(Throwable t){Log.w(TAG,"notification/supervisor pulse failed",t);ProcessCrashJournal.recordHandled(QueueKeepAliveService.this,"queue:pulse",t);}
