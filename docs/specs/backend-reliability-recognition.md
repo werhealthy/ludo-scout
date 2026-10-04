@@ -1,5 +1,29 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## PROPOSTA — servizio AI beta protetto, 2026-10-04 (da approvare)
+
+Obiettivo: prima provaAI manuale nell'app con controllo centralizzato di accesso e consumo. Nuovo servizioCloudflareWorkersFree + singoloDurableObjectSQLite globale,GeminiFreeTier; nessuna carta/billing/WorkersPaid. FirebaseAppDistribution è distribuzioneAPK,non autenticazione/runtime: app/build.gradle non contieneFirebaseAuth; repositorysearchFirebaseAuth/wrangler senza risultati,non attestazioneinventario esternoaccount.
+
+Alternatives: FirebaseFunctions richiedeBlaze perdeploy e quindi collegamentobilling; chiamataGemini direttaAPK esporrebbechiave econsumo senza controllocentrale. PreferireCloudflareFree perbeta privata; documentazioneconsultata2026-10-04: https://developers.cloudflare.com/durable-objects/platform/pricing/ (SQLiteFree,overquota→errori), https://developers.cloudflare.com/workers/platform/limits/ , https://developers.cloudflare.com/workers/configuration/secrets/ , https://firebase.google.com/docs/functions/get-started . Nessun account/progetto creato, pianoaccountCloudflare non verificato.
+
+Architettura proposta:
+- POST /v1/classify riceve1..8recordsoloID/titolo/brand,requestID. Payloadlimiti4096bytes,output2048tokens,modello/contrattofissi,search/foto/URL esclusi. RequestID riutilizzato con payloaddiverso→409;contenuto/modello/contrattoidentici→cache,nessunnuovotrasporto.
+- Beta privata: credenziale casuale distinta perdispositivo,provisionata manualmente dal proprietario,revocabile; nientecredenzialeuniversale nell'APK. Server conserva digest,client protegge conAndroidKeystore e non esporta/logga. Non è attestazionehardware/appintegrity; una credenzialecopiata può abusare della quota finché revocata. Adminbudget/revoca daCloudflareautenticato,mai endpointpubblico contokenclient. Nessun nuovo accountutente oFirebaseAuth perbeta; architettura pubblica futura separata.
+- Worker verificaautorizzazione eformatoprima di routing;unicoDO globale perbudget/idempotenza/cache conchiave stabile,nonoggettoperdispositivo. Prenotazioneatomica durabilePRIMAfetchGemini,no rete entrotransaction;sepersistenzafallisce0call. Concurrentduplicate vedeIN_FLIGHT,non reinvia. REQUEST_UNKNOWN/timeout/fallimento nonrimborsa riserva,no retryautomatico/fallback.
+- GeminiSecret soloambienteserver,neitherrepo norAPK. Killglobalsospende nuoveprenotazioni;inflightgiàinviata puòterminare. Timeout30s,circuitstop429/503,una solacallprovider perrequest,nessunjob/cron/backgroundprovider. Logs soliIDstato/HTTPnumerico/usage,noheader/key/titoli/risposte.
+- Cacheproposte7giorni,chiavecontenutohashincluseversioni;storicoidempotenza/budgetconservato almeno meseattuale+precedente,mai azzerato perliberarequota. Hashnonanonimizza titoli comuni; risultatiaccessibili soloauth. Nessunprezzo/seller/descrizione/foto trasmessi.
+- ClientAndroidprima fase soltantoazione manuale di prova eproposteinombra. Niente bonificaautomatica,pricing/BGG/lingua/override invariati. Timeout/errori mostranoattesa,nonfallbackpagato. Backend/app opt-inOFF predefinito. Budgetfallito→BUDGET_BLOCKED;kill→DISABLED;authfallita→401/403;cache→CACHED;risultatovalido→PROPOSAL. Le56proposteoffline non diventanoautorizzazioneautomatica.
+- Nessunaschemamigrationapp perprimaprova; separato storageprivato di configurazione/token/proposte,con cancellazione controllata,noncatalogwrites.
+
+Decisione di budget proposta daapprovare insiemeall'architettura: tetto100callprovider/mese TOTALI benchmark+runtime e1EUR/mese di riservaconservativa(0.01/call),massimo8record/call. Le8callgiàriservateottobre importateprimadelprovider,quindi92callmassime residue,non100aggiuntive. Tetto perprovamanuale1call/8annunci;batchglobale<=0.10EUR. Nessunariclassificazione9705annunci. Budgetmonetarioè riserva/stimata envelope,noninvoice; tariffe/modelcontractversionati,rivalidatiprima dipaid. Paidrestabloccato finoapprovazione/verificheprovider;no garanziadifatturaassoluta daalertsolo. Il tetto8attualerestaeffettivo finchépropostanonapprovata econtrolliimplementati.
+
+Acceptance primaattivazione:
+1. Testservizioreale localeCloudflare di concorrenza:ultimo slot conteso→unasolafetch;duplicate/corruptstorage/disabled/invalidtoken→0fetch;riavvio conserva budget;import8prenotazioni preserva limiti.
+2. Modelvalidation/parsing/inputbounds/outputbounds/errors/timeouts conservano riserva,nessunretry;runtimecodepreventschargequandoFreeTierattestationmancante o paidnotapproved. Chiave/key/clienttokenmai nei log/repo/APK.
+3. AndroidCI/signedFirebase eprovatelefono separati:propostemanuali soltanto,persistenzaconfigurazione,budgetstatus eerrorirendered. DeployprimoOFF,verificaFreeTieraccountCloudflare/Geminiprogettoesatto;una prova8annunci solo dopo abilitaesplicita. Nessuna chiamataAI/deploy eseguita perquestaproposta.
+
+Prossimaazione dopoapprovazione: pianoimplementazione servizio+client,inrepo su backend/ dedicato;non altri tooloffline. Frontend7/backend6 aperti.
+
 ## Backend AI — adattatore offline delle proposte integrato, 2026-10-04
 
 PR235 backend/ai-shadow-proposals da beta52b57acd; HEADb338bb9661cb1efd62c471c1e96127536f9f6929, squashaa3799181e9ca3df0af35ca88fe7511eae70c73e. Tool tools/classification_proposals.py consuma samplecorrente/source-input/answers/modello/contratto da filelocali; titolo ebrand esatti richiesti per riuso. Content keySHA256 vincolaID/titolo/brand/modello/contratto; associazione sorgente/modello/contratto dichiarata operatore,non attestata. IDduplicati/estranei,confidenceinvalida,claimBGG/lingua rifiutati. Confidencenonriportata=null. Nuovi titoli/brand→STALE_INPUT senza proposta;assenza risposta→MISSING_ANSWER. preserved_type conserva sottotipo locale;runtime_type=null,needs_review=true,apply_authorized=false sempre. Nessunnetwork/key/ledger/database/apply.
