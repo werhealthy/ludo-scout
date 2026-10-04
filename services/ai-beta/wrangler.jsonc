@@ -1,0 +1,8 @@
+{
+ "name":"ludo-ai-beta","main":"src/worker.js","compatibility_date":"2026-07-30",
+ "workers_dev":true,
+ "durable_objects":{"bindings":[{"name":"BUDGET","class_name":"BudgetObject"}]},
+ "migrations":[{"tag":"v1","new_sqlite_classes":["BudgetObject"]}],
+ "vars":{"ENABLED":"false","FREE_TIER_VALID_UNTIL":"0"},
+ "observability":{"enabled":false}
+}
