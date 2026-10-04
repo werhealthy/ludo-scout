@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Backend AI171 — evidenze locali distribuite, 2026-10-04 18:28 Europe/Rome
+
+PR256 HEAD0d860201e42a55e066253b5d10a31ea5384ec796 integrata squashf9e91fc782fe39927b5a58ec7f03e73b659efc19. Beta201/run37216643534/job111478388452 SUCCESS:5.12.171-ai-local-evidence(1000201). Certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato16:27:39.587UTC; uploadFirebase16:28:23.298UTC e distinta distribuzione tester/gruppi16:28:24.306UTC. Release43nu72rmr5mio, artifact11308453573. Aggiornare daAppTester senza cancellare dati.
+
+Impostazioni→TestAIbeta→Confronta annunci salvati→Prepara→Esamina dati locali: selezione dell’annuncio e dettaglio di marca dichiarata, testo acquisito, classificazione locale e BGG salvato. Disponibile conAIoff; ricontrollare snapshot prima dell’apertura. Estratto massimo2000Unicodecodepoint, assenza/troncamento espliciti; input_key continua a coprire testo completo. Dati nel gruppo preparato, non refreshcontinuo del dettaglio aperto. Snapshot170 privo di estratto richiede nuova preparazione; payload ID/titolo/brand e chiavecacheAI invariati, risposta corrispondente riusabile senza nuovo trasporto. Dettaglio non salva revisione o correzioni.
+
+CI finale37216188898 SUCCESS su0d860201: regressioni complete/JUnit/Java/reviewAPK; Android111477064727100/200% e sei catture finali ispezionate, dettagli leggibili/scrollabili. SQLite/JSON/classificatore reali: testo assente, limiteUnicode, cambiamento oltre estratto, legacyinvalidato/cachekeypreservata, OFFinspection e settings/catalogo/job invariati; cache/review/requestID conservati. Review indipendente senza blocchi. Upgrade completo→prepare→reuse non eseguito in un unico testUI, coperto separatamente da fixturelegacy/key e cacheUI. Java locale indisponibile; SQL locale passato. RED37214699540 riproduce estratto assente;37215117718 verde ma cattura200 mostrava parent, non accettata;37215852722 FAIL focusgate senza flagtest, corretto con UiAutomationwindowretrieval. Diff4854382b→0d860201 solo instrumentazione: prodotto reviewato invariato.
+
+MainActivity/MarketStore/DealDatabase preservati; nessuna modifica a schema/classificatore/soglie/pricing/BGG/lingua/override/preferiti/queue/servizio/secrets/accounting. Nessuna provider call o nuova attivazioneAI. Servizio lasciatoOFF dal deploy37214173178; nessun nuovoGETstatus autenticato qui. Ultimo10/100 è risposta e ripetizione confermata dall’utente, non counterpostOFF riletto. Catalogo invariato; nessuna accuracyglobale/identitàBGG/accettazione telefono dichiarata. Classificazione diSogni per Bambini Ribelli rimane divergenza da esaminare, non groundtruth.
+
+Frontend7/backend6 gruppi aperti. Unico prossimo passo: nella171 preparare il gruppo e aprire Esamina dati locali per un annuncio divergente, riportando screenshot del confronto e del dettaglio (marca/testo acquisito), senza riattivareAI o correggere catalogo. Non reinserire endpoint/token e non fare seed/reset/bonifica9705.
+
+
 ## Backend AI — trial reale chiuso OFF, 2026-10-04 17:46 Europe/Rome
 
 Il proprietario conferma la ripetizione del medesimo gruppo con 10/100 invariato e autorizza il passo successivo. Evidenza della ripetizione: conferma utente; il numero nel risultato cached è storico, non una nuova lettura autenticata del budget server.
