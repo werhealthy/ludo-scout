@@ -10,9 +10,10 @@ final class LudoCharacterRenderer {
  private Node[] drawNodes=new Node[0],transformNodes=drawNodes;
  private float sourceWidth,sourceHeight;
  private static final class Node {
-  final LudoPart part;final Bitmap image,alternative;final Matrix transform=new Matrix(),local=new Matrix();final RectF bounds;
+  final LudoPart part;final Bitmap image,alternative;final Matrix transform=new Matrix(),local=new Matrix();final RectF bounds,alternativeBounds;
   Node parent;int depth;
-  Node(LudoPart part,Bitmap image,Bitmap alternative){this.part=part;this.image=image;this.alternative=alternative;bounds=new RectF(part.x,part.y,part.x+part.width,part.y+part.height);}
+  Node(LudoPart part,Bitmap image,Bitmap alternative){this.part=part;this.image=image;this.alternative=alternative;bounds=new RectF(part.x,part.y,part.x+part.width,part.y+part.height);alternativeBounds=new RectF(bounds);
+   if(alternative!=null){float scale=Math.min(part.width/alternative.getWidth(),part.height/alternative.getHeight());float w=alternative.getWidth()*scale,h=alternative.getHeight()*scale;alternativeBounds.set(bounds.centerX()-w/2,bounds.centerY()-h/2,bounds.centerX()+w/2,bounds.centerY()+h/2);}}
  }
  void setFallback(Bitmap bitmap){fallback=bitmap;}
  void setParts(List<LudoPart> parts,Map<String,Bitmap> images,float width,float height){
@@ -47,7 +48,7 @@ final class LudoCharacterRenderer {
    if(image==null||image.isRecycled())continue;
    int layer=canvas.save();
    if(node.part.id.startsWith("spiral_")&&node.parent!=null){canvas.concat(node.parent.transform);canvas.clipRect(node.parent.bounds);canvas.concat(node.local);}else canvas.concat(node.transform);
-   canvas.drawBitmap(image,null,node.bounds,paint);canvas.restoreToCount(layer);
+   canvas.drawBitmap(image,null,image==node.alternative?node.alternativeBounds:node.bounds,paint);canvas.restoreToCount(layer);
   }
   canvas.restoreToCount(saved);
  }

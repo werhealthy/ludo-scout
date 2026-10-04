@@ -1600,7 +1600,7 @@ private void showFilterSheet(){
         for(int i=0;i<keys.length;i++){final String key=keys[i];boolean selected=key.equals(room);TextView target=text(labels[i],14,selected?TEXT:MUTED,selected?Typeface.BOLD:Typeface.NORMAL);target.setGravity(Gravity.CENTER);target.setMinHeight(dp(48));target.setPadding(dp(4),dp(6),dp(4),dp(6));target.setSelected(selected);target.setBackground(round(selected?SURFACE2:Color.TRANSPARENT,12,selected?1:0,OUTLINE));target.setContentDescription(labels[i]+(selected?", selezionata":""));target.setOnClickListener(v->switchLudoRoom(key));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)rp.leftMargin=dp(8);ludoSections.addView(target,rp);}syncPetVisibility();
     }
 
-    private LudoIllustratedRig roomIllustratedRig;
+    private volatile LudoIllustratedRig roomIllustratedRig;
     private void loadLudoRoomActor(LudoPetView actor,int resource){
         galleryNet.execute(()->{Bitmap bitmap=sceneAsset(resource);
             LudoIllustratedRig rig=roomIllustratedRig;if(rig==null)rig=LudoIllustratedRig.load(getResources());final LudoIllustratedRig loaded=rig;

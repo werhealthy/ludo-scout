@@ -88,14 +88,19 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   }catch(Exception e){throw new RuntimeException(e);}});
  }
 
+ private void awaitRoomRig(Activity a)throws Exception{
+  long deadline=android.os.SystemClock.uptimeMillis()+5000;
+  while(android.os.SystemClock.uptimeMillis()<deadline){final boolean[] ready={false};runOnMainSync(()->{try{ready[0]=get(a,"roomIllustratedRig")!=null;}catch(Exception e){throw new RuntimeException(e);}});if(ready[0])return;android.os.SystemClock.sleep(25);}
+  throw new AssertionError("room did not load complete illustrated rig");
+ }
  private void rigContracts(Activity a)throws Exception{
   LudoIllustratedRig rig=LudoIllustratedRig.load(a.getResources());if(rig==null||rig.parts.size()!=14||rig.images.size()!=15)throw new AssertionError("incomplete real illustrated rig");
   LudoCharacterRenderer renderer=new LudoCharacterRenderer();renderer.setParts(rig.parts,rig.images,1000,1040);
   Bitmap target=Bitmap.createBitmap(1000,1040,Bitmap.Config.ARGB_8888);android.graphics.Canvas canvas=new android.graphics.Canvas(target);android.graphics.RectF bounds=new android.graphics.RectF(0,0,1000,1040);
   LudoPose pose=new LudoPose();LudoPose.sample(0,-1,false,0,0,pose);renderer.draw(canvas,bounds,pose,false);
   if(android.graphics.Color.alpha(target.getPixel(350,520))<200||android.graphics.Color.alpha(target.getPixel(500,900))<200)throw new AssertionError("rig face/body not assembled");
-  int open=target.getPixel(300,440);pose.eyeOpen=0;target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);
-  if(open==target.getPixel(300,440))throw new AssertionError("blink did not change eye region");
+  int open=target.getPixel(350,450);pose.eyeOpen=0;target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);
+  if(open==target.getPixel(350,450))throw new AssertionError("blink did not change eye region");
   target.recycle();for(Bitmap image:rig.images.values())image.recycle();
  }
  private void rendererContracts(){
@@ -179,6 +184,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      int[] after=new int[2];footer.getLocationInWindow(after);if(after[1]!=pos[1])throw new AssertionError("search scrolls out of view");
      if(text(nav,"Bundle")!=null||((ViewGroup)nav).getChildCount()!=3)throw new AssertionError("Bundle still in main navigation");
     }catch(Exception e){throw new RuntimeException(e);}});
+    if(LudoRoomState.EXPLORE.equals(room))awaitRoomRig(a);
     if(LudoRoomState.EXPLORE.equals(room))runOnMainSync(()->{try{motionContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
     if(LudoRoomState.EXPLORE.equals(room))overlayContracts(a);
     capture(a,room);
