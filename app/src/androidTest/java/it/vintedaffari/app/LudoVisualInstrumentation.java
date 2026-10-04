@@ -99,6 +99,19 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   }catch(Exception e){throw new RuntimeException(e);}});
  }
 
+ private void compactFrameContracts(Activity a)throws Exception{
+  LudoRoomFrame stage=(LudoRoomFrame)get(a,"ludoStage");float density=a.getResources().getDisplayMetrics().density;
+  int ow=stage.getWidth(),oh=stage.getHeight(),footer=((View)get(a,"ludoRoomDots")).getHeight();
+  for(int[] size:new int[][]{{700,280},{400,300},{300,400}}){
+   int w=Math.round(size[0]*density),h=Math.round(size[1]*density),inset=Math.round(84*density);
+   stage.setHeightBudget(h);stage.setControlsInset(inset);stage.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));stage.layout(0,0,w,h);
+   View actor=stage.getChildAt(1),commands=stage.getChildAt(3);
+   if(actor.getWidth()<=0||actor.getHeight()<=0)throw new AssertionError("compact actor disappeared");
+   if(commands.getBottom()>h-inset||commands.getRight()>w)throw new AssertionError("compact commands hidden by footer");
+   if(actor.getRight()>commands.getLeft()&&actor.getLeft()<commands.getRight()&&actor.getBottom()>commands.getTop())throw new AssertionError("compact actor behind controls");
+  }
+  stage.setHeightBudget(oh);stage.setControlsInset(footer);stage.measure(View.MeasureSpec.makeMeasureSpec(ow,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(oh,View.MeasureSpec.EXACTLY));stage.layout(0,0,ow,oh);invoke(a,"placeLudoStage");
+ }
  private void awaitRoomBackground(Activity a)throws Exception{
   long deadline=android.os.SystemClock.uptimeMillis()+5000;
   while(android.os.SystemClock.uptimeMillis()<deadline){final boolean[] ready={false};runOnMainSync(()->{try{
@@ -214,6 +227,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
     if(LudoRoomState.EXPLORE.equals(room))awaitRoomRig(a);
     if(LudoRoomState.EXPLORE.equals(room))runOnMainSync(()->{try{motionContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
     if(LudoRoomState.EXPLORE.equals(room))overlayContracts(a);
+    runOnMainSync(()->{try{compactFrameContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
     awaitRoomBackground(a);
     capture(a,room);
     runOnMainSync(()->{try{

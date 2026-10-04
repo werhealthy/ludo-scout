@@ -14,9 +14,11 @@ final class LudoRoomFrame extends FrameLayout {
   int h=Math.max(1,heightBudget>0?heightBudget:MeasureSpec.getSize(heightSpec));
   View commands=getChildAt(3),chrome=getChildAt(4);
   compact=h-controlsInset<Math.round(360*getResources().getDisplayMetrics().density);
-  android.widget.LinearLayout sections=(android.widget.LinearLayout)((android.widget.LinearLayout)commands).getChildAt(1);
-  ((android.widget.LinearLayout)commands).getChildAt(0).setVisibility(compact?GONE:VISIBLE);
-  for(int i=0;i<sections.getChildCount();i++){android.widget.LinearLayout target=(android.widget.LinearLayout)sections.getChildAt(i);target.getChildAt(1).setVisibility(compact?GONE:VISIBLE);}
+  android.widget.LinearLayout sections=(android.widget.LinearLayout)((android.widget.LinearLayout)commands).getChildAt(0);
+  for(int i=0;i<sections.getChildCount();i++){android.widget.LinearLayout target=(android.widget.LinearLayout)sections.getChildAt(i);target.getChildAt(1).setVisibility(compact?GONE:VISIBLE);
+   int side=Math.round((compact?48:56)*getResources().getDisplayMetrics().density);
+   android.view.ViewGroup.LayoutParams circle=target.getChildAt(0).getLayoutParams();circle.width=side;circle.height=side;target.getChildAt(0).setLayoutParams(circle);
+   int px=Math.round((compact?0:4)*getResources().getDisplayMetrics().density),py=Math.round((compact?0:6)*getResources().getDisplayMetrics().density);target.setPadding(px,py,px,py);}
   int inner=Math.max(0,w-2*pad);
   int commandWidth=compact?Math.max(0,Math.round(w*.55f)-pad):inner;
   commands.measure(MeasureSpec.makeMeasureSpec(commandWidth,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,h-controlsInset),MeasureSpec.AT_MOST));
