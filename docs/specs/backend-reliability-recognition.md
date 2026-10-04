@@ -1,5 +1,10 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+### Checkpoint runtime2026-10-04
+
+PR237 implementa il servizio e il client manuale default OFF secondo piano approvato;19test locali provider simulato passano. Revisione indipendente corretta: mese mancante failclosed, cache/ID Android vincolati a input/modello/contratto e scadenza. Account Cloudflare non autenticato, login con errore verifica; live/key-progetto/enrollment/prova8 e accettazione telefono restano pendenti. Nessun billing/carta attivato e nessuna call nuova. La distribuzione richiede CI finale/firma/upload e distribuzione Firebase verificati, non è implicata da questo checkpoint. Frontend7/backend6.
+
+
 ## Decisione approvata — test runtime gratuito, 2026-10-04
 
 Utente: «Ok cominciamo così per test», dopo chiarimento che8call era limiteLudo e100serve solo primaprova,non archivio9705. ApprovatiCloudflareWorkersFree/DOsqlite,GeminiFreeTier,authprivata perdevice e100callmese TOTALI con1EURriservate teoriche. Nessunbilling/carta attivati;limite8delvecchio benchmark resta operativo finchécutoverprotetto implementato. Piano su branch backend/ai-runtime-plan: docs/superpowers/plans/2026-10-04-ai-beta-runtime.md,commit962237635e1875ce72dc20aaaae132b68cf772b5;raccomandata esecuzionenativa. Piano da revisionare primaimplementazione secondo writing-plans;nessuncodiceruntime/deploy/nuovacall eseguiti inquestostep.
