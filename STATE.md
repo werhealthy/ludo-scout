@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend AI — prova telefono conclusa, servizio OFF
+
+2026-10-04 prima prova telefono mostra8proposte (6accessori/componenti,2bundle); counter9/100 confermato server9/90000micro. Utente15:55 conferma ripetizione invariata ma scrive8/100: prima schermata9 e GETsuccessivo9, nessun reset eseguito; trattare dato8 come discrepanza dichiarata, non provare screenshotripetizione mancante. Il contatoreserver resta9, evidenza nessunulterioretentativo dopo ripetizione; nessuna prova separata distinguecacheclient da dedupserver (entrambi protetti dai test). Catalogapply/BGG/lingua invariati percontratto, nessuna precisionglobale dichiarata.
+
+Chiusura autorizzata del trial: run37207453334/job111451520468 SUCCESS su betac9a8c9cb95746bcdcc463161ad5f0febbd80f665, test/dryrun/deployOFF. GETautenticato indipendente successivo HTTP200 enabledfalse/calls9/reserved_micro90000/reserved_eur0.09. Key/enrollment/ledgerpreservati, nessuna nuova call durantechiusura; OFFforzato/FREE_TIER_VALID_UNTIL0. SummaryworkflowOFFcontiene prossimo provisioning generico ormai superato: non rifare seed/reset/enrollment. Primo collegamento app→servizio→Gemini→proposte e ripetizione senza nuovo consumo osservati; nessuna nuovaAPKnecessaria.
+
+Utente «Andiamo next step»: prossimo incremento raccomandato nell'attuale gruppoAI: proposte manuali su annunci reali giàacquisiti, confronto con classificatorelocale e revisioneesplicita, inombra/catalogoinvariato. IspezionareAiBetaTestDialog/client e sorgenteannunci prima specificare/implementare; nonbonifica9705 né classificazioneautomatica/pricing/BGG/lingua/schema/paid senza decisione specifica. Limiti100/1EURteorico,91tentativiresidui e cache7giorni invariati. Frontend7/backend6 aperti; frontendpreservato.
+
 ## Backend AI — prova manuale attiva fino alle 16:50 Europe/Rome
 
 2026-10-04 «Vai» autorizza continuazione dopo configurazione telefono confermata. PR245 HEAD7c7de3cfa8ce888101e7b47a121b5cb374b63546 mergedbeta a20def69733c4a61e86db07a7a545b0045f86814; PR246 registra esclusivamente identico workflow su defaultmain, merge4a1d25a62a9e52f03e5d0bb592cf6120d425549d. Nessun codiceapp cambiato/nuovaAPK. CIservizio37206650172/job111449116533 SUCCESS22/22+dryruns; Android37206650087/job111449116391 SUCCESS regressioni/unit/compile/reviewAPK, visual/dialog saltati scope. YAML/bash/Node syntax e limite active1hour verificati localmente; revisione indipendente senzaCritical/Important. Un solo nuovo workflow beta-only freeconfirmation, stessa concurrency deploy, stato letto con tentativi bounded senza richiesteprovider, fail/cancel tentaOFF. Cleanup/cancel best effort; scadenza runtime protegge nuovecall, non deploy programmatoOFF.
