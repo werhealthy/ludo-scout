@@ -2,7 +2,7 @@ name: AI beta service safeguards
 on:
   pull_request:
     branches: [beta]
-    paths: ['services/ai-beta/**', '.github/workflows/ai-beta-service.yml', '.github/workflows/ai-beta-deploy-off.yml']
+    paths: ['services/ai-beta/**', '.github/workflows/ai-beta-service.yml', '.github/workflows/ai-beta-deploy-off.yml', '.github/workflows/ai-beta-trial.yml']
 permissions:
   contents: read
 jobs:
