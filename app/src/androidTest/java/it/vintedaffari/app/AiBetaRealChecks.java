@@ -14,7 +14,9 @@ final class AiBetaRealChecks {
    db.execSQL("INSERT INTO games VALUES(1,'123','Test game','BGG_MATCH_REVIEW')");
    db.execSQL("INSERT INTO market_listings VALUES(1,'Organizer base + expansions','',NULL,0,'',1,100,'AUTO_FILTERED','BLOCKED_CLASSIFIER')");
    db.execSQL("INSERT INTO market_listings VALUES(2,'Catan gioco da tavolo','Kosmos',NULL,0,'',NULL,101,'ACTIVE','PENDING_ANALYSIS')");
+   db.execSQL("UPDATE market_listings SET observed_text='Solo organizer; testo acquisito originale' WHERE id=1");
    JSONArray rows=AiBetaListings.read(db);check(rows.length()==2,"filtered or partial row missing");check(rows.getJSONObject(1).getString("local_type").equals("ACCESSORY"),"local subtype changed");
+   check(rows.getJSONObject(1).optString("source_text").equals("Solo organizer; testo acquisito originale"),"saved source text unavailable for local inspection");
    JSONArray payload=AiBetaListings.payload(rows);check(payload.getJSONObject(0).getLong("listing_id")==1&&payload.getJSONObject(0).length()==3,"input not minimal/canonical");check(!payload.toString().contains("123")&&!payload.toString().contains("PENDING_ANALYSIS"),"private context transmitted");
    String key=AiBetaListings.key(rows);JSONArray reversed=new JSONArray().put(rows.getJSONObject(1)).put(rows.getJSONObject(0));check(key.equals(AiBetaListings.key(reversed)),"reordering consumed another ID");
    JSONObject response=new JSONObject().put("status","PROPOSAL").put("records",new JSONArray().put(answer(1,"ACCESSORY_COMPONENT")).put(answer(2,"BUNDLE"))).put("budget",new JSONObject().put("calls_reserved",9));

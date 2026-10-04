@@ -663,3 +663,20 @@ Chiusura effettiva mediante workflow esistente AI beta deploy OFF sul ramo beta6
 
 Beta170 e catalogo preservati; nessun codiceapp/classificatore/schema/BGG/lingua modificato. Proposte osservate restano da verificare sul prodotto, incluso Sogni per Bambini Ribelli; concordanza per Las ruinas perdidas de Arnaldo non prova identitàBGG. Prossimo incremento: revisione delle divergenze con evidenze originali degli annunci, mantenendo catalogapply disabilitato; non dedurre groundtruth dai soli titoli/evidenze AI. Frontend7/backend6 gruppi aperti.
 
+
+## Revisione evidenze locali — piano 2026-10-04
+
+> Per esecuzione: superpowers:executing-plans, lavoro inline già autorizzato; revisione indipendente finale.
+Obiettivo: esaminare marca e testo acquisito di ciascun annuncio preparato senza nuove chiamate o modifiche al catalogo.
+Architettura: stesso snapshot readonly, aggiungere estratto locale di massimo2000codepoint e flag di troncamento. Hash dell'input continua a coprire testo completo; payload/chiaveAI invariati. Esamina dati locali apre selezione e dettaglio, dopo ricontrollo della sorgente.
+Stack: AndroidJava/SQLite/JSONObject già esistenti.
+Spec: contratto Annunci reali nel presente file. Vincoli: servizioOFF, nessuna BGG/lingua verificata, nessuna correzione/apply/soglia/schema/dipendenza nuova.
+Review focus: snapshot170 privo di estratto richiede nuova preparazione, rispostaAI rimane riusabile; testo mancante esplicito; troncamento Unicode senza surrogate spezzate; modifica oltre estratto invalida; apertura dati con AIspenta senza trasporto.
+
+### Task1: contesto locale ispezionabile
+File: AiBetaListings.java(row+evidence), AiBetaRealDialog.java(button+inspect), AiBetaRealChecks.java e AiBetaInstrumentation.java; android-pr.yml include questo branch nel jobAI esistente; app/build.gradle versione171.
+Interfacce: evidence(JSONObject row)→String locale; source_text/source_truncated solo snapshotlocale, mai payload.
+- [ ] Test RED: rigaSQLite con testo originale restituisce source_text uguale al testo; nome/brand restano distinti; run Android AI instrumentazione deve fallire per estratto assente.
+- [ ] Implementare estrattoUnicode2000 e formatter locale; bottone Esamina dati locali attivo ancheAIoff; controllare snapshot prima di apertura, niente network/catalogwriters.
+- [ ] Test GREEN: SQLiteinvariato, payloadtrecampi/cachekey invariata con modifiche solo testo, hashcompleto rileva coda cambiata, legacy snapshot non riutilizzabile; dettaglio reale leggibile100/200%, cacheAI/richiestaID/review invariati.
+- [ ] Run workflow AndroidPR completo, reviewindipendente, riallinearebeta, merge; beta firmata certificato/uploadFirebase/distribuzione distinti. Checkpoint STATE/spec con verifiche e limiti.

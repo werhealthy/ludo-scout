@@ -466,7 +466,7 @@ jobs:
 
 
   ai-visual:
-    if: github.head_ref == 'backend/ai-beta-runtime' || github.head_ref == 'frontend/ai-real-listings-review' || github.head_ref == 'backend/ai-real-listings'
+    if: github.head_ref == 'backend/ai-beta-runtime' || github.head_ref == 'frontend/ai-real-listings-review' || github.head_ref == 'backend/ai-real-listings' || github.head_ref == 'backend/ai-local-evidence'
     name: AI Android manual dialog
     runs-on: ubuntu-latest
     timeout-minutes: 12
