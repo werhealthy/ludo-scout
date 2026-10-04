@@ -85,7 +85,7 @@ public class PetSelectionRegression {
  LudoPetState petState=new LudoPetState();
  Map<String,Long> petGameIds=new HashMap<>();
  Map<String,GameRecord> petCanonicalGames=new HashMap<>();
- PetView petView=new PetView(),ludoBackdrop=new PetView();boolean petResumed,petWindowFocused;String tab="companion";
+ PetView petView=new PetView(),ludoBackdrop=new PetView();boolean petResumed,petWindowFocused,ludoRoomPanelOpen;String tab="companion";
  Panel activePetPanel,activeGameOverlay,activeDetailDialog;
  '''+methods+'''
  static DealRecord listing(String signature,String game){DealRecord d=new DealRecord();d.signature=signature;d.bggId=game;d.totalCents=500;d.vintedUrl="live";return d;}
@@ -107,6 +107,7 @@ public class PetSelectionRegression {
   expect("456".equals(reopened.petSuggestion().bggId),"recreated screen restores B without an eligible offer");
   reopened.petFailure="offline";expect("456".equals(reopened.petSuggestion().bggId),"failure preserves game metadata");
   c.petResumed=true;c.petWindowFocused=true;c.syncPetVisibility();expect(c.petView.running&&c.ludoBackdrop.running,"visible resumed scene animates both layers");
+  c.ludoRoomPanelOpen=true;c.syncPetVisibility();expect(!c.petView.running&&!c.ludoBackdrop.running,"embedded panel pauses both layers");c.ludoRoomPanelOpen=false;c.syncPetVisibility();expect(c.petView.running&&c.ludoBackdrop.running,"closing embedded panel resumes both layers");
   c.activeGameOverlay=new Panel();c.activeGameOverlay.showing=true;c.syncPetVisibility();expect(!c.petView.running&&!c.ludoBackdrop.running,"game overlay pauses both layers");
   c.activeGameOverlay=null;c.activePetPanel=new Panel();c.syncPetVisibility();expect(!c.petView.running,"pet panel pauses underlying pet");
   c.activePetPanel=null;c.petWindowFocused=false;c.syncPetVisibility();expect(!c.petView.running,"focus loss pauses pet");
@@ -121,3 +122,4 @@ with tempfile.TemporaryDirectory() as tmp:
  sources=[root/"app/src/main/java/it/vintedaffari/app"/f for f in ["GamePreferenceState.java","LudoPetState.java","GameRecord.java","DealRecord.java"]]
  subprocess.run(["javac","-d",tmp,*map(str,sources),str(p)],check=True)
  subprocess.run(["java","-cp",tmp,"it.vintedaffari.app.PetSelectionRegression"],check=True)
+

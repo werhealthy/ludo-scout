@@ -39,6 +39,7 @@ public class MarketNavigationRegression extends ScreenBase {
     String query="catan", databaseQuery="azul", languageFilter="IT";
     int catalogCategory=2, databaseCategory=4, catalogVisible=48;
     long selectedGameId=0, engineDayStart=0, engineEnteredAt=0;
+    boolean ludoRoomPanelOpen;int closedRoomPanels;void setLudoRoomPanel(boolean open){ludoRoomPanelOpen=open;if(!open)closedRoomPanels++;}
     boolean openingPreset=false;int databaseVisible=24;String databaseScope="verified";Dialog activeGameOverlay;ArrayList<Dialog> marketDetailDialogs=new ArrayList<>();
     Dialog activeDetailDialog,activeResolutionDialog;String activeDealSignature="";boolean suppressDetailDismissState=false;
     static class Dialog { boolean showing=true; boolean isShowing(){return showing;} Runnable onDismiss;void dismiss(){showing=false;if(onDismiss!=null)onDismiss.run();} }
@@ -162,7 +163,7 @@ public class MarketNavigationRegression extends ScreenBase {
             n.engineSection=section;n.onBackPressed();equal("overview",n.engineSection,"Work list Back");
         }
     }
-    static void roomBackUsesNavigationHooks(){MarketNavigationRegression n=new MarketNavigationRegression();n.tab="companion";n.scroll.y=640;n.tabHistory.push("discover");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomPositionRecords,"Back records room before leaving");equal(640,n.tabScrollPositions.get("companion"),"Back stores room scroll");n.tab="catalog";n.tabHistory.push("companion");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomEntries,"Back prepares room before entering");equal(640,n.scroll.y,"Back restores room scroll");}
+    static void roomBackUsesNavigationHooks(){MarketNavigationRegression n=new MarketNavigationRegression();n.tab="companion";n.ludoRoomPanelOpen=true;n.onBackPressed();equal(false,n.ludoRoomPanelOpen,"Back closes embedded room panel");equal(1,n.closedRoomPanels,"One panel close");equal("companion",n.tab,"Panel Back retains room");n.scroll.y=640;n.tabHistory.push("discover");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomPositionRecords,"Back records room before leaving");equal(640,n.tabScrollPositions.get("companion"),"Back stores room scroll");n.tab="catalog";n.tabHistory.push("companion");n.onBackPressed();n.uiUpdates.flush();equal(1,n.roomEntries,"Back prepares room before entering");equal(640,n.scroll.y,"Back restores room scroll");}
     public static void main(String[] args){
         int failed=0;
         Runnable[] tests={MarketNavigationRegression::roomBackUsesNavigationHooks,MarketNavigationRegression::retainsSiblingPositions,MarketNavigationRegression::motorBackFollowsHistoryHierarchy,
@@ -190,4 +191,5 @@ with tempfile.TemporaryDirectory() as temp:
     source.write_text(harness + "\n" + presentation.replace("package it.vintedaffari.app;", ""))
     subprocess.run(["javac", "-d", temp, str(source)], check=True)
     subprocess.run(["java", "-cp", temp, "MarketNavigationRegression"], check=True)
+
 
