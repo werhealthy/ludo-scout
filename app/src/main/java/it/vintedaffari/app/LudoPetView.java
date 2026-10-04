@@ -4,11 +4,12 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Rect;
 import android.view.View;
 import android.animation.ValueAnimator;
 import java.util.EnumMap;
 import java.util.Map;
-/** Supplied paper illustrations, cached once and animated only while visible. */
+/** Approved transparent mascot; idle motion runs only while visible. */
 final class LudoPetView extends View {
  private final Paint paint=new Paint(3);
  private final RectF artBounds=new RectF();
@@ -41,10 +42,11 @@ final class LudoPetView extends View {
  @Override protected void onVisibilityChanged(View changed,int visibility){super.onVisibilityChanged(changed,visibility);if(paint!=null)sync();}
  @Override protected void onDraw(Canvas canvas){
   super.onDraw(canvas);Bitmap art=illustrations.get(greeting?LudoPetMood.GREETING:mood);if(art==null)art=illustration;if(art==null||art.isRecycled())return;
-  float scale=Math.min(getWidth()/(float)art.getWidth(),getHeight()/(float)art.getHeight())*.94f;
-  float width=art.getWidth()*scale,height=art.getHeight()*scale;
+  Rect source=portrait?new Rect(0,0,art.getWidth(),Math.round(art.getHeight()*.67f)):null;float aw=art.getWidth(),ah=portrait?source.height():art.getHeight();float scale=Math.min(getWidth()/aw,getHeight()/ah)*.94f;
+  float width=aw*scale,height=ah*scale;
   float breath=(float)Math.sin(phase*Math.PI*2)*getHeight()*.004f+reaction*getHeight()*.015f;
   artBounds.set((getWidth()-width)/2,(getHeight()-height)/2-breath,(getWidth()+width)/2,(getHeight()+height)/2-breath);
-  int saved=canvas.save();if(portrait)canvas.rotate(gazeX*2+reaction*2,getWidth()/2f,getHeight()*.6f);canvas.translate(gazeX*getWidth()*.008f,gazeY*getHeight()*.004f);canvas.drawBitmap(art,null,artBounds,paint);canvas.restoreToCount(saved);
+  int saved=canvas.save();if(portrait)canvas.rotate(gazeX*2+reaction*2,getWidth()/2f,getHeight()*.6f);canvas.translate(gazeX*getWidth()*.008f,gazeY*getHeight()*.004f);canvas.drawBitmap(art,source,artBounds,paint);canvas.restoreToCount(saved);
  }
 }
+

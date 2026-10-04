@@ -34,6 +34,7 @@ import java.util.*;
 class ScreenBase { public void onBackPressed() {} }
 class TextUtils { static boolean isEmpty(String s) { return s==null||s.isEmpty(); } }
 public class MarketNavigationRegression extends ScreenBase {
+    boolean engineDetailReturnToLudo=false;
     String tab="catalog", databaseDetailReturnTab="", engineSection="overview", returnTab="";
     String query="catan", databaseQuery="azul", languageFilter="IT";
     int catalogCategory=2, databaseCategory=4, catalogVisible=48;
@@ -189,3 +190,4 @@ with tempfile.TemporaryDirectory() as temp:
     source.write_text(harness + "\n" + presentation.replace("package it.vintedaffari.app;", ""))
     subprocess.run(["javac", "-d", temp, str(source)], check=True)
     subprocess.run(["java", "-cp", temp, "MarketNavigationRegression"], check=True)
+

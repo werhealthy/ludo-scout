@@ -68,7 +68,7 @@ checks = [
      'LudoIcons.BOOK_OPEN,"Libreria","library"' not in nav and all(x in nav for x in [
          'LudoIcons.HOUSE,"Home","discover"',
          'LudoIcons.SEARCH,"Catalogo","catalog"',
-         'LudoIcons.STAR,"Ludo","companion"'
+         'navItem("","Ludo","companion")', 'R.drawable.ludo_mark'
      ])),
     ("Font Awesome semantic map includes core app actions",
      all(x in icons for x in ["HOUSE=", "SEARCH=", "HEART=", "TRASH=", "CAMERA=", "GEAR=", "CHECK=", "STAR="])),

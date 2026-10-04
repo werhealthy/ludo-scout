@@ -53,6 +53,8 @@ jobs:
       - name: Verify Ludo daily journey and exploration
         run: |
           python3 regression/ludo_primary_search.py
+          python3 -m pip install Pillow==11.3.0
+          python3 regression/ludo_scribble_assets.py
           python3 regression/ludo_pet_rooms.py
           python3 regression/ludo_exploration.py
           python3 regression/ludo_journey_layout.py
@@ -310,6 +312,8 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - name: Install image verification dependency
+        run: python3 -m pip install Pillow==11.3.0
       - name: Create review-only test signing key
         run: |
           mkdir -p "$HOME/.android"
@@ -367,7 +371,7 @@ jobs:
 
 
   ludo-visual:
-    if: github.head_ref == 'frontend/ludo-primary-search'
+    if: github.head_ref == 'frontend/ludo-primary-search' || github.head_ref == 'frontend/ludo-scribble-world'
     name: Ludo Android visual and lint
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -378,6 +382,8 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - name: Install image verification dependency
+        run: python3 -m pip install Pillow==11.3.0
       - name: Create review-only test signing key
         run: |
           mkdir -p "$HOME/.android"
@@ -433,4 +439,5 @@ jobs:
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.LudoVisualInstrumentation | tee browser-large-result.txt
           adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
           grep -F 'Ludo actual rooms, fixed footer and Catalog Bundle verified' browser-large-result.txt
+
 
