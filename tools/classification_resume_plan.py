@@ -27,7 +27,10 @@ def plan(sample, source_input, ledger, month, source_month, source_operation, mo
     if monthly > 1 or batch > Decimal('.10'):
         raise ValueError('benchmark budget ceiling exceeded')
     source = ledger['months'][source_month]['operations'][source_operation]
-    reused=[]
+    reused=copy.deepcopy(source.get('reused_answers',[]))
+    compare(sample,reused)
+    if any(r.get('language') != 'UNKNOWN' or r.get('bgg_verdict','UNKNOWN') != 'UNKNOWN' for r in reused):
+        raise ValueError('unsupported inherited identity or language')
     for entry in source['responses']:
         if entry['status'] not in {'VALIDATED','FAILED_OR_INVALID','RESERVED_REQUEST_UNKNOWN'} or entry['model'] != MODEL:
             raise ValueError('invalid source response or model')
