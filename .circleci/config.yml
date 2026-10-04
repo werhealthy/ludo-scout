@@ -19,8 +19,13 @@ jobs:
               test -n "${!variable:-}" || { echo "Missing project variable: $variable"; exit 1; }
             done
             java -version
-            test -d "$ANDROID_HOME/platforms/android-35"
-            test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+            # CircleCI image does not guarantee the exact SDK packages Ludo needs.
+            if [ ! -d "$ANDROID_HOME/platforms/android-35" ] || [ ! -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" ]; then
+              echo "Installing required Android SDK platform 35 and build-tools 35.0.0"
+              sdkmanager "platforms;android-35" "build-tools;35.0.0"
+            fi
+            test -d "$ANDROID_HOME/platforms/android-35" || { echo "Android platform 35 unavailable"; exit 1; }
+            test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" || { echo "Android build-tools 35.0.0 unavailable"; exit 1; }
             mkdir -p "$HOME/.android"
             umask 077
             printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
