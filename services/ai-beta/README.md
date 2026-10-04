@@ -1,13 +1,33 @@
 # Private AI beta
 
 Default OFF. Worker + one SQLite Durable Object hold all devices' reservations.
-No API key, device secret or admin endpoint is built into Android. The app's
-settings entry offers the eight fixed smoke-test records and a manual comparison
-of at most eight recent canonical saved announcements, including filtered and
-incomplete rows. The phone recalculates the local classifier and displays saved
-BGG context alongside AI type proposals; it never certifies BGG identity/language
-or modifies the catalog. Only ID/title/brand leave the phone. This is not automatic
-archive classification. The saved-announcement preview works with the service OFF.
+No API key, device secret or admin endpoint is built into Android. The existing
+owner configuration now enables automatic checks of current ACTIVE announcements
+in foreground/recovery queue owners, alongside the manual smoke and comparison
+dialogs. The switch is explicitly labelled "Abilita AI nel Motore e prove manuali".
+Unconfigured or disabled phones send nothing. Only ID/title/brand leave the phone.
+
+Automatic checks use a separate encrypted no-backup journal and a cross-process
+file lease, bounded8 records/4096UTF8bytes. Validated per-record proposals are cached
+for7days (up to800 entries with a850KB serialization bound); local description or
+identity changes recheck current SQLite evidence without refreshing remote cache
+expiry. Mixed batches send only uncached records. GET/status verifies enabled state
+and valid100attempt/EUR1reservation accounting before a new reservation. OFF,
+unavailable or inconsistent state backs off15minutes. Pending transport recovery
+keeps the original requestID; the server resolves prior IDs before the new budget
+cutoff. Terminal provider FAILED retains its charge and advances unrelated work.
+No client reset, refund, service activation or paid upgrade.
+
+AI agreement never establishes BGG identity/language, restores filtered history or
+promotes an item. A negative proposal conflicting with local BASE_GAME/UNCERTAIN
+can change an existing automatic ACTIVE deal fromOK toMATCH_UNCERTAIN, with full
+source freshness checked again inside the writer transaction. Human confirmations,
+overrides and stronger holds remain protected. Subsequent automatic legacy upsert
+preserves that hold for unchanged title/brand/BGG; human overrides retain precedence.
+This is an asynchronous additional check, not a claim that all announcements were
+AI-verified before their first display. Raw local descriptions, BGG context, prices
+and preferences stay local and unchanged. Diagnostics record counts/states, no titles
+or credentials. Manual comparison alone still never writes the catalog.
 
 ## Verify locally
 
@@ -43,9 +63,9 @@ replaced. No Gemini credentials or external provider traffic in tests/CI.
    Expiring `FREE_TIER_VALID_UNTIL` is epoch milliseconds; initial live trial
    attestation lasts at most24hours. Set ENABLED=true only after account checks.
 5. Enter the HTTPS workers.dev endpoint and personal token in Android
-   Settings → Test AI · beta → Configura prova. Enable the manual test.
+   Settings → Test AI · beta → Configura prova. Enable AI in the engine and manual tests.
    Tap Test AI su8annunci once. Repeat uses the same requestID/content cache,
-   not a new provider attempt. No cron, queue or automatic background AI.
+   not a new provider attempt. Automatic engine checks reuse this configuration and budget; the smoke test stays manual.
 6. Disable after the trial; record exact service counter and phone result.
 
 ## Limits and failure behavior

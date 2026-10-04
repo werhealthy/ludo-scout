@@ -44,6 +44,7 @@ final class AiEngineSession {
  }
  private static Result finish(Journal store,JSONObject j,long now,String state,int checked,int held,boolean more)throws Exception {
   j.put("state",state).put("checked",checked).put("held",held).put("updated_at",now);
+  j.put("checked_total",j.optLong("checked_total")+checked).put("held_total",j.optLong("held_total")+held);
   j.put("next_at",more?now+10000:now+AiEnginePolicy.BACKOFF);
   prune(j,now);store.save(j);return new Result(state,checked,held,more);
  }
@@ -66,35 +67,56 @@ final class AiEngineSession {
    if(rows.length()==0)return finish(store,j,now,"NO_WORK",0,0,j.optBoolean("scan_more"));
   }
   // Reuse each validated title/brand proposal locally, even when batch grouping or identity changes.
-  JSONArray cached=new JSONArray();JSONObject cache=j.getJSONObject("cache");
-  for(int i=0;i<rows.length();i++){JSONObject c=cache.optJSONObject(remoteKey(rows.getJSONObject(i)));if(c!=null&&AiEnginePolicy.fresh(c.optLong("at"),now))cached.put(c.getJSONObject("answer"));}
+  JSONArray cached=new JSONArray(),cachedRows=new JSONArray(),remoteRows=new JSONArray();JSONObject cache=j.getJSONObject("cache");
+  int checkedCached=0,heldCached=0;
+  if(pending!=null)remoteRows=rows;
+  else for(int i=0;i<rows.length();i++){
+   JSONObject row=rows.getJSONObject(i),c=cache.optJSONObject(remoteKey(row));
+   if(c!=null&&AiEnginePolicy.fresh(c.optLong("at"),now)){cached.put(c.getJSONObject("answer"));cachedRows.put(row);}else remoteRows.put(row);
+  }
+  if(cachedRows.length()>0){
+   JSONObject cachedResponse=new JSONObject().put("status","PROPOSAL").put("records",cached);
+   try{AiBetaListings.display(cachedRows,cachedResponse);}catch(Exception invalid){return finish(store,j,now,"INVALID_CACHE",0,0,false);}
+   heldCached=source.apply(cachedRows,cachedResponse);checkedCached=cachedRows.length();
+   for(int i=0;i<cachedRows.length();i++){
+    JSONObject row=cachedRows.getJSONObject(i);
+    j.getJSONObject("seen").put(localKey(row),new JSONObject().put("at",cache.getJSONObject(remoteKey(row)).getLong("at")));
+   }
+   // Preserve the original remote cache timestamp. Local rechecks cannot extend the seven-day TTL.
+   if(remoteRows.length()==0)return finish(store,j,now,"CHECKED_CACHE",checkedCached,heldCached,true);
+  }
+  rows=remoteRows;
   JSONObject response;
-  if(pending==null&&cached.length()==rows.length()){
-   response=new JSONObject().put("status","PROPOSAL").put("records",cached);
-  }else{
+  {
    JSONObject status;
-   try{status=transport.status();}catch(Exception unavailable){return finish(store,j,now,"STATUS_UNAVAILABLE",0,0,false);}
+   try{status=transport.status();}catch(Exception unavailable){return finish(store,j,now,"STATUS_UNAVAILABLE",checkedCached,heldCached,false);}
    JSONObject budget=status.optJSONObject("budget");
    Object calls=budget==null?null:budget.opt("calls_reserved"),micro=budget==null?null:budget.opt("reserved_micro");
-   if(!Boolean.TRUE.equals(status.opt("enabled")))return finish(store,j,now,"SERVICE_OFF",0,0,false);
+   if(!Boolean.TRUE.equals(status.opt("enabled")))return finish(store,j,now,"SERVICE_OFF",checkedCached,heldCached,false);
    if(!(calls instanceof Number)||!(micro instanceof Number)||((Number)calls).doubleValue()!=((Number)calls).longValue()
       ||((Number)micro).doubleValue()!=((Number)micro).longValue()||((Number)calls).longValue()<0||((Number)calls).longValue()>100
       ||((Number)micro).longValue()<((Number)calls).longValue()*10000||((Number)micro).longValue()>1000000)
-    return finish(store,j,now,"INVALID_BUDGET",0,0,false);
-   if(((Number)calls).longValue()>=100||((Number)micro).longValue()+10000>1000000)
-    return finish(store,j,now,"BUDGET_BLOCKED",0,0,false);
-   if(!source.current(rows))return finish(store,j,now,"STALE_INPUT",0,0,true);
+    return finish(store,j,now,"INVALID_BUDGET",checkedCached,heldCached,false);
+   if(pending==null&&(((Number)calls).longValue()>=100||((Number)micro).longValue()+10000>1000000))
+    return finish(store,j,now,"BUDGET_BLOCKED",checkedCached,heldCached,false);
+   if(!source.current(rows))return finish(store,j,now,"STALE_INPUT",checkedCached,heldCached,true);
    if(pending==null){
     pending=new JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("snapshot",rows).put("at",now);
     j.put("pending",pending);prune(j,now);store.save(j); // Persist BEFORE the physical attempt.
    }
    String id=pending.getString("id");
-   try{response=transport.submit(id,AiBetaListings.payload(rows));}
-   catch(Exception ambiguous){return finish(store,j,now,"PENDING_RECOVERY",0,0,false);}
-   if(!"PROPOSAL".equals(response.optString("status")))
-    return finish(store,j,now,"PENDING_"+response.optString("status","UNAVAILABLE"),0,0,false);
+   try{response=transport.submit(id,AiBetaListings.payload(remoteRows));}
+   catch(Exception ambiguous){return finish(store,j,now,"PENDING_RECOVERY",checkedCached,heldCached,false);}
+   if("FAILED".equals(response.optString("status"))&&id.equals(response.optString("request_id"))&&AiBetaProtocol.MODEL.equals(response.optString("model"))&&AiBetaProtocol.CONTRACT.equals(response.optString("contract"))){
+    // A terminal provider failure keeps its reservation, but cannot monopolize unrelated work.
+    for(int i=0;i<rows.length();i++)j.getJSONObject("seen").put(localKey(rows.getJSONObject(i)),new JSONObject().put("at",now));
+    j.remove("pending");j.put("failed_batches",j.optInt("failed_batches")+1);
+    return finish(store,j,now,"TERMINAL_FAILED",checkedCached,heldCached,true);
+   }
+   if(!"PROPOSAL".equals(response.optString("status")))return finish(store,j,now,"PENDING_"+response.optString("status","UNAVAILABLE"),checkedCached,heldCached,false);
    if(!id.equals(response.optString("request_id"))||!AiBetaProtocol.MODEL.equals(response.optString("model"))||!AiBetaProtocol.CONTRACT.equals(response.optString("contract")))
-    return finish(store,j,now,"INVALID_RESPONSE",0,0,false);
+    return finish(store,j,now,"INVALID_RESPONSE",checkedCached,heldCached,false);
+   try{AiBetaListings.display(remoteRows,response);}catch(Exception invalid){return finish(store,j,now,"INVALID_RESPONSE",checkedCached,heldCached,false);}
   }
   // The existing strict proposal validator checks IDs, enums, flags, confidence and language.
   try{AiBetaListings.display(rows,response);}catch(Exception invalid){return finish(store,j,now,"INVALID_RESPONSE",0,0,false);}
@@ -106,6 +128,6 @@ final class AiEngineSession {
    cache.put(remoteKey(row),new JSONObject().put("at",now).put("answer",answer));
   }
   j.remove("pending");
-  return finish(store,j,now,"CHECKED",rows.length(),held,true);
+  return finish(store,j,now,"CHECKED",checkedCached+rows.length(),heldCached+held,true);
  }
 }

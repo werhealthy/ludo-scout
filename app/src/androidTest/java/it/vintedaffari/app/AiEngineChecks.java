@@ -89,6 +89,15 @@ final class AiEngineChecks {
    try(Cursor c=db.rawQuery("SELECT verification_state FROM deals WHERE signature='ai-held'",null)){c.moveToFirst();check(c.getString(0).equals("MATCH_UNCERTAIN"),"automatic reanalysis erased the AI hold");}
   }
   reviewChecks(now);
+  try(SQLiteDatabase db=fixture()){
+   Memory m=new Memory();Network net=new Network();
+   AiEngineSession.run(config(),m,new AiEngineListings(db),net,now);
+   db.execSQL("UPDATE market_listings SET observed_text='Changed local context'");net.id=null;
+   AiEngineSession.run(config(),m,new AiEngineListings(db),net,now+6L*86400000);
+   check(net.calls==1,"fresh cache was not reused");
+   AiEngineSession.run(config(),m,new AiEngineListings(db),net,now+7L*86400000+1);
+   check(net.calls==2,"local recheck extended remote proposal expiry");
+  }
  }
  private static void addSecond(SQLiteDatabase db){
   db.execSQL("INSERT INTO market_listings VALUES(2,'Azul gioco da tavolo','Next Move','buono',1000,'Testo completo',1,100,'ACTIVE','MATCHED','sig2','temp2','1000',0,NULL)");

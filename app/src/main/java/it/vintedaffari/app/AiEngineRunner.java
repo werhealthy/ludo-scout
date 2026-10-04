@@ -20,6 +20,7 @@ final class AiEngineRunner {
  private AiEngineRunner(){}
  static boolean hasPending(){return BUSY.get()||more;}
  static AiBetaSettings journal(Context c){return new AiBetaSettings(c,"ai-engine.private",900000);}
+ static void configurationChanged(Context context){nextAttempt=0;more=false;schedule(context);}
  static void schedule(Context context){
   if(context==null||System.currentTimeMillis()<nextAttempt||!BUSY.compareAndSet(false,true))return;
   Context app=context.getApplicationContext();
@@ -56,9 +57,10 @@ final class AiEngineRunner {
       AiEngineSession.Result result=AiEngineSession.run(config,store,source,transport,System.currentTimeMillis());
       more=result.more;
       nextAttempt=System.currentTimeMillis()+(result.more?10000:AiEnginePolicy.BACKOFF);
+      JSONObject progress=privateJournal.load();
       android.content.ContentValues diagnostic=new android.content.ContentValues();
       diagnostic.put("name","diag:ai_engine");diagnostic.put("value",result.checked);diagnostic.put("updated_at",System.currentTimeMillis());
-      diagnostic.put("text_value","build=ai-engine-v1;state="+result.state+";checked="+result.checked+";held="+result.held+";more="+result.more);
+      diagnostic.put("text_value","build=ai-engine-v1;state="+result.state+";checked="+result.checked+";held="+result.held+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more);
       db.insertWithOnConflict("queue_controls",null,diagnostic,SQLiteDatabase.CONFLICT_REPLACE);
       if(result.held>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
       if(result.more)QueueWorkScheduler.scheduleAfter(app,10000);
