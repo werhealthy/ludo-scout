@@ -93,6 +93,8 @@ jobs:
           if test -f "$RUNNER_TEMP/ai-private-provision/cleanup.json"; then
             npx wrangler secret bulk "$RUNNER_TEMP/ai-private-provision/cleanup.json"
           fi
+      - name: Verify temporary credential revoked
+        run: node scripts/provision.mjs revoked "$GITHUB_WORKSPACE/ledger-source/ledger.json" "$RUNNER_TEMP/ai-private-provision"
       - name: Delete runner private files
         if: always()
         run: rm -f "$RUNNER_TEMP/ai-private-provision/secrets.json" "$RUNNER_TEMP/ai-private-provision/cleanup.json" "$RUNNER_TEMP/ai-private-provision/probe-token"
