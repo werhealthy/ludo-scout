@@ -85,7 +85,7 @@ public class PetSelectionRegression {
  LudoPetState petState=new LudoPetState();
  Map<String,Long> petGameIds=new HashMap<>();
  Map<String,GameRecord> petCanonicalGames=new HashMap<>();
- PetView petView=new PetView();boolean petResumed,petWindowFocused;String tab="companion";
+ PetView petView=new PetView(),ludoBackdrop=new PetView();boolean petResumed,petWindowFocused;String tab="companion";
  Panel activePetPanel,activeGameOverlay,activeDetailDialog;
  '''+methods+'''
  static DealRecord listing(String signature,String game){DealRecord d=new DealRecord();d.signature=signature;d.bggId=game;d.totalCents=500;d.vintedUrl="live";return d;}
@@ -106,13 +106,13 @@ public class PetSelectionRegression {
   PetSelectionRegression reopened=new PetSelectionRegression();reopened.preferences=new GamePreferenceState(disk);reopened.rememberPetRefresh("456",b);
   expect("456".equals(reopened.petSuggestion().bggId),"recreated screen restores B without an eligible offer");
   reopened.petFailure="offline";expect("456".equals(reopened.petSuggestion().bggId),"failure preserves game metadata");
-  c.petResumed=true;c.petWindowFocused=true;c.syncPetVisibility();expect(c.petView.running,"visible resumed pet animates");
-  c.activeGameOverlay=new Panel();c.activeGameOverlay.showing=true;c.syncPetVisibility();expect(!c.petView.running,"game overlay pauses underlying pet");
+  c.petResumed=true;c.petWindowFocused=true;c.syncPetVisibility();expect(c.petView.running&&c.ludoBackdrop.running,"visible resumed scene animates both layers");
+  c.activeGameOverlay=new Panel();c.activeGameOverlay.showing=true;c.syncPetVisibility();expect(!c.petView.running&&!c.ludoBackdrop.running,"game overlay pauses both layers");
   c.activeGameOverlay=null;c.activePetPanel=new Panel();c.syncPetVisibility();expect(!c.petView.running,"pet panel pauses underlying pet");
   c.activePetPanel=null;c.petWindowFocused=false;c.syncPetVisibility();expect(!c.petView.running,"focus loss pauses pet");
   c.petWindowFocused=true;c.activeDetailDialog=new Panel();c.activeDetailDialog.showing=true;c.syncPetVisibility();expect(!c.petView.running,"listing detail pauses pet");
-  c.activeDetailDialog=null;c.petResumed=false;c.syncPetVisibility();expect(!c.petView.running,"paused activity never resumes animation");
-  c.petResumed=true;c.syncPetVisibility();expect(c.petView.running,"closing overlays resumes visible pet");
+  c.activeDetailDialog=null;c.petResumed=false;c.syncPetVisibility();expect(!c.petView.running&&!c.ludoBackdrop.running,"paused activity never resumes either layer");
+  c.petResumed=true;c.syncPetVisibility();expect(c.petView.running&&c.ludoBackdrop.running,"closing overlays resumes both visible layers");
   System.out.println("PASS actual Activity selection during refresh, removed-offer fallback, recreation and covering-window gates");
  }
 }'''
