@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Frontend — rig illustrato implementato in PR242, verifiche bloccate
+
+Utente «Vai implementa»2026-10-04 approva integrazione atlas cut-out generato. Branch frontend/ludo-illustrated-rig, PR242 draft HEAD4374b767670d46ca959c86c49b91084634450018.14parti trasparenti+1bocca sorpresa losslessWebP, coordinate/pivot/gerarchia in docs/assets/ludo-rig-v1.json, guida/specifica relative. Personaggio ricomposto ispezionato localmente, circa560KBcompressi/2.6MBdecode. Solo mascotte persistente stanza: decode su artwork executor e cache perActivity, fallback canonico/portrait inline conservati. Blink200ms/6s, head1grado, tap braccia±14gradi/bocca con aspectfit, spirali ritagliate negli occhi. Nessuna stanza/hotspot/icone del pacchetto o backend/AI/costo/dipendenza introdotti. MainActivity condiviso solo binding/loadcache.
+
+RED posefields37197832996/job111423255870 letto; GREEN JUnit posa/gerarchia37198205939/job111424334878 e compileJava prodotto. Audit assetesatto rifiutava le nuove15parti: whitelist esplicita aggiornata, esclusioni legacy preservate. Android111424334840 ha riprodotto fixtureoverlay «did not acquire real focus»: attesaDialog focused-draw corretta, rerun pendente, nessuna cattura valida/accettazione dichiarata. Review indipendente senza Critical/Important; Minor possibile decode duplicato con creazioni actor sovrapposte, percorso normale single-thread/actorpersistente non lo fa.
+
+CI37198317892 tentativi1/2:3job richiesti FAIL prima di qualsiasi step/assegnazione runner, nessun log. Annotationcount2 ma endpoint non accessibile al connettore; non attribuire a billing/quota senza evidenza. Ultimo HEAD introduce solo attesa testDialog; verifica finale/fullregressioni ancora necessaria. Versione168 proposta, NON distribuita/mergiata; beta167 resta ultima frontend firmata. Toolchain Android/Java locale indisponibile. Serve approvazione utente prima del fallbackbrowserGitHub per leggere erroreActions (regola sviluppatore), poi completare CI e distribuzione già autorizzata.
+
+Frontend7/backend6 gruppi aperti; consolidato gruppoLudo. Unico prossimo passo frontend: leggere annotazioneCI, ripristinare runner/verificare ultimaHEAD, ispezionare100/200% e motion1, poi merge/beta firmata. Preservare il checkpoint backend seguente e non abilitare servizi o pagamenti per questa feature.
+
 ## Backend AI — provisioning privato pronto, attende conferma accesso browser
 
 2026-10-04 utente conferma GEMINI_API_KEY GitHub associata a Ludo scout Free/no billing (dichiarazione proprietario, chiave mai letta). PR243 HEAD193f1281403ae6f54dddfe292ed100e82faf0e6e integrata squash8f1031452e4c4ddddfffcf9576712330753ef45c; PR244 registra solo identico workflow in main, merged6d84c4c51176c440af24a94ea6c4b6fee68d73b. Servizio CI37198073870 SUCCESS22/22, CLI pinned --secrets-file dryrun/secretbulkhelp verificati; Android37198073875 SUCCESS, visual/browser/AI dialog saltati scope. Nuovi3test RED→GREEN, CLI locale outputvuoto0600/redacted rejection. Review indipendente senza Important/Critical; rischio operativo residuo: revocaCloudflare fallita lascia probe temporaneo ma runfallisce e AIrestaOFF.

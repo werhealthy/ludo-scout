@@ -1,5 +1,15 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Frontend — rig illustrato implementato in PR242, verifiche bloccate
+
+Utente «Vai implementa»2026-10-04 approva integrazione atlas cut-out generato. Branch frontend/ludo-illustrated-rig, PR242 draft HEAD4374b767670d46ca959c86c49b91084634450018.14parti trasparenti+1bocca sorpresa losslessWebP, coordinate/pivot/gerarchia in docs/assets/ludo-rig-v1.json, guida/specifica relative. Personaggio ricomposto ispezionato localmente, circa560KBcompressi/2.6MBdecode. Solo mascotte persistente stanza: decode su artwork executor e cache perActivity, fallback canonico/portrait inline conservati. Blink200ms/6s, head1grado, tap braccia±14gradi/bocca con aspectfit, spirali ritagliate negli occhi. Nessuna stanza/hotspot/icone del pacchetto o backend/AI/costo/dipendenza introdotti. MainActivity condiviso solo binding/loadcache.
+
+RED posefields37197832996/job111423255870 letto; GREEN JUnit posa/gerarchia37198205939/job111424334878 e compileJava prodotto. Audit assetesatto rifiutava le nuove15parti: whitelist esplicita aggiornata, esclusioni legacy preservate. Android111424334840 ha riprodotto fixtureoverlay «did not acquire real focus»: attesaDialog focused-draw corretta, rerun pendente, nessuna cattura valida/accettazione dichiarata. Review indipendente senza Critical/Important; Minor possibile decode duplicato con creazioni actor sovrapposte, percorso normale single-thread/actorpersistente non lo fa.
+
+CI37198317892 tentativi1/2:3job richiesti FAIL prima di qualsiasi step/assegnazione runner, nessun log. Annotationcount2 ma endpoint non accessibile al connettore; non attribuire a billing/quota senza evidenza. Ultimo HEAD introduce solo attesa testDialog; verifica finale/fullregressioni ancora necessaria. Versione168 proposta, NON distribuita/mergiata; beta167 resta ultima frontend firmata. Toolchain Android/Java locale indisponibile. Serve approvazione utente prima del fallbackbrowserGitHub per leggere erroreActions (regola sviluppatore), poi completare CI e distribuzione già autorizzata.
+
+Frontend7/backend6 gruppi aperti; consolidato gruppoLudo. Unico prossimo passo frontend: leggere annotazioneCI, ripristinare runner/verificare ultimaHEAD, ispezionare100/200% e motion1, poi merge/beta firmata. Preservare il checkpoint backend seguente e non abilitare servizi o pagamenti per questa feature.
+
 ## Frontend — Ludo native motion, beta167 distribuita
 
 PR238 HEAD61e452cc0d134ccb1a36f35c4d22d9ad955bb294, squash4eb153265e7da10de497fe7622c9334b3d409aa5. CI finale37195838356 SUCCESS; visual111417394185:12catture100/200% e motion1 ispezionate. Beta194/run37196275016 SUCCESS: 5.12.167-ludo-native-motion(1000194). Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato10:47:39UTC2026-10-04; upload Firebase10:48:17UTC e distinta distribuzione tester10:48:18UTC, release7r942mgpqdp78. Quota artefatti GitHub esaurita (step opzionale); Firebase disponibile in App Tester. Nessuna accettazione telefono dichiarata. Checkpoint conserva anche PR240/workflow Cloudflare OFF, aggiunti in parallelo senza cambiamenti Android.
