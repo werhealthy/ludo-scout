@@ -66,6 +66,12 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   set(a,"petResumed",true);invoke(a,"syncPetVisibility");actor.setResumed(true);animator=petField(actor,"idle");
   actor.react();actor.react();if(petField(actor,"idle")!=animator)throw new AssertionError("tap creates extra animator");
   if(!enabled&&petField(actor,"idle")!=null)throw new AssertionError("reduced motion still runs");
+  if(enabled){
+   Field started=LudoPetView.class.getDeclaredField("reactionStarted");started.setAccessible(true);started.setLong(actor,android.os.SystemClock.uptimeMillis()-800);
+   Bitmap sample=Bitmap.createBitmap(Math.max(1,actor.getWidth()),Math.max(1,actor.getHeight()),Bitmap.Config.ARGB_8888);android.graphics.Canvas canvas=new android.graphics.Canvas(sample);actor.draw(canvas);
+   float before=((LudoPose)petField(actor,"pose")).reactionLift;actor.react();actor.draw(canvas);float after=((LudoPose)petField(actor,"pose")).reactionLift;sample.recycle();
+   if(before<.014f||Math.abs(before-after)>.001f)throw new AssertionError("repeated tap jumps to resting pose");
+  }
   actor.setResumed(false);if(petField(actor,"idle")!=null||((Long)petField(actor,"reactionStarted"))!=-1L)throw new AssertionError("pause leaves reaction/animator alive");
   actor.react();if(((Long)petField(actor,"reactionStarted"))!=-1L)throw new AssertionError("paused tap starts movement");
   actor.setResumed(true);
