@@ -18,7 +18,7 @@ final class AiBetaRealChecks {
    JSONArray payload=AiBetaListings.payload(rows);check(payload.getJSONObject(0).getLong("listing_id")==1&&payload.getJSONObject(0).length()==3,"input not minimal/canonical");check(!payload.toString().contains("123")&&!payload.toString().contains("PENDING_ANALYSIS"),"private context transmitted");
    String key=AiBetaListings.key(rows);JSONArray reversed=new JSONArray().put(rows.getJSONObject(1)).put(rows.getJSONObject(0));check(key.equals(AiBetaListings.key(reversed)),"reordering consumed another ID");
    JSONObject response=new JSONObject().put("status","PROPOSAL").put("records",new JSONArray().put(answer(1,"ACCESSORY_COMPONENT")).put(answer(2,"BUNDLE"))).put("budget",new JSONObject().put("calls_reserved",9));
-   String display=AiBetaListings.display(rows,response);check(display.contains("Accessorio")&&display.contains("concorde")&&display.contains("divergente")&&display.contains("BGG_MATCH_REVIEW")&&display.contains("9 / 100"),"comparison lost context");
+   String display=AiBetaListings.display(rows,response);check(display.contains("Accessorio")&&display.contains("concorde")&&display.contains("divergente")&&display.contains("da revisionare")&&display.contains("9 / 100"),"comparison lost context");
    JSONObject bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("apply_authorized",true);rejected(rows,bad);
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("bgg_verified",true);rejected(rows,bad);
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("language","IT");rejected(rows,bad);
@@ -26,6 +26,7 @@ final class AiBetaRealChecks {
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("listing_id",2);rejected(rows,bad);
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("listing_id",99);rejected(rows,bad);
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("proposed_type","OTHER");rejected(rows,bad);
+   for(String localOnly:new String[]{"ACCESSORY","COMPONENTS","EMPTY_BOX","UNCERTAIN"}){bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("proposed_type",localOnly);rejected(rows,bad);}
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("evidence","");rejected(rows,bad);
    check(AiBetaListings.read(db).toString().equals(rows.toString()),"comparison wrote catalog");
    db.execSQL("UPDATE market_listings SET brand='changed' WHERE id=1");check(!key.equals(AiBetaListings.key(AiBetaListings.read(db))),"stale input reusable");
