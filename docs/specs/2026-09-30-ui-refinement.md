@@ -1,5 +1,12 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Frontend — Ludo a tutto schermo, direzione approvata 2026-10-04
+
+Il feedback più recente supersede la fascia scena/titolo/tab della168: stanza illustrata continua sull'intera area Ludo, attore grande persistente, comandi circolari sovrapposti in basso e ricerca fissa. Risultati/attività, Preferiti e Libreria si aprono in un pannello sopra la stanza; Back chiude prima il pannello. I tre originali forniti1000363565/566/567 sono rispettivamente Motore/Preferiti/Libreria; nessuna nuova stanza inventata. Pack UI: icona Ludo in nav/launcher, Desideri nel comando Preferiti, libro standard per Libreria. Gli altri quattro glyph sono risorse disponibili per momenti semanticamente pertinenti; cameo non introdotti nelle card in questo task. Rig canonico168 conservato, respiro/sguardo/oscillazione più percepibili, blink e tap esistenti, reduced motion/lifecycle rispettati. Layout compatto mantiene comandi e attore affiancati in viewport bassi. Nessuna modifica a AI, dati, matching, pricing, schema, soglie o dipendenze.
+
+Branch frontend/ludo-fullscreen-pet: implementazione in verifica, NON dichiarata distribuita o accettata. Frontend7/backend6 gruppi aperti; stesso gruppo Ludo. Prossimo passo: CI completa e catture Android100/200%/motion, poi beta firmata secondo workflow esistente.
+
+
 ## Backend — full catalog audit tooling verified, 2026-10-04
 
 Owner confirms beta171 comparison marked reviewed and asks autonomous integration/current catalog reanalysis, with a 99% error-reduction target. Screenshot Sogni per Bambini Ribelli shows title-only observed text and declared Cranio Creations brand: explains local BASE_GAME cue, does not settle AI NON_GAME as ground truth. No further permission requested; no actual phone database accessed.

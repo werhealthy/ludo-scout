@@ -109,7 +109,7 @@ public final class MainActivity extends Activity {
         QueueKeepAliveService.ensureRunning(this);
     }
 
-    @Override protected void onResume(){super.onResume();petResumed=true;petLoadedAt=0;syncPetVisibility();engineUiResumed=true;if(getSharedPreferences("ludo_journey",MODE_PRIVATE).getBoolean("return_search",false)){getSharedPreferences("ludo_journey",MODE_PRIVATE).edit().putBoolean("return_search",false).putLong("baseline_end",System.currentTimeMillis()).apply();openLudoExploration();ludoShowResults=true;}if("activity".equals(tab)||ludoExplorationVisible()){engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,f);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
+    @Override protected void onResume(){super.onResume();petResumed=true;petLoadedAt=0;syncPetVisibility();engineUiResumed=true;if(getSharedPreferences("ludo_journey",MODE_PRIVATE).getBoolean("return_search",false)){getSharedPreferences("ludo_journey",MODE_PRIVATE).edit().putBoolean("return_search",false).putLong("baseline_end",System.currentTimeMillis()).apply();openLudoExploration();ludoRoomPanelOpen=true;ludoShowResults=true;}if("activity".equals(tab)||ludoExplorationVisible()){engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(receiver,f);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
     @Override protected void onPause(){petResumed=false;syncPetVisibility();engineUiResumed=false;clearEngineHistoryPull();uiUpdates.removeCallbacks(activityStatusPulse);persistTransientUiSession();super.onPause();}
     @Override public void onTrimMemory(int level){
         super.onTrimMemory(level);
@@ -132,7 +132,7 @@ private void buildShell(){
         LinearLayout shell=new LinearLayout(this);shell.setOrientation(LinearLayout.VERTICAL);root.addView(shell,new FrameLayout.LayoutParams(-1,-1));
         refreshHost=new PullRefreshScrollView(this);scroll=refreshHost.scroll();refreshHost.setOnRefresh(this::refreshCurrent);scroll.setOnScrollChangeListener((v,sx,sy,ox,oy)->{View content=scroll.getChildAt(0);if(content==null)return;int remaining=content.getHeight()-(scroll.getHeight()+sy);if(remaining>=dp(520))return;if("database".equals(tab)&&selectedGameId==0&&databaseResultsHost!=null&&!databaseLoadingMore)loadMoreDatabase();else if("catalog".equals(tab)&&catalogResultsHost!=null&&!catalogLoadingMore)loadMoreCatalog();});
         body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setClipToPadding(false);body.setPadding(dp(18),dp(4),dp(18),dp(40));
-        refreshHost.setContent(body);refreshHost.setRoomSwipeHandler(()->"companion".equals(tab)&&activePetPanel==null&&(activeGameOverlay==null||!activeGameOverlay.isShowing())&&(activeDetailDialog==null||!activeDetailDialog.isShowing())&&libraryDetailDialogs.isEmpty(),direction->switchLudoRoom(LudoRoomState.swipeTarget(ludoRoomState().room(),direction)));mainScrollStage=new FrameLayout(this);mainScrollStage.addView(refreshHost,new FrameLayout.LayoutParams(-1,-1));shell.addView(mainScrollStage,new LinearLayout.LayoutParams(-1,0,1));
+        refreshHost.setContent(body);refreshHost.setRoomSwipeHandler(()->"companion".equals(tab)&&activePetPanel==null&&(activeGameOverlay==null||!activeGameOverlay.isShowing())&&(activeDetailDialog==null||!activeDetailDialog.isShowing())&&libraryDetailDialogs.isEmpty(),direction->switchLudoRoom(LudoRoomState.swipeTarget(ludoRoomState().room(),direction)));mainScrollStage=new FrameLayout(this);mainScrollStage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if("companion".equals(tab)&&(b-t!=ob-ot||r-l!=or-ol))placeLudoStage();});mainScrollStage.addView(refreshHost,new FrameLayout.LayoutParams(-1,-1));shell.addView(mainScrollStage,new LinearLayout.LayoutParams(-1,0,1));
         nav=new LinearLayout(this);nav.setGravity(Gravity.CENTER);nav.setPadding(dp(8),dp(7),dp(8),dp(7));nav.setBackgroundColor(SURFACE);nav.setElevation(dp(10));
         shell.addView(nav,new LinearLayout.LayoutParams(-1,dp(78)));
         companionFab=makeCompanionFab();FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(dp(70),dp(70),Gravity.END|Gravity.BOTTOM);fp.rightMargin=dp(18);fp.bottomMargin=dp(94);root.addView(companionFab,fp);
@@ -187,7 +187,7 @@ private View makeCompanionFab(){
         int active=home?Color.WHITE:LIME,inactive=home?Color.WHITE:MUTED;
         LinearLayout x=new LinearLayout(this);x.setOrientation(LinearLayout.VERTICAL);x.setGravity(Gravity.CENTER);x.setPadding(dp(3),dp(5),dp(3),dp(3));
         FrameLayout pill=new FrameLayout(this);pill.setBackground(round(on?(home?DISCOVER_NAV_ACTIVE:SURFACE2):Color.TRANSPARENT,14,on&&home?1:0,Color.rgb(43,43,43)));
-        if("companion".equals(value)){ImageView icon=new ImageView(this);icon.setImageResource(R.drawable.ludo_mark);icon.setImageTintList(android.content.res.ColorStateList.valueOf(on?active:inactive));icon.setPadding(dp(18),dp(3),dp(18),dp(3));icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);pill.addView(icon,new FrameLayout.LayoutParams(-1,-1));}else{TextView icon=appIcon(glyph,22,on?active:inactive);pill.addView(icon,new FrameLayout.LayoutParams(-1,-1));}x.setContentDescription(label);x.setSelected(on);x.addView(pill,new LinearLayout.LayoutParams(dp(70),dp(35)));
+        if("companion".equals(value)){ImageView icon=new ImageView(this);icon.setImageResource(R.drawable.ludo_icon_ludo);icon.setAlpha(on?1f:.62f);icon.setPadding(dp(12),0,dp(12),0);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);pill.addView(icon,new FrameLayout.LayoutParams(-1,-1));}else{TextView icon=appIcon(glyph,22,on?active:inactive);pill.addView(icon,new FrameLayout.LayoutParams(-1,-1));}x.setContentDescription(label);x.setSelected(on);x.addView(pill,new LinearLayout.LayoutParams(dp(70),dp(35)));
         TextView l=discoverText(label,10,on?active:inactive,Typeface.BOLD);l.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-1,-2);tlp.topMargin=dp(4);x.addView(l,tlp);x.setOnClickListener(v->navigate(value));return x;
     }
@@ -249,7 +249,7 @@ private View makeCompanionFab(){
     }
     private void openDatabaseGame(long gameId,String sourceTab){if(gameId<=0)return;if(scroll!=null)tabScrollPositions.put(tab,scroll.getScrollY());selectedGameId=gameId;databaseDetailReturnTab=!TextUtils.isEmpty(sourceTab)&&!"database".equals(sourceTab)?sourceTab:"";if(!"database".equals(tab))tab="database";persistTransientUiSession();renderNav();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null)scroll.scrollTo(0,0);},30);}
     private void closeDatabaseGame(){selectedGameId=0;if(!TextUtils.isEmpty(databaseDetailReturnTab)){String target=databaseDetailReturnTab;databaseDetailReturnTab="";tab=target;renderNav();}final String destination=tab;final int savedY=tabScrollPositions.getOrDefault(destination,0);persistTransientUiSession();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null&&destination.equals(tab)&&selectedGameId==0)scroll.scrollTo(0,savedY);},35);}
-    @Override public void onBackPressed(){recordLudoRoomPosition();if("activity".equals(tab)&&"overview".equals(engineSection)&&engineDetailReturnToLudo){openLudoExploration();return;}if("activity".equals(tab)&&!"overview".equals(engineSection)){engineSection=EngineOverviewPresentation.backSection(engineSection,engineDayStart>0);scheduleRender(0);if(scroll!=null)scroll.scrollTo(0,0);return;}if("database".equals(tab)&&selectedGameId>0){closeDatabaseGame();return;}if(scroll!=null)tabScrollPositions.put(tab,scroll.getScrollY());if(!tabHistory.isEmpty()){prepareLudoNavigation(tabHistory.peek());tab=tabHistory.pop();final String destination=tab;final int savedY=tabScrollPositions.getOrDefault(destination,0);renderNav();persistTransientUiSession();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null&&destination.equals(tab))scroll.scrollTo(0,savedY);},35);return;}if(!"discover".equals(tab)){tab="discover";renderNav();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null)scroll.scrollTo(0,tabScrollPositions.getOrDefault(tab,0));},35);return;}if(scroll!=null)scroll.smoothScrollTo(0,0);}
+    @Override public void onBackPressed(){if("companion".equals(tab)&&ludoRoomPanelOpen){setLudoRoomPanel(false);return;}recordLudoRoomPosition();if("activity".equals(tab)&&"overview".equals(engineSection)&&engineDetailReturnToLudo){openLudoExploration();return;}if("activity".equals(tab)&&!"overview".equals(engineSection)){engineSection=EngineOverviewPresentation.backSection(engineSection,engineDayStart>0);scheduleRender(0);if(scroll!=null)scroll.scrollTo(0,0);return;}if("database".equals(tab)&&selectedGameId>0){closeDatabaseGame();return;}if(scroll!=null)tabScrollPositions.put(tab,scroll.getScrollY());if(!tabHistory.isEmpty()){prepareLudoNavigation(tabHistory.peek());tab=tabHistory.pop();final String destination=tab;final int savedY=tabScrollPositions.getOrDefault(destination,0);renderNav();persistTransientUiSession();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null&&destination.equals(tab))scroll.scrollTo(0,savedY);},35);return;}if(!"discover".equals(tab)){tab="discover";renderNav();scheduleRender(1);uiUpdates.postDelayed(()->{if(scroll!=null)scroll.scrollTo(0,tabScrollPositions.getOrDefault(tab,0));},35);return;}if(scroll!=null)scroll.smoothScrollTo(0,0);}
     private void scheduleRender(long delayMs){uiUpdates.removeCallbacks(deferredRender);uiUpdates.postDelayed(deferredRender,Math.max(0,delayMs));}
     private void updateActivityIndicator(){updateActivityIndicator(activityButton);}
     private void requestActivityIndicatorSnapshot(){
@@ -1507,7 +1507,7 @@ private void showFilterSheet(){
     private LudoPetView petView;private boolean petResumed,petWindowFocused;private Dialog activePetPanel;private boolean petPanelProfile,petPanelFavorites;private int petFavoritesRequest;
     private LocalScoutBrain.Snapshot petSnapshot;private List<DealRecord> petHuntDeals=Collections.emptyList();private List<LibraryGame> petLibrary=Collections.emptyList();private GameRecord petRememberedGame;
     private final Map<String,Long> petGameIds=new HashMap<>();private final Map<String,GameRecord> petCanonicalGames=new HashMap<>();private boolean petLoading;private long petLoadedAt;private String petFailure;
-    private void syncPetVisibility(){boolean visible=petResumed&&petWindowFocused&&"companion".equals(tab)&&activePetPanel==null&&(activeGameOverlay==null||!activeGameOverlay.isShowing())&&(activeDetailDialog==null||!activeDetailDialog.isShowing());if(petView!=null)petView.setResumed(visible);if(ludoBackdrop!=null)ludoBackdrop.setResumed(visible);}
+    private void syncPetVisibility(){boolean visible=petResumed&&petWindowFocused&&"companion".equals(tab)&&!ludoRoomPanelOpen&&activePetPanel==null&&(activeGameOverlay==null||!activeGameOverlay.isShowing())&&(activeDetailDialog==null||!activeDetailDialog.isShowing());if(petView!=null)petView.setResumed(visible);if(ludoBackdrop!=null)ludoBackdrop.setResumed(visible);}
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);petWindowFocused=focused;syncPetVisibility();}
     private void requestPetSnapshot(){
         if(petLoading||(petSnapshot!=null||petFailure!=null)&&System.currentTimeMillis()-petLoadedAt<15000)return;petLoading=true;final String remembered=gamePreferences().lastGame();
@@ -1541,10 +1541,11 @@ private void showFilterSheet(){
     private void prepareLudoNavigation(String destination){recordLudoRoomPosition();if("companion".equals(destination)&&!"companion".equals(tab)){renderedLudoRoom="";tabScrollPositions.put("companion",ludoRoomState().position(ludoRoomState().room()));}}
     private void openLudoHome(){if("companion".equals(tab)){switchLudoRoom(LudoRoomState.HOME);return;}LudoRoomState rooms=ludoRoomState();int y=rooms.switchTo(LudoRoomState.HOME,rooms.position(rooms.room()));saveLudoRooms();renderedLudoRoom="";tabScrollPositions.put("companion",y);navigate("companion");}
     private void switchLudoRoom(String next){
-        LudoRoomState rooms=ludoRoomState();String target=LudoRoomState.normalize(next);if(target.equals(rooms.room()))return;
+        LudoRoomState rooms=ludoRoomState();String target=LudoRoomState.normalize(next);if(target.equals(rooms.room()))return;ludoRoomPanelOpen=false;
         int y=rooms.switchTo(target,scroll==null?rooms.position(rooms.room()):scroll.getScrollY());renderedLudoRoom="";saveLudoRooms();tabScrollPositions.put("companion",y);render();
         if(scroll!=null)scroll.post(()->{if("companion".equals(tab)&&target.equals(rooms.room())){scroll.scrollTo(0,y);scroll.announceForAccessibility(rooms.isHome()?"Libreria":LudoRoomState.HUNTS.equals(rooms.room())?"Preferiti":"Motore");}});
     }
+    private boolean ludoRoomPanelOpen;
     private View ludoRoomDots;
     private LudoRoomFrame ludoStage;
     private LudoRoomBackdropView ludoBackdrop;
@@ -1552,24 +1553,32 @@ private void showFilterSheet(){
     private void clearLudoFooter(){
         if(ludoRoomDots!=null){mainScrollStage.removeView(ludoRoomDots);ludoRoomDots=null;}
         FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)refreshHost.getLayoutParams();lp.bottomMargin=0;
-        if(!"companion".equals(tab)){lp.topMargin=0;if(ludoStage!=null){mainScrollStage.removeView(ludoStage);ludoStage=null;ludoBackdrop=null;ludoSections=null;}}
+        if(!"companion".equals(tab)){ludoRoomPanelOpen=false;body.setBackgroundColor(BG);refreshHost.setVisibility(View.VISIBLE);refreshHost.setBackgroundColor(Color.TRANSPARENT);refreshHost.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);lp.height=-1;lp.gravity=Gravity.TOP;lp.topMargin=0;if(ludoStage!=null){mainScrollStage.removeView(ludoStage);ludoStage=null;ludoBackdrop=null;ludoSections=null;}}
         refreshHost.setLayoutParams(lp);
     }
     private void showLudoRoomIndicators(){
-        LinearLayout footer=new LinearLayout(this);footer.setOrientation(LinearLayout.VERTICAL);footer.setPadding(dp(16),dp(4),dp(16),dp(12));footer.setBackgroundColor(BG);
+        LinearLayout footer=new LinearLayout(this);footer.setOrientation(LinearLayout.VERTICAL);footer.setPadding(dp(16),dp(4),dp(16),dp(12));footer.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{Color.TRANSPARENT,0xcc17121f}));
         renderLudoSearch(footer);ludoRoomDots=footer;mainScrollStage.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         footer.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(ludoRoomDots!=footer||!"companion".equals(tab))return;FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)refreshHost.getLayoutParams();if(lp.bottomMargin!=footer.getHeight()){lp.bottomMargin=footer.getHeight();refreshHost.setLayoutParams(lp);}placeLudoStage();});
     }
 
     private void placeLudoStage(){
         if(ludoStage==null||ludoRoomDots==null||!"companion".equals(tab)||mainScrollStage.getHeight()==0)return;
-        int budget=mainScrollStage.getHeight()-ludoRoomDots.getHeight()-dp(152);
-        int minimum=ludoStage.getChildAt(3).getMeasuredHeight()+dp(116);
-        boolean pinned=budget>=minimum;
-        ViewGroup destination=pinned?mainScrollStage:body;
-        if(ludoStage.getParent()!=destination){if(ludoStage.getParent()!=null)((ViewGroup)ludoStage.getParent()).removeView(ludoStage);if(pinned)mainScrollStage.addView(ludoStage,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));else body.addView(ludoStage,0,new LinearLayout.LayoutParams(-1,-2));}
-        ludoStage.setHeightBudget(pinned?budget:0);
-        FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)refreshHost.getLayoutParams();int reserve=pinned?ludoStage.getHeight():0;if(lp.topMargin!=reserve){lp.topMargin=reserve;refreshHost.setLayoutParams(lp);}
+        ludoStage.setHeightBudget(mainScrollStage.getHeight());
+        ludoStage.setControlsInset(ludoRoomDots.getHeight());
+        FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)refreshHost.getLayoutParams();
+        lp.topMargin=0;lp.bottomMargin=ludoRoomDots.getHeight();lp.gravity=Gravity.BOTTOM;
+        lp.height=Math.max(dp(120),(mainScrollStage.getHeight()-lp.bottomMargin)*4/5);
+        refreshHost.setLayoutParams(lp);
+        refreshHost.setVisibility(ludoRoomPanelOpen?View.VISIBLE:View.GONE);
+        refreshHost.setImportantForAccessibility(ludoRoomPanelOpen?View.IMPORTANT_FOR_ACCESSIBILITY_AUTO:View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        ludoStage.setImportantForAccessibility(ludoRoomPanelOpen?View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS:View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+        syncPetVisibility();
+    }
+    private void setLudoRoomPanel(boolean open){
+        ludoRoomPanelOpen=open;placeLudoStage();
+        if(open){refreshHost.bringToFront();if(ludoRoomDots!=null)ludoRoomDots.bringToFront();refreshHost.requestFocus();refreshHost.announceForAccessibility("Pannello aperto");}
+        else if(petView!=null){petView.requestFocus();petView.announceForAccessibility("Torna alla stanza di Ludo");}
     }
 
     private void renderLudoSearch(LinearLayout footer){
@@ -1579,7 +1588,10 @@ private void showFilterSheet(){
     private void renderCompanion(){
         LudoRoomState rooms=ludoRoomState();ludoSearchQuery=ludoSearchDraft();ludoSearchInput=null;renderedLudoRoom=rooms.room();final String displayedRoom=rooms.room();final int roomY=rooms.position(displayedRoom);
         if(scroll!=null)scroll.post(()->{if("companion".equals(tab)&&displayedRoom.equals(ludoRoomState().room()))scroll.scrollTo(0,roomY);});
-        requestPetSnapshot();body.setPadding(0,0,0,dp(24));body.setBackgroundColor(BG);showLudoRoomIndicators();
+        requestPetSnapshot();body.setPadding(0,0,0,dp(24));body.setBackgroundColor(Color.TRANSPARENT);
+        refreshHost.setBackground(round(SURFACE,26,1,OUTLINE));showLudoRoomIndicators();
+        TextView close=secondaryTextAction("Torna alla stanza");close.setMinHeight(dp(48));close.setGravity(Gravity.CENTER);close.setOnClickListener(v->setLudoRoomPanel(false));body.addView(close,new LinearLayout.LayoutParams(-1,-2));
+        refreshHost.setVisibility(ludoRoomPanelOpen?View.VISIBLE:View.GONE);
         if(rooms.isHome()){renderLudoHomeScene();renderLibrary();return;}
         renderLudoEnvironment(rooms.room());
         if(LudoRoomState.HUNTS.equals(rooms.room())){renderLudoHunts();return;}
@@ -1590,14 +1602,35 @@ private void showFilterSheet(){
     private void renderLudoEnvironment(String room){
         if(ludoStage==null){
             ludoStage=new LudoRoomFrame(this,false);ludoBackdrop=new LudoRoomBackdropView(this,BG);ludoStage.addView(ludoBackdrop);
+            LudoRoomSwipe swipe=new LudoRoomSwipe();ludoBackdrop.setOnTouchListener((v,event)->{if(ludoRoomPanelOpen)return false;switch(event.getActionMasked()){
+                case android.view.MotionEvent.ACTION_DOWN:swipe.down(event.getX(),event.getY());return true;
+                case android.view.MotionEvent.ACTION_MOVE:swipe.move(event.getX(),event.getY(),android.view.ViewConfiguration.get(this).getScaledTouchSlop());return true;
+                case android.view.MotionEvent.ACTION_UP:int direction=swipe.release(event.getX(),event.getY(),dp(48));if(direction!=0)switchLudoRoom(LudoRoomState.swipeTarget(ludoRoomState().room(),direction));else v.performClick();return true;
+                case android.view.MotionEvent.ACTION_CANCEL:swipe.cancel();return true;default:return false;}});
             petView=new LudoPetView(this);petView.setMood(LudoPetMood.IDLE);ludoStage.addView(petView);loadLudoRoomActor(petView,R.drawable.ludo_scribble_character);ludoStage.addView(new Space(this));
-            LinearLayout heading=new LinearLayout(this);heading.setOrientation(LinearLayout.VERTICAL);LinearLayout title=new LinearLayout(this);title.setGravity(Gravity.CENTER_VERTICAL);title.addView(text("Ludo",24,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(0,-2,1));
-            TextView options=appIcon(LudoIcons.ELLIPSIS_VERTICAL,18,TEXT);options.setGravity(Gravity.CENTER);options.setContentDescription("Azioni di Ludo");options.setOnClickListener(v->{if(LudoRoomState.EXPLORE.equals(ludoRoomState().room()))showEngineOverviewMenu();else{PopupMenu menu=new PopupMenu(this,options);menu.getMenu().add("I miei gusti").setOnMenuItemClickListener(item->{requestPetSnapshot();openPetSpace(true);return true;});menu.getMenu().add("Gestisci le cacce salvate").setOnMenuItemClickListener(item->{requestPetSnapshot();openPetSpace(false);return true;});menu.show();}});title.addView(options,new LinearLayout.LayoutParams(dp(48),dp(48)));heading.addView(title);
-            ludoSections=new LinearLayout(this);heading.addView(ludoSections,new LinearLayout.LayoutParams(-1,-2));ludoStage.addView(heading);ludoStage.addView(new Space(this));
-            final LudoRoomFrame stage=ludoStage;mainScrollStage.addView(stage,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));stage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(ludoStage!=stage||!"companion".equals(tab))return;FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)refreshHost.getLayoutParams();int reserve=stage.getParent()==mainScrollStage?stage.getHeight():0;if(lp.topMargin!=reserve){lp.topMargin=reserve;refreshHost.setLayoutParams(lp);}});
+            LinearLayout commands=new LinearLayout(this);commands.setOrientation(LinearLayout.VERTICAL);
+            ludoSections=new LinearLayout(this);ludoSections.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sections=new LinearLayout.LayoutParams(-1,-2);sections.topMargin=dp(12);commands.addView(ludoSections,sections);ludoStage.addView(commands);
+            LinearLayout chrome=new LinearLayout(this);chrome.setGravity(Gravity.CENTER_VERTICAL);
+            Button title=productPrimaryButton("Esplora",LudoIcons.ARROW_DOWN,SURFACE2,()->setLudoRoomPanel(true));title.setTag("ludo-room-open");title.setMinHeight(dp(48));chrome.addView(title,new LinearLayout.LayoutParams(-2,-2));chrome.addView(new Space(this),new LinearLayout.LayoutParams(0,1,1));
+            TextView options=appIcon(LudoIcons.ELLIPSIS_VERTICAL,18,TEXT);options.setGravity(Gravity.CENTER);options.setContentDescription("Azioni di Ludo");options.setBackground(round(0xcc21182f,24,0,0));options.setOnClickListener(v->{if(LudoRoomState.EXPLORE.equals(ludoRoomState().room()))showEngineOverviewMenu();else{PopupMenu menu=new PopupMenu(this,options);menu.getMenu().add("I miei gusti").setOnMenuItemClickListener(item->{requestPetSnapshot();openPetSpace(true);return true;});menu.getMenu().add("Gestisci le cacce salvate").setOnMenuItemClickListener(item->{requestPetSnapshot();openPetSpace(false);return true;});menu.show();}});LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(dp(48),dp(48));op.leftMargin=dp(12);chrome.addView(options,op);ludoStage.addView(chrome);
+            final LudoRoomFrame stage=ludoStage;mainScrollStage.addView(stage,0,new FrameLayout.LayoutParams(-1,-1));stage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(ludoStage==stage&&"companion".equals(tab))placeLudoStage();});
         }
-        if(ludoStage.getParent()==null)mainScrollStage.addView(ludoStage,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));ludoBackdrop.setRoom(room);ludoSections.removeAllViews();String[] keys={LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME},labels={"Esplora","Preferiti","Libreria"};
-        for(int i=0;i<keys.length;i++){final String key=keys[i];boolean selected=key.equals(room);TextView target=text(labels[i],14,selected?TEXT:MUTED,selected?Typeface.BOLD:Typeface.NORMAL);target.setGravity(Gravity.CENTER);target.setMinHeight(dp(48));target.setPadding(dp(4),dp(6),dp(4),dp(6));target.setSelected(selected);target.setBackground(round(selected?SURFACE2:Color.TRANSPARENT,12,selected?1:0,OUTLINE));target.setContentDescription(labels[i]+(selected?", selezionata":""));target.setOnClickListener(v->switchLudoRoom(key));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)rp.leftMargin=dp(8);ludoSections.addView(target,rp);}syncPetVisibility();
+        ludoBackdrop.setRoom(room);loadLudoRoomBackground(room,ludoBackdrop);
+        String name=LudoRoomState.HOME.equals(room)?"Libreria":LudoRoomState.HUNTS.equals(room)?"Preferiti":"Esplora";
+        ((Button)ludoStage.findViewWithTag("ludo-room-open")).setText(name);ludoStage.findViewWithTag("ludo-room-open").setContentDescription(name+". Apri "+(LudoRoomState.EXPLORE.equals(room)?"risultati e attività":"il pannello"));
+        ludoSections.removeAllViews();String[] keys={LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME},labels={"Esplora","Preferiti","Libreria"};
+        for(int i=0;i<keys.length;i++){
+            final String key=keys[i];boolean selected=key.equals(room);LinearLayout target=new LinearLayout(this);target.setOrientation(LinearLayout.VERTICAL);target.setGravity(Gravity.CENTER);target.setPadding(dp(4),dp(6),dp(4),dp(6));
+            FrameLayout circle=new FrameLayout(this);circle.setBackground(round(selected?0xff70466e:0xe621182f,999,selected?2:1,selected?0xffedd18d:OUTLINE));
+            if(i<2){ImageView icon=new ImageView(this);icon.setImageResource(i==0?R.drawable.ludo_icon_ludo:R.drawable.ludo_icon_desideri);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);circle.addView(icon,new FrameLayout.LayoutParams(-1,-1));}
+            else{TextView icon=appIcon(LudoIcons.BOOK_OPEN,24,0xffedd18d);icon.setGravity(Gravity.CENTER);circle.addView(icon,new FrameLayout.LayoutParams(-1,-1));}
+            target.addView(circle,new LinearLayout.LayoutParams(dp(56),dp(56)));TextView label=text(labels[i],12,TEXT,Typeface.BOLD);label.setGravity(Gravity.CENTER);label.setPadding(dp(6),dp(4),dp(6),dp(4));label.setBackground(round(0xe621182f,12,0,0));target.addView(label,new LinearLayout.LayoutParams(-1,-2));target.setSelected(selected);target.setFocusable(true);target.setContentDescription(labels[i]+(selected?", stanza attuale. Apri il pannello":". Cambia stanza"));target.setOnClickListener(v->{if(key.equals(ludoRoomState().room()))setLudoRoomPanel(true);else switchLudoRoom(key);});ludoSections.addView(target,new LinearLayout.LayoutParams(0,-2,1));
+        }
+        ludoStage.post(this::placeLudoStage);syncPetVisibility();
+    }
+    private void loadLudoRoomBackground(String room,LudoRoomBackdropView target){
+        int resource=LudoRoomState.HOME.equals(room)?R.drawable.ludo_room_library_background:LudoRoomState.HUNTS.equals(room)?R.drawable.ludo_room_hunts_background:R.drawable.ludo_room_engine_background;
+        galleryNet.execute(()->{Bitmap image=sceneAsset(resource);runOnUiThread(()->{if(!isDestroyed()&&target==ludoBackdrop&&"companion".equals(tab)&&room.equals(ludoRoomState().room()))target.setBitmap(image);});});
     }
 
     private volatile LudoIllustratedRig roomIllustratedRig;
@@ -1646,7 +1679,7 @@ private void showFilterSheet(){
         LinearLayout results=new LinearLayout(this);boolean large=getResources().getConfiguration().fontScale>1.3f;results.setOrientation(large?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
         for(int stage:new int[]{0,4}){final int selected=stage;View metric=ludoMetric(snapshot.journeyCounts[stage],stage==0?"annunci osservati":"annunci idonei");metric.setMinimumHeight(dp(48));metric.setFocusable(true);metric.setContentDescription(snapshot.journeyCounts[stage]+(stage==0?" annunci osservati oggi":" annunci idonei oggi")+". Apri gli annunci.");metric.setOnClickListener(v->showJourneyItems(snapshot,selected));LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(large?-1:0,-2,large?0:1);if(stage==4){if(large)mp.topMargin=dp(16);else mp.leftMargin=dp(18);}results.addView(metric,mp);}host.addView(results);
         uiUpdates.removeCallbacks(activityStatusPulse);if(engineUiResumed)uiUpdates.postDelayed(activityStatusPulse,snapshot.phases[0]>0||snapshot.activeMask!=0?2_000L:10_000L);
-        if(ludoShowResults){ludoShowResults=false;host.post(()->{if(ludoExplorationVisible()&&scroll!=null)scroll.smoothScrollTo(0,host.getTop());});}
+        if(ludoShowResults&&ludoRoomPanelOpen){ludoShowResults=false;host.post(()->{if(ludoExplorationVisible()&&scroll!=null)scroll.smoothScrollTo(0,host.getTop());});}
     }
 
     private void renderLudoActions(){
@@ -2757,7 +2790,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     // Helpers retained from the stable engine shell.
     private boolean ludoShowResults,browserOpening,engineDetailReturnToLudo;
     private void enterEngineDetail(String section){recordLudoRoomPosition();if("companion".equals(tab)){engineDetailReturnToLudo=true;if(scroll!=null)tabScrollPositions.put("companion",scroll.getScrollY());}tab="activity";engineSection=section;persistTransientUiSession();renderNav();}
-    private void openLudoExploration(){if(engineDetailReturnToLudo){engineDetailReturnToLudo=false;tab="companion";renderedLudoRoom="";renderNav();}recordLudoRoomPosition();LudoRoomState rooms=ludoRoomState();rooms.switchTo(LudoRoomState.EXPLORE,rooms.position(rooms.room()));saveLudoRooms();renderedLudoRoom="";engineSection="overview";if(!"companion".equals(tab))navigate("companion");else scheduleRender(0);engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}
+    private void openLudoExploration(){if(engineDetailReturnToLudo){ludoRoomPanelOpen=true;engineDetailReturnToLudo=false;tab="companion";renderedLudoRoom="";renderNav();}recordLudoRoomPosition();LudoRoomState rooms=ludoRoomState();rooms.switchTo(LudoRoomState.EXPLORE,rooms.position(rooms.room()));saveLudoRooms();renderedLudoRoom="";engineSection="overview";if(!"companion".equals(tab))navigate("companion");else scheduleRender(0);engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}
     private void openVintedBrowserExperiment(String url,String mode,String sellerId){
         if(!VintedBrowserPolicy.allowedPage(url)){Toast.makeText(this,"Link non disponibile",Toast.LENGTH_SHORT).show();return;}if(browserOpening)return;
         if("SEARCH".equals(mode)){browserOpening=true;uiDataIo.execute(()->{try{long[] day=ExplorationPlan.day(System.currentTimeMillis());List<DealDatabase.JourneyItem> observed=db.engineJourneyItems(day[0],day[1]);int[] before=DealDatabase.journeyCounts(observed);org.json.JSONObject gates=new org.json.JSONObject();for(DealDatabase.JourneyItem i:observed){try{int mask=JourneyDelta.mask(i.completed);gates.put(i.identity,mask);gates.put("signature:"+i.signature,mask);}catch(org.json.JSONException impossible){throw new IllegalStateException(impossible);}}SharedPreferences.Editor edit=getSharedPreferences("ludo_journey",MODE_PRIVATE).edit().putLong("baseline_day",day[0]).putLong("baseline_at",System.currentTimeMillis()).putLong("baseline_end",0).putString("baseline_gates",gates.toString()).putBoolean("return_search",true);for(int i=0;i<5;i++)edit.putInt("before_"+i,before[i]);if(!edit.commit())throw new IllegalStateException("baseline");runOnUiThread(()->{browserOpening=false;if(!isDestroyed()&&!isFinishing())launchVintedBrowser(url,mode,sellerId);});}catch(RuntimeException failure){runOnUiThread(()->{browserOpening=false;Toast.makeText(this,"Esplorazione non avviata. Riprova.",Toast.LENGTH_SHORT).show();});}});}else launchVintedBrowser(url,mode,sellerId);
@@ -3903,6 +3936,7 @@ private int ageColor(DealRecord d){String a=ageLabel(d);if(a.endsWith(" min")){t
     }
 
 }
+
 
 
 

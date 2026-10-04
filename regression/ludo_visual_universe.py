@@ -9,6 +9,9 @@ replaced={'ludo_'+n for n in ['idle','hello','deal_search','treasure_reward','no
 rig_parts={'ludo_part_'+n for n in ['body','cape','hat','head','ear_left','ear_right','eye_left','eye_right','spiral_left','spiral_right','mouth','mouth_surprised','arm_left','arm_right','dice']}
 raster_allowed=(allowed-replaced)|{'ludo_scribble_character'}|rig_parts
 allowed.update(rig_parts)
+icon_parts={'ludo_icon_'+n for n in ['ludo','desideri','fortuna','loading','refresh','highlight']}
+raster_allowed.update(icon_parts)
+allowed.update(icon_parts)
 assert actual==raster_allowed, f'Legacy or missing Ludo art: {actual ^ raster_allowed}'
 allowed.update({'ludo_scribble_character','ludo_mark'})
 for p in (root/'app/src/main').rglob('*'):
@@ -21,4 +24,5 @@ main=(root/'app/src/main/java/it/vintedaffari/app/MainActivity.java').read_text(
 journey=main.split('private void renderLudoJourney(){')[1].split('private void')[0]
 assert 'setX' not in journey and 'dp(100),dp(100)' not in journey, 'Fixed wheel still overflows container'
 print('PASS visual universe: resource references, launcher chain, legacy vector, adaptive journey')
+
 
