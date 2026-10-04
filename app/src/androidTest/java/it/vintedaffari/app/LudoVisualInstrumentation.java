@@ -48,7 +48,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      for(String label:new String[]{"Trova nuovi giochi"})if(text(footer,label)==null)throw new AssertionError("missing destination/action "+label);
      View scene=(View)get(a,"ludoStage");View actorNow=(View)get(a,"petView");
      if(actor[0]!=null&&actor[0]!=actorNow)throw new AssertionError("mascot recreated between rooms");actor[0]=actorNow;
-     if(((FrameLayout.LayoutParams)refresh.getLayoutParams()).topMargin!=scene.getHeight())throw new AssertionError("scene obscures content");
+     if(((FrameLayout.LayoutParams)refresh.getLayoutParams()).topMargin!=(scene.getParent()==get(a,"mainScrollStage")?scene.getHeight():0))throw new AssertionError("scene obscures content");
      for(String label:new String[]{"Esplora","Preferiti","Libreria"})if(text(scene,label)==null)throw new AssertionError("top section missing "+label);
      if(refresh.getHeight()<100)throw new AssertionError("content viewport collapsed");
      int[] pos=new int[2],navPos=new int[2];footer.getLocationInWindow(pos);nav.getLocationInWindow(navPos);

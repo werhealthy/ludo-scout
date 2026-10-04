@@ -40,7 +40,7 @@ checks = [
      "nel Catalogo" not in components),
     ("human attention retains a visible direct inbox",
      "engineAttentionCard(snapshot.recoveryCount)" in overview and
-     "Richieste manuali · nessuna" in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and
+     "Nessun annuncio da confermare" in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and
      'enterEngineDetail("review")' in main[main.index("private View engineAttentionCard"):main.index("private View engineWorkQueueCard")] and 'tab="activity";engineSection=section' in main),
     ("unfinished scrolls use user-facing waiting states",
      "Altri scroll" in components and "Riprenderà" in components and "In attesa" in components),
@@ -59,5 +59,6 @@ failed = [name for name, ok in checks if not ok]
 if failed:
     raise SystemExit("Motore UI clarity regression failed: " + ", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} Motore UI clarity guards")
+
 
 
