@@ -6,13 +6,16 @@ import android.widget.FrameLayout;
 final class LudoRoomFrame extends FrameLayout {
  private final boolean library;
  private int actorY;
+ private int heightBudget;
+ void setHeightBudget(int value){if(heightBudget!=value){heightBudget=value;requestLayout();}}
  LudoRoomFrame(Context context,boolean library){super(context);this.library=library;}
  @Override protected void onMeasure(int widthSpec,int heightSpec){
   int w=MeasureSpec.getSize(widthSpec),pad=Math.round(18*getResources().getDisplayMetrics().density);
   getChildAt(3).measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-2*pad),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED));
-  actorY=Math.max(Math.round(w*.20f),getChildAt(3).getMeasuredHeight()+pad);
-  int actorW=Math.round(w*(library?.45f:.40f)),actorH=Math.round(w*(library?.34f:.40f));
-  int h=Math.max(Math.round(w*.76f),actorY+actorH+pad*2);
+  actorY=getChildAt(3).getMeasuredHeight()+pad;
+  int actorW=Math.round(w*.42f),actorH=Math.round(w*.40f);
+  int h=actorY+actorH+pad;
+  if(heightBudget>0&&h>heightBudget){actorH=Math.max(0,heightBudget-actorY-pad);actorW=Math.min(actorW,Math.round(actorH*1.05f));h=actorY+actorH+pad;}
   getChildAt(0).measure(MeasureSpec.makeMeasureSpec(w,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(h,MeasureSpec.EXACTLY));
   getChildAt(1).measure(MeasureSpec.makeMeasureSpec(actorW,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(actorH,MeasureSpec.EXACTLY));
   int propW=Math.round(w*.18f);getChildAt(2).measure(MeasureSpec.makeMeasureSpec(propW,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(propW,MeasureSpec.EXACTLY));

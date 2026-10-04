@@ -36,6 +36,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   try{
    Intent intent=new Intent(getTargetContext(),MainActivity.class);intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
    Activity a=startActivitySync(intent);waitForIdleSync();
+   final Object[] actor={null};
    for(String room:new String[]{LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME}){
     runOnMainSync(()->{try{set(a,"tab","companion");set(a,"ludoRooms",new LudoRoomState(room,0,0,0));set(a,"renderedLudoRoom","");invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});
     waitForIdleSync();getUiAutomation().waitForIdle(200,5000);
@@ -44,7 +45,12 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      View footer=(View)get(a,"ludoRoomDots");View refresh=(View)get(a,"refreshHost");View nav=(View)get(a,"nav");
      if(footer==null||footer.getHeight()<=0)throw new AssertionError("footer not measured");
      if(((FrameLayout.LayoutParams)refresh.getLayoutParams()).bottomMargin!=footer.getHeight())throw new AssertionError("footer obscures scroll viewport");
-     for(String label:new String[]{"Esplora","Preferiti","Libreria","Trova nuovi giochi"})if(text(footer,label)==null)throw new AssertionError("missing destination/action "+label);
+     for(String label:new String[]{"Trova nuovi giochi"})if(text(footer,label)==null)throw new AssertionError("missing destination/action "+label);
+     View scene=(View)get(a,"ludoStage");View actorNow=(View)get(a,"petView");
+     if(actor[0]!=null&&actor[0]!=actorNow)throw new AssertionError("mascot recreated between rooms");actor[0]=actorNow;
+     if(((FrameLayout.LayoutParams)refresh.getLayoutParams()).topMargin!=scene.getHeight())throw new AssertionError("scene obscures content");
+     for(String label:new String[]{"Esplora","Preferiti","Libreria"})if(text(scene,label)==null)throw new AssertionError("top section missing "+label);
+     if(refresh.getHeight()<100)throw new AssertionError("content viewport collapsed");
      int[] pos=new int[2],navPos=new int[2];footer.getLocationInWindow(pos);nav.getLocationInWindow(navPos);
      if(pos[1]+footer.getHeight()>navPos[1])throw new AssertionError("footer overlaps main navigation");
      ((android.widget.ScrollView)get(a,"scroll")).scrollTo(0,99999);
@@ -53,10 +59,11 @@ public final class LudoVisualInstrumentation extends Instrumentation {
     }catch(Exception e){throw new RuntimeException(e);}});
     capture(a,room);
    }
-   runOnMainSync(()->{try{set(a,"tab","catalog");invoke(a,"render");if(get(a,"ludoRoomDots")!=null)throw new AssertionError("Ludo footer leaked to Catalog");if(((FrameLayout.LayoutParams)((View)get(a,"refreshHost")).getLayoutParams()).bottomMargin!=0)throw new AssertionError("Catalog viewport still reserved");if(text((View)get(a,"body"),"Bundle")==null)throw new AssertionError("Bundle inaccessible from Catalog");}catch(Exception e){throw new RuntimeException(e);}});
+   runOnMainSync(()->{try{set(a,"tab","catalog");invoke(a,"render");if(get(a,"ludoRoomDots")!=null||get(a,"ludoStage")!=null)throw new AssertionError("Ludo footer leaked to Catalog");if(((FrameLayout.LayoutParams)((View)get(a,"refreshHost")).getLayoutParams()).bottomMargin!=0)throw new AssertionError("Catalog viewport still reserved");if(text((View)get(a,"body"),"Bundle")==null)throw new AssertionError("Bundle inaccessible from Catalog");}catch(Exception e){throw new RuntimeException(e);}});
    capture(a,"catalog");
    runOnMainSync(a::finish);
-   result.putString("stream","Ludo actual rooms, fixed footer and Catalog Bundle verified");finish(Activity.RESULT_OK,result);
+   result.putString("stream","Ludo actual rooms, fixed footer and Catalog Bundle verified; persistent actor and top sections checked");finish(Activity.RESULT_OK,result);
   }catch(Throwable failure){result.putString("stream",android.util.Log.getStackTraceString(failure));finish(Activity.RESULT_CANCELED,result);}
  }
 }
+

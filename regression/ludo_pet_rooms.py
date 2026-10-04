@@ -7,10 +7,13 @@ res=root/'app/src/main/res/drawable-nodpi'
 names=['room_engine_background','engine_character','engine_secondary_props','room_hunts_background','hunts_character','hunts_prop','room_library_background','library_character']
 for i,name in enumerate(names):
  p=res/('ludo_'+name+'.webp')
+ if name in {'engine_character','hunts_character','library_character'}:
+  alias=root/('app/src/main/res/drawable/ludo_'+name+'.xml');assert '@drawable/ludo_scribble_character' in alias.read_text()
+  p=res/'ludo_scribble_character.webp'
  assert p.exists(),f'Missing separate room asset: {name}'
  b=p.read_bytes();assert b[:4]==b'RIFF' and b[8:12]==b'WEBP',name
  if i in (1,2,4,5,7):
-  assert b[12:16]==b'VP8X' and b[20]&16,f'{name} requires real alpha'
+  assert (b[12:16]==b'VP8X' and b[20]&16) or (b[12:16]==b'VP8L' and b[24]&16),f'{name} requires real alpha'
 geometry=root/'app/src/main/java/it/vintedaffari/app/LudoOrbitGeometry.java'
 assert geometry.exists(),'Measured native orbit geometry missing'
 javac=shutil.which('javac')
@@ -33,3 +36,4 @@ public class OrbitTest {
   subprocess.run(['java','-cp',str(d),'it.vintedaffari.app.OrbitTest'],check=True)
 else:print('JVM orbit geometry not run locally: javac unavailable; required by CI')
 print('Separate rooms and transparent sprites verified')
+
