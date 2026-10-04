@@ -2,7 +2,7 @@
 
 ### Checkpoint runtime2026-10-04
 
-PR237 implementa il servizio e il client manuale default OFF secondo piano approvato;19test locali provider simulato passano. Revisione indipendente corretta: mese mancante failclosed, cache/ID Android vincolati a input/modello/contratto e scadenza. Account Cloudflare non autenticato, login con errore verifica; live/key-progetto/enrollment/prova8 e accettazione telefono restano pendenti. Nessun billing/carta attivato e nessuna call nuova. La distribuzione richiede CI finale/firma/upload e distribuzione Firebase verificati, non è implicata da questo checkpoint. Frontend7/backend6.
+PR237 è integrata (d9b53233); beta166(1000193) firmata/uploadata/distribuita Firebase (run37194000195, release4c6fkprs13ipg). Servizio e client manuale default OFF secondo piano approvato;19test real-runtime provider simulato e CI finali servizio/offline/Android/regressioni/Activity100/200 passano. Revisione indipendente corretta: mese mancante failclosed, cache/ID Android vincolati a input/modello/contratto e scadenza. Account Cloudflare non autenticato, login con errore verifica; live/key-progetto/enrollment/prova8 e accettazione telefono restano pendenti. Nessun billing/carta attivato e nessuna call nuova. Distribuzione distinta verificata10:06:36UTC2026-10-04; accettazione telefono pendente. Vecchio workflow provider disabilitato su piattaforma e if:false su beta; ulteriore variabilefalse bloccata da conferma accesso GitHub. Ledger fresco8/.08, seed locale non importato; live bloccato da account Cloudflare non autenticato. Completare accessi/cutover prima di una sola prova8; nessuna nuova approvazione di budget/architettura richiesta. Frontend7/backend6.
 
 
 ## Decisione approvata — test runtime gratuito, 2026-10-04
