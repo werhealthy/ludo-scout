@@ -4,7 +4,7 @@
 
 Il feedback più recente supersede la fascia scena/titolo/tab della168: stanza illustrata continua sull'intera area Ludo, attore grande persistente, comandi circolari sovrapposti in basso e ricerca fissa. Risultati/attività, Preferiti e Libreria si aprono in un pannello sopra la stanza; Back chiude prima il pannello. I tre originali forniti1000363565/566/567 sono rispettivamente Motore/Preferiti/Libreria; nessuna nuova stanza inventata. Pack UI: icona Ludo in nav/launcher, Desideri nel comando Preferiti, libro standard per Libreria. Gli altri quattro glyph sono risorse disponibili per momenti semanticamente pertinenti; cameo non introdotti nelle card in questo task. Rig canonico168 conservato, respiro/sguardo/oscillazione più percepibili, blink e tap esistenti, reduced motion/lifecycle rispettati. Layout compatto mantiene comandi e attore affiancati in viewport bassi. Nessuna modifica a AI, dati, matching, pricing, schema, soglie o dipendenze.
 
-Branch frontend/ludo-fullscreen-pet: implementazione in verifica, NON dichiarata distribuita o accettata. Frontend7/backend6 gruppi aperti; stesso gruppo Ludo. Prossimo passo: CI completa e catture Android100/200%/motion, poi beta firmata secondo workflow esistente.
+PR258 integrata5fad1d0; beta202/run37220060608 SUCCESS e Firebase5.12.172-ludo-fullscreen(1000202) distribuita17:24:58UTC, release6mdbkqhhcbal0. CI618 completa PASS ma ispezione motion mostra nav nera in Preferiti/Libreria: verifica visiva non conclusa. PR260 solo test isola geometria dalla scena live e verifica nav; CI620 rerun visual pendente dopo timeout bitmap200%. Vedere checkpointSTATE per dettagli. Frontend7/backend6 aperti, stesso gruppo Ludo; nessuna accettazione telefono.
 
 
 ## Backend — full catalog audit tooling verified, 2026-10-04

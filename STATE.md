@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Frontend — Ludo172 distribuita; verifica visiva finale aperta, 2026-10-04
+
+PR258 HEAD276263dda55ae884ca96fc906299edab6ac2ca58 integrata squash5fad1d0755f310c00ac55407bcf85979099a25d0, preservando backend171 e audit catalogo PR259. Stanze originali1000363565/566/567 Motore/Preferiti/Libreria sull'intera area Ludo; mascotte persistente grande, comandi circolari sovrapposti, pannelli e ricerca fissa. Nome della stanza o comando selezionato apre il pannello; Back lo chiude. Ritorno dalla ricerca riapre risultati. Pack glyph Ludo in nav/launcher, Desideri in Preferiti; altri4 glyph disponibili, cameo non aggiunti. Rig168 conservato con respiro/sguardo/oscillazione più visibili; motion/lifecycle/overlay protetti. Nessuna modifica AI/backend/schema/catalogo/pricing/soglie/dipendenze.
+
+Beta202/run37220060608/job111488407504 SUCCESS:5.12.172-ludo-fullscreen(1000202). Certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato17:24:13.629UTC; uploadFirebase17:24:57.476UTC e distinta distribuzione tester/gruppi17:24:58.210UTC. Release6mdbkqhhcbal0, artifact11310232402. Aggiornare da AppTester senza cancellare dati.
+
+CI618/run37219541589 SUCCESS su276263: regressioni complete/unit/Java/reviewAPK, posa/gerarchia e visual Android100/200%/motion1. Lint mantiene5errori preesistenti/121warning con continue-on-error; non pulito. Review indipendente senza Critical/Important. Timeout motion615 ripetuto, richieste di layout identiche eliminate in LudoRoomFrame;618 completa PASS. Successiva ispezione delle21catture distinte ha rilevato nav inferiore nera in Preferiti/Libreria motion1, non nelle catture reduced motion/200%; NON considerare accettazione visiva conclusa. Ipotesi di interferenza del test compact che forza misure della scena attaccata; non prova di causa prodotto.
+
+PR260 HEAD7d012ad20b9cb6c815838c980a27b0b81910476c modifica SOLO instrumentazione: geometria su fixture LudoRoomFrame non attaccata, nav3figli mostrati/misurati prima ogni cattura. Nessun cambiamento ai bytecode app distribuita. Review statica senza blocchi. CI619 FAIL fixture Viewchrome riempiva AT_MOST, sostituita con TextView altezza vincolata;620 prima prova font100PASS,200FAIL approved bitmap non visualizzata entro5s, nessun crashapp osservato. Rerun solo job visual avviato; ancora pendente. Unico prossimo passo frontend: terminare620/ispezionare immagini motion e nav, correggere prodotto se necessario, poi registrare risultato definitivo. Nessuna accettazione/fluidità telefono dichiarata.
+
+Frontend7/backend6 gruppi aperti; correzione nello stesso gruppo Ludo. ServizioAI e checkpoint backend preservati.
+
 ## Backend — full catalog audit tooling verified, 2026-10-04
 
 Owner confirms beta171 comparison marked reviewed and asks autonomous integration/current catalog reanalysis, with a 99% error-reduction target. Screenshot Sogni per Bambini Ribelli shows title-only observed text and declared Cranio Creations brand: explains local BASE_GAME cue, does not settle AI NON_GAME as ground truth. No further permission requested; no actual phone database accessed.
