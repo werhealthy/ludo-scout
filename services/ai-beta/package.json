@@ -1,0 +1,1 @@
+{"name":"ludo-ai-beta","private":true,"type":"module","scripts":{"test":"node --test test/*.test.js","dev":"wrangler dev","deploy":"wrangler deploy"},"devDependencies":{"miniflare":"4.20260730.0","wrangler":"4.147.0"}}

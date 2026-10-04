@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend AI — runtime manuale implementato, attivazione bloccata
+
+2026-10-04: utente «Si» approva il piano e l’esecuzione nativa. PR237 `backend/ai-beta-runtime` implementa servizio Workers/SQLite Durable Object, unico budget globale100 tentativi/mese + EUR1 prenotati teorici, seed storico senza reset, token device revocabili e chiave solo server. Default OFF. Vecchio workflow benchmark disabilitato nel cutover. Android166 aggiunge Impostazioni → Test AI · beta con8 fixture titolo/brand, impostazioni Keystore/no-backup, richiesta persistita e proposte senza alcuna scrittura al catalogo/BGG/lingua/pricing/override.
+
+Revisione indipendente: corretti due Important con prove RED→GREEN: mese registrato mancante non può azzerare budget; modello/contratto/input e scadenza7giorni vincolano ID e visualizzazione salvata. Test servizio locale19/19 su runtime reale Miniflare/SQLite, incluso timeout30s, failurepersistenza, concorrenza/restart e dedupe; providerHTTP simulato, nessuna call reale. Wrangler dry-run0. CI finale Android/regressioni/render100/200 e servizio da confermare prima merge/distribuzione; prima CI unit/compile/APK verde, runner visuale corretto dopo errore di configurazione. Non dichiarare accettazione telefono.
+
+Ledger letto fresco: ottobre2026 conserva8call/EUR0.08 prenotati, non fattura. Import/live solo dopo vecchio benchmark disabilitato e nessun job attivo. Cloudflare CLI non autenticata; dashboard login ha errore di verifica persistente dopo un reload. Nessun account alternativo, secret/device enrollment, deploy, nuova call, carta o billing attivato; stato carte/progetto-key non verificato oggi. Servizio resta OFF fino verifiche Free e autenticazione. Unico prossimo gruppo: accesso sicuro Cloudflare, verifica account/key-progetto, cutover fresco/enrollment e una prova manuale8record. Non richiedere di nuovo approvazione100/servizio già concessa. Frontend7/backend6 aperti.
+
 ## Backend AI — test100approvato, piano runtime pronto
 
 Utente2026-10-04«Ok cominciamo così per test»approvaCloudflareFree/GeminiFreeTier/authprivata e100callTOTALI/mese+1EURriservate teoriche;100testnonarchivio9705,8delbenchmarklimiteLudononquotaGoogle. Pianocreatosubackend/ai-runtime-plan,commit962237635e1875ce72dc20aaaae132b68cf772b5,pathdocs/superpowers/plans/2026-10-04-ai-beta-runtime.md. Quattrotask:servizio/protezioni,bootstrapledger+device,clientmanualeAndroid,CI/distribuzione/prova8annunci. Richiestareviewpianoprimaimplementationwriting-plans,esecuzionenativa raccomandata. Nonrichiedereapprovazione100/architetturadinovo:giàapprovati.

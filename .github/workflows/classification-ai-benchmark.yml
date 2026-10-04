@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   benchmark:
-    if: github.ref == 'refs/heads/beta' && inputs.confirm_free_tier && vars.AI_BENCHMARK_ENABLED == 'true'
+    # Disabled for cutover: all future provider attempts must use the global AI service ledger.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
