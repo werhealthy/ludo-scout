@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - name: Offline tests (no provider credentials)
