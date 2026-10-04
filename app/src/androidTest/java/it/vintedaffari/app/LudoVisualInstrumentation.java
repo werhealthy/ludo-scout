@@ -194,11 +194,13 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   Bundle result=new Bundle();
   try{
    Intent intent=new Intent(getTargetContext(),MainActivity.class);intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-   Activity a=startActivitySync(intent);waitForIdleSync();
+   android.util.Log.i("LudoVisual","CONTRACT start Activity");
+   Activity a=startActivitySync(intent);android.util.Log.i("LudoVisual","CONTRACT Activity launched");waitForIdleSync();
    runOnMainSync(this::rendererContracts);
    runOnMainSync(()->{try{rigContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
    final Object[] actor={null};
    for(String room:new String[]{LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME}){
+    android.util.Log.i("LudoVisual","CONTRACT render "+room);
     runOnMainSync(()->{try{set(a,"tab","companion");set(a,"ludoRooms",new LudoRoomState(room,0,0,0));set(a,"renderedLudoRoom","");invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});
     waitForIdleSync();getUiAutomation().waitForIdle(200,5000);
     runOnMainSync(()->{try{
@@ -224,8 +226,10 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      int[] after=new int[2];footer.getLocationInWindow(after);if(after[1]!=pos[1])throw new AssertionError("search scrolls out of view");
      if(text(nav,"Bundle")!=null||((ViewGroup)nav).getChildCount()!=3)throw new AssertionError("Bundle still in main navigation");
     }catch(Exception e){throw new RuntimeException(e);}});
+    android.util.Log.i("LudoVisual","CONTRACT geometry "+room);
     if(LudoRoomState.EXPLORE.equals(room))awaitRoomRig(a);
     if(LudoRoomState.EXPLORE.equals(room))runOnMainSync(()->{try{motionContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
+    android.util.Log.i("LudoVisual","CONTRACT motion "+room);
     if(LudoRoomState.EXPLORE.equals(room))overlayContracts(a);
     runOnMainSync(()->{try{compactFrameContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
     awaitRoomBackground(a);
@@ -253,4 +257,3 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   }catch(Throwable failure){result.putString("stream",android.util.Log.getStackTraceString(failure));finish(Activity.RESULT_CANCELED,result);}
  }
 }
-
