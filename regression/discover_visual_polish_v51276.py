@@ -68,7 +68,7 @@ checks = [
      'LudoIcons.BOOK_OPEN,"Libreria","library"' not in nav and all(x in nav for x in [
          'LudoIcons.HOUSE,"Home","discover"',
          'LudoIcons.SEARCH,"Catalogo","catalog"',
-         'navItem("","Ludo","companion")', 'R.drawable.ludo_mark'
+         'navItem("","Ludo","companion")', 'R.drawable.ludo_icon_ludo'
      ])),
     ("Font Awesome semantic map includes core app actions",
      all(x in icons for x in ["HOUSE=", "SEARCH=", "HEART=", "TRASH=", "CAMERA=", "GEAR=", "CHECK=", "STAR="])),
@@ -82,3 +82,4 @@ failed = [name for name, ok in checks if not ok]
 if failed:
     raise SystemExit("Discover visual polish regression failed: " + ", ".join(failed))
 print(f"PASS {len(checks)}/{len(checks)} Discover visual polish guards")
+
