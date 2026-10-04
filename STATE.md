@@ -1,5 +1,10 @@
 # Ludo Scout — Current state
 
+## Backend AI — proposta runtime pronta per decisione
+
+2026-10-04:proposta concreta salvata nella specbackend:CloudflareWorkersFree+DurableObjectSQLiteglobale,GeminiFreeTier,tokenrevocabileperdispositivo provisionatomanualmente,secretserverside;primafasemanuale8annunci/proposteinombra,nessunapply. Nuovaservizio/auth evariazionetetto richiedonodecisioneutente(AGENTS). Proposta100callmese+1EURriservato totale benchmark/runtime,import8callottobre→92residue,nonreset. Limite8attuale invariato finoapprovazione. FirebaseFunctionsBlaze non consigliato pervincolonobilling;appGradle noncontieneFirebaseAuth. Fonti/accettazione/protezionidettagliateinspec;non accountinventarioesterno. Nessun nuovoaccount/deploy/credenziale/call/billing/APK;frontend165preservato. Frontend7/backend6aperti. Prossimo passo:approvazioneCloudflareFree+authprivata+tetto100,quindipianoimplementazione;nessunaltrotooloffline.
+
+
 ## Frontend — Ludo scarabocchio e Motore tecnico, 2026-10-04
 
 Mascotte approvata verde con occhi a spirale integrata come WebP con alpha reale. Gli stati su carta chiara e i tre personaggi differenti sono sostituiti da alias allo stesso asset. Marchio monocromatico testa/cappello/spirali in nav e launcher; occhi a spirale nei caricamenti; ritratto negli stati vuoti e nel riepilogo Libreria. Nessuna nuova variante della mascotte.
