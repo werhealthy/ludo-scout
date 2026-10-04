@@ -19,9 +19,9 @@ final class LudoPetView extends View {
  private LudoPetMood mood=LudoPetMood.IDLE;
  private ValueAnimator idle;
  private boolean resumed,portrait,greeting,windowFocused;
- private float gazeX,gazeY;
+ private float gazeX,gazeY,reactionBaseLift;
  private long idleStarted,reactionStarted=-1;
- private final Runnable endGreeting=()->{greeting=false;reactionStarted=-1;invalidate();};
+ private final Runnable endGreeting=()->{greeting=false;reactionStarted=-1;reactionBaseLift=0;invalidate();};
  LudoPetView(Context context){super(context);setContentDescription("Ludo, il tuo compagno di giochi");setFocusable(true);setOnClickListener(v->react());}
  void setIllustration(Bitmap bitmap){illustration=bitmap;invalidate();}
  void setIllustrations(Map<LudoPetMood,Bitmap> art){illustrations.clear();illustrations.putAll(art);invalidate();}
@@ -34,11 +34,13 @@ final class LudoPetView extends View {
  void lookTowards(float x,float y){gazeX=Float.isFinite(x)?Math.max(-1,Math.min(1,x)):0;gazeY=Float.isFinite(y)?Math.max(-1,Math.min(1,y)):0;invalidate();}
  void react(){
   sync();removeCallbacks(endGreeting);announceForAccessibility("Ludo ti saluta");
-  greeting=idle!=null;reactionStarted=greeting?SystemClock.uptimeMillis():-1;
+  long now=SystemClock.uptimeMillis();greeting=idle!=null;
+  LudoPose.sample(greeting?now-idleStarted:0,greeting&&reactionStarted>=0?now-reactionStarted:-1,greeting,gazeX,gazeY,reactionBaseLift,pose);
+  reactionBaseLift=pose.reactionLift;reactionStarted=greeting?now:-1;
   if(greeting)postDelayed(endGreeting,1600);invalidate();
  }
  private boolean shouldAnimate(){return LudoPetState.animate(ValueAnimator.areAnimatorsEnabled(),resumed,isAttachedToWindow()&&getWindowVisibility()==VISIBLE&&isShown()&&windowFocused);}
- private void stopMotion(){if(idle!=null){idle.cancel();idle=null;}idleStarted=0;reactionStarted=-1;greeting=false;removeCallbacks(endGreeting);invalidate();}
+ private void stopMotion(){if(idle!=null){idle.cancel();idle=null;}idleStarted=0;reactionStarted=-1;reactionBaseLift=0;greeting=false;removeCallbacks(endGreeting);invalidate();}
  private void sync(){
   if(!shouldAnimate()){stopMotion();return;}if(idle!=null)return;
   idleStarted=SystemClock.uptimeMillis();
@@ -52,7 +54,7 @@ final class LudoPetView extends View {
  @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);windowFocused=focused;if(renderer!=null)sync();}
  @Override protected void onDraw(Canvas canvas){
   super.onDraw(canvas);boolean moving=idle!=null&&shouldAnimate();long now=SystemClock.uptimeMillis();
-  LudoPose.sample(moving?now-idleStarted:0,moving&&reactionStarted>=0?now-reactionStarted:-1,moving,gazeX,gazeY,pose);
+  LudoPose.sample(moving?now-idleStarted:0,moving&&reactionStarted>=0?now-reactionStarted:-1,moving,gazeX,gazeY,reactionBaseLift,pose);
   Bitmap art=illustrations.get(greeting?LudoPetMood.GREETING:mood);if(art==null)art=illustration;renderer.setFallback(art);
   artBounds.set(getWidth()*.03f,getHeight()*.03f,getWidth()*.97f,getHeight()*.97f);renderer.draw(canvas,artBounds,pose,portrait);
  }
