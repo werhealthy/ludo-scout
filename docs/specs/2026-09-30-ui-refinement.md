@@ -10,6 +10,7 @@ Utente aggiunge metodo pagamento e autorizza esplicitamente limiteActions: budge
 
 Frontend7/backend6 gruppi aperti; Ludo consolidato. Unico prossimo passo frontend: prova telefono168 con tap ripetuti, blink, cambio stanza, pannello/Back e pausa/ripresa; screenshot/versione se difetti. Stanze verticali/hotspot restano successivi.
 
+
 ## Frontend — rig illustrato implementato in PR242, verifiche bloccate
 
 Utente «Vai implementa»2026-10-04 approva integrazione atlas cut-out generato. Branch frontend/ludo-illustrated-rig, PR242 draft HEAD4374b767670d46ca959c86c49b91084634450018.14parti trasparenti+1bocca sorpresa losslessWebP, coordinate/pivot/gerarchia in docs/assets/ludo-rig-v1.json, guida/specifica relative. Personaggio ricomposto ispezionato localmente, circa560KBcompressi/2.6MBdecode. Solo mascotte persistente stanza: decode su artwork executor e cache perActivity, fallback canonico/portrait inline conservati. Blink200ms/6s, head1grado, tap braccia±14gradi/bocca con aspectfit, spirali ritagliate negli occhi. Nessuna stanza/hotspot/icone del pacchetto o backend/AI/costo/dipendenza introdotti. MainActivity condiviso solo binding/loadcache.
