@@ -1,5 +1,31 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## AI — revisione delle56risposte e contratto di integrazione, 2026-10-04
+
+Revisione offline del ledger run37163936519 contro fixtureinput/reference correnti e codice beta ListingClassifier.java/BoardGameIntakeGate.java.56risposte uniche,40riferimenti testuali,16PENDING:13dei16PENDING hanno needs_review=false del modello. Quel booleano non certifica affidabilità e non deve diventare un'autorizzazione di pubblicazione.38/40 concordanti resta misura sul sottoinsieme dichiarato, nessuna precision globale. Nessuna nuova call o modifica catalogo.
+
+Casi concreti:
+-7760 «lotto Black Rose Wars, pari al nuovo»: il modello motiva BUNDLE con «lotto ... implies multiple items», ma il titolo non identifica più prodotti. Restare dubbio, non inventare contenuto.
+-8298 «Bundle - Figuras Heroclix»: bundle dichiarato, ma identità di gioco/base completa non provata; non usare prezzo per gioco singolo.
+-9270 «Four Gardens Promo ... Espansione»: UNKNOWN contro riferimento testualeEXPANSION; astensione conservativa, serve evidenza per ruolo del promo.
+-7947 «Lote libros o una unidad»: UNKNOWN controNON_GAME testuale; non promuovere a gioco, il titolo dichiara libri.
+-9593/9596 Gearworks+playmat: propostaBUNDLE concordante sul testo. Il classifier corrente valuta ACCESSORY prima diBUNDLE: non modificare globalmente questa precedenza, poiché «organizer gioco base + espansioni» è realmente accessorio.
+-8800 Andor Solo Erweiterung: propostaEXPANSION concordante sul testo; parola tedesca non presente nell'arrayEXPANSION corrente. Correzione lessicale locale possibile, separata dall'AI e senza conferma automatica identitàBGG.
+- ACCESSORY_COMPONENT del test perde distinzioneACCESSORY/COMPONENTS/EMPTY_BOX presente nell'app. Nessun mapping automatico univoco; conservare sottotipo locale.
+- Titoli brevi Confusion/schonbrunn/Brains: BASE_GAME e confidence alta non risolvono contenuto/identità; confidenza è autodichiarata.
+- Brand non basta come prova: libri conHasbro vengono correttamenteNON_GAME nel test; protezioni negative locali restano prioritarie.
+
+Contratto per il prossimo incremento, autorizzato dall'utente «Ok vai» alla preparazione dell'integrazione:
+1. Prima fase in ombra: produrre proposte confrontabili senza applicarle a catalogo,pricing,BGG,lingua,override o preferiti. Risultati mancanti/invalidi/conflitto rimangono in attesa; nessun retry automatico.
+2. Riutilizzare risposte giàvalidate solo per stesso contenuto/modello/versione contratto; non trattare listing_id isolato come cache valida dopo modifiche titolo/brand.
+3. Dati titolo/brand minimi;nessuna chiave provider inAPK. Trasporto autenticato e ledger centrale preventivo per tutti i dispositivi necessari prima di runtime remoto. GitHub Actions con secret non è unendpoint da invocare liberamente dall'APK.
+4. Kill switch globale, budget cumulativo,riserva atomica prima del trasporto,limiti input/output,timeout e dedupe devono coprire la pipeline runtime; benchmarklimit8calls non basta. FreeTier/billingproject verificato prima di attivazione; paid mai automatico.
+5. Publisher/BGG/category trust gates esistenti non superati da confidence o needs_reviewAI. UNKNOWN mantiene significato distinto da MISSING.
+6. Integrare prima il consumo offline delle56proposte per validare contratto e mapping; mantenere provider spento. Il trasporto remoto richiede sceltaesplicita di hosting/auth: nuovo backend è decisione architetturale, non deducibile dal successo del test.
+
+Verifica: ricontati56/40/16 e13PENDING senza review; revisione sorgenti beta, non esecuzione Java (javac non disponibile nel workspace).31test della consegna precedente giàverificati, non dichiarati nuovi test di questa revisione. RunliveSUCCESS,5callvalidate e8callmese; nessunAPKnuovo. Frontend7/backend6 aperti. Prossimo incremento: adattatore offline di proposte senza trasporto/apply, poi endpoint remoto autenticato da definire; nessuna ulteriore call mese corrente.
+
+
 ## AI — collegamento alla ripresa manuale, 2026-10-04
 
 PR233 pianificazione offline integrata con merge40937b1d; CI37163339054 e37163339087 SUCCESS. Autorizzazione «Andiamo avanti» al collegamento dispatch. Input opzionale resume_source_run nel workflow beta; vuoto mantiene il benchmark originale. Wrapper classification_resume_execute.py verifica toggle,FreeTier,beta,keypresente prima di trasporto. Provenienza automatica sorgente: GET run dello stesso repo, completed/manuale/beta/workflowcorretto,headSHA40hex; fixture dal commit sorgente uguale e AST contratto MODEL/INSTRUCTIONS/limiti/payload/response uguale senza eseguire codice remoto. Permesso Actions read solo per metadata sorgente. Operazione ledger sorgente unica tra mesi; nuova operazione richiede ID non giàesistente. Pianificazione dal ledger fresco, riuso/inherited VALIDATED, riserve originali preservate; runner riserva ogni nuova call conCAS,stop al primo errore/no retry/no fallback. Nessuna variazione tetti8call/mese/€1mese/€0.10batch. Report durable completo o parziale anche dopo errore, missingids distinti, accuracyglobale=null e metriche solo riferimenti TEXT_REFERENCE dei record realmente risposti; riusati e calldelnuovorun separati.
