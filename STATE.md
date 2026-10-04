@@ -1,5 +1,16 @@
 # Ludo Scout — Current state
 
+## Backend AI — adattatore offline delle proposte integrato, 2026-10-04
+
+PR235 backend/ai-shadow-proposals da beta52b57acd; HEADb338bb9661cb1efd62c471c1e96127536f9f6929, squashaa3799181e9ca3df0af35ca88fe7511eae70c73e. Tool tools/classification_proposals.py consuma samplecorrente/source-input/answers/modello/contratto da filelocali; titolo ebrand esatti richiesti per riuso. Content keySHA256 vincolaID/titolo/brand/modello/contratto; associazione sorgente/modello/contratto dichiarata operatore,non attestata. IDduplicati/estranei,confidenceinvalida,claimBGG/lingua rifiutati. Confidencenonriportata=null. Nuovi titoli/brand→STALE_INPUT senza proposta;assenza risposta→MISSING_ANSWER. preserved_type conserva sottotipo locale;runtime_type=null,needs_review=true,apply_authorized=false sempre. Nessunnetwork/key/ledger/database/apply.
+
+ProvaCLI sui dati reali salvati run37163936519:56PROPOSAL/8MISSING_ANSWER,0applyauthorization; tutti64sottotipi precedenti conservati, nessun nuovo provider call. CLI outputesclusivo: provati rifiuto sovrascrittura sample/reportesistente ehashinput invariati.40testclassification locali passati (31precedenti+9nuovi),py_compile passato; REDverificato prima implementazione,regressioneconfidence mancante riprodotta e corretta. CI37164568312 offlineSUCCESS; CI37164568288/job111324746535 AndroidSUCCESS suite regressioni/unitpricing/Java/buildreview. Jobvisual/lint e auditAndroid saltati per scope,nessuna verificatelefono. Diffrevisionato;Androidinvariato,nessunAPK/versionbump/distribuzione necessario.
+
+Il tool è consumatoreoffline in ombra, NON integrazione runtime nell'app. Comando: python3 tools/classification_proposals.py --sample CURRENT.json --source-input SOURCE.json --answers ANSWERS.json --model MODEL --contract CONTRACT --output NEW.json. Sample/source formato records;answersarray. File privati generati noncommittati. Nessun paid,billing,carta o tetto8callmese modificati.
+
+Frontend7/backend6 aperti. Nessuna azionetelefono. Unico prossimo gruppo: definire endpointautenticato con chiaveserverside eledgerbudgetcentrale per collegamentoapp; presentare sceltaarchitetturale concreta prima di attivare nuovi servizi. Non moltiplicare altri tooloffline prima di risolvere questo collegamento.
+
+
 ## Backend AI — revisione conclusa, integrazione runtime da costruire
 
 Autorizzazione utente «Ok vai»2026-10-04 alla revisione/preparazione integrazione. Riviste56risposte del run37163936519 contro input/reference e classifier/gate effettivi beta.40TEXT_REFERENCE(38concordanti),16PENDING;13PENDING hanno needs_review=false del modello: non affidabile come gate. Lotto7760 contenuto non provato,Heroclix8298 non basecompleto provato, promo9270 e libri7947 astensioni, Gearworks+playmat9593/9596 bundletestuale ma non cambiare precedenzaaccessori globalmente. ACCESSORY_COMPONENT comprime3sottotipi app; identitàBGG/lingua mai validate. Dettagli e contratto salvati nella specbackend,commit4ad6959586d81fc0f6e718dfc01924e4bac7b932.
