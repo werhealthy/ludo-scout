@@ -1,0 +1,58 @@
+name: AI beta deploy OFF
+on:
+  workflow_dispatch:
+    inputs:
+      workers_free_confirmed:
+        description: "I verified this Cloudflare account uses Workers Free (no paid upgrade)"
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: ai-beta-cloudflare-deploy
+  cancel-in-progress: false
+jobs:
+  deploy-off:
+    if: github.ref == 'refs/heads/beta' && inputs.workers_free_confirmed == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/ai-beta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - name: Verify disabled configuration
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'));
+          assert.equal(config.name, 'ludo-ai-beta');
+          assert.equal(config.vars.ENABLED, 'false');
+          assert.equal(config.vars.FREE_TIER_VALID_UNTIL, '0');
+          assert.deepEqual(config.migrations, [{tag:'v1',new_sqlite_classes:['BudgetObject']}]);
+          assert.equal(config.observability.enabled, false);
+          NODE
+      - run: npx wrangler deploy --dry-run --outdir /tmp/ai-beta-bundle
+      - name: Publish disabled service
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          npx wrangler deploy --var ENABLED:false --var FREE_TIER_VALID_UNTIL:0
+      - name: Record scope
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'TEXT'
+          Published ludo-ai-beta with ENABLED=false and FREE_TIER_VALID_UNTIL=0.
+          No Gemini call, enrollment, seed import or provider activation was performed.
+          Workers Free confirmation is an owner declaration, not an automated billing audit.
+          Next: provision the fresh historical ledger and private device credentials, verify status, then perform the separately controlled trial.
+          TEXT
