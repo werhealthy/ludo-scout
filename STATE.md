@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend AI — trial annunci reali riattivato fino alle 18:09 Europe/Rome
+
+2026-10-04 utente autorizza continuazione e dispatch browserGitHub. PR252 HEAD0303a74ec4ba8049e8d3a18db92808290e61fea1 integrata squash2e5f34cdfc49d850a16daf64134b6c60690547c4. Riattivazione usa accounting corrente invece del seed storico8: nessuna riscrittura SEED_MANIFEST/GEMINI_API_KEY, token telefono invariato. CI servizio37211401434 SUCCESS27/27+dryruns; Android37211401436 SUCCESS regressioni/unit/compile/reviewAPK, visual saltate per scope; revisione indipendente senza fix richiesti. Nessun codiceapp o nuovaAPK: beta170 distribuita preservata.
+
+Run37211853812/job111464478243 SUCCESS su beta2e5f34c:27test, legacydisabled, OFF pubblicato conservando secrets. GETstatus autenticato OFF15:09:02.613UTC calls9/100/reserved_micro90000; ON15:09:07.465UTC stesso accounting9/.09 esatto. Probe revocata HTTP40115:09:09.579UTC, fileprivati rimossi. Nessuna classificazione/provider call agente o workflow; catalogo invariato. Scadenza1791130142687 = 2026-10-04 18:09:02 Europe/Rome, dopo scadenza nuoveclassifyDISABLED, non deployOFF programmato. Budget100tentativi/1EURteorico invariato.
+
+Unico prossimo passo telefono: nella170 chiudere e riaprire Confronta annunci salvati per rileggere servizio, Prepara fino a8annunci reali e Chiedi proposteAI una volta; attendere risultato e poi ripetere medesimo gruppo per verificare counter/cache. Prima nuova prenotazione attesa10/100, ripetizione identica senza incremento; dati reali/proposte/identitàBGG non ancora osservati in questa finestra. Revisione privata non applica catalogo; classificazione locale e BGG salvato sono contesto, nessuna validazione automatica BGG/lingua. Dopo prova chiusura OFF e counter con workflowesistente, senza seed/reset/nuovo enrollment. Frontend7/backend6 aperti.
+
 ## Backend AI170 — revisione privata e confronto stabile, distribuita 2026-10-04
 
 PR249 HEAD8cf03360f2b84d88ad4790c4961e2f76a4b32c91 integrata squash04edd8523846460298822531dce9d340c0ce0f28. Beta200/run37210073311/job111459286568 SUCCESS:5.12.170-ai-real-listings-review(1000200). Certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato14:44:12.666UTC; uploadFirebase14:44:51.274UTC e distinta distribuzione tester/gruppi14:44:52.296UTC. Release7dd1apvpr48r0, artifact11306945596; aggiorna AppTester senza cancellare dati.
