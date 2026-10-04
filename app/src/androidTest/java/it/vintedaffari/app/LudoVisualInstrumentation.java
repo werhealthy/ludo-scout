@@ -88,6 +88,16 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   }catch(Exception e){throw new RuntimeException(e);}});
  }
 
+ private void rigContracts(Activity a)throws Exception{
+  LudoIllustratedRig rig=LudoIllustratedRig.load(a.getResources());if(rig==null||rig.parts.size()!=14||rig.images.size()!=15)throw new AssertionError("incomplete real illustrated rig");
+  LudoCharacterRenderer renderer=new LudoCharacterRenderer();renderer.setParts(rig.parts,rig.images,1000,1040);
+  Bitmap target=Bitmap.createBitmap(1000,1040,Bitmap.Config.ARGB_8888);android.graphics.Canvas canvas=new android.graphics.Canvas(target);android.graphics.RectF bounds=new android.graphics.RectF(0,0,1000,1040);
+  LudoPose pose=new LudoPose();LudoPose.sample(0,-1,false,0,0,pose);renderer.draw(canvas,bounds,pose,false);
+  if(android.graphics.Color.alpha(target.getPixel(350,520))<200||android.graphics.Color.alpha(target.getPixel(500,900))<200)throw new AssertionError("rig face/body not assembled");
+  int open=target.getPixel(300,440);pose.eyeOpen=0;target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);
+  if(open==target.getPixel(300,440))throw new AssertionError("blink did not change eye region");
+  target.recycle();for(Bitmap image:rig.images.values())image.recycle();
+ }
  private void rendererContracts(){
   Bitmap blank=Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888);blank.eraseColor(android.graphics.Color.GRAY);
   if(hasSceneContent(blank))throw new AssertionError("blank screenshot accepted");
@@ -147,6 +157,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    Intent intent=new Intent(getTargetContext(),MainActivity.class);intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
    Activity a=startActivitySync(intent);waitForIdleSync();
    runOnMainSync(this::rendererContracts);
+   runOnMainSync(()->{try{rigContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
    final Object[] actor={null};
    for(String room:new String[]{LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME}){
     runOnMainSync(()->{try{set(a,"tab","companion");set(a,"ludoRooms",new LudoRoomState(room,0,0,0));set(a,"renderedLudoRoom","");invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});

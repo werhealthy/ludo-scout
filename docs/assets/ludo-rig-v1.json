@@ -1,0 +1,300 @@
+{
+  "width": 1000,
+  "height": 1040,
+  "parts": [
+    {
+      "id": "cape",
+      "parent": "body",
+      "order": 0,
+      "crop": [
+        918,
+        247,
+        1245,
+        463
+      ],
+      "position": [
+        255,
+        650,
+        530,
+        350
+      ],
+      "pivot": [
+        265,
+        35
+      ]
+    },
+    {
+      "id": "body",
+      "parent": null,
+      "order": 1,
+      "crop": [
+        15,
+        204,
+        331,
+        469
+      ],
+      "position": [
+        290,
+        690,
+        420,
+        330
+      ],
+      "pivot": [
+        210,
+        330
+      ]
+    },
+    {
+      "id": "hat",
+      "parent": "head",
+      "order": 2,
+      "crop": [
+        635,
+        173,
+        967,
+        460
+      ],
+      "position": [
+        160,
+        0,
+        670,
+        579
+      ],
+      "pivot": [
+        350,
+        500
+      ]
+    },
+    {
+      "id": "ear_left",
+      "parent": "head",
+      "order": 3,
+      "crop": [
+        103,
+        534,
+        287,
+        692
+      ],
+      "position": [
+        105,
+        490,
+        120,
+        103
+      ],
+      "pivot": [
+        110,
+        55
+      ]
+    },
+    {
+      "id": "ear_right",
+      "parent": "head",
+      "order": 3,
+      "crop": [
+        365,
+        547,
+        562,
+        693
+      ],
+      "position": [
+        785,
+        510,
+        130,
+        96
+      ],
+      "pivot": [
+        10,
+        40
+      ]
+    },
+    {
+      "id": "head",
+      "parent": "body",
+      "order": 4,
+      "crop": [
+        321,
+        240,
+        639,
+        455
+      ],
+      "position": [
+        185,
+        365,
+        630,
+        426
+      ],
+      "pivot": [
+        315,
+        365
+      ]
+    },
+    {
+      "id": "eye_left",
+      "parent": "head",
+      "order": 5,
+      "crop": [
+        57,
+        761,
+        257,
+        980
+      ],
+      "position": [
+        258,
+        425,
+        190,
+        208
+      ],
+      "pivot": [
+        95,
+        104
+      ]
+    },
+    {
+      "id": "eye_right",
+      "parent": "head",
+      "order": 5,
+      "crop": [
+        392,
+        761,
+        585,
+        979
+      ],
+      "position": [
+        514,
+        447,
+        190,
+        215
+      ],
+      "pivot": [
+        95,
+        107
+      ]
+    },
+    {
+      "id": "spiral_left",
+      "parent": "eye_left",
+      "order": 6,
+      "crop": [
+        701,
+        797,
+        857,
+        964
+      ],
+      "position": [
+        297,
+        471,
+        112,
+        120
+      ],
+      "pivot": [
+        56,
+        60
+      ]
+    },
+    {
+      "id": "spiral_right",
+      "parent": "eye_right",
+      "order": 6,
+      "crop": [
+        1006,
+        801,
+        1160,
+        961
+      ],
+      "position": [
+        553,
+        494,
+        112,
+        116
+      ],
+      "pivot": [
+        56,
+        58
+      ]
+    },
+    {
+      "id": "mouth",
+      "parent": "head",
+      "order": 7,
+      "crop": [
+        464,
+        1077,
+        624,
+        1144
+      ],
+      "position": [
+        416,
+        674,
+        158,
+        66
+      ],
+      "pivot": [
+        79,
+        33
+      ]
+    },
+    {
+      "id": "arm_left",
+      "parent": "body",
+      "order": 8,
+      "crop": [
+        634,
+        520,
+        884,
+        718
+      ],
+      "position": [
+        260,
+        744,
+        205,
+        162
+      ],
+      "pivot": [
+        185,
+        100
+      ]
+    },
+    {
+      "id": "arm_right",
+      "parent": "body",
+      "order": 8,
+      "crop": [
+        972,
+        523,
+        1223,
+        719
+      ],
+      "position": [
+        555,
+        744,
+        205,
+        160
+      ],
+      "pivot": [
+        20,
+        100
+      ]
+    },
+    {
+      "id": "dice",
+      "parent": "body",
+      "order": 9,
+      "crop": [
+        980,
+        1028,
+        1141,
+        1188
+      ],
+      "position": [
+        450,
+        835,
+        100,
+        99
+      ],
+      "pivot": [
+        50,
+        50
+      ]
+    }
+  ]
+}
