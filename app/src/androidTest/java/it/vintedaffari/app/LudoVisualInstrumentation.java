@@ -119,7 +119,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    TextView text=new TextView(a);text.setText(label);text.setTextSize(12);target.addView(text,new android.widget.LinearLayout.LayoutParams(-1,-2));
    sections.addView(target,new android.widget.LinearLayout.LayoutParams(0,-2,1));
   }
-  stage.addView(commandBox);View chrome=new View(a);chrome.setMinimumHeight(((LudoRoomFrame)get(a,"ludoStage")).getChildAt(4).getHeight());stage.addView(chrome);
+  stage.addView(commandBox);TextView chrome=new TextView(a);chrome.setHeight(((LudoRoomFrame)get(a,"ludoStage")).getChildAt(4).getHeight());stage.addView(chrome);
   for(int[] size:new int[][]{{700,280},{400,300},{300,400}}){
    int w=Math.round(size[0]*density),h=Math.round(size[1]*density),inset=Math.round(84*density);
    stage.setHeightBudget(h);stage.setControlsInset(inset);stage.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));stage.layout(0,0,w,h);
