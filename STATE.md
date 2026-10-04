@@ -1,5 +1,12 @@
 # Ludo Scout — Current state
 
+## Backend AI — test100approvato, piano runtime pronto
+
+Utente2026-10-04«Ok cominciamo così per test»approvaCloudflareFree/GeminiFreeTier/authprivata e100callTOTALI/mese+1EURriservate teoriche;100testnonarchivio9705,8delbenchmarklimiteLudononquotaGoogle. Pianocreatosubackend/ai-runtime-plan,commit962237635e1875ce72dc20aaaae132b68cf772b5,pathdocs/superpowers/plans/2026-10-04-ai-beta-runtime.md. Quattrotask:servizio/protezioni,bootstrapledger+device,clientmanualeAndroid,CI/distribuzione/prova8annunci. Richiestareviewpianoprimaimplementationwriting-plans,esecuzionenativa raccomandata. Nonrichiedereapprovazione100/architetturadinovo:giàapprovati.
+
+Il cutover importa prenotazionifresche (attualmente8/.08),disabilitavecchioActionsproviderprimaattivazione eusaunicoserverbudget. Nessuncodiceruntime/deploy/nuovacall/billing/APK eseguiti;providerdefaultOFF finoverifiche. Appfrontend165preservata. Frontend7/backend6aperti;nessunaprovatelefonoora. Prossimopasso:reviewpiano,poiimplementaretask1servizioprotetto.
+
+
 ## Backend AI — proposta runtime pronta per decisione
 
 2026-10-04:proposta concreta salvata nella specbackend:CloudflareWorkersFree+DurableObjectSQLiteglobale,GeminiFreeTier,tokenrevocabileperdispositivo provisionatomanualmente,secretserverside;primafasemanuale8annunci/proposteinombra,nessunapply. Nuovaservizio/auth evariazionetetto richiedonodecisioneutente(AGENTS). Proposta100callmese+1EURriservato totale benchmark/runtime,import8callottobre→92residue,nonreset. Limite8attuale invariato finoapprovazione. FirebaseFunctionsBlaze non consigliato pervincolonobilling;appGradle noncontieneFirebaseAuth. Fonti/accettazione/protezionidettagliateinspec;non accountinventarioesterno. Nessun nuovoaccount/deploy/credenziale/call/billing/APK;frontend165preservato. Frontend7/backend6aperti. Prossimo passo:approvazioneCloudflareFree+authprivata+tetto100,quindipianoimplementazione;nessunaltrotooloffline.
