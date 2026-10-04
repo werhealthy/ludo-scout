@@ -1,0 +1,5 @@
+# Ludo cut-out source v1
+
+User-generated atlas approved for implementation2026-10-04. Fourteen independent lossless transparent WebP source parts plus a surprised mouth variant, stored drawable-nodpi/ludo_part_*.webp. Artboard1000x1040; exact crop/positions/parent/pivots in ludo-rig-v1.json; Java configuration LudoIllustratedRig mirrors it. Exports isolate alpha-connected components (alpha>24, two-pixel edge allowance) to exclude neighboring atlas pieces; RGB/styling of retained pixels unchanged. Mouth/closed-lid alternatives were generated; unused closed lids excluded from app. No original PSD exists. Artwork is rebuilt from the approved cut-out sheet, not pixel-identical to the earlier whole-character WebP.
+
+Room mascot only; inline portraits keep earlier canonical art. Runtime decodes once off the Activity UI thread, complete rig or fallback, no partial character; cached perActivity. Blink200ms every6s, head1degree idle, tap arms±14degrees and surprised mouth while lift>.008; gaze moves spiral parts clipped to eye bounds. All existing lifecycle/system-animation gates retained. No room/hotspot/icon rollout in this PR.

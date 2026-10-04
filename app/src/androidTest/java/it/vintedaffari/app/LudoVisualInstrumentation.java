@@ -51,10 +51,10 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    }
   return distinct>20;
  }
- private void awaitActivityFrame(Activity a)throws Exception{
+ private void awaitActivityFrame(Activity a)throws Exception{awaitViewFrame(a.getWindow().getDecorView());}
+ private void awaitViewFrame(View decor)throws Exception{
   java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
   runOnMainSync(()->{
-   View decor=a.getWindow().getDecorView();
    android.view.ViewTreeObserver.OnDrawListener listener=new android.view.ViewTreeObserver.OnDrawListener(){
     @Override public void onDraw(){
      if(decor.hasWindowFocus()&&decor.isShown()){
@@ -64,7 +64,18 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    };
    decor.getViewTreeObserver().addOnDrawListener(listener);decor.invalidate();
   });
-  if(!drawn.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("Activity did not regain focus and draw");
+  // A draw requested before focus is restored can be the last frame when motion is
+  // disabled. Request another frame while waiting; keep the real focus/draw gate.
+  long deadline=android.os.SystemClock.uptimeMillis()+5000;
+  while(drawn.getCount()!=0&&android.os.SystemClock.uptimeMillis()<deadline){
+   runOnMainSync(decor::invalidate);
+   drawn.await(25,java.util.concurrent.TimeUnit.MILLISECONDS);
+  }
+  if(drawn.getCount()!=0){
+   final String[] state={""};
+   runOnMainSync(()->state[0]="focus="+decor.hasWindowFocus()+", shown="+decor.isShown()+", attached="+decor.isAttachedToWindow());
+   throw new AssertionError("Activity did not regain focus and draw: "+state[0]);
+  }
   waitForIdleSync();getUiAutomation().waitForIdle(200,5000);
  }
  private void overlayContracts(Activity a)throws Exception{
@@ -73,7 +84,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    overlay[0]=new android.app.Dialog(a);TextView label=new TextView(a);label.setText("Ludo overlay fixture");overlay[0].setContentView(label);
    set(a,"activeGameOverlay",overlay[0]);overlay[0].show();invoke(a,"syncPetVisibility");
   }catch(Exception e){throw new RuntimeException(e);}});
-  waitForIdleSync();getUiAutomation().waitForIdle(200,5000);
+  waitForIdleSync();awaitViewFrame(overlay[0].getWindow().getDecorView());
   runOnMainSync(()->{try{
    if(!overlay[0].isShowing()||!overlay[0].getWindow().getDecorView().hasWindowFocus())throw new AssertionError("overlay did not acquire real focus");
    LudoPetView actor=(LudoPetView)get(a,"petView");
@@ -88,6 +99,21 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   }catch(Exception e){throw new RuntimeException(e);}});
  }
 
+ private void awaitRoomRig(Activity a)throws Exception{
+  long deadline=android.os.SystemClock.uptimeMillis()+5000;
+  while(android.os.SystemClock.uptimeMillis()<deadline){final boolean[] ready={false};runOnMainSync(()->{try{ready[0]=get(a,"roomIllustratedRig")!=null;}catch(Exception e){throw new RuntimeException(e);}});if(ready[0])return;android.os.SystemClock.sleep(25);}
+  throw new AssertionError("room did not load complete illustrated rig");
+ }
+ private void rigContracts(Activity a)throws Exception{
+  LudoIllustratedRig rig=LudoIllustratedRig.load(a.getResources());if(rig==null||rig.parts.size()!=14||rig.images.size()!=15)throw new AssertionError("incomplete real illustrated rig");
+  LudoCharacterRenderer renderer=new LudoCharacterRenderer();renderer.setParts(rig.parts,rig.images,1000,1040);
+  Bitmap target=Bitmap.createBitmap(1000,1040,Bitmap.Config.ARGB_8888);android.graphics.Canvas canvas=new android.graphics.Canvas(target);android.graphics.RectF bounds=new android.graphics.RectF(0,0,1000,1040);
+  LudoPose pose=new LudoPose();LudoPose.sample(0,-1,false,0,0,pose);renderer.draw(canvas,bounds,pose,false);
+  if(android.graphics.Color.alpha(target.getPixel(350,520))<200||android.graphics.Color.alpha(target.getPixel(500,900))<200)throw new AssertionError("rig face/body not assembled");
+  int open=target.getPixel(350,450);pose.eyeOpen=0;target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);
+  if(open==target.getPixel(350,450))throw new AssertionError("blink did not change eye region");
+  target.recycle();for(Bitmap image:rig.images.values())image.recycle();
+ }
  private void rendererContracts(){
   Bitmap blank=Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888);blank.eraseColor(android.graphics.Color.GRAY);
   if(hasSceneContent(blank))throw new AssertionError("blank screenshot accepted");
@@ -147,6 +173,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    Intent intent=new Intent(getTargetContext(),MainActivity.class);intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
    Activity a=startActivitySync(intent);waitForIdleSync();
    runOnMainSync(this::rendererContracts);
+   runOnMainSync(()->{try{rigContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
    final Object[] actor={null};
    for(String room:new String[]{LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME}){
     runOnMainSync(()->{try{set(a,"tab","companion");set(a,"ludoRooms",new LudoRoomState(room,0,0,0));set(a,"renderedLudoRoom","");invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});
@@ -168,6 +195,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      int[] after=new int[2];footer.getLocationInWindow(after);if(after[1]!=pos[1])throw new AssertionError("search scrolls out of view");
      if(text(nav,"Bundle")!=null||((ViewGroup)nav).getChildCount()!=3)throw new AssertionError("Bundle still in main navigation");
     }catch(Exception e){throw new RuntimeException(e);}});
+    if(LudoRoomState.EXPLORE.equals(room))awaitRoomRig(a);
     if(LudoRoomState.EXPLORE.equals(room))runOnMainSync(()->{try{motionContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
     if(LudoRoomState.EXPLORE.equals(room))overlayContracts(a);
     capture(a,room);

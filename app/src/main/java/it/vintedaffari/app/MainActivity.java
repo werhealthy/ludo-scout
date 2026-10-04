@@ -1600,8 +1600,13 @@ private void showFilterSheet(){
         for(int i=0;i<keys.length;i++){final String key=keys[i];boolean selected=key.equals(room);TextView target=text(labels[i],14,selected?TEXT:MUTED,selected?Typeface.BOLD:Typeface.NORMAL);target.setGravity(Gravity.CENTER);target.setMinHeight(dp(48));target.setPadding(dp(4),dp(6),dp(4),dp(6));target.setSelected(selected);target.setBackground(round(selected?SURFACE2:Color.TRANSPARENT,12,selected?1:0,OUTLINE));target.setContentDescription(labels[i]+(selected?", selezionata":""));target.setOnClickListener(v->switchLudoRoom(key));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)rp.leftMargin=dp(8);ludoSections.addView(target,rp);}syncPetVisibility();
     }
 
+    private volatile LudoIllustratedRig roomIllustratedRig;
     private void loadLudoRoomActor(LudoPetView actor,int resource){
-        galleryNet.execute(()->{Bitmap bitmap=sceneAsset(resource);runOnUiThread(()->{if(!isDestroyed()&&actor==petView&&"companion".equals(tab))actor.setIllustration(bitmap);});});
+        galleryNet.execute(()->{Bitmap bitmap=sceneAsset(resource);
+            LudoIllustratedRig rig=roomIllustratedRig;if(rig==null)rig=LudoIllustratedRig.load(getResources());final LudoIllustratedRig loaded=rig;
+            runOnUiThread(()->{if(isDestroyed()||isFinishing())return;if(loaded!=null)roomIllustratedRig=loaded;
+                if(actor==petView){actor.setIllustration(bitmap);if(loaded!=null)actor.setParts(loaded.parts,loaded.images,1000,1040);}
+            });});
     }
     private LinearLayout ludoContent(){
         LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(18),dp(12),dp(18),dp(16));body.addView(content,new LinearLayout.LayoutParams(-1,-2));return content;
