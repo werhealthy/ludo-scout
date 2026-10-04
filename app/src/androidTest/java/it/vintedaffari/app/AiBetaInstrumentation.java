@@ -21,6 +21,11 @@ public final class AiBetaInstrumentation extends Instrumentation {
   for(int i=0;i<50;i++){getUiAutomation().waitForIdle(100,1000);android.view.accessibility.AccessibilityNodeInfo node=findNode(getUiAutomation().getRootInActiveWindow(),text,exact);if(node!=null)return node;Thread.sleep(100);}throw new AssertionError("local evidence UI absent: "+text);
  }
  private void capture(String name)throws Exception {
+  waitForIdleSync();getUiAutomation().waitForIdle(500,5000);
+  android.view.accessibility.AccessibilityNodeInfo heading=waitForNode("Evidenze locali",true);
+  android.view.accessibility.AccessibilityWindowInfo window=heading.getWindow();
+  if(window==null||!window.isActive()||!window.isFocused())throw new AssertionError("local evidence window did not acquire focus before capture");
+  android.util.Log.i("LudoVisual","Focused local evidence window ready for "+name);
   Bitmap screenshot=getUiAutomation().takeScreenshot();if(screenshot==null)throw new AssertionError("evidence screenshot absent");Bitmap reduced=Bitmap.createScaledBitmap(screenshot,432,Math.round(screenshot.getHeight()*432f/screenshot.getWidth()),true);java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);for(int offset=0,index=0;offset<encoded.length();offset+=3000,index++)android.util.Log.i("LudoVisual","VISUAL "+name+" "+index+" "+encoded.substring(offset,Math.min(offset+3000,encoded.length())));screenshot.recycle();reduced.recycle();
  }
  @Override public void onStart(){Bundle result=new Bundle();Activity a=null;try{
