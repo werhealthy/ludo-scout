@@ -111,9 +111,7 @@ public final class AiBetaRealDialog {
  private void show(AiBetaRealListings.Snapshot chosen,JSONObject saved)throws Exception {
   JSONObject response=cached(saved,chosen);
   if(response!=null){update(chosen,comparison(response,chosen,chosen.localKey().equals(saved.optString("real_review_key"))),true);return;}
-  StringBuilder text=new StringBuilder("Annunci preparati: ").append(chosen.local.length()).append(" / 8\nCatalogo invariato · nessuna analisi automatica\n");
-  for(int i=0;i<chosen.local.length();i++){JSONObject r=chosen.local.getJSONObject(i);text.append("\n#").append(r.getLong("listing_id")).append(" · ").append(r.getString("title")).append("\nLocale: ").append(localCategory(r.getString("local_type"))).append("\n").append(r.getString("local_reason")).append("\n");}
-  if(chosen.local.length()==0)text.append("\nNessun annuncio idoneo nel gruppo recente. Acquisisci annunci nell’app, poi prepara di nuovo.");
+  StringBuilder text=new StringBuilder("Annunci preparati: ").append(chosen.local.length()).append(" / 8\n\n").append(AiBetaListings.display(chosen.local,null));
   if(!enabled)text.append("\nProva AI disattivata.");
   update(chosen,text.toString(),false);
  }
@@ -122,4 +120,3 @@ public final class AiBetaRealDialog {
   return (reviewed?"Revisionato: registrata soltanto la lettura del confronto. Nessuna correzione applicata.\n\n":"")+body;
  }
 }
-
