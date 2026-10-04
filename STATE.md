@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend AI — prima proposta su annunci del telefono osservata, 2026-10-04 17:34 Europe/Rome
+
+Due screenshot forniti dal proprietario mostrano il pannello Annunci reali/confrontoAI con dati acquisiti e contatore storico della risposta10/100. Coerente con una nuova prenotazione rispetto al GET9 del trial; non è una nuova verifica indipendente server o prova della ripetizione. I due screenshot sono porzioni diverse del gruppo, non documentano due invii separati. Sorgentiimmagine viste nella conversazione; copie scratch dichiarate mancanti, nessun accesso Library.
+
+Visibili proposteNON_GAME per Marty mystere e Nathan Never, Fallout3 guida, Tolkien e Jeeg; titolo KeikogiDomyos visibile ma risposta tagliata. Sogni per Bambini Ribelli: localeBASE_GAME perbrand, propostaNON_GAME/evidenzaBooktitle; Las ruinas perdidas de Arnaldo: locale e propostaBASE_GAME. Questi sono esiti osservati del confronto, non groundtruth o identitàBGG verificate. Non usare concordanza/brand/confidence come autorizzazione. Gli annunci leggibili mostrano statofiltrato e nessunBGGsalvato; nessuna associazione BGG creata o validata dal test. UIcatalogoinvariato coerente concontratto, non auditdatabase telefono. Revisione privata ancora non osservata.
+
+Trial registrato attivo fino18:09:02Europe/Rome, accountingpreprova9/.09; nessuna richiesta/deploy/attivazione/callprovider dell’agente in questo riscontro. Non dichiarareOFF sulla base della chiusuradeltrial precedente. Catalogapply/BGG/lingua/bonifica9705 e precisionglobale ancora non autorizzati/verificati.
+
+Unico prossimo passo: ripetere Chiedi proposteAI sul medesimo gruppo senza Prepara, verificando10/100 invariato. Dopo ripetizione chiudere trialOFF e verificarecounter con workflowesistente senza seed/reset/enrollment. Frontend7/backend6 gruppi aperti.
+
 ## Backend AI — trial annunci reali riattivato fino alle 18:09 Europe/Rome
 
 2026-10-04 utente autorizza continuazione e dispatch browserGitHub. PR252 HEAD0303a74ec4ba8049e8d3a18db92808290e61fea1 integrata squash2e5f34cdfc49d850a16daf64134b6c60690547c4. Riattivazione usa accounting corrente invece del seed storico8: nessuna riscrittura SEED_MANIFEST/GEMINI_API_KEY, token telefono invariato. CI servizio37211401434 SUCCESS27/27+dryruns; Android37211401436 SUCCESS regressioni/unit/compile/reviewAPK, visual saltate per scope; revisione indipendente senza fix richiesti. Nessun codiceapp o nuovaAPK: beta170 distribuita preservata.
