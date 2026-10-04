@@ -67,6 +67,12 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Run automatic AI trust policy
+        run: |
+          mkdir -p /tmp/ai-policy
+          javac -d /tmp/ai-policy regression/AiEnginePolicyProbe.java app/src/main/java/it/vintedaffari/app/AiEnginePolicy.java
+          java -cp /tmp/ai-policy it.vintedaffari.app.AiEnginePolicyProbe
+
       - name: Verify Vinted browser redesign states
         run: python3 regression/vinted_browser_redesign.py
 
@@ -470,7 +476,7 @@ jobs:
 
 
   ai-visual:
-    if: github.head_ref == 'backend/ai-beta-runtime' || github.head_ref == 'frontend/ai-real-listings-review' || github.head_ref == 'backend/ai-real-listings' || github.head_ref == 'backend/ai-local-evidence'
+    if: github.head_ref == 'backend/ai-engine-integration' || github.head_ref == 'backend/ai-beta-runtime' || github.head_ref == 'frontend/ai-real-listings-review' || github.head_ref == 'backend/ai-real-listings' || github.head_ref == 'backend/ai-local-evidence'
     name: AI Android manual dialog
     runs-on: ubuntu-latest
     timeout-minutes: 12
