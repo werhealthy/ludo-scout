@@ -454,5 +454,11 @@ jobs:
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.LudoVisualInstrumentation | tee browser-large-result.txt
           adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
           grep -F 'Ludo actual rooms, fixed footer and Catalog Bundle verified' browser-large-result.txt
+          adb shell settings put system font_scale 1.0
+          adb shell settings put global animator_duration_scale 1
+          adb logcat -c
+          timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.LudoVisualInstrumentation | tee ludo-motion-result.txt
+          adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
+          grep -F 'Ludo actual rooms, fixed footer and Catalog Bundle verified' ludo-motion-result.txt
 
 

@@ -31,11 +31,46 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   for(int offset=0,index=0;offset<encoded.length();offset+=3000,index++)android.util.Log.i("LudoVisual","VISUAL "+(a.getResources().getConfiguration().fontScale>1.3f?"large_":"normal_")+name+" "+index+" "+encoded.substring(offset,Math.min(offset+3000,encoded.length())));
   original.recycle();reduced.recycle();
  }
+
+ private void rendererContracts(){
+  Bitmap target=Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888),red=Bitmap.createBitmap(10,10,Bitmap.Config.ARGB_8888),blue=Bitmap.createBitmap(10,10,Bitmap.Config.ARGB_8888);
+  red.eraseColor(android.graphics.Color.RED);blue.eraseColor(android.graphics.Color.BLUE);
+  android.graphics.Canvas canvas=new android.graphics.Canvas(target);android.graphics.RectF bounds=new android.graphics.RectF(0,0,100,100);LudoPose pose=new LudoPose();LudoPose.sample(0,-1,false,0,0,pose);
+  LudoCharacterRenderer renderer=new LudoCharacterRenderer();renderer.setFallback(red);renderer.draw(canvas,bounds,pose,false);
+  if(target.getPixel(50,99)!=android.graphics.Color.RED)throw new AssertionError("fallback feet do not reach bottom anchor");
+  target.eraseColor(0);pose.bodyScaleY=.996f;renderer.draw(canvas,bounds,pose,false);
+  if(target.getPixel(50,99)!=android.graphics.Color.RED)throw new AssertionError("breathing moves foot anchor");
+  java.util.List<LudoPart> parts=java.util.Arrays.asList(new LudoPart("head","body",1,40,20,20,20,10,10),new LudoPart("body",null,0,0,0,100,100,50,100));
+  java.util.Map<String,Bitmap> images=new java.util.HashMap<>();images.put("head",blue);images.put("body",red);renderer.setParts(parts,images,100,100);pose.bodyScaleY=1;target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);
+  if(target.getPixel(50,30)!=android.graphics.Color.BLUE||target.getPixel(10,30)!=android.graphics.Color.RED)throw new AssertionError("draw order/coordinates");
+  // Root translation must move the child as well without changing its source coordinates.
+  pose.gazeX=1;target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);
+  if(target.getPixel(40,30)==android.graphics.Color.BLUE||target.getPixel(41,30)!=android.graphics.Color.BLUE)throw new AssertionError("parent transform not inherited");
+  renderer.setParts(java.util.Collections.emptyList(),java.util.Collections.emptyMap(),100,100);renderer.setFallback(null);target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);if(target.getPixel(50,50)!=0)throw new AssertionError("missing asset fabricated");
+  renderer.setFallback(blue);blue.recycle();renderer.draw(canvas,bounds,pose,false);if(target.getPixel(50,50)!=0)throw new AssertionError("recycled asset rendered");
+  red.recycle();target.recycle();
+ }
+ private Object petField(LudoPetView actor,String name)throws Exception{Field f=LudoPetView.class.getDeclaredField(name);f.setAccessible(true);return f.get(actor);}
+ private void motionContracts(Activity a)throws Exception{
+  LudoPetView actor=(LudoPetView)get(a,"petView");boolean enabled=android.animation.ValueAnimator.areAnimatorsEnabled();
+  actor.setResumed(true);Object animator=petField(actor,"idle");
+  if(enabled&&animator==null)throw new AssertionError("visible actor does not animate");
+  actor.react();actor.react();if(petField(actor,"idle")!=animator)throw new AssertionError("tap creates extra animator");
+  if(!enabled&&petField(actor,"idle")!=null)throw new AssertionError("reduced motion still runs");
+  actor.setResumed(false);if(petField(actor,"idle")!=null||((Long)petField(actor,"reactionStarted"))!=-1L)throw new AssertionError("pause leaves reaction/animator alive");
+  actor.react();if(((Long)petField(actor,"reactionStarted"))!=-1L)throw new AssertionError("paused tap starts movement");
+  actor.setResumed(true);
+  android.app.Dialog overlay=new android.app.Dialog(a);overlay.setContentView(new android.widget.TextView(a));set(a,"activeGameOverlay",overlay);overlay.show();invoke(a,"syncPetVisibility");
+  if(petField(actor,"idle")!=null)throw new AssertionError("overlay leaves actor animating");overlay.dismiss();set(a,"activeGameOverlay",null);invoke(a,"syncPetVisibility");
+  actor.onWindowFocusChanged(false);if(petField(actor,"idle")!=null)throw new AssertionError("focus loss leaves actor animating");actor.onWindowFocusChanged(true);
+ }
+
  @Override public void onStart(){
   Bundle result=new Bundle();
   try{
    Intent intent=new Intent(getTargetContext(),MainActivity.class);intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
    Activity a=startActivitySync(intent);waitForIdleSync();
+   runOnMainSync(this::rendererContracts);
    final Object[] actor={null};
    for(String room:new String[]{LudoRoomState.EXPLORE,LudoRoomState.HUNTS,LudoRoomState.HOME}){
     runOnMainSync(()->{try{set(a,"tab","companion");set(a,"ludoRooms",new LudoRoomState(room,0,0,0));set(a,"renderedLudoRoom","");invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});
@@ -57,6 +92,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      int[] after=new int[2];footer.getLocationInWindow(after);if(after[1]!=pos[1])throw new AssertionError("search scrolls out of view");
      if(text(nav,"Bundle")!=null||((ViewGroup)nav).getChildCount()!=3)throw new AssertionError("Bundle still in main navigation");
     }catch(Exception e){throw new RuntimeException(e);}});
+    if(LudoRoomState.EXPLORE.equals(room))runOnMainSync(()->{try{motionContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
     capture(a,room);
    }
    runOnMainSync(()->{try{set(a,"tab","catalog");invoke(a,"render");if(get(a,"ludoRoomDots")!=null||get(a,"ludoStage")!=null)throw new AssertionError("Ludo footer leaked to Catalog");if(((FrameLayout.LayoutParams)((View)get(a,"refreshHost")).getLayoutParams()).bottomMargin!=0)throw new AssertionError("Catalog viewport still reserved");if(text((View)get(a,"body"),"Bundle")==null)throw new AssertionError("Bundle inaccessible from Catalog");}catch(Exception e){throw new RuntimeException(e);}});
