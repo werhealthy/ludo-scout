@@ -62,5 +62,8 @@ class ProposalTests(unittest.TestCase):
     def test_inputs_are_not_modified(self):
         before=copy.deepcopy((self.sample,self.source,self.answers));self.call()
         self.assertEqual((self.sample,self.source,self.answers),before)
+    def test_unreported_confidence_stays_unknown(self):
+        del self.answers[0]['confidence']
+        self.assertIsNone(self.call()['records'][0]['confidence'])
 
 if __name__=='__main__':unittest.main()
