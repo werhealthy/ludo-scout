@@ -1,5 +1,20 @@
 # Ludo Scout — Current state
 
+## Backend AI — ripresa manuale verificata, 2026-10-04
+
+PR233 (planner offline), merge40937b1d6a4c8b3cd236179c68272400fd011601; CI37163339054 offline e37163339087 Android SUCCESS. PR234 (executor manuale), HEADfc0b2e97335745f37c42cb832a5c196c269a4037, merged9de21af012a884d7951ea29ad511ba79e650f03; CI37163645292 offline e37163645304 Android SUCCESS.31test offline e py_compile passati. Nessuna modifica Android/APK/distribuzione necessaria.
+
+Una sola ripresa manuale avviata su beta dal run37162021933: run37163936519/job111322898320 SUCCESS,31test offline passati,5nuove call tutte VALIDATED,40nuove risposte e16riusate =56/64. Report persistito nel ledger operation37163936519, complete=false,8missing ID9686/9790/55/9438/6773/9380/8848/4532. Mese2026-10 conserva8call riservate (3precedenti incluso fallimento +5nuove), EUR0.08 riservati NON fattura; nessun reset/aumento budget, retry automatico, fallback o catalog/database write. Limite mensile raggiunto: ulteriori chiamate bloccate dal preflight.
+
+Metriche limitate ai40TEXT_REFERENCE risposti:38/40 concordanti (95%),2astensioni UNKNOWN (promo9270 e lotto libri7947);5UNKNOWN su56risposte;12cambi rispetto a tipi precedenti. Non accuracy globale/ground truth fisica. LinguaUNKNOWN e BGG non verificato. Gli8missing esclusi dalle metriche, espliciti nel report. Nessuna bonifica o integrazione runtime autorizzata da questo esito.
+
+Ripresa verifica runorigine completed/beta/workflow_dispatch, fixture dal commitorigine identica alla corrente, contratto runner AST compatibile; eredita solo risposte validate e mantiene prenotazioneCAS prima di ogni call. Report parziale salvato anche dopo errore; stesso runoperation non rieseguibile. Input resume_source_run opzionale mantiene runner iniziale se vuoto. Una futura ripresa manuale dal run37163936519 potrà riusare56risposte; non programmarla automaticamente.
+
+AI Studio progettoLudo scout/gen-lang-client-0614558181 ricontrollato immediatamente prima: Livello gratuito, fatturazione non configurata. Nessun billing/carta attivati; actual_billed resta null, non importo misurato. Vincolo utente sul futuro paid invariato: blocchi preventivi verificati prima di collegare pagamenti; limiti del solo benchmark non sono protezione della futura pipeline runtime.
+
+Frontend7/backend6 aperti. Nessuna prova telefono. Prossimo passo: revisione offline dei56risultati e dei casi ambigui prima di proporre integrazione; nessuna ulteriore chiamata provider nel mese corrente. Questa sezione supersede gli stati pendenti delle sezioni AI precedenti.
+
+
 ## Backend AI — prova gratuita parziale e vincolo billing, 2026-10-04
 
 Progetto Google AI Studio «Ludo scout» verificato nella pagina Spesa: Livello gratuito, fatturazione non configurata. Non prova assenza di carte in altri servizi/account Google né verifica automatica del progetto della chiave custodita in GitHub Secret; chiave mai letta. Utente richiede niente billing/carta collegati alle API ora; prima di attivare pagamenti richiede blocchi di spesa verificati. Nessun billing attivato. Per futuro paid: blocco preventivo nel codice, limiti provider, ricarica automatica disattivata e verifica dei ritardi/overage; non promettere un tetto assoluto con soli alert o spend cap provider. Documentazione ufficiale https://ai.google.dev/gemini-api/docs/billing segnala latenza circa10min per project spend caps e possibili saldi prepay negativi.
