@@ -6,6 +6,7 @@ on:
       - 'tools/classification*.py'
       - 'regression/classification_runner_test.py'
       - 'regression/classification_resume_test.py'
+      - 'regression/classification_resume_execute_test.py'
       - 'regression/fixtures/classification_*64.json'
       - '.github/workflows/classification-ai-benchmark.yml'
       - 'regression/classification_benchmark_test.py'
@@ -23,3 +24,5 @@ jobs:
       - run: python3 regression/classification_runner_test.py
 
       - run: python3 regression/classification_resume_test.py
+
+      - run: python3 regression/classification_resume_execute_test.py
