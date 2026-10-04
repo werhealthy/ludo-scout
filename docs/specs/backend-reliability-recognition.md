@@ -1,5 +1,15 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Backend AI — prima proposta su annunci del telefono osservata, 2026-10-04 17:34 Europe/Rome
+
+Due screenshot forniti dal proprietario mostrano il pannello Annunci reali/confrontoAI con dati acquisiti e contatore storico della risposta10/100. Coerente con una nuova prenotazione rispetto al GET9 del trial; non è una nuova verifica indipendente server o prova della ripetizione. I due screenshot sono porzioni diverse del gruppo, non documentano due invii separati. Sorgentiimmagine viste nella conversazione; copie scratch dichiarate mancanti, nessun accesso Library.
+
+Visibili proposteNON_GAME per Marty mystere e Nathan Never, Fallout3 guida, Tolkien e Jeeg; titolo KeikogiDomyos visibile ma risposta tagliata. Sogni per Bambini Ribelli: localeBASE_GAME perbrand, propostaNON_GAME/evidenzaBooktitle; Las ruinas perdidas de Arnaldo: locale e propostaBASE_GAME. Questi sono esiti osservati del confronto, non groundtruth o identitàBGG verificate. Non usare concordanza/brand/confidence come autorizzazione. Gli annunci leggibili mostrano statofiltrato e nessunBGGsalvato; nessuna associazione BGG creata o validata dal test. UIcatalogoinvariato coerente concontratto, non auditdatabase telefono. Revisione privata ancora non osservata.
+
+Trial registrato attivo fino18:09:02Europe/Rome, accountingpreprova9/.09; nessuna richiesta/deploy/attivazione/callprovider dell’agente in questo riscontro. Non dichiarareOFF sulla base della chiusuradeltrial precedente. Catalogapply/BGG/lingua/bonifica9705 e precisionglobale ancora non autorizzati/verificati.
+
+Unico prossimo passo: ripetere Chiedi proposteAI sul medesimo gruppo senza Prepara, verificando10/100 invariato. Dopo ripetizione chiudere trialOFF e verificarecounter con workflowesistente senza seed/reset/enrollment. Frontend7/backend6 gruppi aperti.
+
 ## Backend AI170 — revisione privata e confronto stabile, distribuita 2026-10-04
 
 PR249 HEAD8cf03360f2b84d88ad4790c4961e2f76a4b32c91 integrata squash04edd8523846460298822531dce9d340c0ce0f28. Beta200/run37210073311/job111459286568 SUCCESS:5.12.170-ai-real-listings-review(1000200). Certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato14:44:12.666UTC; uploadFirebase14:44:51.274UTC e distinta distribuzione tester/gruppi14:44:52.296UTC. Release7dd1apvpr48r0, artifact11306945596; aggiorna AppTester senza cancellare dati.
