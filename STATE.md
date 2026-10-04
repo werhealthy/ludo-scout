@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Backend — full catalog audit tooling verified, 2026-10-04
+
+Owner confirms beta171 comparison marked reviewed and asks autonomous integration/current catalog reanalysis, with a 99% error-reduction target. Screenshot Sogni per Bambini Ribelli shows title-only observed text and declared Cranio Creations brand: explains local BASE_GAME cue, does not settle AI NON_GAME as ground truth. No further permission requested; no actual phone database accessed.
+
+PR259 HEADf60089fda4830594d281402c792ddaffd8be8186 merged squashc4f37c15123188dd6fe13b7180968ba15dc544c8. Added tools/catalog_ai_audit.py, 13 archive tests, paired error metrics and 4 benchmark tests, existing offline workflow registration, docs/catalog-ai-audit.md, AI_HANDOFF/CHANGELOG. Every canonical exported listing is inspected; exact Vinted duplicates deduplicated, stored BGG conflicts/orphan games/current reviews prioritized. ACTIVE/AUTO_FILTERED title-brand batch plan respects8rows/4096UTF8bytes and remaining100attempts. Reports retain all lifecycle counts, excluded/oversized/unplanned records and archive hash; mutation during parsing rejected. At declared10reservations maximum90requests/720records, potentially fewer; no execution/live budget read implied. UNKNOWN references no longer inflate accuracy; model abstentions remain unresolved in paired reduction. Missing independent labels/zero baseline means no percentage claim.
+
+Verification: local complete offline classification suite57PASS. Offline37219025534/job111485384234 SUCCESS; generalAndroid37219025594/job111485384989 SUCCESS on exactf60089f (regressions, pricing/unit, Javacompile and reviewAPK). Independent review no blockers; duplicate BGG, unknown accuracy, group priority and hash findings tested RED→GREEN and corrected. Android visual/lint jobs skipped by existing scope; no phone acceptance inferred. Merge skips redundant beta delivery because no Android/runtime/resources changed; installed171 preserved. No schema/classifier/filter/pricing/BGG/language/preference/queue/secrets/ledger/service modification, provider call, catalog write or newAPK.
+
+Current phone export is unavailable in this session; only historical64fixtures exist in GitHub. Current catalog analysis, automatic engine AI integration, 99% reduction, post-OFF authenticated10counter and audit of actual phone DB writes remain unverified. Last service deployment OFF retained; no fresh status claim. Do not substitute synthetic tests or historical fixtures for current catalog evidence.
+
+Frontend7/backend6 remain open; consolidate this in existing classification/AI work, no new group. Single next step: receive the current ZIP from installed app Impostazioni→Esporta archivio per audit, run full structural audit and ground the next integration in those findings. This is required data, not another confirmation or repeated screenshot test; no endpoint/token reentry, reset, reseed or paid upgrade.
+
+
 ## Backend AI171 — evidenze locali distribuite, 2026-10-04 18:28 Europe/Rome
 
 PR256 HEAD0d860201e42a55e066253b5d10a31ea5384ec796 integrata squashf9e91fc782fe39927b5a58ec7f03e73b659efc19. Beta201/run37216643534/job111478388452 SUCCESS:5.12.171-ai-local-evidence(1000201). Certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato16:27:39.587UTC; uploadFirebase16:28:23.298UTC e distinta distribuzione tester/gruppi16:28:24.306UTC. Release43nu72rmr5mio, artifact11308453573. Aggiornare daAppTester senza cancellare dati.
