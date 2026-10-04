@@ -49,20 +49,20 @@ jobs:
           assert.equal((await get(base)).state,'disabled_manually');
           assert.ok((await get(base+'/runs?per_page=100')).workflow_runs.every(r=>r.status==='completed'));
           NODE
-      - uses: actions/checkout@v4
-        with:
-          ref: ai-benchmark-ledger
-          path: ledger-source
-          persist-credentials: false
-      - name: Prepare private server configuration
+      - name: Prepare temporary read-only verification
         env:
-          AI_BENCHMARK_ENABLED: ${{ vars.AI_BENCHMARK_ENABLED }}
-          FREE_PROJECTS_CONFIRMED: ${{ inputs.free_projects_confirmed }}
           DEVICE_DIGEST: ${{ inputs.device_digest }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -m 700 "$RUNNER_TEMP/ai-private-provision"
-          node scripts/provision.mjs prepare "$GITHUB_WORKSPACE/ledger-source/ledger.json" "$RUNNER_TEMP/ai-private-provision"
+          node --input-type=module <<'NODE'
+          import {randomBytes} from 'node:crypto';
+          import {writeFile} from 'node:fs/promises';
+          import {buildResume} from './scripts/resume.mjs';
+          const token=randomBytes(32).toString('base64url');
+          const config=buildResume(process.env.DEVICE_DIGEST,token);
+          for(const [name,value]of [['auth.json',JSON.stringify(config.auth)],['cleanup.json',JSON.stringify(config.cleanup)],['probe-token',token]])
+            await writeFile(process.env.RUNNER_TEMP+'/ai-private-provision/'+name,value,{flag:'wx',mode:0o600});
+          NODE
       - name: Validate OFF configuration
         run: |
           node --input-type=module <<'NODE'
@@ -73,24 +73,28 @@ jobs:
           assert.equal(c.vars.ENABLED,'false');
           assert.equal(c.vars.FREE_TIER_VALID_UNTIL,'0');
           NODE
-      - name: Publish private configuration with AI OFF
+      - name: Preserve existing secrets and publish AI OFF
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-          npx wrangler deploy --var ENABLED:false --var FREE_TIER_VALID_UNTIL:0 --secrets-file "$RUNNER_TEMP/ai-private-provision/secrets.json"
+          npx wrangler deploy --var ENABLED:false --var FREE_TIER_VALID_UNTIL:0
+      - name: Install temporary verification digest
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler secret bulk "$RUNNER_TEMP/ai-private-provision/auth.json"
       - name: Prepare read-only deployment verification
         run: |
           cat > "$RUNNER_TEMP/ai-private-provision/check.mjs" <<'NODE'
-          import {readFile} from 'node:fs/promises';
+          import {readFile,writeFile} from 'node:fs/promises';
           import {pathToFileURL} from 'node:url';
           try {
             const root=process.env.GITHUB_WORKSPACE;
-            const {makeSeed}=await import(pathToFileURL(root+'/services/ai-beta/scripts/bootstrap.mjs'));
-            const seed=makeSeed(JSON.parse(await readFile(root+'/ledger-source/ledger.json','utf8')),true);
+            const {verifyBudget,verifyUnchanged}=await import(pathToFileURL(root+'/services/ai-beta/scripts/resume.mjs'));
+            const baselineFile=process.env.RUNNER_TEMP+'/ai-private-provision/baseline.json';
             const token=await readFile(process.env.RUNNER_TEMP+'/ai-private-provision/probe-token','utf8');
             const mode=process.argv[2];
             if(!['off','on','revoked'].includes(mode))throw Error();
@@ -99,9 +103,13 @@ jobs:
               console.log('Read-only status attempt '+attempt+': HTTP '+r.status);
               if(mode==='revoked'&&r.status===401){console.log('Temporary verification credential confirmed revoked.');process.exit(0);}
               if(mode!=='revoked'&&r.status===200){
-                const s=await r.json(),month=new Date().toISOString().slice(0,7),e=seed.months[month];
-                if(!e||s.budget?.month!==month||s.budget.calls_reserved!==e.calls_reserved||s.budget.reserved_micro!==e.reserved_micro||typeof s.enabled!=='boolean')throw Error();
-                if(s.enabled===(mode==='on')){console.log('Authenticated '+mode+' status and exact historical accounting verified.');process.exit(0);}
+                const s=await r.json(),month=new Date().toISOString().slice(0,7);
+                if(typeof s.enabled!=='boolean')throw Error();
+                if(s.enabled===(mode==='on')){
+                  if(mode==='off'){const b=verifyBudget(s,month,false);await writeFile(baselineFile,JSON.stringify(b),{flag:'wx',mode:0o600});}
+                  else verifyUnchanged(s,JSON.parse(await readFile(baselineFile,'utf8')),month);
+                  console.log('Authenticated '+mode+' status verified; calls='+s.budget.calls_reserved+'/100; reserved_micro='+s.budget.reserved_micro);process.exit(0);
+                }
               }
               if(![200,401,503].includes(r.status)||attempt===6)throw Error();
               await new Promise(resolve=>setTimeout(resolve,10000));
@@ -109,16 +117,15 @@ jobs:
           }catch{console.error('Deployment verification failed; credentials and response details redacted.');process.exitCode=1;}
           NODE
           chmod 600 "$RUNNER_TEMP/ai-private-provision/check.mjs"
-      - name: Verify imported counter while OFF
+      - name: Capture current counter while OFF
         run: node "$RUNNER_TEMP/ai-private-provision/check.mjs" off
       - name: Enable trial for at most one hour
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           TRIAL_UNTIL=$(node -e 'process.stdout.write(String(Date.now()+3600000))')
-          npx wrangler deploy --var ENABLED:true --var FREE_TIER_VALID_UNTIL:"$TRIAL_UNTIL" --secrets-file "$RUNNER_TEMP/ai-private-provision/secrets.json"
+          npx wrangler deploy --var ENABLED:true --var FREE_TIER_VALID_UNTIL:"$TRIAL_UNTIL"
           echo "Trial expires at epoch milliseconds $TRIAL_UNTIL" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify enabled trial without a provider call
         run: node "$RUNNER_TEMP/ai-private-provision/check.mjs" on
@@ -145,9 +152,10 @@ jobs:
         run: npx wrangler deploy --var ENABLED:false --var FREE_TIER_VALID_UNTIL:0
       - name: Delete runner private files
         if: always()
-        run: rm -f "$RUNNER_TEMP/ai-private-provision/secrets.json" "$RUNNER_TEMP/ai-private-provision/cleanup.json" "$RUNNER_TEMP/ai-private-provision/probe-token" "$RUNNER_TEMP/ai-private-provision/check.mjs"
+        run: rm -f "$RUNNER_TEMP/ai-private-provision/auth.json" "$RUNNER_TEMP/ai-private-provision/baseline.json" "$RUNNER_TEMP/ai-private-provision/cleanup.json" "$RUNNER_TEMP/ai-private-provision/probe-token" "$RUNNER_TEMP/ai-private-provision/check.mjs"
       - name: Record verified scope
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'TEXT'
-          One-hour manual trial enabled after authenticated OFF/accounting checks. Enabled status verified, temporary credential revoked and HTTP 401 confirmed. Only owner phone digest remains. No classification/provider request was made by this workflow.
+          One-hour manual trial resumed after authenticated current OFF/accounting checks; seed, Gemini key and durable accounting were not rewritten. Enabled status verified, temporary credential revoked and HTTP 401 confirmed. Only owner phone digest remains. No classification/provider request was made by this workflow.
           TEXT
+
