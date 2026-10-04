@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Frontend — rig illustrato168 distribuito, 2026-10-04
+
+PR242 HEADd799cf568d868eb82056db584b077f488691a84f integrata squashd735406353036dece91876434046a56c7d9bc811. CI37206824117 SUCCESS: regressioni complete/Java/APK, contratti posa/gerarchia e visualAndroid111449630131. Dodici catture font100/200% e motion1 ispezionate, actor persistente, footer/stanze/Catalogo; nessuna accettazione o fluidità telefono dichiarata. Race test dopo dismissDialog risolta richiedendo redraw durante attesa focus/draw reali, senza allentare assert. Rerun precedente37198631333: primo downloademulatore ZIPilleggibile, secondo test-focus fallito; diagnosi e correzione documentate inPR. Lint debito preesistente5errori/112warning.
+
+Beta198/run37207314233 job111451100382 SUCCESS: 5.12.168-ludo-illustrated-rig(1000198), certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato13:58:39UTC; uploadFirebase13:59:24UTC e distribuzione tester/gruppi distinta13:59:25UTC, release69405380j0tl0. Artefatto GitHub11305721379 disponibile. Cut-out14parti+mouthvariant, blink/head/tap, cacheoffthread e lifecycle/reducedmotion; nessuna stanzaillustrata/hotspot nuova o dipendenza introdotta. Ultima beta frontend168 disponibile inAppTester, aggiorna senza cancellare dati.
+
+Utente aggiunge metodo pagamento e autorizza esplicitamente limiteActions: budgetAccount esistente0 aggiornato2USDmensili, StopusageYes e alert attivi, verificato browser2026-10-04 circa15:18Europe/Rome. Nessunupgrade piano, nessuna modifica billingCloudflare/Google. Questo supersede il bloccoquota nel checkpoint storico. Preservati i checkpoint backendAI concorrenti; frontend non modifica o riattiva AI.
+
+Frontend7/backend6 gruppi aperti; Ludo consolidato. Unico prossimo passo frontend: prova telefono168 con tap ripetuti, blink, cambio stanza, pannello/Back e pausa/ripresa; screenshot/versione se difetti. Stanze verticali/hotspot restano successivi.
+
 ## Backend AI — prova manuale attiva fino alle 16:50 Europe/Rome
 
 2026-10-04 «Vai» autorizza continuazione dopo configurazione telefono confermata. PR245 HEAD7c7de3cfa8ce888101e7b47a121b5cb374b63546 mergedbeta a20def69733c4a61e86db07a7a545b0045f86814; PR246 registra esclusivamente identico workflow su defaultmain, merge4a1d25a62a9e52f03e5d0bb592cf6120d425549d. Nessun codiceapp cambiato/nuovaAPK. CIservizio37206650172/job111449116533 SUCCESS22/22+dryruns; Android37206650087/job111449116391 SUCCESS regressioni/unit/compile/reviewAPK, visual/dialog saltati scope. YAML/bash/Node syntax e limite active1hour verificati localmente; revisione indipendente senzaCritical/Important. Un solo nuovo workflow beta-only freeconfirmation, stessa concurrency deploy, stato letto con tentativi bounded senza richiesteprovider, fail/cancel tentaOFF. Cleanup/cancel best effort; scadenza runtime protegge nuovecall, non deploy programmatoOFF.
