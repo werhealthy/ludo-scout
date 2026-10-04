@@ -20,3 +20,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npx wrangler deploy --dry-run --outdir /tmp/ai-beta-bundle
+
+      - name: Verify pinned private provisioning CLI
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; fs.writeFileSync('/tmp/ai-provision-cli.json', JSON.stringify({GEMINI_API_KEY:'offline-test',SEED_MANIFEST:'offline-test',DEVICE_DIGESTS:'{}'}), {mode:0o600});"
+          npx wrangler deploy --dry-run --secrets-file /tmp/ai-provision-cli.json --outdir /tmp/ai-provision-bundle
+          npx wrangler secret bulk --help
+          rm -f /tmp/ai-provision-cli.json
