@@ -2,8 +2,12 @@
 
 Default OFF. Worker + one SQLite Durable Object hold all devices' reservations.
 No API key, device secret or admin endpoint is built into Android. The app's
-settings entry submits only the eight fixed title/brand records, then displays
-proposals without modifying the catalog. This is not archive classification.
+settings entry offers the eight fixed smoke-test records and a manual comparison
+of at most eight recent canonical saved announcements, including filtered and
+incomplete rows. The phone recalculates the local classifier and displays saved
+BGG context alongside AI type proposals; it never certifies BGG identity/language
+or modifies the catalog. Only ID/title/brand leave the phone. This is not automatic
+archive classification. The saved-announcement preview works with the service OFF.
 
 ## Verify locally
 
