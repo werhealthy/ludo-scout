@@ -21,6 +21,9 @@ public final class AiBetaInstrumentation extends Instrumentation {
   for(int i=0;i<50;i++){getUiAutomation().waitForIdle(100,1000);android.view.accessibility.AccessibilityNodeInfo node=findNode(getUiAutomation().getRootInActiveWindow(),text,exact);if(node!=null)return node;Thread.sleep(100);}throw new AssertionError("local evidence UI absent: "+text);
  }
  private void capture(String name)throws Exception {
+  android.accessibilityservice.AccessibilityServiceInfo service=getUiAutomation().getServiceInfo();
+  service.flags|=android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+  getUiAutomation().setServiceInfo(service);
   waitForIdleSync();getUiAutomation().waitForIdle(500,5000);
   android.view.accessibility.AccessibilityNodeInfo heading=waitForNode("Evidenze locali",true);
   android.view.accessibility.AccessibilityWindowInfo window=heading.getWindow();
