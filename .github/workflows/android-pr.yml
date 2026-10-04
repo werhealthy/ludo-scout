@@ -493,6 +493,8 @@ jobs:
           adb shell settings put global animator_duration_scale 0
           adb install -r app/build/outputs/apk/debug/app-debug.apk
           adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell pm grant it.vintedaffari.app android.permission.POST_NOTIFICATIONS
+          adb shell am force-stop it.vintedaffari.app
           adb logcat -c
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.AiBetaInstrumentation | tee browser-visual-result.txt
           adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
