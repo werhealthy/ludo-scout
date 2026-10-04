@@ -11,7 +11,7 @@ permissions:
 jobs:
   native-contract:
     name: Native Ludo animation contracts
-    if: github.head_ref == 'frontend/ludo-native-animation' || github.head_ref == 'frontend/ludo-illustrated-rig'
+    if: github.head_ref == 'frontend/ludo-native-animation' || github.head_ref == 'frontend/ludo-illustrated-rig' || github.head_ref == 'frontend/ludo-fullscreen-pet'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -389,7 +389,7 @@ jobs:
 
 
   ludo-visual:
-    if: github.head_ref == 'frontend/ludo-primary-search' || github.head_ref == 'frontend/ludo-scribble-world' || github.head_ref == 'frontend/ludo-native-animation' || github.head_ref == 'frontend/ludo-illustrated-rig'
+    if: github.head_ref == 'frontend/ludo-primary-search' || github.head_ref == 'frontend/ludo-scribble-world' || github.head_ref == 'frontend/ludo-native-animation' || github.head_ref == 'frontend/ludo-illustrated-rig' || github.head_ref == 'frontend/ludo-fullscreen-pet'
     name: Ludo Android visual and lint
     runs-on: ubuntu-latest
     timeout-minutes: 12
