@@ -1,5 +1,16 @@
 # Ludo Scout — Current state
 
+## Frontend — Ludo scarabocchio e Motore tecnico, 2026-10-04
+
+Mascotte approvata verde con occhi a spirale integrata come WebP con alpha reale. Gli stati su carta chiara e i tre personaggi differenti sono sostituiti da alias allo stesso asset. Marchio monocromatico testa/cappello/spirali in nav e launcher; occhi a spirale nei caricamenti; ritratto negli stati vuoti e nel riepilogo Libreria. Nessuna nuova variante della mascotte.
+
+Scena persistente tra Esplora/Preferiti/Libreria: tab in alto, ricerca fissa in basso, ambiente nativo con palette450ms e particelle. Su schermi bassi la scena passa nello scroll per preservare il contenuto e il personaggio. Oggi/Questo mese con gerarchia coerente, azioni operative dopo i risultati; righe con icone e testo concreto. Motore torna alla vista tecnica pre-Ludo98 adattata alle cinque fasi attuali, totale operativo centrale e fallback righe per font grandi. Back conserva l'origine Ludo dopo ripristino Activity; dettagli senza query ricostruibile tornano alla panoramica.
+
+Nessuna modifica a SQLite, pricing, filtri/soglie, queue, acquisizione o rete. File condiviso MainActivity modificato per rendering/routing. Review ha fatto correggere viewport su schermi bassi e ripristino Back; ultima review senza Critical/Important aperti. Verifiche alpha/corners, alias, icona e diffcheck locali. Test JVM/SQLite/unit/compile/APK e rendering Activity reale a font100/200% nella CI PR; otto screenshot ispezionati, ultima riga Motore corretta dopo ispezione. Lint5errori preesistenti e109warning: non dichiarato pulito.
+
+PR236 HEAD5b6d17ac326a6849c1a3cb86447478c670597e20, merge d0747388651c5b706d6abcb5165d3a5c01196a1d. CI PR37166009441 SUCCESS e beta192/run37166295389 SUCCESS. Distribuita5.12.165-ludo-scribble(1000192): firma attesa C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificata00:57:39UTC; uploadFirebase00:58:27UTC e distribuzione distinta ai tester00:58:28UTC2026-10-04, release00fblfq2tj2p0. Accettazione e prestazioni sul telefono ancora pendenti. Frontend7/backend6 gruppi aperti. Unico prossimo passo frontend: aggiornare senza cancellare dati e provare sezioni Ludo, scrolling/ricerca fissa, Motore/Back, simbolo e caricamenti; screenshot/versione se emerge un difetto.
+
+
 ## Backend AI — adattatore offline delle proposte integrato, 2026-10-04
 
 PR235 backend/ai-shadow-proposals da beta52b57acd; HEADb338bb9661cb1efd62c471c1e96127536f9f6929, squashaa3799181e9ca3df0af35ca88fe7511eae70c73e. Tool tools/classification_proposals.py consuma samplecorrente/source-input/answers/modello/contratto da filelocali; titolo ebrand esatti richiesti per riuso. Content keySHA256 vincolaID/titolo/brand/modello/contratto; associazione sorgente/modello/contratto dichiarata operatore,non attestata. IDduplicati/estranei,confidenceinvalida,claimBGG/lingua rifiutati. Confidencenonriportata=null. Nuovi titoli/brand→STALE_INPUT senza proposta;assenza risposta→MISSING_ANSWER. preserved_type conserva sottotipo locale;runtime_type=null,needs_review=true,apply_authorized=false sempre. Nessunnetwork/key/ledger/database/apply.
