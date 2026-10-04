@@ -61,6 +61,13 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    }
    runOnMainSync(()->{try{set(a,"tab","catalog");invoke(a,"render");if(get(a,"ludoRoomDots")!=null||get(a,"ludoStage")!=null)throw new AssertionError("Ludo footer leaked to Catalog");if(((FrameLayout.LayoutParams)((View)get(a,"refreshHost")).getLayoutParams()).bottomMargin!=0)throw new AssertionError("Catalog viewport still reserved");if(text((View)get(a,"body"),"Bundle")==null)throw new AssertionError("Bundle inaccessible from Catalog");}catch(Exception e){throw new RuntimeException(e);}});
    capture(a,"catalog");
+   runOnMainSync(()->{try{
+    set(a,"tab","activity");set(a,"engineSection","phase");set(a,"engineDetailReturnToLudo",true);
+    Bundle saved=new Bundle();java.lang.reflect.Method save=MainActivity.class.getDeclaredMethod("saveUiState",Bundle.class);save.setAccessible(true);save.invoke(a,saved);
+    set(a,"engineDetailReturnToLudo",false);java.lang.reflect.Method restore=MainActivity.class.getDeclaredMethod("restoreUiState",Bundle.class);restore.setAccessible(true);restore.invoke(a,saved);
+    if(!Boolean.TRUE.equals(get(a,"engineDetailReturnToLudo"))||!"overview".equals(get(a,"engineSection")))throw new AssertionError("engine recreation lost Ludo origin or restored an unloaded phase");
+    invoke(a,"onBackPressed");if(!"companion".equals(get(a,"tab")))throw new AssertionError("engine recreation Back did not return to Ludo");
+   }catch(Exception e){throw new RuntimeException(e);}});
    runOnMainSync(a::finish);
    result.putString("stream","Ludo actual rooms, fixed footer and Catalog Bundle verified; persistent actor and top sections checked");finish(Activity.RESULT_OK,result);
   }catch(Throwable failure){result.putString("stream",android.util.Log.getStackTraceString(failure));finish(Activity.RESULT_CANCELED,result);}
