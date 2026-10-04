@@ -1772,7 +1772,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 "manualRecoveryState={"+manualRecoveryStateSummary+"}\n"+
                 "openedVintedTarget={"+openedVintedTargetSummary+"}\n"+
                 "openedVintedVerify={"+openedVintedVerifySummary+"}\n"+
-                "aiEngine={"+aiEngineSummary+"}\\n"+
+                "aiEngine={"+aiEngineSummary+"}\n"+
                 "catalogHealth={"+catalogHealthSummary+"}\n"+
                 "catalogRatingSweep={"+catalogRatingSweepSummary+"}\n"+
                 "lastOpenedVintedPage="+p.getString("lastOpenedVintedPage","")+"\n"+
