@@ -18,8 +18,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Verify read-only real AI announcement selection
-        run: python3 regression/ai_real_listings.py
       - name: Verify supplied Ludo visual universe
         run: python3 regression/ludo_visual_universe.py
       - name: Run featured pedestal regression
@@ -290,6 +288,8 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Verify AI real-listing read-only selection
+        run: python3 regression/ai_real_listings.py
       - name: Run unified catalog and bundle workflow regression
         run: python3 regression/catalog_bundle_workflow.py
       - name: Run pricing unit tests
@@ -340,6 +340,8 @@ jobs:
             --app "$FIREBASE_APP_ID" \
             --testers "$FIREBASE_TESTERS" \
             --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+
+
 
 
 

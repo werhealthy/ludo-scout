@@ -79,7 +79,7 @@ public final class AiBetaRealDialog {
      JSONObject response=AiBetaClient.submit(saved.optString("endpoint"),saved.optString("token"),id,chosen.rows);
      if("PROPOSAL".equals(response.optString("status"))) {
       comparison(response,chosen,false);
-      saved.put("real_response",response).put("real_response_key",chosen.key).put("real_response_at",System.currentTimeMillis());
+      saved.put("real_response",response).put("real_display_key",chosen.key).put("real_display_at",System.currentTimeMillis());
       saved.remove("real_review_key");settings.save(saved);
      }else message=AiBetaTestDialog.display(response,chosen.rows);
     }
@@ -102,7 +102,7 @@ public final class AiBetaRealDialog {
   });
  }
  private static JSONObject cached(JSONObject saved,AiBetaRealListings.Snapshot chosen)throws Exception {
-  if(!AiBetaProtocol.reusableDisplay(chosen.key,saved.optString("real_response_key"),saved.optLong("real_response_at"),System.currentTimeMillis()))return null;
+  if(!AiBetaProtocol.reusableDisplay(chosen.key,saved.optString("real_display_key"),saved.optLong("real_display_at"),System.currentTimeMillis()))return null;
   JSONObject response=saved.optJSONObject("real_response");
   if(response==null)return null;
   if(!AiBetaProtocol.MODEL.equals(response.optString("model"))||!AiBetaProtocol.CONTRACT.equals(response.optString("contract")))throw new Exception("stale contract");
@@ -118,33 +118,8 @@ public final class AiBetaRealDialog {
   update(chosen,text.toString(),false);
  }
  static String comparison(JSONObject response,AiBetaRealListings.Snapshot chosen,boolean reviewed)throws Exception {
-  if(!"PROPOSAL".equals(response.getString("status")))throw new Exception("invalid proposal");
-  AiBetaTestDialog.display(response,chosen.rows); // Validates ids, categories and catalog/BGG/language prohibitions.
-  JSONArray proposals=response.getJSONArray("records");
-  StringBuilder text=new StringBuilder("Confronto locale / AI · catalogo invariato\n").append(reviewed?"Revisionato: registrata soltanto la lettura del confronto. Nessuna correzione applicata.\n":"Da revisionare: ogni proposta richiede una valutazione.\n");
-  for(int i=0;i<chosen.local.length();i++) {
-   JSONObject local=chosen.local.getJSONObject(i),proposal=null;
-   for(int j=0;j<proposals.length();j++)if(proposals.getJSONObject(j).getLong("listing_id")==local.getLong("listing_id"))proposal=proposals.getJSONObject(j);
-   if(proposal==null||!proposal.getBoolean("needs_review"))throw new Exception("invalid review");
-   Object confidence=proposal.get("confidence");
-   if(confidence!=JSONObject.NULL&&(!(confidence instanceof Number)||!Double.isFinite(((Number)confidence).doubleValue())||((Number)confidence).doubleValue()<0||((Number)confidence).doubleValue()>100))throw new Exception("invalid confidence");
-   String evidence=proposal.getString("evidence");if(evidence.trim().isEmpty()||evidence.length()>500)throw new Exception("invalid evidence");
-   String localType=local.getString("local_type"),proposed=proposal.getString("proposed_type");
-   text.append("\n#").append(local.getLong("listing_id")).append(" · ").append(local.getString("title"))
-       .append("\nLocale: ").append(localCategory(localType)).append("\n").append(local.getString("local_reason"))
-       .append("\nAI: ").append(AiBetaTestDialog.category(proposed)).append("\n").append(evidence).append("\n");
-   switch(AiBetaComparison.verdict(localType,proposed)) {
-    case "AGREEMENT":text.append("Concordanti · da verificare");break;
-    case "COMPATIBLE_GROUP":text.append("Categoria compatibile; sottotipo locale conservato");break;
-    case "CONFLICT":text.append("Discordanti · nessuna sostituzione automatica");break;
-    default:text.append("Informazioni insufficienti · da chiarire");
-   }
-   text.append("\n");
-  }
-  JSONObject budget=response.optJSONObject("budget");if(budget!=null)text.append("\nChiamate al momento della risposta: ").append(budget.optInt("calls_reserved")).append(" / 100");
-  return text.toString();
- }
- private static String localCategory(String type)throws Exception {
-  switch(type){case "ACCESSORY":return "Accessorio";case "COMPONENTS":return "Componenti separati";case "EMPTY_BOX":return "Scatola vuota";case "UNCERTAIN":return "Da chiarire";default:return AiBetaTestDialog.category(type);}
+  String body=AiBetaListings.display(chosen.local,response);
+  return (reviewed?"Revisionato: registrata soltanto la lettura del confronto. Nessuna correzione applicata.\n\n":"")+body;
  }
 }
+

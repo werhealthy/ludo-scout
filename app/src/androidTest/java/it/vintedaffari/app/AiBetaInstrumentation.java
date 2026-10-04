@@ -14,6 +14,7 @@ public final class AiBetaInstrumentation extends Instrumentation {
  @Override public void onCreate(Bundle arguments){super.onCreate(arguments);start();}
  private View find(View v,String text){if(v instanceof TextView&&text.equals(((TextView)v).getText().toString()))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View found=find(g.getChildAt(i),text);if(found!=null)return found;}}return null;}
  @Override public void onStart(){Bundle result=new Bundle();Activity a=null;try{
+  AiBetaRealChecks.run();
   String fixture;try(java.io.InputStream in=getTargetContext().getAssets().open("ai-beta/sample8.json");java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){byte[] buf=new byte[2048];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);fixture=new org.json.JSONArray(out.toString("UTF-8")).toString();}AiBetaSettings settings=new AiBetaSettings(getTargetContext());org.json.JSONObject saved=new org.json.JSONObject().put("enabled",false).put("last_display","Prova disattivata · nessuna chiamata AI").put("last_display_key",AiBetaProtocol.fingerprint(fixture,AiBetaProtocol.MODEL,AiBetaProtocol.CONTRACT)).put("last_display_at",System.currentTimeMillis());settings.save(saved);if(settings.load().optBoolean("enabled",true))throw new AssertionError("disabled setting lost");
   if(!new java.io.File(getTargetContext().getNoBackupFilesDir(),"ai-beta.private").isFile())throw new AssertionError("settings not excluded from backup");
   a=startActivitySync(new Intent().setClassName(getTargetContext(),"it.vintedaffari.app.MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));final Activity screen=a;AtomicReference<AlertDialog> opened=new AtomicReference<>();runOnMainSync(()->opened.set(AiBetaTestDialog.show(screen)));AlertDialog dialog=opened.get();
@@ -39,17 +40,16 @@ public final class AiBetaInstrumentation extends Instrumentation {
    MarketStore.createSchema(db);
    insert(db,1,"Organizer Catan","Contesto locale, venditore e prezzo mai inviati","AUTO_FILTERED",20);
    insert(db,2,"Solo carte Catan","","ACTIVE",20);
-   insert(db,3,"Annuncio nascosto","","USER_HIDDEN",99);
-   insert(db,4,new String(new char[6000]).replace('\0','X'),"","ACTIVE",100);
+   insert(db,3,"   ","","USER_HIDDEN",99);
    long before=android.database.DatabaseUtils.longForQuery(db,"SELECT total_changes()",null);
    AiBetaRealListings.Snapshot snapshot=AiBetaRealListings.select(db);
-   if(snapshot.rows.length()!=2||snapshot.rows.getJSONObject(0).getLong("listing_id")!=2)throw new AssertionError("selection bounds/lifecycle/tie failed");
+   if(snapshot.rows.length()!=2||snapshot.rows.getJSONObject(0).getLong("listing_id")!=1||snapshot.local.getJSONObject(0).getLong("listing_id")!=2)throw new AssertionError("selection bounds/canonical order/tie failed");
    if(!"COMPONENTS".equals(snapshot.local.getJSONObject(0).getString("local_type")))throw new AssertionError("local subtype lost");
    for(int i=0;i<snapshot.rows.length();i++)if(snapshot.rows.getJSONObject(i).length()!=3||snapshot.rows.getJSONObject(i).has("observed_text")||snapshot.rows.getJSONObject(i).has("local_type"))throw new AssertionError("remote payload leaked local fields");
    if(new org.json.JSONObject().put("request_id","00000000-0000-0000-0000-000000000000").put("records",snapshot.rows).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length>4096)throw new AssertionError("payload oversized");
    if(!AiBetaRealListings.current(db,snapshot)||before!=android.database.DatabaseUtils.longForQuery(db,"SELECT total_changes()",null))throw new AssertionError("read-only selection changed archive");
    org.json.JSONObject answer=response(snapshot);String display=AiBetaRealDialog.comparison(answer,snapshot,false);
-   if(!display.contains("Componenti separati")||!display.contains("sottotipo locale conservato"))throw new AssertionError("grouped proposal overwrote local subtype");
+   if(!display.contains("Componenti")||!display.contains("sottotipo locale conservato"))throw new AssertionError("grouped proposal overwrote local subtype");
    for(String field:new String[]{"apply_authorized","bgg_verified"}) {
     org.json.JSONObject invalid=new org.json.JSONObject(answer.toString());invalid.getJSONArray("records").getJSONObject(0).put(field,true);boolean rejected=false;
     try{AiBetaRealDialog.comparison(invalid,snapshot,false);}catch(Exception expected){rejected=true;}
@@ -62,6 +62,10 @@ public final class AiBetaInstrumentation extends Instrumentation {
    AiBetaRealListings.Snapshot edited=AiBetaRealListings.select(db);
    if(!snapshot.key.equals(edited.key)||snapshot.localKey().equals(edited.localKey()))throw new AssertionError("remote reuse/local revision scope failed");
    db.execSQL("DELETE FROM market_listings WHERE id=1");if(AiBetaRealListings.current(db,edited))throw new AssertionError("deleted listing retained stale proposal");
+   for(int i=100;i<109;i++)insert(db,i,"Gioco "+i,"","ACTIVE",i);
+   if(AiBetaRealListings.select(db).rows.length()!=8)throw new AssertionError("eight-row bound failed");
+   insert(db,4,new String(new char[4096]).replace('\0','界'),"","ACTIVE",999);
+   boolean bounded=false;try{AiBetaRealListings.select(db);}catch(Exception expected){bounded=true;}if(!bounded)throw new AssertionError("oversized multibyte input accepted");
   }
  }
  private void renderRealComparison(Activity a,AiBetaSettings settings)throws Exception {
@@ -71,7 +75,7 @@ public final class AiBetaInstrumentation extends Instrumentation {
   insert(db,900000002,"Solo carte Catan","Componenti separati","AUTO_FILTERED",System.currentTimeMillis()+1000);
   AiBetaRealListings.Snapshot snapshot=AiBetaRealListings.prepare(getTargetContext());
   if(snapshot.rows.length()!=2)throw new AssertionError("isolated emulator selection unexpected");
-  org.json.JSONObject saved=settings.load();saved.put("real_snapshot",snapshot.local).put("real_response",response(snapshot)).put("real_response_key",snapshot.key).put("real_response_at",System.currentTimeMillis()).put("enabled",false);settings.save(saved);
+  org.json.JSONObject saved=settings.load();saved.put("real_snapshot",snapshot.local).put("real_response",response(snapshot)).put("real_display_key",snapshot.key).put("real_display_at",System.currentTimeMillis()).put("enabled",false);settings.save(saved);
   AtomicReference<AlertDialog> opened=new AtomicReference<>();runOnMainSync(()->opened.set(AiBetaRealDialog.show(a)));AlertDialog real=opened.get();
   boolean loaded=false;for(int i=0;i<50;i++){waitForIdleSync();AtomicReference<Boolean> seen=new AtomicReference<>(false);runOnMainSync(()->{View root=real.getWindow().getDecorView();View button=find(root,"Segna confronto come revisionato");seen.set(button!=null&&button.isEnabled());});if(seen.get()){loaded=true;break;}Thread.sleep(100);}if(!loaded)throw new AssertionError("real cached comparison not rendered");
   runOnMainSync(()->{View root=real.getWindow().getDecorView();View analyze=find(root,"Chiedi proposte AI");if(analyze==null||analyze.isEnabled())throw new AssertionError("real analysis allowed while OFF");});

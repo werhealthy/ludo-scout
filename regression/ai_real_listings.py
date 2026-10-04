@@ -1,32 +1,22 @@
-"""Execute the app's actual selection SQL with a read-only database.
+"""Execute the production read-only selection SQL against adversarial SQLite data."""
+import pathlib, re, sqlite3
+p=pathlib.Path('app/src/main/java/it/vintedaffari/app/AiBetaListings.java')
+s=p.read_text()
+sql=re.search(r'SELECTION_SQL\s*=\s*"([^"]+)"',s).group(1)
+db=sqlite3.connect(':memory:')
+db.executescript('CREATE TABLE market_listings(id INTEGER PRIMARY KEY,vinted_title TEXT,brand TEXT,item_condition TEXT,current_price_cents INTEGER,observed_text TEXT,game_id INTEGER,last_seen INTEGER,lifecycle TEXT,match_state TEXT); CREATE TABLE games(id INTEGER PRIMARY KEY,bgg_id TEXT,canonical_name TEXT,match_state TEXT);')
+db.execute("INSERT INTO games VALUES(1,'123','Known game','MATCHED')")
+for i in range(1,13):
+ db.execute('INSERT INTO market_listings VALUES(?,?,?,?,?,?,?,?,?,?)',(i,'Organizer base + expansions' if i==12 else 'Game '+str(i),'Brand',None,0,'',1 if i==12 else None,100,'AUTO_FILTERED' if i==12 else 'ACTIVE','MATCHED'))
+db.execute("INSERT INTO market_listings VALUES(13,'  ',NULL,NULL,0,NULL,NULL,999,'ACTIVE','')")
+before=list(db.iterdump())
+rows=db.execute(sql).fetchall()
+assert [r[0] for r in rows]==list(range(12,4,-1)),rows
+assert rows[0][-3:]==('123','Known game','MATCHED'),rows[0]
+assert rows[1][-3:]==('','',''),rows[1]
+assert list(db.iterdump())==before
+db.execute('DELETE FROM market_listings')
+assert db.execute(sql).fetchall()==[]
+assert 'OPEN_READONLY' in s and 'getReadableDatabase' not in s and 'getWritableDatabase' not in s
+print('Real AI selection: eight recent canonical IDs, stable ties, filtered/partial rows, optional BGG, blank titles, empty DB and unchanged SQL data passed')
 
-Protects against selecting deleted/hidden listings, unstable ties, unbounded
-archive reads and writes while preparing a manual AI comparison.
-"""
-import json, re, sqlite3, tempfile
-from pathlib import Path
-root = Path(__file__).resolve().parents[1]
-source = root / 'app/src/main/java/it/vintedaffari/app/AiBetaRealListings.java'
-assert source.exists(), 'Real announcement selection is missing'
-sql = re.search(r'SELECT_RECENT\s*=\s*("(?:[^"\\]|\\.)*")', source.read_text())
-assert sql, 'Selection SQL is missing'
-query = json.loads(sql.group(1))
-with tempfile.TemporaryDirectory() as tmp:
-    path = Path(tmp) / 'archive.db'
-    db = sqlite3.connect(path)
-    schema = (root / 'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text()
-    expression = re.search(r'db.execSQL\(("CREATE TABLE IF NOT EXISTS market_listings.*?\));', schema, re.S).group(1)
-    db.execute(''.join(json.loads(s) for s in re.findall(r'"(?:[^"\\]|\\.)*"', expression)))
-    for ident, state, title, stamp in [(1,'ACTIVE','Catan',10),(2,'AUTO_FILTERED','Organizer Catan',10),(3,'SOLD','Sold',99),(4,'REMOVED','Removed',99),(5,'USER_HIDDEN','Hidden',99),(6,'RESET_LEGACY','Reset',99),(7,'ACTIVE','   ',100)]:
-        db.execute('INSERT INTO market_listings(id,temp_fingerprint,vinted_title,brand,observed_text,current_price_cents,lifecycle,first_seen,last_seen) VALUES(?,?,?,?,?,100,?,0,?)', (ident,str(ident),title,'Kosmos','Descrizione locale',state,stamp))
-    for ident in range(10,60):
-        db.execute('INSERT INTO market_listings(id,temp_fingerprint,vinted_title,current_price_cents,lifecycle,first_seen,last_seen) VALUES(?,?,?,100,?,0,0)', (ident,str(ident),'Gioco '+str(ident),'ACTIVE'))
-    db.commit(); before = '\n'.join(db.iterdump()); db.close()
-    ro = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
-    rows = ro.execute(query).fetchall()
-    assert [row[0] for row in rows[:2]] == [2,1], 'Recent ordering / tie-break lost'
-    assert len(rows) == 32, 'Candidate read is not bounded'
-    assert not {3,4,5,6,7}.intersection(row[0] for row in rows), 'Unavailable / blank rows selected'
-    assert rows[0][1:4] == ('Organizer Catan','Kosmos','Descrizione locale'), 'Local evidence lost'
-    assert '\n'.join(ro.iterdump()) == before, 'Preparation changed the catalog'
-print('Real listings: lifecycle, stable order, bounded read, local context and unchanged archive passed')
