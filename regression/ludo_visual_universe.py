@@ -6,7 +6,9 @@ allowed.update({'ludo_room_engine_background','ludo_engine_character','ludo_engi
 res=root/'app/src/main/res'
 actual={p.stem for p in res.rglob('*') if p.is_file() and p.stem.startswith('ludo_') and p.suffix in {'.png','.webp'}}
 replaced={'ludo_'+n for n in ['idle','hello','deal_search','treasure_reward','no_results','sleeping','hunt_explorer','engine_character','hunts_character','library_character','app_icon']}
-raster_allowed=(allowed-replaced)|{'ludo_scribble_character'}
+rig_parts={'ludo_part_'+n for n in ['body','cape','hat','head','ear_left','ear_right','eye_left','eye_right','spiral_left','spiral_right','mouth','mouth_surprised','arm_left','arm_right','dice']}
+raster_allowed=(allowed-replaced)|{'ludo_scribble_character'}|rig_parts
+allowed.update(rig_parts)
 assert actual==raster_allowed, f'Legacy or missing Ludo art: {actual ^ raster_allowed}'
 allowed.update({'ludo_scribble_character','ludo_mark'})
 for p in (root/'app/src/main').rglob('*'):
