@@ -9,6 +9,21 @@ permissions:
   contents: read
 
 jobs:
+  native-contract:
+    name: Native Ludo animation contracts
+    if: github.head_ref == 'frontend/ludo-native-animation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - run: chmod +x gradlew
+      - run: ./gradlew --no-daemon :app:testDebugUnitTest --tests it.vintedaffari.app.LudoPoseTest --tests it.vintedaffari.app.LudoPartTest
+
   validate:
     name: Regressions and Java compile
     runs-on: ubuntu-latest
@@ -371,7 +386,7 @@ jobs:
 
 
   ludo-visual:
-    if: github.head_ref == 'frontend/ludo-primary-search' || github.head_ref == 'frontend/ludo-scribble-world'
+    if: github.head_ref == 'frontend/ludo-primary-search' || github.head_ref == 'frontend/ludo-scribble-world' || github.head_ref == 'frontend/ludo-native-animation'
     name: Ludo Android visual and lint
     runs-on: ubuntu-latest
     timeout-minutes: 12
