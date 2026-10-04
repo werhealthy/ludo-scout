@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend AI — collegamento Cloudflare GitHub pronto, deploy pendente
+
+2026-10-04: utente conferma secret GitHub nominati CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID; valori mai letti, presenza/validità ancora non provate da un run. PR240 backend/ai-cloudflare-deploy-off HEAD4691cae777e9eae7f3a93d75eaf51662949ffd6a integrata squash6ba6078ed295758c90a9bbb551df5143e7548617. Nuovo workflow .github/workflows/ai-beta-deploy-off.yml manuale, solo beta, richiede dichiarazione WorkersFree; npm test/dryrun e assert configurazione OFF precedono deploy con ENABLED=false/FREE_TIER_VALID_UNTIL=0. CI servizio37196236776 SUCCESS; Android37196236827 SUCCESS, visual/dialog/browser saltati per scope. YAML e assert OFF verificati localmente; configurazione ENABLED=true rifiutata; review indipendente senza blocchi. Nessun Android change/APK/distribuzione richiesto.
+
+Nessun deploy/run manuale, seed import, enrollment, secret Gemini trasferito, provider call o billing attivato in questa ripresa. Dichiarazione piano non è audit automatico. Unico prossimo step: confermare account WorkersFree, avviare workflow AI beta deploy OFF su beta e verificare esito/endpoint. Poi proseguire cutover e provisioning dal checkpoint sotto. Connector GitHub disponibile non espone dispatch né lettura metadata secret; eventuale browser fallback richiede consenso prima uso. Frontend7/backend6 aperti.
+
 ## Backend AI — beta166 distribuita, servizio OFF e accessi pendenti
 
 PR237 HEAD01a65f28ece3971cb56d0304ffe687038318aa76, squash d9b53233d09f5711e653050d1b3ee8ef64572d79. Integrato il runtime manuale approvato: Workers + un Durable Object SQLite globale,100 tentativi/mese totali ed EUR1 prenotati teorici, storico importato senza reset, token revocabili e chiave solo server. Android Impostazioni → Test AI · beta usa8 fixture controllate e mostra proposte; niente scritture catalogo/BGG/lingua/pricing/override. Impostazioni/richiesta/proposte cifrate Keystore fuori backup/export, default OFF.
