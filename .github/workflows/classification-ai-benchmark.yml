@@ -7,6 +7,11 @@ on:
         type: boolean
         required: true
         default: false
+      resume_source_run:
+        description: 'Optional completed benchmark run ID to continue. Reuse validated answers; process only missing records within remaining monthly limits. Empty starts original benchmark.'
+        type: string
+        required: false
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -25,12 +30,15 @@ jobs:
         run: |
           python3 regression/classification_benchmark_test.py
           python3 regression/classification_runner_test.py
+          python3 regression/classification_resume_test.py
+          python3 regression/classification_resume_execute_test.py
       - name: Bounded manual benchmark (no retries)
         env:
           AI_BENCHMARK_ENABLED: ${{ vars.AI_BENCHMARK_ENABLED }}
+          RESUME_SOURCE_RUN: ${{ inputs.resume_source_run }}
           CONFIRM_FREE_TIER: ${{ inputs.confirm_free_tier }}
           AI_MONTHLY_BUDGET_EUR: ${{ vars.AI_MONTHLY_BUDGET_EUR || '1' }}
           AI_BATCH_BUDGET_EUR: ${{ vars.AI_BATCH_BUDGET_EUR || '.10' }}
           GH_TOKEN: ${{ github.token }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python3 tools/classification_benchmark_runner.py
+        run: python3 tools/classification_resume_execute.py
