@@ -57,3 +57,8 @@ test('reservation write failure rolls back and blocks transport',async()=>{const
  x=await setup({dir});assert.equal((await x.request('request-0002',[{...rows[0],title:'Another game'}])).status,503);assert.equal(x.calls(),0);
  const status=await(await x.mf.dispatchFetch('https://local/v1/status',{headers:{authorization:'Bearer '+token}})).json();assert.equal(status.budget.calls_reserved,9);
  }finally{await x.close();await rm(dir,{recursive:true,force:true});}});
+test('missing recorded month cannot silently reset the global quota',async()=>{const dir=await mkdtemp(join(tmpdir(),'ludo-missing-'));let x=await setup({dir,seed:99});try{
+ await x.request();await x.close();await mutateState(dir,db=>db.prepare('DELETE FROM state WHERE id=?').run('month:'+month));
+ x=await setup({dir,seed:99});assert.equal((await x.request('request-0002',[{...rows[0],title:'Another game'}])).status,503);assert.equal(x.calls(),0);
+ }finally{await x.close();await rm(dir,{recursive:true,force:true});}});
+test('a legitimate new UTC month starts once and survives restart',async()=>{const dir=await mkdtemp(join(tmpdir(),'ludo-rollover-'));const seed=JSON.stringify({version:1,source_sha256:'a'.repeat(64),benchmark_disabled:true,months:{'2020-01':{calls_reserved:8,reserved_micro:80000}}});let x=await setup({dir,bindings:{SEED_MANIFEST:seed}});try{const body=await(await x.request()).json();assert.equal(body.budget.calls_reserved,1);await x.close();x=await setup({dir,bindings:{SEED_MANIFEST:seed}});assert.equal((await(await x.request()).json()).budget.calls_reserved,1);assert.equal(x.calls(),0);}finally{await x.close();await rm(dir,{recursive:true,force:true});}});

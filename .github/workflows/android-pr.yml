@@ -463,7 +463,7 @@ jobs:
       - name: Build actual browser and platform test APK
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest -PLUDO_AI_TEST
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest -PLUDO_AI_TEST=true
       - name: Render actual AI manual dialog
         timeout-minutes: 5
         run: |

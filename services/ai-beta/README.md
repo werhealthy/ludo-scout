@@ -28,7 +28,9 @@ replaced. No Gemini credentials or external provider traffic in tests/CI.
    `SEED_MANIFEST` (the generated JSON), and `DEVICE_DIGESTS` (JSON mapping device
    IDs to SHA256 of their separate randomly generated tokens). Never place
    raw secrets in wrangler.jsonc, shell arguments, CI output or chat.
-   Create the token with at least32random bytes; deliver privately to the owner.
+   Run node scripts/enroll.mjs DEVICE_ID PRIVATE_OUTPUT.json to create
+   a32-byte random token and digest in an exclusive mode0600 file, without printing
+   the secret. Deliver privately to the owner.
    Revoke a device by removing its digest and redeploying with `ENABLED=false`
    during changes. A stolen valid token can consume remaining quota; this beta
    does not claim app attestation or public-user authentication.
