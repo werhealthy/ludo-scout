@@ -15,7 +15,7 @@ export function verifyStatus(status,seed,month){
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  try{
   const [mode,ledgerFile,dir]=process.argv.slice(2);
-  if(!ledgerFile||!dir||!['prepare','verify'].includes(mode))throw Error('Usage');
+  if(!ledgerFile||!dir||!['prepare','verify','revoked'].includes(mode))throw Error('Usage');
   const ledger=JSON.parse(await readFile(ledgerFile,'utf8'));
   if(mode==='prepare'){
    const token=randomBytes(32).toString('base64url');
@@ -25,10 +25,15 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   }else{
    const token=await readFile(dir+'/probe-token','utf8');
    const response=await fetch(endpoint,{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});
+   if(mode==='revoked'){
+    if(response.status!==401)throw Error('Verification credential not revoked');
+    console.log('Temporary verification credential confirmed revoked.');
+   }else{
    if(response.status!==200)throw Error('Status failed');
    const status=await response.json();
    verifyStatus(status,makeSeed(ledger,true),new Date().toISOString().slice(0,7));
    console.log('Authenticated status verified: AI disabled; imported historical accounting matches.');
+   }
   }
  }catch{console.error('Private provisioning failed; details and credentials redacted.');process.exitCode=1;}
 }
