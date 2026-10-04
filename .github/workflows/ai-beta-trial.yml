@@ -1,0 +1,153 @@
+name: AI beta one-hour trial
+on:
+  workflow_dispatch:
+    inputs:
+      free_projects_confirmed:
+        description: "Confirmed Workers Free and GitHub Gemini key belongs to Ludo scout Free Tier, no billing"
+        required: true
+        type: boolean
+        default: false
+      device_digest:
+        description: "SHA256 of the owner's private phone token (never the token itself)"
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ai-beta-cloudflare-deploy
+  cancel-in-progress: false
+jobs:
+  trial:
+    if: github.ref == 'refs/heads/beta' && inputs.free_projects_confirmed == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/ai-beta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - name: Verify legacy route disabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AI_BENCHMARK_ENABLED: ${{ vars.AI_BENCHMARK_ENABLED }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          assert.equal(process.env.AI_BENCHMARK_ENABLED, 'false');
+          const base='https://api.github.com/repos/werhealthy/ludo-scout/actions/workflows/classification-ai-benchmark.yml';
+          const get=async url=>{
+            const r=await fetch(url,{headers:{authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json'},signal:AbortSignal.timeout(15000)});
+            assert.equal(r.status,200);
+            return r.json();
+          };
+          assert.equal((await get(base)).state,'disabled_manually');
+          assert.ok((await get(base+'/runs?per_page=100')).workflow_runs.every(r=>r.status==='completed'));
+          NODE
+      - uses: actions/checkout@v4
+        with:
+          ref: ai-benchmark-ledger
+          path: ledger-source
+          persist-credentials: false
+      - name: Prepare private server configuration
+        env:
+          AI_BENCHMARK_ENABLED: ${{ vars.AI_BENCHMARK_ENABLED }}
+          FREE_PROJECTS_CONFIRMED: ${{ inputs.free_projects_confirmed }}
+          DEVICE_DIGEST: ${{ inputs.device_digest }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/ai-private-provision"
+          node scripts/provision.mjs prepare "$GITHUB_WORKSPACE/ledger-source/ledger.json" "$RUNNER_TEMP/ai-private-provision"
+      - name: Validate OFF configuration
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+          assert.equal(c.name,'ludo-ai-beta');
+          assert.equal(c.vars.ENABLED,'false');
+          assert.equal(c.vars.FREE_TIER_VALID_UNTIL,'0');
+          NODE
+      - name: Publish private configuration with AI OFF
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler deploy --var ENABLED:false --var FREE_TIER_VALID_UNTIL:0 --secrets-file "$RUNNER_TEMP/ai-private-provision/secrets.json"
+      - name: Prepare read-only deployment verification
+        run: |
+          cat > "$RUNNER_TEMP/ai-private-provision/check.mjs" <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          import {pathToFileURL} from 'node:url';
+          try {
+            const root=process.env.GITHUB_WORKSPACE;
+            const {makeSeed}=await import(pathToFileURL(root+'/services/ai-beta/scripts/bootstrap.mjs'));
+            const seed=makeSeed(JSON.parse(await readFile(root+'/ledger-source/ledger.json','utf8')),true);
+            const token=await readFile(process.env.RUNNER_TEMP+'/ai-private-provision/probe-token','utf8');
+            const mode=process.argv[2];
+            if(!['off','on','revoked'].includes(mode))throw Error();
+            for(let attempt=1;attempt<=6;attempt++){
+              const r=await fetch('https://ludo-ai-beta.havas-html-to-figma.workers.dev/v1/status',{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});
+              console.log('Read-only status attempt '+attempt+': HTTP '+r.status);
+              if(mode==='revoked'&&r.status===401){console.log('Temporary verification credential confirmed revoked.');process.exit(0);}
+              if(mode!=='revoked'&&r.status===200){
+                const s=await r.json(),month=new Date().toISOString().slice(0,7),e=seed.months[month];
+                if(!e||s.budget?.month!==month||s.budget.calls_reserved!==e.calls_reserved||s.budget.reserved_micro!==e.reserved_micro||typeof s.enabled!=='boolean')throw Error();
+                if(s.enabled===(mode==='on')){console.log('Authenticated '+mode+' status and exact historical accounting verified.');process.exit(0);}
+              }
+              if(![200,401,503].includes(r.status)||attempt===6)throw Error();
+              await new Promise(resolve=>setTimeout(resolve,10000));
+            }
+          }catch{console.error('Deployment verification failed; credentials and response details redacted.');process.exitCode=1;}
+          NODE
+          chmod 600 "$RUNNER_TEMP/ai-private-provision/check.mjs"
+      - name: Verify imported counter while OFF
+        run: node "$RUNNER_TEMP/ai-private-provision/check.mjs" off
+      - name: Enable trial for at most one hour
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          TRIAL_UNTIL=$(node -e 'process.stdout.write(String(Date.now()+3600000))')
+          npx wrangler deploy --var ENABLED:true --var FREE_TIER_VALID_UNTIL:"$TRIAL_UNTIL" --secrets-file "$RUNNER_TEMP/ai-private-provision/secrets.json"
+          echo "Trial expires at epoch milliseconds $TRIAL_UNTIL" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify enabled trial without a provider call
+        run: node "$RUNNER_TEMP/ai-private-provision/check.mjs" on
+      - name: Revoke temporary verification credential
+        if: always()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if test -f "$RUNNER_TEMP/ai-private-provision/cleanup.json"; then
+            npx wrangler secret bulk "$RUNNER_TEMP/ai-private-provision/cleanup.json"
+          fi
+      - name: Verify temporary credential revoked
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/ai-private-provision/check.mjs"; then
+            node "$RUNNER_TEMP/ai-private-provision/check.mjs" revoked
+          fi
+      - name: Return OFF on failure or cancellation
+        if: always() && (failure() || cancelled())
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --var ENABLED:false --var FREE_TIER_VALID_UNTIL:0
+      - name: Delete runner private files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/ai-private-provision/secrets.json" "$RUNNER_TEMP/ai-private-provision/cleanup.json" "$RUNNER_TEMP/ai-private-provision/probe-token" "$RUNNER_TEMP/ai-private-provision/check.mjs"
+      - name: Record verified scope
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'TEXT'
+          One-hour manual trial enabled after authenticated OFF/accounting checks. Enabled status verified, temporary credential revoked and HTTP 401 confirmed. Only owner phone digest remains. No classification/provider request was made by this workflow.
+          TEXT
