@@ -5,7 +5,7 @@ import org.json.JSONObject;
 /** Executed inside the platform instrumentation: real SQLite, JSON and local classifier. */
 final class AiBetaRealChecks {
  static void check(boolean condition,String message){if(!condition)throw new AssertionError(message);}
- static JSONObject answer(long id,String type)throws Exception{return new JSONObject().put("listing_id",id).put("proposed_type",type).put("evidence","Title evidence").put("needs_review",true).put("apply_authorized",false).put("bgg_verified",false).put("language","UNKNOWN");}
+ static JSONObject answer(long id,String type)throws Exception{return new JSONObject().put("listing_id",id).put("proposed_type",type).put("confidence",JSONObject.NULL).put("evidence","Title evidence").put("needs_review",true).put("apply_authorized",false).put("bgg_verified",false).put("language","UNKNOWN");}
  static void rejected(JSONArray rows,JSONObject response)throws Exception {boolean rejected=false;try{AiBetaListings.display(rows,response);}catch(Exception expected){rejected=true;}check(rejected,"unsafe response accepted");}
  static void run()throws Exception {
   try(SQLiteDatabase db=SQLiteDatabase.create(null)){
@@ -18,7 +18,7 @@ final class AiBetaRealChecks {
    JSONArray payload=AiBetaListings.payload(rows);check(payload.getJSONObject(0).getLong("listing_id")==1&&payload.getJSONObject(0).length()==3,"input not minimal/canonical");check(!payload.toString().contains("123")&&!payload.toString().contains("PENDING_ANALYSIS"),"private context transmitted");
    String key=AiBetaListings.key(rows);JSONArray reversed=new JSONArray().put(rows.getJSONObject(1)).put(rows.getJSONObject(0));check(key.equals(AiBetaListings.key(reversed)),"reordering consumed another ID");
    JSONObject response=new JSONObject().put("status","PROPOSAL").put("records",new JSONArray().put(answer(1,"ACCESSORY_COMPONENT")).put(answer(2,"BUNDLE"))).put("budget",new JSONObject().put("calls_reserved",9));
-   String display=AiBetaListings.display(rows,response);check(display.contains("Accessorio")&&display.contains("concorde")&&display.contains("divergente")&&display.contains("da revisionare")&&display.contains("9 / 100"),"comparison lost context");
+   String display=AiBetaListings.display(rows,response);check(display.contains("Accessorio")&&display.contains("categoria compatibile")&&display.contains("divergente")&&display.contains("da revisionare")&&display.contains("9 / 100"),"comparison lost context");
    JSONObject bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("apply_authorized",true);rejected(rows,bad);
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("bgg_verified",true);rejected(rows,bad);
    bad=new JSONObject(response.toString());bad.getJSONArray("records").getJSONObject(0).put("language","IT");rejected(rows,bad);
@@ -34,3 +34,4 @@ final class AiBetaRealChecks {
   }
  }
 }
+

@@ -19,3 +19,4 @@ db.execute('DELETE FROM market_listings')
 assert db.execute(sql).fetchall()==[]
 assert 'OPEN_READONLY' in s and 'getReadableDatabase' not in s and 'getWritableDatabase' not in s
 print('Real AI selection: eight recent canonical IDs, stable ties, filtered/partial rows, optional BGG, blank titles, empty DB and unchanged SQL data passed')
+

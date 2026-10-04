@@ -1,5 +1,15 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Annunci reali — confronto AI manuale, 2026-10-04
+
+Incremento autorizzato dall’utente nella ripresa backend: fino a8 annunci già acquisiti, confronto con classificatore locale e catalogo invariato fino alla revisione. Riutilizzare il servizio/client esistenti; nessuna nuova attivazione, provider call o modifica ai limiti. Servizio OFF e ultimo counter server registrato9/100; non confondere una proposta con validazione BGG o lingua.
+
+Dal pannello TestAIbeta, Confronta annunci salvati apre una preparazione esplicita. Riutilizzare la selezione frontend degli ultimi8 annunci canonici, con ordine last_seen/id stabile e contestoBGG/lifecycle visibile. Payload4096bytes: rifiutare il gruppo troppo lungo senza troncare titolo/brand. Nessuna reteVinted, queryarchivio completa, schemamigration o scrittura catalogo. Trasmettere soloID/titolo/brand. Descrizione resta locale e partecipa al controllo stale del confronto. Conservare ACCESSORY/COMPONENTS/EMPTY_BOX; proposta aggregata ACCESSORY_COMPONENT è compatibilità di gruppo, non sottotipo confermato. UNCERTAIN/UNKNOWN restano dubbi, confidence non autorizza apply.
+
+Proposte criptate nello storage privato giàesistente, cache7giorni vincolata a contenuto/modello/contratto; requestID separato dal testcontrollato e salvato prima del trasporto. Nessunretry automatico. Ripetizione di una proposta valida usa cache senza trasporto. Prima di invio, dopo risposta, riapertura e revisione ricontrollare annunci preparati: cambiamento/eliminazione o nuovo stato annuncio impedisce azione sul vecchio confronto. Un cambiamento alla sola descrizione invalida revisione locale pur permettendo riusoAI dello stesso titolo/brand dopo nuova preparazione. Contatore in cache è storico al momento risposta, non statuslive.
+
+Segna confronto come revisionato registra esclusivamente lettura del gruppo; nessun catalogapply, correzione, pricing/BGG/lingua/override/preferiti o job aggiuntivo. Preparazione disponibile anche con opt-inOFF. Test attesi: SQL reale sufixture readonly, JUnit confronto, instrumentationAndroid reale con cache risposte simulata (nessunprovider/token), payload minimizzato/limiti, stale/delete, revisione persistente, riuso senza trasporto e layout100/200%. Verifiche/distribuzione da registrare al merge. Frontend7/backend6 gruppi restano aperti; gruppoAI non dichiarato concluso globalmente.
+
 ## Frontend AI169 — annunci salvati, distribuita 2026-10-04
 
 PR248 HEAD f66e82b67564ff475093866725b75d7f71d70120 integrata squash 956448eb32c9e0f97526bd719c9705226ab1ad16. Distribuita 5.12.169-ai-real-listings (1000199): beta199/run37209117432/job111456476147 SUCCESS. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato14:28:46UTC; upload Firebase14:29:35.343UTC e distinta distribuzione tester/gruppi14:29:35.769UTC. Release285it62cbo4ug; artifact11305044123. Aggiornare da App Tester senza cancellare dati.
