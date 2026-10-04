@@ -64,7 +64,18 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    };
    decor.getViewTreeObserver().addOnDrawListener(listener);decor.invalidate();
   });
-  if(!drawn.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("Activity did not regain focus and draw");
+  // A draw requested before focus is restored can be the last frame when motion is
+  // disabled. Request another frame while waiting; keep the real focus/draw gate.
+  long deadline=android.os.SystemClock.uptimeMillis()+5000;
+  while(drawn.getCount()!=0&&android.os.SystemClock.uptimeMillis()<deadline){
+   runOnMainSync(decor::invalidate);
+   drawn.await(25,java.util.concurrent.TimeUnit.MILLISECONDS);
+  }
+  if(drawn.getCount()!=0){
+   final String[] state={""};
+   runOnMainSync(()->state[0]="focus="+decor.hasWindowFocus()+", shown="+decor.isShown()+", attached="+decor.isAttachedToWindow());
+   throw new AssertionError("Activity did not regain focus and draw: "+state[0]);
+  }
   waitForIdleSync();getUiAutomation().waitForIdle(200,5000);
  }
  private void overlayContracts(Activity a)throws Exception{
