@@ -1,5 +1,9 @@
 # Ludo Scout — Current state
 
+## Frontend — rettifica catture e controllo finale173
+
+Correzione verifica2026-10-04: ispezione diretta dei pixel dei JPEG618/620 conferma nav disegnata in tutte le regioni (campioni luminosi57/31/20); crop618Preferiti100/motion identico SHA256prefix523ec2399bc00a0e. Le anteprime sono state interpretate erroneamente come nav nera; nessun difetto di scomparsa nav stabilito. CI620 rerun visual111491544709 SUCCESS100/200%/motion, prodotto172 validato; timeoutbitmap precedente non ricomparso, causa non stabilita. PR260 ora HEAD9fa1e076c5e37f7d068223a36cce4d99b9ece8e8: conserva nav se destinazione selezionata invariata, nuova verifica pixel/cattura e fixture geometrica separata, versione173. Questa è ottimizzazione/irrobustimento, non correzione di disappearing-nav riprodotto. CI621/run37221828584 pendente; successivo merge/beta solo dopo esito finale. Le indicazioni storiche di nav nera/accettazione bloccata sotto sono supersedute da questa rettifica. Frontend7/backend6 aperti; nessuna accettazione telefono.
+
 ## Frontend — Ludo172 distribuita; verifica visiva finale aperta, 2026-10-04
 
 PR258 HEAD276263dda55ae884ca96fc906299edab6ac2ca58 integrata squash5fad1d0755f310c00ac55407bcf85979099a25d0, preservando backend171 e audit catalogo PR259. Stanze originali1000363565/566/567 Motore/Preferiti/Libreria sull'intera area Ludo; mascotte persistente grande, comandi circolari sovrapposti, pannelli e ricerca fissa. Nome della stanza o comando selezionato apre il pannello; Back lo chiude. Ritorno dalla ricerca riapre risultati. Pack glyph Ludo in nav/launcher, Desideri in Preferiti; altri4 glyph disponibili, cameo non aggiunti. Rig168 conservato con respiro/sguardo/oscillazione più visibili; motion/lifecycle/overlay protetti. Nessuna modifica AI/backend/schema/catalogo/pricing/soglie/dipendenze.
