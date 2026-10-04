@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Frontend AI169 — annunci salvati, distribuita 2026-10-04
+
+PR248 HEAD f66e82b67564ff475093866725b75d7f71d70120 integrata squash 956448eb32c9e0f97526bd719c9705226ab1ad16. Distribuita 5.12.169-ai-real-listings (1000199): beta199/run37209117432/job111456476147 SUCCESS. Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato14:28:46UTC; upload Firebase14:29:35.343UTC e distinta distribuzione tester/gruppi14:29:35.769UTC. Release285it62cbo4ug; artifact11305044123. Aggiornare da App Tester senza cancellare dati.
+
+Impostazioni → Test AI · beta → Confronta annunci salvati: massimo8 annunci canonici recenti, inclusi filtrati/incompleti; locale ricalcolata con ListingClassifier, proposta AI/concordanza/divergenza e BGG salvato. Non è verifica AI dell'identità BGG/lingua, né classificazione automatica dell'archivio. Solo SELECT/OPEN_READONLY senza helper/upgrade; nessuna modifica schema/catalogo/pricing/queue/servizio/budget. Titolo/marca/ID soli in rete, payload4096byte e ordine canonico. ID persistito prima trasporto, cache privata7giorni, nessun retry automatico; sorgente ricontrollata prima/dopo e risposta estranea/duplicata/apply/BGG/lingua/categoria invalida rifiutata. Configurazione e rig168 preservati, MainActivity/MarketStore/DealDatabase non modificati.
+
+Prove: SQL produzione su SQLite locale RED→GREEN (limite8/tie/filtrati/parziali/BGG assente/DB vuoto/nessuna mutazione), YAML parse. CI finale37208791663 SUCCESS: regressioni complete/Android unit/Java/reviewAPK; job111455520871 SQLite/JSON/classificatore reali, risposte simulate, Activity/dialog100/200% e quattro catture ispezionate. Click con cache abilitata senza endpoint/token termina con proposta senza pending ID; modifica marca prima del click ferma invio senza pending ID. PrimaCI37208420543 verde. Review indipendente finale senza Critical/Important; Minor REMOVED usa fallback stato non disponibile. Lint e altri visual saltati per scope. Java locale non eseguibile; nessuna accettazione/fluidità/precisione o nuova prova provider sul telefono dichiarata.
+
+Servizio AI preservato OFF: nessun deploy/attivazione/provider call in questo lavoro. Ultimo counter server verificato nello step precedente9/100, nessuna nuova lettura live qui; ledger/enrollment/cache server invariati. Client mantiene opt-in precedente; preview/cache funzionano con servizio OFF. A→B→A protetto dal cachekey server device+contenuto entro7giorni, senza nuova prenotazione anche se cambia ID client.
+
+Frontend7/backend6 gruppi aperti. Unico prossimo passo: prova manuale della169 con annunci del telefono in una finestra trial controllata già prevista, poi OFF e confronto counter server; nessuna bonifica9705/apply/BGG/lingua/paid autorizzata.
+
+
 ## Frontend — rig illustrato168 distribuito, 2026-10-04
 
 PR242 HEADd799cf568d868eb82056db584b077f488691a84f integrata squashd735406353036dece91876434046a56c7d9bc811. CI37206824117 SUCCESS: regressioni complete/Java/APK, contratti posa/gerarchia e visualAndroid111449630131. Dodici catture font100/200% e motion1 ispezionate, actor persistente, footer/stanze/Catalogo; nessuna accettazione o fluidità telefono dichiarata. Race test dopo dismissDialog risolta richiedendo redraw durante attesa focus/draw reali, senza allentare assert. Rerun precedente37198631333: primo downloademulatore ZIPilleggibile, secondo test-focus fallito; diagnosi e correzione documentate inPR. Lint debito preesistente5errori/112warning.
