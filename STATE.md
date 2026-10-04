@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend AI — revisione conclusa, integrazione runtime da costruire
+
+Autorizzazione utente «Ok vai»2026-10-04 alla revisione/preparazione integrazione. Riviste56risposte del run37163936519 contro input/reference e classifier/gate effettivi beta.40TEXT_REFERENCE(38concordanti),16PENDING;13PENDING hanno needs_review=false del modello: non affidabile come gate. Lotto7760 contenuto non provato,Heroclix8298 non basecompleto provato, promo9270 e libri7947 astensioni, Gearworks+playmat9593/9596 bundletestuale ma non cambiare precedenzaaccessori globalmente. ACCESSORY_COMPONENT comprime3sottotipi app; identitàBGG/lingua mai validate. Dettagli e contratto salvati nella specbackend,commit4ad6959586d81fc0f6e718dfc01924e4bac7b932.
+
+Nessuna nuova call,catalogwrite,modificaAndroid oAPK. La nuova app164 non contieneAIruntime.31test precedenti non rieseguiti per revisione documentale; Java non eseguito localmente(javacassente). Non spacciare questa revisione per integrazione completata.
+
+Decisione operativa: prima consumo offline delleproposte senzaapply/trasporto, protezioni negative/sottotipi/BGG/pricing/override preservati. Per runtime remoto serve endpointautenticato, secretserverside,ledgercentrale preventivo condiviso perdispositivi,kill/dedupe ebudget; GitHubSecret non va inAPK. Hosting/auth sono sceltaarchitetturale ancora da definire, non autorizzazionea pagare. Nessuna carta/billing attivati,limiti8callmese invariati.
+Frontend7/backend6 aperti. Nessuna prova telefono. Unico prossimo incremento: adattatoreoffline perproposte, poi sceltaendpoint perAIruntime protetto.
+
+
 ## Backend AI — ripresa manuale verificata, 2026-10-04
 
 PR233 (planner offline), merge40937b1d6a4c8b3cd236179c68272400fd011601; CI37163339054 offline e37163339087 Android SUCCESS. PR234 (executor manuale), HEADfc0b2e97335745f37c42cb832a5c196c269a4037, merged9de21af012a884d7951ea29ad511ba79e650f03; CI37163645292 offline e37163645304 Android SUCCESS.31test offline e py_compile passati. Nessuna modifica Android/APK/distribuzione necessaria.
