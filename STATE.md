@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Frontend — Ludo native motion, beta167 distribuita
+
+PR238 HEAD61e452cc0d134ccb1a36f35c4d22d9ad955bb294, squash4eb153265e7da10de497fe7622c9334b3d409aa5. CI finale37195838356 SUCCESS; visual111417394185:12catture100/200% e motion1 ispezionate. Beta194/run37196275016 SUCCESS: 5.12.167-ludo-native-motion(1000194). Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato10:47:39UTC2026-10-04; upload Firebase10:48:17UTC e distinta distribuzione tester10:48:18UTC, release7r942mgpqdp78. Quota artefatti GitHub esaurita (step opzionale); Firebase disponibile in App Tester. Nessuna accettazione telefono dichiarata. Checkpoint conserva anche PR240/workflow Cloudflare OFF, aggiunti in parallelo senza cambiamenti Android.
+
+Spec e piano approvati dall'utente il 2026-10-04; esecuzione nativa confermata. Ludo usa posa temporale pura e renderer Canvas Android Java con WebP canonico reale e supporto futuro a parti raster illustrate. Respiro minimo con piedi ancorati, tap di1600ms con retrigger continuo, nessuna dipendenza/servizio/costo. Background e mascotte condividono gate pausa/overlay; focus/invisibilità/detach/animazioni disabilitate cancellano animator/reazioni. MainActivity condiviso modificato solo in onPause e syncPetVisibility. Nessuna modifica backend AI, prezzi, coda, database o navigazione.
+
+Input prossimo designer: tavola a livelli, superfici nascoste complete; corpo/piedi, mantello, testa, cappello, occhi/spirali, bocche e mani esportati trasparenti con coordinate e pivot nella stessa tavola. Nessuna estrazione fittizia dal WebP. Blink/volto/gesti e stanze verticali/hotspot restano successivi, non consegnati qui.
+
+Verifica: test RED→GREEN reali tramite CI (toolchain locale Java/Android non disponibile), 11 contratti JUnit posa/gerarchia; pixel Android per appoggio, ordine, pivot parent/child e asset assenti/riciclati; lifecycle/retrigger reali; regressioni JVM/SQLite/frontend e APK. Review finale indipendente senza difetti prodotto confermati: Important di verifica visiva risolto con dialog in fasi reali, attesa focus/draw e rigetto screenshot vuoti. Lint mantiene debito preesistente5errori/112warning, non dichiarato pulito. CI non prova fluidità/accettazione telefono.
+
+Frontend7/backend6 gruppi aperti; nessun nuovo gruppo. Prossimo passo frontend: aggiornare la beta senza cancellare dati e provare Ludo, tap ripetuti, cambio stanze, overlay e pausa/ripresa sul telefono. Backend AI resta OFF; provisioning e accessi seguono il checkpoint backend successivo.
+
 ## Backend AI — collegamento Cloudflare GitHub pronto, deploy pendente
 
 2026-10-04: utente conferma secret GitHub nominati CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID; valori mai letti, presenza/validità ancora non provate da un run. PR240 backend/ai-cloudflare-deploy-off HEAD4691cae777e9eae7f3a93d75eaf51662949ffd6a integrata squash6ba6078ed295758c90a9bbb551df5143e7548617. Nuovo workflow .github/workflows/ai-beta-deploy-off.yml manuale, solo beta, richiede dichiarazione WorkersFree; npm test/dryrun e assert configurazione OFF precedono deploy con ENABLED=false/FREE_TIER_VALID_UNTIL=0. CI servizio37196236776 SUCCESS; Android37196236827 SUCCESS, visual/dialog/browser saltati per scope. YAML e assert OFF verificati localmente; configurazione ENABLED=true rifiutata; review indipendente senza blocchi. Nessun Android change/APK/distribuzione richiesto.

@@ -1,7 +1,7 @@
 # Ludo — animazione nativa e scena interattiva
 
 ## Stato e obiettivo
-Direzione proposta nella chat e approvata dall'utente con «Vai cominciamo a implementare», 2026-10-04. Questa specifica concreta resta da revisionare prima del piano di implementazione. Base beta 0609649b37a829b87b9bf30d26bad8af0f15581d, app 5.12.165. Nessuna nuova dipendenza, servizio o costo.
+Direzione proposta nella chat e approvata dall'utente con «Vai cominciamo a implementare», 2026-10-04. Spec e piano approvati con «Si» nella stessa chat; primo incremento implementato nella PR238, beta5.12.167-ludo-native-motion. Base implementazione riallineata a beta166; nessuna modifica al suo servizio AI. Nessuna nuova dipendenza, servizio o costo.
 
 Ludo rimane al centro/basso della scena mentre cambiano le stanze. Stile canonico: folletto verde illustrato con cappello prugna, mantello teal e occhi a spirale. Non creare nuove identità stilistiche. Renderer Android Java/Canvas con animazioni native; nessun motore 3D o runtime Rive/Lottie.
 
@@ -30,3 +30,4 @@ Test significativi della posa a tempi uguali con refresh differenti, rientro tap
 
 ## File e consegna
 LudoPetView.java e nuovi helper focalizzati per posa/parti. MainActivity.java condiviso solo se necessario per lifecycle o binding; dichiararlo nella PR. Non riscrivere MainActivity né LudoRoomFrame per preparare stanze non ancora fornite. Branch frontend/ludo-native-animation. Nessuna APK per la sola specifica. Frontend7/backend6 gruppi aperti; lavoro consolidato nel gruppo Ludo esistente.
+
