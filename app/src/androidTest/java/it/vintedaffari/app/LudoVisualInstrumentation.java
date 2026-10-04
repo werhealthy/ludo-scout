@@ -48,18 +48,30 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   if(target.getPixel(40,30)==android.graphics.Color.BLUE||target.getPixel(41,30)!=android.graphics.Color.BLUE)throw new AssertionError("parent transform not inherited");
   renderer.setParts(java.util.Collections.emptyList(),java.util.Collections.emptyMap(),100,100);renderer.setFallback(null);target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);if(target.getPixel(50,50)!=0)throw new AssertionError("missing asset fabricated");
   renderer.setFallback(blue);blue.recycle();renderer.draw(canvas,bounds,pose,false);if(target.getPixel(50,50)!=0)throw new AssertionError("recycled asset rendered");
-  red.recycle();target.recycle();
+  Bitmap green=Bitmap.createBitmap(10,10,Bitmap.Config.ARGB_8888);green.eraseColor(android.graphics.Color.GREEN);
+  renderer.setParts(java.util.Arrays.asList(new LudoPart("body",null,0,0,0,100,100,50,100),new LudoPart("head","body",1,40,20,20,20,10,10),new LudoPart("hat","head",2,60,20,10,10,5,5)),new java.util.HashMap<String,Bitmap>(){{put("body",red);put("hat",green);}},100,100);
+  pose.gazeX=0;pose.headRotationDeg=90;target.eraseColor(0);renderer.draw(canvas,bounds,pose,false);
+  if(target.getPixel(55,45)!=android.graphics.Color.GREEN||target.getPixel(65,25)==android.graphics.Color.GREEN)throw new AssertionError("child did not rotate around parent pivot");
+  green.recycle();red.recycle();target.recycle();
  }
  private Object petField(LudoPetView actor,String name)throws Exception{Field f=LudoPetView.class.getDeclaredField(name);f.setAccessible(true);return f.get(actor);}
  private void motionContracts(Activity a)throws Exception{
   LudoPetView actor=(LudoPetView)get(a,"petView");boolean enabled=android.animation.ValueAnimator.areAnimatorsEnabled();
   actor.setResumed(true);Object animator=petField(actor,"idle");
   if(enabled&&animator==null)throw new AssertionError("visible actor does not animate");
+  LudoRoomBackdropView backdrop=(LudoRoomBackdropView)get(a,"ludoBackdrop");
+  Field particleField=LudoRoomBackdropView.class.getDeclaredField("particles");particleField.setAccessible(true);
+  if(enabled&&particleField.get(backdrop)==null)throw new AssertionError("visible background not animating");
+  set(a,"petResumed",false);invoke(a,"syncPetVisibility");if(particleField.get(backdrop)!=null)throw new AssertionError("paused scene leaves background animating");
+  set(a,"petResumed",true);invoke(a,"syncPetVisibility");actor.setResumed(true);animator=petField(actor,"idle");
   actor.react();actor.react();if(petField(actor,"idle")!=animator)throw new AssertionError("tap creates extra animator");
   if(!enabled&&petField(actor,"idle")!=null)throw new AssertionError("reduced motion still runs");
   actor.setResumed(false);if(petField(actor,"idle")!=null||((Long)petField(actor,"reactionStarted"))!=-1L)throw new AssertionError("pause leaves reaction/animator alive");
   actor.react();if(((Long)petField(actor,"reactionStarted"))!=-1L)throw new AssertionError("paused tap starts movement");
   actor.setResumed(true);
+  ViewGroup parent=(ViewGroup)actor.getParent();int index=parent.indexOfChild(actor);android.view.ViewGroup.LayoutParams layout=actor.getLayoutParams();parent.removeView(actor);
+  if(petField(actor,"idle")!=null||((Long)petField(actor,"reactionStarted"))!=-1L)throw new AssertionError("detach leaves motion alive");
+  parent.addView(actor,index,layout);actor.setResumed(true);
   android.app.Dialog overlay=new android.app.Dialog(a);overlay.setContentView(new android.widget.TextView(a));set(a,"activeGameOverlay",overlay);overlay.show();invoke(a,"syncPetVisibility");
   if(petField(actor,"idle")!=null)throw new AssertionError("overlay leaves actor animating");overlay.dismiss();set(a,"activeGameOverlay",null);invoke(a,"syncPetVisibility");
   actor.onWindowFocusChanged(false);if(petField(actor,"idle")!=null)throw new AssertionError("focus loss leaves actor animating");actor.onWindowFocusChanged(true);
