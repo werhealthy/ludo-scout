@@ -1,5 +1,12 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## Decisione approvata — test runtime gratuito, 2026-10-04
+
+Utente: «Ok cominciamo così per test», dopo chiarimento che8call era limiteLudo e100serve solo primaprova,non archivio9705. ApprovatiCloudflareWorkersFree/DOsqlite,GeminiFreeTier,authprivata perdevice e100callmese TOTALI con1EURriservate teoriche. Nessunbilling/carta attivati;limite8delvecchio benchmark resta operativo finchécutoverprotetto implementato. Piano su branch backend/ai-runtime-plan: docs/superpowers/plans/2026-10-04-ai-beta-runtime.md,commit962237635e1875ce72dc20aaaae132b68cf772b5;raccomandata esecuzionenativa. Piano da revisionare primaimplementazione secondo writing-plans;nessuncodiceruntime/deploy/nuovacall eseguiti inquestostep.
+
+Cutover:primaabilitazione importare ledgerfresco senzareset(idempotenza,digest,8/.08attuali),disabilitare vecchio benchmarkActions,usareunicoDOglobale pernuovecall. Non mantenere contatoriindipendenti che ciascuno conceda100. Primoprovatel8annunci controllati/proposteinombra,nessuncatalogapply;datasettitolo/brand minimizzato. Nessun nuovo ulterioretooloffline previsto.
+
+
 ## PROPOSTA — servizio AI beta protetto, 2026-10-04 (da approvare)
 
 Obiettivo: prima provaAI manuale nell'app con controllo centralizzato di accesso e consumo. Nuovo servizioCloudflareWorkersFree + singoloDurableObjectSQLite globale,GeminiFreeTier; nessuna carta/billing/WorkersPaid. FirebaseAppDistribution è distribuzioneAPK,non autenticazione/runtime: app/build.gradle non contieneFirebaseAuth; repositorysearchFirebaseAuth/wrangler senza risultati,non attestazioneinventario esternoaccount.
