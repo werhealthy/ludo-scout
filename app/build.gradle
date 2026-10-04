@@ -17,8 +17,8 @@ android {
         // Local builds keep the source baseline. CI supplies a monotonic build number
         // via LUDO_VERSION_CODE so every distributed beta can update the previous one.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
-        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 219
-        versionName '5.12.173-ludo-fullscreen'
+        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 220
+        versionName '5.12.174-identity-context'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')

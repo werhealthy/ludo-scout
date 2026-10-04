@@ -162,7 +162,11 @@
       else if(fuzzyHits)reason='Titolo compatibile con piccolo refuso';
       else if(contained)reason='Nome del gioco contenuto integralmente nel titolo dell’annuncio';
       if(ctx.why.length)reason+=' · '+ctx.why.join(', ');
-      const row=resultFor(e,Math.round(score*10)/10,reason,{coverage,precision});
+      // A complete name contained in a longer title is only a candidate when
+      // distinctive seller words remain unexplained. A publisher boost or a wide
+      // ranking gap cannot turn that partial identity into independent proof.
+      const autoMatchEligible=!(contained&&extraQuery.length>0&&!extrasEdition);
+      const row=resultFor(e,Math.round(score*10)/10,reason,{coverage,precision,autoMatchEligible});
       const prev=bestByGame.get(e.game.id);if(!prev||prev.score<row.score)bestByGame.set(e.game.id,row);
     }
     const candidates=[...bestByGame.values()].sort((a,b)=>b.score-a.score);
@@ -170,7 +174,7 @@
     if(top){
       const gap=top.score-(second?.score??0);
       const decisive=(top.score>=97&&gap>=5) || (top.score>=92&&gap>=10) || (top.score>=88&&gap>=18);
-      if(decisive)return {status:'matched',game:top.game,alias:top.alias,reason:top.reason,candidates:candidates.slice(0,5)};
+      if(decisive&&top.autoMatchEligible)return {status:'matched',game:top.game,alias:top.alias,reason:top.reason,candidates:candidates.slice(0,5)};
       if(top.score>=55)return {status:'ambiguous',reason:gap<8?'Più candidati hanno segnali simili.':'Candidato plausibile ma non abbastanza sicuro per l’auto-match.',candidates:candidates.slice(0,5)};
     }
     return {status:'none',reason:'Nessun titolo/alias locale abbastanza vicino.',candidates:candidates.slice(0,5)};

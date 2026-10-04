@@ -36,6 +36,9 @@ jobs:
         run: python3 regression/engine_performance_metrics_v51279.py
 
 
+      - name: Run catalog identity collision behavior
+        run: node --test regression/catalog_identity_context.test.js regression/catalog_identity_assets.test.js
+
       - name: Run passive Vinted browser capture behavior
         run: node --test regression/vinted_browser_capture.test.js
 
