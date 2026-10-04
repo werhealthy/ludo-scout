@@ -76,12 +76,16 @@ def metrics(rows, references):
     predictions, truth = indexed(rows), indexed(references)
     if truth.keys() - predictions.keys():
         raise ValueError('reference IDs outside the sample')
-    tp = fp = fn = abstentions = correct = 0
+    tp = fp = fn = abstentions = correct = evaluated = unknown_references = 0
     confusion = {}
     for key, ref in truth.items():
         expected, actual = ref.get('category'), predictions[key]['proposed_type']
         if expected not in CATEGORIES:
             raise ValueError('invalid reference category')
+        if expected == 'UNKNOWN':
+            unknown_references += 1
+            continue
+        evaluated += 1
         confusion.setdefault(expected, {}).setdefault(actual, 0)
         confusion[expected][actual] += 1
         correct += expected == actual
@@ -91,8 +95,8 @@ def metrics(rows, references):
             fn += expected == 'BASE_GAME' and actual not in {'BASE_GAME', 'UNKNOWN'}
             abstentions += expected == 'BASE_GAME' and actual == 'UNKNOWN'
     n = len(rows)
-    return {'evaluated': len(truth), 'total': n,
-            'accuracy': correct / len(truth) if truth else None,
+    return {'evaluated': evaluated, 'total': n, 'unknown_references': unknown_references,
+            'accuracy': correct / evaluated if evaluated else None,
             'base_game_precision': tp / (tp + fp) if tp + fp else None,
             'base_game_false_positives': fp, 'base_game_false_negatives': fn,
             'base_game_abstentions': abstentions,
@@ -103,6 +107,37 @@ def metrics(rows, references):
             'unrecognized_prior': sum(r.get('prior_status') == 'UNRECOGNIZED' for r in rows),
             'confusion_matrix': confusion, 'cost_per_listing_eur': None,
             'ai_calls_by_this_tool': 0}
+
+def error_reduction(rows, references):
+    """Paired comparison only; abstention is unresolved, never an eliminated error.
+
+    Caller supplies independent references. UNKNOWN references and unknown prior
+    classifications cannot establish a before/after error denominator.
+    """
+    predictions, truth = indexed(rows), indexed(references)
+    if truth.keys() - predictions.keys():
+        raise ValueError('reference IDs outside the sample')
+    paired = baseline = model = abstentions = 0
+    for key, ref in truth.items():
+        expected = ref.get('category')
+        if expected not in CATEGORIES:
+            raise ValueError('invalid reference category')
+        row = predictions[key]
+        previous = PRIOR.get(row.get('previous_type'), row.get('previous_type'))
+        if expected == 'UNKNOWN' or previous not in CATEGORIES - {'UNKNOWN'}:
+            continue
+        actual = row['proposed_type']
+        if actual not in CATEGORIES:
+            raise ValueError('invalid proposed category')
+        paired += 1
+        baseline += previous != expected
+        model += actual != expected
+        abstentions += actual == 'UNKNOWN'
+    return {'paired_evaluated': paired, 'baseline_errors': baseline,
+            'model_errors_or_abstentions': model, 'model_abstentions': abstentions,
+            'relative_error_reduction': (baseline - model) / baseline if baseline else None,
+            'scope': 'SUPPLIED_REFERENCES_ONLY_NOT_GLOBAL_CATALOG_ACCURACY'}
+
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -123,6 +158,7 @@ def main():
     refs = json.loads(sources[2].read_text(encoding='utf-8')) if args.references else []
     rows = compare(sample, answers)
     report = {'model': args.model, 'dry_run': True, 'records': rows, 'metrics': metrics(rows, refs),
+              'error_reduction': error_reduction(rows, refs),
               'reference_provenance': 'SUPPLIER_DECLARED_INDEPENDENT_NOT_VERIFIED' if refs else 'NO_REFERENCES'}
     with dest.open('x', encoding='utf-8') as f:
         json.dump(report, f, ensure_ascii=False, indent=2, allow_nan=False)

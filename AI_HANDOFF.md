@@ -1,3 +1,7 @@
+# Backend catalog audit — 2026-10-04
+
+Owner requests autonomous AI integration and analysis of the current catalog. Review acknowledgement confirmed in chat after beta171; no device filesystem audit inferred. New full-export tool and paired measurements are covered by 56 offline tests. `docs/catalog-ai-audit.md` explains usage, budget and limits. This is structural/offline tooling, not automatic Android AI integration. Current catalog is on the phone; no fresh export available in this session. AI remains at its previously deployed OFF configuration; no fresh authenticated status reading, provider calls, schema changes, database cleanup or APK. Do not infer 99% reduction without independent labels. Frontend7/backend6 remain open.
+
 # Ludo Scout — AI handoff
 
 ## Backend155 — Ludo integrato e cattura prima dell’avanzamento, distribuita

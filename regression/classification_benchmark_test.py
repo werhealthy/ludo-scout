@@ -100,5 +100,40 @@ class BenchmarkTest(unittest.TestCase):
         self.assertEqual(m['base_game_abstentions'], 1)
         self.assertEqual(m['unknown_fraction'], 1 / 3)
 
+    def test_reduction_uses_same_independently_labelled_rows(self):
+        rows = self.m.compare([
+            {'listing_id': 1, 'previous_type': 'BASE_GAME'},
+            {'listing_id': 2, 'previous_type': 'NON_GAME'},
+            {'listing_id': 3, 'previous_type': 'UNCERTAIN'},
+        ], [dict(self.answer[0], listing_id=i, category='NON_GAME', language='UNKNOWN')
+            for i in (1, 2, 3)])
+        report = self.m.error_reduction(rows, [
+            {'listing_id': i, 'category': 'NON_GAME'} for i in (1, 2, 3)])
+        self.assertEqual(report['paired_evaluated'], 2)
+        self.assertEqual(report['baseline_errors'], 1)
+        self.assertEqual(report['model_errors_or_abstentions'], 0)
+        self.assertEqual(report['relative_error_reduction'], 1)
+
+    def test_abstaining_cannot_be_reported_as_eliminating_errors(self):
+        row = {'listing_id': 1, 'proposed_type': 'UNKNOWN',
+               'previous_type': 'BASE_GAME', 'prior_status': 'KNOWN'}
+        report = self.m.error_reduction([row], [{'listing_id': 1, 'category': 'NON_GAME'}])
+        self.assertEqual(report['relative_error_reduction'], 0)
+        self.assertEqual(report['model_abstentions'], 1)
+
+    def test_no_denominator_means_no_reduction_claim(self):
+        row = {'listing_id': 1, 'proposed_type': 'NON_GAME',
+               'previous_type': 'NON_GAME', 'prior_status': 'KNOWN'}
+        for refs in ([], [{'listing_id': 1, 'category': 'UNKNOWN'}],
+                     [{'listing_id': 1, 'category': 'NON_GAME'}]):
+            self.assertIsNone(self.m.error_reduction([row], refs)['relative_error_reduction'])
+
+    def test_unknown_reference_does_not_count_as_accuracy(self):
+        result = self.m.metrics([{'listing_id': 1, 'proposed_type': 'UNKNOWN'}],
+                                [{'listing_id': 1, 'category': 'UNKNOWN'}])
+        self.assertIsNone(result['accuracy'])
+        self.assertEqual(result['evaluated'], 0)
+        self.assertEqual(result['unknown_references'], 1)
+
 if __name__ == '__main__':
     unittest.main()

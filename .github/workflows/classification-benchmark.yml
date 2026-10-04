@@ -4,6 +4,8 @@ on:
     branches: [beta]
     paths:
       - 'tools/classification*.py'
+      - 'tools/catalog_ai_audit.py'
+      - 'regression/catalog_ai_audit_test.py'
       - 'regression/classification_proposals_test.py'
       - 'regression/classification_runner_test.py'
       - 'regression/classification_resume_test.py'
@@ -22,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 regression/classification_benchmark_test.py
+      - run: python3 regression/catalog_ai_audit_test.py
       - run: python3 regression/classification_runner_test.py
 
       - run: python3 regression/classification_resume_test.py

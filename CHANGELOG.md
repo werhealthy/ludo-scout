@@ -1,3 +1,7 @@
+## 2026-10-04 — Complete catalog audit tooling and paired AI measurements
+
+Added read-only full-export structural audit and budget-bounded title/brand batch planning. Added paired prior/proposed error reduction; UNKNOWN references no longer inflate accuracy and model abstentions remain unresolved. No Android runtime/schema/catalog/service changes, model calls or new APK. Current phone export still required; no claim of 99% reduction or full automatic integration. Offline classification suite: 56 tests passed; see docs/catalog-ai-audit.md.
+
 # Ludo Scout — Changelog
 
 ## Backend155 — Ludo integrato e cattura prima dell’avanzamento, distribuita
