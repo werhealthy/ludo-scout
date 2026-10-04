@@ -15,6 +15,16 @@ final class AiEngineListings implements AiEngineSession.Source {
  private static final String PROTECTED="NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id))";
  private static final String ELIGIBLE="l.id>0 AND l.lifecycle='ACTIVE' AND TRIM(COALESCE(l.vinted_title,''))<>'' AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(d.confirmed,0)=0 AND COALESCE(d.verification_state,'')<>'USER_CONFIRMED' AND "+PROTECTED;
  AiEngineListings(SQLiteDatabase db){this.db=db;}
+ /** Called by legacy upsert inside its writer transaction; user overrides are applied afterward. */
+ static void preserveHold(SQLiteDatabase db,String signature,android.content.ContentValues incoming){
+  if(!"OK".equals(incoming.getAsString("verification_state")))return;
+  try(Cursor c=db.rawQuery("SELECT vinted_title,brand,bgg_id,verification_reason FROM deals WHERE signature=? AND lifecycle='ACTIVE' AND verification_state='MATCH_UNCERTAIN' AND verification_reason LIKE 'AI_CATEGORY_REVIEW:%' AND COALESCE(confirmed,0)=0",new String[]{signature})){
+   if(c.moveToFirst()&&java.util.Objects.equals(c.getString(0),incoming.getAsString("vinted_title"))
+      &&java.util.Objects.equals(c.getString(1),incoming.getAsString("brand"))&&java.util.Objects.equals(c.getString(2),incoming.getAsString("bgg_id"))){
+    incoming.put("verification_state","MATCH_UNCERTAIN");incoming.put("verification_reason",c.getString(3));
+   }
+  }
+ }
  private static JSONObject row(Cursor c)throws Exception {
   return AiBetaListings.row(c).put("engine_verification",c.getString(11)).put("engine_confirmed",c.getInt(12)).put("engine_manual_review",c.getInt(13));
  }

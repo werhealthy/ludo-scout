@@ -14,15 +14,16 @@ final class AiEngineChecks {
   public void save(JSONObject value)throws Exception{j=new JSONObject(value.toString());}
  }
  private static final class Network implements AiEngineSession.Transport {
-  int calls,statusCalls;boolean enabled=true,fail,invalid;int budget=10;String id;Runnable during;
+  int calls,statusCalls;boolean enabled=true,fail,invalid;int budget=10;String id,reply="PROPOSAL";JSONArray lastPayload;Runnable during;
   public JSONObject status()throws Exception {statusCalls++;return new JSONObject().put("enabled",enabled).put("budget",new JSONObject().put("calls_reserved",budget).put("reserved_micro",budget*10000));}
   public JSONObject submit(String request,JSONArray payload)throws Exception {
    calls++;if(id!=null)check(id.equals(request),"recovery allocated another reservation ID");id=request;
+   lastPayload=new JSONArray(payload.toString());
    check(payload.length()<=8,"unbounded batch");for(int i=0;i<payload.length();i++)check(payload.getJSONObject(i).length()==3,"private fields transmitted");
    if(during!=null)during.run();if(fail)throw new Exception("simulated lost response");
    JSONArray answers=new JSONArray();for(int i=0;i<payload.length();i++)answers.put(AiBetaRealChecks.answer(payload.getJSONObject(i).getLong("listing_id"),"NON_GAME"));
    if(invalid)answers.getJSONObject(0).put("bgg_verified",true);
-   return new JSONObject().put("status","PROPOSAL").put("request_id",request).put("model",AiBetaProtocol.MODEL).put("contract",AiBetaProtocol.CONTRACT).put("records",answers);
+   return new JSONObject().put("status",reply).put("request_id",request).put("model",AiBetaProtocol.MODEL).put("contract",AiBetaProtocol.CONTRACT).put("records",answers);
   }
  }
  private static SQLiteDatabase fixture(){
@@ -87,5 +88,35 @@ final class AiEngineChecks {
    upsert.setAccessible(true);upsert.invoke(null,db,"ai-held",card,analysis,ListingClassifier.classify(card),"OK",null,100L,"fair");
    try(Cursor c=db.rawQuery("SELECT verification_state FROM deals WHERE signature='ai-held'",null)){c.moveToFirst();check(c.getString(0).equals("MATCH_UNCERTAIN"),"automatic reanalysis erased the AI hold");}
   }
+  reviewChecks(now);
+ }
+ private static void addSecond(SQLiteDatabase db){
+  db.execSQL("INSERT INTO market_listings VALUES(2,'Azul gioco da tavolo','Next Move','buono',1000,'Testo completo',1,100,'ACTIVE','MATCHED','sig2','temp2','1000',0,NULL)");
+  db.execSQL("INSERT INTO deals VALUES('sig2','OK',0,'ACTIVE','123','Azul gioco da tavolo','Next Move',NULL,2000)");
+ }
+ private static void reviewChecks(long now)throws Exception {
+  java.util.ArrayList<String> failures=new java.util.ArrayList<>();
+  try(SQLiteDatabase db=fixture()){
+   Memory m=new Memory();Network net=new Network();net.fail=true;
+   AiEngineSession.run(config(),m,new AiEngineListings(db),net,now);
+   net.fail=false;net.budget=100;
+   check(AiEngineSession.run(config(),m,new AiEngineListings(db),net,now+AiEnginePolicy.BACKOFF).held==1,"reserved request cannot recover at budget100");
+  }catch(AssertionError failure){failures.add(failure.getMessage());}
+  try(SQLiteDatabase db=fixture()){
+   Memory m=new Memory();Network net=new Network();
+   AiEngineSession.run(config(),m,new AiEngineListings(db),net,now);
+   db.execSQL("UPDATE market_listings SET observed_text='New local evidence' WHERE id=1");addSecond(db);net.id=null;
+   AiEngineSession.run(config(),m,new AiEngineListings(db),net,now+10000);
+   check(net.lastPayload.length()==1&&net.lastPayload.getJSONObject(0).getLong("listing_id")==2,"cached row consumed a new remote batch");
+  }catch(AssertionError failure){failures.add(failure.getMessage());}
+  try(SQLiteDatabase db=fixture()){
+   Memory m=new Memory();Network net=new Network();net.reply="FAILED";
+   check(AiEngineSession.run(config(),m,new AiEngineListings(db),net,now).state.equals("TERMINAL_FAILED"),"terminal failure blocks unrelated work");
+   addSecond(db);net.id=null;net.reply="PROPOSAL";
+   AiEngineSession.run(config(),m,new AiEngineListings(db),net,now+10000);
+   check(net.lastPayload.length()==1&&net.lastPayload.getJSONObject(0).getLong("listing_id")==2,"failed batch monopolized the lane");
+  }catch(AssertionError failure){failures.add(failure.getMessage());}
+  if(!failures.isEmpty())throw new AssertionError(String.join("; ",failures));
+  android.util.Log.i("LudoAI","AI engine budget100 recovery, partial cache and terminal failure verified");
  }
 }
