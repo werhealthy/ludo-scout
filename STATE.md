@@ -1,5 +1,14 @@
 # Ludo Scout — Current state
 
+## Backend AI — trial reale chiuso OFF, 2026-10-04 17:46 Europe/Rome
+
+Il proprietario conferma la ripetizione del medesimo gruppo con 10/100 invariato e autorizza il passo successivo. Evidenza della ripetizione: conferma utente; il numero nel risultato cached è storico, non una nuova lettura autenticata del budget server.
+
+Chiusura effettiva mediante workflow esistente AI beta deploy OFF sul ramo beta628d5ba8: run37214173178/job111471207293 SUCCESS. Test servizio27/27, configurazione OFF e dry-run passati. Pubblicazione con ENABLED=false/FREE_TIER_VALID_UNTIL=0 completata15:46:08.121UTC; versione workerb308a609-d09c-4cf0-b11d-858f40ad3320. Nessun provider call, seed/reset/enrollment, scrittura secrets o nuovo trial. Accounting durable preservato dal deploy; questo workflow non include GETstatus autenticato, quindi counter10 post-OFF non verificato indipendentemente. Non confondere successo deploy con una verifica HTTP autenticata. Summary generico del workflow propone provisioning storico: indicazione obsoleta, non eseguirla.
+
+Beta170 e catalogo preservati; nessun codiceapp/classificatore/schema/BGG/lingua modificato. Proposte osservate restano da verificare sul prodotto, incluso Sogni per Bambini Ribelli; concordanza per Las ruinas perdidas de Arnaldo non prova identitàBGG. Prossimo incremento: revisione delle divergenze con evidenze originali degli annunci, mantenendo catalogapply disabilitato; non dedurre groundtruth dai soli titoli/evidenze AI. Frontend7/backend6 gruppi aperti.
+
+
 ## Backend AI — prima proposta su annunci del telefono osservata, 2026-10-04 17:34 Europe/Rome
 
 Due screenshot forniti dal proprietario mostrano il pannello Annunci reali/confrontoAI con dati acquisiti e contatore storico della risposta10/100. Coerente con una nuova prenotazione rispetto al GET9 del trial; non è una nuova verifica indipendente server o prova della ripetizione. I due screenshot sono porzioni diverse del gruppo, non documentano due invii separati. Sorgentiimmagine viste nella conversazione; copie scratch dichiarate mancanti, nessun accesso Library.

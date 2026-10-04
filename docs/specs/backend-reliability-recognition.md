@@ -654,3 +654,12 @@ Prova prevista dopo distribuzione verificata: A iniziale; scansione ON2min/OFF, 
 Approvato15:05Europe/Rome, implementatoPR151, CI402 e beta151 verdi; Firebase132(1000151) firmata/upload/distribuita. SEARCHON/VIEWOFF+snapshot/BUNDLEON diretta; limiti e ACK confermati, lifecycle/token protetti, nessun catalogwriter/HTTP proprio. Rete reale/provider/payload/pubblicazione/copertura seller richiedono prova telefono; nessun successo completo del nuovo motore o filtroowned/lingua dichiarato. Specifica/piano con checklist e prove in docs/plans/2026-10-02-vinted-browser-experiment.md; prossimopasso solo report telefono.
 
 
+
+## Backend AI — trial reale chiuso OFF, 2026-10-04 17:46 Europe/Rome
+
+Il proprietario conferma la ripetizione del medesimo gruppo con 10/100 invariato e autorizza il passo successivo. Evidenza della ripetizione: conferma utente; il numero nel risultato cached è storico, non una nuova lettura autenticata del budget server.
+
+Chiusura effettiva mediante workflow esistente AI beta deploy OFF sul ramo beta628d5ba8: run37214173178/job111471207293 SUCCESS. Test servizio27/27, configurazione OFF e dry-run passati. Pubblicazione con ENABLED=false/FREE_TIER_VALID_UNTIL=0 completata15:46:08.121UTC; versione workerb308a609-d09c-4cf0-b11d-858f40ad3320. Nessun provider call, seed/reset/enrollment, scrittura secrets o nuovo trial. Accounting durable preservato dal deploy; questo workflow non include GETstatus autenticato, quindi counter10 post-OFF non verificato indipendentemente. Non confondere successo deploy con una verifica HTTP autenticata. Summary generico del workflow propone provisioning storico: indicazione obsoleta, non eseguirla.
+
+Beta170 e catalogo preservati; nessun codiceapp/classificatore/schema/BGG/lingua modificato. Proposte osservate restano da verificare sul prodotto, incluso Sogni per Bambini Ribelli; concordanza per Las ruinas perdidas de Arnaldo non prova identitàBGG. Prossimo incremento: revisione delle divergenze con evidenze originali degli annunci, mantenendo catalogapply disabilitato; non dedurre groundtruth dai soli titoli/evidenze AI. Frontend7/backend6 gruppi aperti.
+
