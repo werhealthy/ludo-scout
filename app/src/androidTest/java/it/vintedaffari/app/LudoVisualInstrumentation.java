@@ -25,6 +25,11 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  }
  private void capture(Activity a,String name)throws Exception{
   awaitActivityFrame(a);
+  runOnMainSync(()->{try{
+   ViewGroup nav=(ViewGroup)get(a,"nav");
+   if(nav.getChildCount()!=3)throw new AssertionError("navigation destinations missing before capture");
+   for(int i=0;i<3;i++){View item=nav.getChildAt(i);if(!item.isShown()||item.getWidth()<=0||item.getHeight()<=0)throw new AssertionError("navigation item not laid out before capture");}
+  }catch(Exception e){throw new RuntimeException(e);}});
   Bitmap original=null;
   for(int attempt=0;attempt<3;attempt++){
    awaitActivityFrame(a);original=getUiAutomation().takeScreenshot();
@@ -100,8 +105,21 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  }
 
  private void compactFrameContracts(Activity a)throws Exception{
-  LudoRoomFrame stage=(LudoRoomFrame)get(a,"ludoStage");float density=a.getResources().getDisplayMetrics().density;
-  int ow=stage.getWidth(),oh=stage.getHeight(),footer=((View)get(a,"ludoRoomDots")).getHeight();
+  // Measure the real frame class without changing the attached Activity hierarchy.
+  // Manually measuring a live child at foreign dimensions can disturb sibling traversal.
+  float density=a.getResources().getDisplayMetrics().density;
+  LudoRoomFrame stage=new LudoRoomFrame(a,false);
+  stage.addView(new View(a));stage.addView(new View(a));stage.addView(new android.widget.Space(a));
+  android.widget.LinearLayout commandBox=new android.widget.LinearLayout(a);commandBox.setOrientation(android.widget.LinearLayout.VERTICAL);
+  android.widget.LinearLayout sections=new android.widget.LinearLayout(a);
+  android.widget.LinearLayout.LayoutParams sectionParams=new android.widget.LinearLayout.LayoutParams(-1,-2);sectionParams.topMargin=Math.round(12*density);commandBox.addView(sections,sectionParams);
+  for(String label:new String[]{"Esplora","Preferiti","Libreria"}){
+   android.widget.LinearLayout target=new android.widget.LinearLayout(a);target.setOrientation(android.widget.LinearLayout.VERTICAL);
+   target.addView(new View(a),new android.widget.LinearLayout.LayoutParams(Math.round(56*density),Math.round(56*density)));
+   TextView text=new TextView(a);text.setText(label);text.setTextSize(12);target.addView(text,new android.widget.LinearLayout.LayoutParams(-1,-2));
+   sections.addView(target,new android.widget.LinearLayout.LayoutParams(0,-2,1));
+  }
+  stage.addView(commandBox);View chrome=new View(a);chrome.setMinimumHeight(((LudoRoomFrame)get(a,"ludoStage")).getChildAt(4).getHeight());stage.addView(chrome);
   for(int[] size:new int[][]{{700,280},{400,300},{300,400}}){
    int w=Math.round(size[0]*density),h=Math.round(size[1]*density),inset=Math.round(84*density);
    stage.setHeightBudget(h);stage.setControlsInset(inset);stage.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));stage.layout(0,0,w,h);
@@ -110,7 +128,6 @@ public final class LudoVisualInstrumentation extends Instrumentation {
    if(commands.getBottom()>h-inset||commands.getRight()>w)throw new AssertionError("compact commands hidden by footer");
    if(actor.getRight()>commands.getLeft()&&actor.getLeft()<commands.getRight()&&actor.getBottom()>commands.getTop())throw new AssertionError("compact actor behind controls");
   }
-  stage.setHeightBudget(oh);stage.setControlsInset(footer);stage.measure(View.MeasureSpec.makeMeasureSpec(ow,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(oh,View.MeasureSpec.EXACTLY));stage.layout(0,0,ow,oh);invoke(a,"placeLudoStage");
  }
  private void awaitRoomBackground(Activity a)throws Exception{
   long deadline=android.os.SystemClock.uptimeMillis()+5000;
@@ -225,6 +242,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      ((android.widget.ScrollView)get(a,"scroll")).scrollTo(0,99999);
      int[] after=new int[2];footer.getLocationInWindow(after);if(after[1]!=pos[1])throw new AssertionError("search scrolls out of view");
      if(text(nav,"Bundle")!=null||((ViewGroup)nav).getChildCount()!=3)throw new AssertionError("Bundle still in main navigation");
+     for(int i=0;i<3;i++){View item=((ViewGroup)nav).getChildAt(i);if(!item.isShown()||item.getWidth()<=0||item.getHeight()<=0)throw new AssertionError("navigation item not laid out");}
     }catch(Exception e){throw new RuntimeException(e);}});
     android.util.Log.i("LudoVisual","CONTRACT geometry "+room);
     if(LudoRoomState.EXPLORE.equals(room))awaitRoomRig(a);
