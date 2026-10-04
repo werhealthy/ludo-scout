@@ -25,18 +25,19 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  }
  private void capture(Activity a,String name)throws Exception{
   awaitActivityFrame(a);
+  final int[][] navBounds=new int[3][4];
   runOnMainSync(()->{try{
    ViewGroup nav=(ViewGroup)get(a,"nav");
    if(nav.getChildCount()!=3)throw new AssertionError("navigation destinations missing before capture");
-   for(int i=0;i<3;i++){View item=nav.getChildAt(i);if(!item.isShown()||item.getWidth()<=0||item.getHeight()<=0)throw new AssertionError("navigation item not laid out before capture");}
+   for(int i=0;i<3;i++){View item=nav.getChildAt(i);if(!item.isShown()||item.getWidth()<=0||item.getHeight()<=0)throw new AssertionError("navigation item not laid out before capture");int[] position=new int[2];item.getLocationInWindow(position);navBounds[i]=new int[]{position[0],position[1],item.getWidth(),item.getHeight()};}
   }catch(Exception e){throw new RuntimeException(e);}});
   Bitmap original=null;
   for(int attempt=0;attempt<3;attempt++){
    awaitActivityFrame(a);original=getUiAutomation().takeScreenshot();
-   if(original!=null&&hasSceneContent(original))break;
+   if(original!=null&&hasSceneContent(original)&&hasNavigationContent(original,navBounds))break;
    if(original!=null){original.recycle();original=null;}
   }
-  if(original==null)throw new AssertionError("blank or obscured Activity screenshot: "+name);
+  if(original==null)throw new AssertionError("blank scene or navigation in Activity screenshot: "+name);
   Bitmap reduced=Bitmap.createScaledBitmap(original,432,Math.round(original.getHeight()*432f/original.getWidth()),true);
   java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();reduced.compress(Bitmap.CompressFormat.JPEG,88,bytes);
   String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);
@@ -44,6 +45,15 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   original.recycle();reduced.recycle();
  }
 
+ private boolean hasNavigationContent(Bitmap image,int[][] bounds){
+  // Navigation has a black surface: every destination must draw its bright glyph/label.
+  for(int[] item:bounds){int bright=0;
+   for(int y=Math.max(0,item[1]);y<Math.min(image.getHeight(),item[1]+item[3]);y+=3)
+    for(int x=Math.max(0,item[0]);x<Math.min(image.getWidth(),item[0]+item[2]);x+=3){int color=image.getPixel(x,y);if(Math.max(android.graphics.Color.red(color),Math.max(android.graphics.Color.green(color),android.graphics.Color.blue(color)))>180)bright++;}
+   if(bright<10)return false;
+  }
+  return true;
+ }
  private boolean hasSceneContent(Bitmap image){
   // Sample the central app viewport: system bars alone must never satisfy the capture.
   int first=0,distinct=0;boolean initialized=false;
@@ -157,6 +167,7 @@ public final class LudoVisualInstrumentation extends Instrumentation {
  private void rendererContracts(){
   Bitmap blank=Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888);blank.eraseColor(android.graphics.Color.GRAY);
   if(hasSceneContent(blank))throw new AssertionError("blank screenshot accepted");
+  if(hasNavigationContent(blank,new int[][]{{0,0,30,100},{30,0,30,100},{60,0,30,100}}))throw new AssertionError("blank navigation accepted");
   new android.graphics.Canvas(blank).drawRect(20,20,80,80,new android.graphics.Paint(){{setColor(android.graphics.Color.GREEN);}});
   if(!hasSceneContent(blank))throw new AssertionError("visible content rejected");blank.recycle();
   Bitmap target=Bitmap.createBitmap(100,100,Bitmap.Config.ARGB_8888),red=Bitmap.createBitmap(10,10,Bitmap.Config.ARGB_8888),blue=Bitmap.createBitmap(10,10,Bitmap.Config.ARGB_8888);

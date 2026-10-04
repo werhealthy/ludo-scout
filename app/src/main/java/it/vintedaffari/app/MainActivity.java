@@ -175,8 +175,12 @@ private View makeCompanionFab(){
     }
     private void cancelImageRequests(View view){if(view==null)return;if(view instanceof ImageView)view.setTag(new Object());if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)cancelImageRequests(group.getChildAt(i));}}
     private boolean isMarketTab(){return "catalog".equals(tab)||"database".equals(tab)||"bundles".equals(tab);}
+    private String renderedNavSelection="";
     private void renderNav(){
-        boolean home=true;nav.setBackgroundColor(home?Color.BLACK:SURFACE);nav.removeAllViews();
+        boolean home=true;nav.setBackgroundColor(home?Color.BLACK:SURFACE);
+        String selection="discover".equals(tab)?"discover":isMarketTab()?"catalog":"companion".equals(tab)?"companion":"none";
+        if(selection.equals(renderedNavSelection)&&nav.getChildCount()==3)return;
+        renderedNavSelection=selection;nav.removeAllViews();
         nav.addView(navItem(LudoIcons.HOUSE,"Home","discover"),navLp());
         nav.addView(navItem(LudoIcons.SEARCH,"Catalogo","catalog"),navLp());
         nav.addView(navItem("","Ludo","companion"),navLp());
