@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend AI — Cloudflare pubblicato OFF, 2026-10-04
+
+Utente conferma WorkersFree e chiede avvio delegato. Run manuale37196709262 su beta829b834992e924c809f09e3d5643f2ab181e9095 SUCCESS; job111420006046:19/19test, assertOFF, dryrun e deploy passano. Upload10:51:59UTC e trigger10:51:59UTC; Worker https://ludo-ai-beta.havas-html-to-figma.workers.dev versione6fa5e8e6-d3d2-4eed-847d-b285eb0c4b63. Token/accountGitHub accettati dal deploy, valori mai letti. ENABLED=false/FREE_TIER_VALID_UNTIL=0 forzati. WorkersFree è conferma proprietario, non auditAPI billing. Nessuna callGemini/liveAI, seedimport, enrollment o secretGemini trasferito; status autenticato/telefono ancora pendenti.
+
+Corretto omissione registrazione workflow: manual dispatch necessita file sul defaultmain; pagina iniziale notfound, docGitHub verificata. PR241 aggiunge a main solo identico filePR240 già verificato, merge56e88de8c3aefa3dbec9f56b254843290bead021; nessun codiceapp/servizio promosso. UI ora espone Runworkflow, beta selezionato, confermaFree fornita utente. App166 preservata; nessun APK necessario. Unico prossimo gruppo: cutover legacyvariable/freshledger, trasferimento seed e secret server tramite canale sicuro, enrollmentdevice e verifica counter autenticato ancoraOFF; poi prova8. Frontend7/backend6 aperti.
+
 ## Frontend — Ludo native motion, beta167 distribuita
 
 PR238 HEAD61e452cc0d134ccb1a36f35c4d22d9ad955bb294, squash4eb153265e7da10de497fe7622c9334b3d409aa5. CI finale37195838356 SUCCESS; visual111417394185:12catture100/200% e motion1 ispezionate. Beta194/run37196275016 SUCCESS: 5.12.167-ludo-native-motion(1000194). Certificato atteso C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato10:47:39UTC2026-10-04; upload Firebase10:48:17UTC e distinta distribuzione tester10:48:18UTC, release7r942mgpqdp78. Quota artefatti GitHub esaurita (step opzionale); Firebase disponibile in App Tester. Nessuna accettazione telefono dichiarata. Checkpoint conserva anche PR240/workflow Cloudflare OFF, aggiunti in parallelo senza cambiamenti Android.
