@@ -51,6 +51,7 @@ jobs:
 
       - name: Verify Ludo daily journey and exploration
         run: |
+          python3 regression/ludo_fullscreen_pet.py
           python3 regression/ludo_primary_search.py
           python3 regression/ludo_pet_rooms.py
           python3 regression/ludo_exploration.py
@@ -340,6 +341,7 @@ jobs:
             --app "$FIREBASE_APP_ID" \
             --testers "$FIREBASE_TESTERS" \
             --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
+
 
 
 

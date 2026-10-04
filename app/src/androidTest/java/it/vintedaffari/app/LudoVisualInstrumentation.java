@@ -99,6 +99,16 @@ public final class LudoVisualInstrumentation extends Instrumentation {
   }catch(Exception e){throw new RuntimeException(e);}});
  }
 
+ private void awaitRoomBackground(Activity a)throws Exception{
+  long deadline=android.os.SystemClock.uptimeMillis()+5000;
+  while(android.os.SystemClock.uptimeMillis()<deadline){final boolean[] ready={false};runOnMainSync(()->{try{
+   Object backdrop=get(a,"ludoBackdrop");Field field=LudoRoomBackdropView.class.getDeclaredField("bitmap");field.setAccessible(true);
+   Bitmap image=(Bitmap)field.get(backdrop);String room=((LudoRoomState)get(a,"ludoRooms")).room();
+   int resource=LudoRoomState.HOME.equals(room)?R.drawable.ludo_room_library_background:LudoRoomState.HUNTS.equals(room)?R.drawable.ludo_room_hunts_background:R.drawable.ludo_room_engine_background;
+   java.util.Map<?,?> cache=(java.util.Map<?,?>)get(a,"sceneAssets");ready[0]=image!=null&&image==cache.get(resource);
+  }catch(Exception e){throw new RuntimeException(e);}});if(ready[0])return;android.os.SystemClock.sleep(25);}
+  throw new AssertionError("approved room bitmap not displayed");
+ }
  private void awaitRoomRig(Activity a)throws Exception{
   long deadline=android.os.SystemClock.uptimeMillis()+5000;
   while(android.os.SystemClock.uptimeMillis()<deadline){final boolean[] ready={false};runOnMainSync(()->{try{ready[0]=get(a,"roomIllustratedRig")!=null;}catch(Exception e){throw new RuntimeException(e);}});if(ready[0])return;android.os.SystemClock.sleep(25);}
@@ -186,9 +196,15 @@ public final class LudoVisualInstrumentation extends Instrumentation {
      for(String label:new String[]{"Trova nuovi giochi"})if(text(footer,label)==null)throw new AssertionError("missing destination/action "+label);
      View scene=(View)get(a,"ludoStage");View actorNow=(View)get(a,"petView");
      if(actor[0]!=null&&actor[0]!=actorNow)throw new AssertionError("mascot recreated between rooms");actor[0]=actorNow;
-     if(((FrameLayout.LayoutParams)refresh.getLayoutParams()).topMargin!=(scene.getParent()==get(a,"mainScrollStage")?scene.getHeight():0))throw new AssertionError("scene obscures content");
-     for(String label:new String[]{"Esplora","Preferiti","Libreria"})if(text(scene,label)==null)throw new AssertionError("top section missing "+label);
-     if(refresh.getHeight()<100)throw new AssertionError("content viewport collapsed");
+     if(((FrameLayout.LayoutParams)refresh.getLayoutParams()).topMargin!=0)throw new AssertionError("old header still reserves room space");
+     if(scene.getHeight()!=((View)get(a,"mainScrollStage")).getHeight())throw new AssertionError("room is not full viewport");
+     if(refresh.getVisibility()!=View.GONE)throw new AssertionError("dashboard still visible in room");
+     View commands=((ViewGroup)scene).getChildAt(3);
+     if(actorNow.getRight()>commands.getLeft()&&actorNow.getLeft()<commands.getRight()&&actorNow.getBottom()>commands.getTop())throw new AssertionError("actor overlaps commands");
+     if(actorNow.getWidth()<80||actorNow.getHeight()<80)throw new AssertionError("actor collapsed");
+     if(commands.getBottom()>scene.getHeight()-footer.getHeight())throw new AssertionError("room buttons behind search");
+     for(String label:new String[]{"Esplora","Preferiti","Libreria"})if(text(scene,label)==null)throw new AssertionError("room button missing "+label);
+     
      int[] pos=new int[2],navPos=new int[2];footer.getLocationInWindow(pos);nav.getLocationInWindow(navPos);
      if(pos[1]+footer.getHeight()>navPos[1])throw new AssertionError("footer overlaps main navigation");
      ((android.widget.ScrollView)get(a,"scroll")).scrollTo(0,99999);
@@ -198,7 +214,16 @@ public final class LudoVisualInstrumentation extends Instrumentation {
     if(LudoRoomState.EXPLORE.equals(room))awaitRoomRig(a);
     if(LudoRoomState.EXPLORE.equals(room))runOnMainSync(()->{try{motionContracts(a);}catch(Exception e){throw new RuntimeException(e);}});
     if(LudoRoomState.EXPLORE.equals(room))overlayContracts(a);
+    awaitRoomBackground(a);
     capture(a,room);
+    runOnMainSync(()->{try{
+     Method open=MainActivity.class.getDeclaredMethod("setLudoRoomPanel",boolean.class);open.setAccessible(true);open.invoke(a,true);
+     if(((View)get(a,"refreshHost")).getVisibility()!=View.VISIBLE)throw new AssertionError("panel did not open");
+     if(petField((LudoPetView)get(a,"petView"),"idle")!=null)throw new AssertionError("actor moves behind panel");
+    }catch(Exception e){throw new RuntimeException(e);}});
+    waitForIdleSync();capture(a,room+"_panel");
+    runOnMainSync(()->{try{invoke(a,"onBackPressed");if(!"companion".equals(get(a,"tab"))||Boolean.TRUE.equals(get(a,"ludoRoomPanelOpen")))throw new AssertionError("Back did not close panel in same room");if(actor[0]!=get(a,"petView"))throw new AssertionError("panel recreated mascot");}catch(Exception e){throw new RuntimeException(e);}});
+
    }
    runOnMainSync(()->{try{set(a,"tab","catalog");invoke(a,"render");if(get(a,"ludoRoomDots")!=null||get(a,"ludoStage")!=null)throw new AssertionError("Ludo footer leaked to Catalog");if(((FrameLayout.LayoutParams)((View)get(a,"refreshHost")).getLayoutParams()).bottomMargin!=0)throw new AssertionError("Catalog viewport still reserved");if(text((View)get(a,"body"),"Bundle")==null)throw new AssertionError("Bundle inaccessible from Catalog");}catch(Exception e){throw new RuntimeException(e);}});
    capture(a,"catalog");
@@ -210,7 +235,8 @@ public final class LudoVisualInstrumentation extends Instrumentation {
     invoke(a,"onBackPressed");if(!"companion".equals(get(a,"tab")))throw new AssertionError("engine recreation Back did not return to Ludo");
    }catch(Exception e){throw new RuntimeException(e);}});
    runOnMainSync(a::finish);
-   result.putString("stream","Ludo actual rooms, fixed footer and Catalog Bundle verified; persistent actor and top sections checked");finish(Activity.RESULT_OK,result);
+   result.putString("stream","Ludo actual rooms, fixed footer and Catalog Bundle verified; fullscreen approved backgrounds, panel Back, persistent actor and room buttons checked");finish(Activity.RESULT_OK,result);
   }catch(Throwable failure){result.putString("stream",android.util.Log.getStackTraceString(failure));finish(Activity.RESULT_CANCELED,result);}
  }
 }
+

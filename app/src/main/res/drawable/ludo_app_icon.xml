@@ -1,4 +1,5 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item><shape><solid android:color="#332441"/><corners android:radius="24dp"/></shape></item>
-    <item android:drawable="@drawable/ludo_mark" android:left="20dp" android:right="20dp" android:top="20dp" android:bottom="20dp" />
+    <item android:drawable="@drawable/ludo_icon_ludo" android:left="20dp" android:right="20dp" android:top="20dp" android:bottom="20dp" />
 </layer-list>
+

@@ -1,5 +1,12 @@
 # Ludo Scout — UI refinement e scaletta tematica
 
+## Frontend — Ludo a tutto schermo, direzione approvata 2026-10-04
+
+Il feedback più recente supersede la fascia scena/titolo/tab della168: stanza illustrata continua sull'intera area Ludo, attore grande persistente, comandi circolari sovrapposti in basso e ricerca fissa. Risultati/attività, Preferiti e Libreria si aprono in un pannello sopra la stanza; Back chiude prima il pannello. I tre originali forniti1000363565/566/567 sono rispettivamente Motore/Preferiti/Libreria; nessuna nuova stanza inventata. Pack UI: icona Ludo in nav/launcher, Desideri nel comando Preferiti, libro standard per Libreria. Gli altri quattro glyph sono risorse disponibili per momenti semanticamente pertinenti; cameo non introdotti nelle card in questo task. Rig canonico168 conservato, respiro/sguardo/oscillazione più percepibili, blink e tap esistenti, reduced motion/lifecycle rispettati. Layout compatto mantiene comandi e attore affiancati in viewport bassi. Nessuna modifica a AI, dati, matching, pricing, schema, soglie o dipendenze.
+
+Branch frontend/ludo-fullscreen-pet: implementazione in verifica, NON dichiarata distribuita o accettata. Frontend7/backend6 gruppi aperti; stesso gruppo Ludo. Prossimo passo: CI completa e catture Android100/200%/motion, poi beta firmata secondo workflow esistente.
+
+
 ## Backend AI171 — evidenze locali distribuite, 2026-10-04 18:28 Europe/Rome
 
 PR256 HEAD0d860201e42a55e066253b5d10a31ea5384ec796 integrata squashf9e91fc782fe39927b5a58ec7f03e73b659efc19. Beta201/run37216643534/job111478388452 SUCCESS:5.12.171-ai-local-evidence(1000201). Certificato C7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710 verificato16:27:39.587UTC; uploadFirebase16:28:23.298UTC e distinta distribuzione tester/gruppi16:28:24.306UTC. Release43nu72rmr5mio, artifact11308453573. Aggiornare daAppTester senza cancellare dati.

@@ -10,8 +10,8 @@ final class LudoPose {
   if(!motionEnabled)return;
   double phase=Math.max(0,elapsedMs)%4200L*(Math.PI*2/4200);
   float wave=(float)Math.sin(phase);
-  out.bodyScaleY=1+wave*.004f;out.headRotationDeg=wave;
-  out.gazeX=clamp(x);out.gazeY=clamp(y);
+  out.bodyScaleY=1+wave*.012f;out.headRotationDeg=wave*2;
+  out.gazeX=clamp(x+wave*.45f);out.gazeY=clamp(y+(float)Math.sin(phase*.5)*.12f);
   long blinkTime=Math.max(0,elapsedMs)%6000L;
   if(blinkTime>=3500&&blinkTime<=3700)out.eyeOpen=Math.abs(blinkTime-3600)/100f;
   if(reactionElapsedMs>=0&&reactionElapsedMs<1600){double t=reactionElapsedMs/1600.0,waveTap=Math.sin(Math.PI*t),envelope=waveTap*waveTap;
@@ -22,3 +22,4 @@ final class LudoPose {
  }
  private static float clamp(float value){return Float.isFinite(value)?Math.max(-1,Math.min(1,value)):0;}
 }
+

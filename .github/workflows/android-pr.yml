@@ -69,6 +69,7 @@ jobs:
 
       - name: Verify Ludo daily journey and exploration
         run: |
+          python3 regression/ludo_fullscreen_pet.py
           python3 regression/ludo_primary_search.py
           python3 -m pip install Pillow==11.3.0
           python3 regression/ludo_scribble_assets.py
@@ -527,6 +528,7 @@ jobs:
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.AiBetaInstrumentation | tee browser-large-result.txt
           adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
           grep -F 'AI manual dialog rendered' browser-large-result.txt
+
 
 
 
