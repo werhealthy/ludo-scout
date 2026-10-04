@@ -27,7 +27,11 @@ public final class AiBetaListings {
  static JSONObject row(Cursor c)throws Exception {
    VintedCard card=new VintedCard(c.getString(1),c.getString(2),c.getString(3),c.getInt(4)/100.0,null,null,new Rect(0,0,1,1),c.getString(5));
    ListingClassifier.Result local=ListingClassifier.classify(card);
+   String source=card.rawDescription==null?"":card.rawDescription;
+   int count=source.codePointCount(0,source.length());
+   String excerpt=count>2000?source.substring(0,source.offsetByCodePoints(0,2000)):source;
    return new JSONObject().put("listing_id",c.getLong(0)).put("title",card.title).put("brand",card.brand)
+    .put("source_text",excerpt).put("source_truncated",count>2000)
     .put("local_type",local.type.name()).put("local_reason",local.reason).put("lifecycle",c.getString(6))
     .put("listing_match_state",c.getString(7)).put("bgg_id",c.getString(8)).put("game_title",c.getString(9)).put("game_match_state",c.getString(10))
     .put("input_key",AiBetaProtocol.fingerprint(new JSONArray().put(card.title).put(card.brand).put(card.rawDescription).toString(),"local","v1"));
@@ -54,6 +58,16 @@ public final class AiBetaListings {
  static String comparable(String type){switch(type){case "ACCESSORY":case "COMPONENTS":case "EMPTY_BOX":return "ACCESSORY_COMPONENT";case "UNCERTAIN":return "UNKNOWN";default:return type;}}
  static String lifecycle(String state){switch(state){case "ACTIVE":return "attivo";case "AUTO_FILTERED":return "filtrato";case "USER_HIDDEN":return "nascosto";case "SOLD":return "venduto";case "ARCHIVED":return "archiviato";default:return "stato non disponibile";}}
  static String category(String type)throws Exception {switch(type){case "BASE_GAME":return "Gioco base";case "EXPANSION":return "Espansione";case "BUNDLE":return "Bundle";case "ACCESSORY":return "Accessorio";case "COMPONENTS":return "Componenti";case "EMPTY_BOX":return "Scatola vuota";case "ACCESSORY_COMPONENT":return "Accessorio o componente";case "NON_GAME":return "Non gioco";case "UNCERTAIN":case "UNKNOWN":return "Da chiarire";default:throw new Exception("invalid category");}}
+ static String evidence(JSONObject row)throws Exception {
+  String brand=row.getString("brand"),source=row.getString("source_text"),bgg=row.getString("bgg_id");
+  return "Dati del gruppo preparato · solo sul telefono\nCatalogo invariato. BGG e lingua non verificati dall’AI.\n\n"
+   +row.getString("title")+"\nMarca dichiarata: "+(brand.trim().isEmpty()?"non disponibile":brand)
+   +"\n\nTesto acquisito: "+(source.trim().isEmpty()?"non disponibile":source)
+   +(row.getBoolean("source_truncated")?"\n[Mostrati i primi 2.000 caratteri del testo acquisito]":"")
+   +"\n\nLocale (ricalcolata): "+category(row.getString("local_type"))+"\n"+row.getString("local_reason")
+   +"\n"+(bgg.isEmpty()?"BGG: nessun collegamento salvato":"BGG salvato: "+row.getString("game_title")+" (#"+bgg+") · da verificare")
+   +"\nStato annuncio: "+lifecycle(row.getString("lifecycle"));
+ }
  static String display(JSONArray snapshot,JSONObject response)throws Exception {
   if(response!=null&&!"PROPOSAL".equals(response.getString("status")))throw new Exception("invalid proposal status");
   JSONArray answers=response==null?null:response.getJSONArray("records");
