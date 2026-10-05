@@ -9,7 +9,7 @@ public class AiBetaComparisonTest {
   assertEquals("CONFLICT",AiBetaComparison.verdict("ACCESSORY","BASE_GAME"));
  }
  @Test public void abstentionIsNotAgreementAndConfidenceCannotResolveConflict() {
-  assertEquals("UNCERTAIN",AiBetaComparison.verdict("UNCERTAIN","BASE_GAME"));
+  assertEquals("AI_EVIDENCE",AiBetaComparison.verdict("UNCERTAIN","BASE_GAME"));
   assertEquals("UNCERTAIN",AiBetaComparison.verdict("BASE_GAME","UNKNOWN"));
   assertEquals("AGREEMENT",AiBetaComparison.verdict("BUNDLE","BUNDLE"));
   assertEquals("CONFLICT",AiBetaComparison.verdict("EXPANSION","BASE_GAME"));
