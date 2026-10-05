@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {mkdtemp,rm,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
 const token='test-device-secret-only',workerToken='test-local-worker-secret',month=new Date().toISOString().slice(0,7);
 const rows=[{listing_id:1,title:'Game + playmat',brand:'Maker'}];
@@ -12,7 +13,7 @@ const answer=[{listing_id:1,category:'BUNDLE',confidence:90,evidence:'Game plus 
 const hash=x=>createHash('sha256').update(x).digest('hex');
 async function setup(options={}){
  const dir=options.dir||await mkdtemp(join(tmpdir(),'ludo-ai-'));let calls=0;
- const mf=new Miniflare({modules:true,modulesRules:[{type:'ESModule',include:['**/*.js']}],scriptPath:new URL('../src/worker.js',import.meta.url).pathname,
+ const mf=new Miniflare({modules:true,modulesRules:[{type:'ESModule',include:['**/*.js']}],scriptPath:fileURLToPath(new URL('../src/worker.js',import.meta.url)),
  compatibilityDate:'2026-07-30',durableObjects:{BUDGET:{className:'BudgetObject',useSQLite:true}},durableObjectsPersist:dir,
  bindings:{ENABLED:'true',FREE_TIER_VALID_UNTIL:String(Date.now()+3600000),GEMINI_API_KEY:'fake-test-key',
  DEVICE_DIGESTS:JSON.stringify({d1:hash(token)}),LOCAL_WORKER_DIGEST:hash(workerToken),SEED_MANIFEST:JSON.stringify({version:1,source_sha256:'a'.repeat(64),benchmark_disabled:true,months:{[month]:{calls_reserved:options.seed??8,reserved_micro:(options.seed??8)*10000}}}),...options.bindings},
