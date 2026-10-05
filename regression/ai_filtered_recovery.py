@@ -18,7 +18,7 @@ checks={
  "visual evidence required":'photos.length()>0' in policy and 'strong>=2' in policy,
  "explicit non-game category cannot recover":"isExplicitNonGameCategory" in policy,
  "recovery re-enters local analysis":'listing.put("lifecycle","ACTIVE")' in recover_block and 'listing.put("enrichment_state","PENDING_ANALYSIS")' in recover_block and 'listing.put("match_state","PENDING_ANALYSIS")' in recover_block,
- "provisional identity detached":"listing.putNull("game_id")" in recover_block and 'listing.putNull("match_confidence")' in recover_block,
+ "provisional identity detached":'listing.putNull("game_id")' in recover_block and 'listing.putNull("match_confidence")' in recover_block,
  "existing observation reused":'ORDER BY observed_at DESC,id DESC LIMIT 1' in recover_block and 'observation.put("analysis_status","pending")' in recover_block,
  "recovery does not write BGG or deal trust":'db.update("games"' not in recover_block and 'db.update("deals"' not in recover_block,
  "local classifier wake is explicit":"AI_RECOVERY_READY" in runner and "AiEngineRunner.RECOVERY_READY" in radar and "continuePersistentAnalysis()" in radar,
