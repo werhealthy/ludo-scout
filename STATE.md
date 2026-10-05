@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.180 grounded AI evidence merged; local install pending, 2026-10-05
+
+Owner locally verified 5.12.179-ai-copy-status after updating beta correctly: regression/ai_copy_idle_status.py PASS (copy button, clipboard, selectable text, feedback, worker photo count/queue idle/version), Gradle clean + :app:testDebugUnitTest + :app:compileDebugJavaWithJavac + assembleDebug BUILD SUCCESSFUL in 53s (41 tasks), and adb install -r succeeded over 5.12.178 without clearing data. Installed package moved from versionCode1002005/versionName5.12.178-ai-photo-evidence to versionCode1002006/versionName5.12.179-ai-copy-status.
+
+Phone screenshot of “Prova AI · beta” after “Test AI su 8 annunci” exposed two concrete issues. First, “Copia testo” was implemented only in AiBetaRealDialog (“Confronta annunci salvati”), not in the 8-listing fixture dialog actually used by the owner, so the action was absent. Second, the controlled sample8 fixture contains no source_text and no photos (the dialog fills both as empty), yet Qwen evidence attributed claims to “Descrizione” and “Immagini”, including “Immagini mostrano scatola del gioco e playmat insieme”. Treat this as hallucinated provenance; the screenshot is not valid proof of visual evidence.
+
+PR271 “Backend: fix AI test copy and ground Qwen evidence” merged squash ce9519284c67054a767718829c1aa787f1a36ce5. Android label is 5.12.180-ai-grounded-copy. The fixture dialog now exposes a fixed AlertDialog “Copia testo” action and selectable result text. The local worker explicitly tells Qwen which description/photo fields are actually present, drops generated evidence that cites absent photos/descriptions/brand, and forces edition_language=UNKNOWN when no photo reached the model. Catalog remains proposal-only/read-only; no BGG identity, pricing, schema, threshold, budget, service or network-rate change.
+
+Verification for PR271: exact diff reviewed and PR was mergeable. GitHub Android PR validation run37287543588 failed before executing code on job111689930117 (steps=null); dependent jobs were skipped, so this is not compile/test evidence. 5.12.180 has NOT yet been locally built or installed. Single next backend step: on owner Windows PC pull beta, restart the local Qwen worker so the new guardrails are loaded, run regression/ai_copy_idle_status.py + Android unit/Javac/build, install as versionCode1002007 over the existing app, then rerun “Test AI su 8 annunci” and copy the complete output plus worker Job/Done/queue-empty lines.
+
+Frontend7/backend6 groups remain open.
+
+
 ## Backend — Qwen local live; PR270 merged, 5.12.179 delivery blocked, 2026-10-05
 
 PR270 `Backend: copy AI comparison and show local queue idle` was realigned to current `beta` and merged as squash 22c269e5f265cab9aac1c17c0701ebde3d9de454. Realignment head was a7f6b1ef82db65ce29fedec9ac539b4b9ed11781; the only concurrent beta change was this STATE checkpoint, so the functional PR diff stayed limited to app/build.gradle, AiBetaRealDialog.java, regression/ai_copy_idle_status.py and tools/ai_local_worker.py. Android label in beta is now 5.12.179-ai-copy-status.
