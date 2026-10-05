@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend — phone audit identifies AI status transport as current stop; cause unknown, 2026-10-05
+
+Owner supplied the full read-only runtime audit for canonical listings 1572, 1577 and 1581. listing_count=3; all three rows are BASE_GAME, AUTO_FILTERED/AUTO_FILTERED_NON_GAME, with last_error “Nessun candidato BGG sufficientemente forte: scarto automatico, non fact-check”, null BGG IDs, no AI category evidence, observations still PENDING_ANALYSIS, no deals and zero overrides. The audit captured at 1791231560952.
+
+At 1791231435669, diag:ai_engine was build=ai-engine-v3; state=STATUS_UNAVAILABLE; checked=0; held=0; recovered=0; checksTotal=96; holdsTotal=1; failedBatches=0; more=false; retryAt=1791232335669. The installed app is 5.12.202-ai-wait-deadline, versionCode 1002032, and the owner confirmed an authorized Pixel 8. The retry deadline was still in the future at capture.
+
+Code path: AiEngineSession maps an exception from Transport.status() to STATUS_UNAVAILABLE before any classification submission; checked=0 is consistent with no batch being checked. AiBetaClient.status can throw for invalid endpoint/token configuration, non-200 response, connection/read errors, oversized or malformed response. AiEngineRunner intentionally logs no exception detail. The report does not identify which condition occurred, and no correlated bridge log, endpoint status response or USB reverse listing was supplied. Therefore no specific failure cause is established.
+
+Next evidence-only checks on the owner PC: query the local bridge GET /v1/status with its existing debug bearer token (no classify request), and read adb reverse --list. Preserve their exact outputs and correlate with bridge logs; do not build/install or increase AI requests until the status path is understood. Keep PR #310 draft until an AI-positive real batch remains ACTIVE and advances to BGG.
+
 ## Backend — current phone audit summary; row-level report pending, 2026-10-05
 
 Owner PowerShell confirms one authorized Pixel 8 (37311FDJH00AX8, state device). Installed package is 5.12.202-ai-wait-deadline, versionCode 1002032. The owner ran tools/ai_recovery_runtime_audit.py --ids 1572,1577,1581; it completed and relaunched MainActivity. Its console summary is AI evidence=0, AI-positive filtered=0, BGG progressed=0, cohort_pass=false.
