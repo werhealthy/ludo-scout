@@ -1,6 +1,9 @@
 package it.vintedaffari.app;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Color;
 import android.text.InputType;
 import android.view.View;
@@ -21,10 +24,11 @@ public final class AiBetaTestDialog {
  private static TextView label(Activity a,String s){TextView t=new TextView(a);t.setText(s);t.setTextColor(Color.rgb(225,223,236));t.setTextSize(15);t.setPadding(0,12,0,12);return t;}
  public static AlertDialog show(Activity a){
   int pad=Math.round(20*a.getResources().getDisplayMetrics().density);LinearLayout box=new LinearLayout(a);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(pad,pad,pad,pad);box.setBackgroundColor(Color.rgb(27,24,39));
-  ScrollView scroll=new ScrollView(a);scroll.addView(box);TextView status=label(a,"Caricamento della prova…");box.addView(status);
+  ScrollView scroll=new ScrollView(a);scroll.addView(box);TextView status=label(a,"Caricamento della prova…");status.setTextIsSelectable(true);box.addView(status);
   Button configure=new Button(a);configure.setText("Configura prova");box.addView(configure);Button run=new Button(a);run.setText("Test AI su 8 annunci");run.setEnabled(false);box.addView(run);
   Button real=new Button(a);real.setText("Confronta annunci salvati");box.addView(real);real.setOnClickListener(v->showReal(a));
-  AlertDialog dialog=new AlertDialog.Builder(a).setTitle("Prova AI · beta").setView(scroll).setNegativeButton("Chiudi",null).create();dialog.show();
+  AlertDialog dialog=new AlertDialog.Builder(a).setTitle("Prova AI · beta").setView(scroll).setNeutralButton("Copia testo",null).setNegativeButton("Chiudi",null).create();dialog.show();
+  dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->copyText(a,status));
   AiBetaSettings settings=new AiBetaSettings(a);
   IO.execute(()->{try{JSONObject saved=settings.load();String key=AiBetaProtocol.fingerprint(fixture(a).toString(),AiBetaProtocol.MODEL,AiBetaProtocol.CONTRACT);String previous=AiBetaProtocol.reusableDisplay(key,saved.optString("last_display_key"),saved.optLong("last_display_at"),System.currentTimeMillis())?saved.optString("last_display"):"La prova usa 8 annunci controllati. Le proposte non modificano il catalogo.";a.runOnUiThread(()->{if(!visible(a,dialog))return;status.setText(previous);run.setEnabled(saved.optBoolean("enabled",false)&&!BUSY.get());});}catch(Exception e){a.runOnUiThread(()->{if(visible(a,dialog))status.setText("Configurazione non leggibile. Configura nuovamente la prova.");});}});
   configure.setOnClickListener(v->IO.execute(()->{try{JSONObject saved=settings.load();a.runOnUiThread(()->{if(visible(a,dialog))configure(a,settings,saved,run,status);});}catch(Exception e){a.runOnUiThread(()->{if(visible(a,dialog))status.setText("Configurazione non leggibile.");});}}));
@@ -37,6 +41,13 @@ public final class AiBetaTestDialog {
   return dialog;
  }
  static AlertDialog showReal(Activity a){return AiBetaRealDialog.show(a);}
+ private static void copyText(Activity a,TextView status){
+  CharSequence value=status.getText();if(value==null||value.length()==0)return;
+  ClipboardManager clipboard=(ClipboardManager)a.getSystemService(Context.CLIPBOARD_SERVICE);
+  if(clipboard==null)return;
+  clipboard.setPrimaryClip(ClipData.newPlainText("Prova AI Ludo Scout",value));
+  Toast.makeText(a,"Testo copiato",Toast.LENGTH_SHORT).show();
+ }
  private static JSONArray fixture(Activity a)throws Exception{try(InputStream in=a.getAssets().open("ai-beta/sample8.json");ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[2048];int n;while((n=in.read(b))!=-1){if(out.size()+n>4096)throw new Exception("fixture too large");out.write(b,0,n);}JSONArray rows=new JSONArray(out.toString("UTF-8"));for(int i=0;i<rows.length();i++){JSONObject r=rows.getJSONObject(i);if(!r.has("source_text"))r.put("source_text","");if(!r.has("photos"))r.put("photos",new JSONArray());}return rows;}}
  static String display(JSONObject response,JSONArray source)throws Exception{
   String state=response.optString("status");if(!"PROPOSAL".equals(state)){
