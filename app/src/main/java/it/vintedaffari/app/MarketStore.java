@@ -2069,15 +2069,14 @@ public final class MarketStore {
         // request frequency. Each listing is attempted once automatically so a missing seller cannot
         // create an endless background loop. Seller identity unlocks deterministic same-seller bundles.
         Long sellerBackfill=scalarLong(db,
-                "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' "+
+                "SELECT l.id FROM market_listings l WHERE l.lifecycle='ACTIVE' "+
                 "AND (l.seller_id IS NULL OR l.seller_id='') "+
                 "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
-                "AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND g.rating>=? "+
                 "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name=?||l.id) "+
                 "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='browser_listing:'||l.id AND q.value=1) "+
                 "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN (?,?,?)) "+
                 "ORDER BY l.last_seen DESC,l.id DESC LIMIT 1",
-                new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),SELLER_BACKFILL_MARKER_PREFIX,PENDING,PROCESSING,FAILED_RETRYABLE});
+                new String[]{SELLER_BACKFILL_MARKER_PREFIX,PENDING,PROCESSING,FAILED_RETRYABLE});
         if(sellerBackfill!=null){
             enqueueListingJob(db,sellerBackfill,JOB_VINTED_DEEP,now,6,SELLER_BACKFILL_SOURCE);
             ContentValues marker=new ContentValues();marker.put("name",SELLER_BACKFILL_MARKER_PREFIX+sellerBackfill);marker.put("value",1);marker.put("updated_at",now);marker.put("text_value","state=QUEUED;source="+SELLER_BACKFILL_SOURCE);
