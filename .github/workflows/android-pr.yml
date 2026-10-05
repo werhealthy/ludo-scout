@@ -72,6 +72,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Verify Android API28 compatibility
+        run: python3 regression/android_api28_compat.py
+
       - name: Run automatic AI trust policy
         run: |
           mkdir -p /tmp/ai-policy
@@ -308,6 +311,11 @@ jobs:
         run: python3 regression/invisible_interaction_v51241.py
       - name: Run unified catalog and bundle workflow regression
         run: python3 regression/catalog_bundle_workflow.py
+      - name: Android lint
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:lintDebug
+
       - name: Run pricing unit tests
         run: |
           chmod +x ./gradlew

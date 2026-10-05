@@ -211,7 +211,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             int reset=bundleDatabase.resetRetryableDiagnostics();bundleDatabase.resetPipelineCounters();
             pipelinePrefs.edit().putInt("bundlePipelineGeneration",4).putInt("bundlePipelineResetRows",reset).apply();
         }
-        IntentFilter retryFilter=new IntentFilter(OperationCenter.RETRY);retryFilter.addAction(OperationCenter.REFRESH_MISSING);retryFilter.addAction(BrowserCapturePolicy.READY_ACTION);if(Build.VERSION.SDK_INT>=33)registerReceiver(retryReceiver,retryFilter,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(retryReceiver,retryFilter);retryRegistered=true;
+        IntentFilter retryFilter=new IntentFilter(OperationCenter.RETRY);retryFilter.addAction(OperationCenter.REFRESH_MISSING);retryFilter.addAction(BrowserCapturePolicy.READY_ACTION);androidx.core.content.ContextCompat.registerReceiver(this,retryReceiver,retryFilter,androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);retryRegistered=true;
         diag().edit()
                 .putBoolean("serviceConnected", true)
                 .putLong("serviceConnectedAt", System.currentTimeMillis())
@@ -1947,6 +1947,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+
 
 
 

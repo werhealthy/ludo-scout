@@ -1,7 +1,7 @@
 """Execute production SQL gates against SQLite; no Vinted traffic."""
 from pathlib import Path
 import re, sqlite3
-s=(Path(__file__).resolve().parents[1]/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text()
+s=(Path(__file__).resolve().parents[1]/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text(encoding='utf-8')
 db=sqlite3.connect(':memory:')
 db.executescript("CREATE TABLE processing_jobs(job_type,state,source); INSERT INTO processing_jobs VALUES('VINTED_DEEP_ENRICHMENT','PENDING','SELLER_BACKFILL');")
 parking=re.search(r'String automatic="([^"]+)";',s).group(1)
@@ -19,10 +19,10 @@ print('PASS seller idle SQL gates and ordinary parking')
 # Active Motore must never claim backfill, even for an observation in the run.
 assert "? > 0 AND j.source<>'SELLER_BACKFILL'" in gate
 for method in ('runnableVintedDueCount','oldestRunnableVintedAgeMs','nextRunnableVintedDueAt'):
- section=(Path(__file__).resolve().parents[1]/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text().split(method+'(',1)[1].split('\n    }',1)[0]
+ section=(Path(__file__).resolve().parents[1]/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text(encoding='utf-8').split(method+'(',1)[1].split('\n    }',1)[0]
  assert "'CATALOG_HEALTH','SELLER_BACKFILL')" in section
 # Execute the exact unpark selection: previous network attempts/other reasons stay terminal.
-source=(Path(__file__).resolve().parents[1]/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text()
+source=(Path(__file__).resolve().parents[1]/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text(encoding='utf-8')
 where=re.search(r'db.update\("processing_jobs",unparkSeller,"([^"]+)"',source).group(1)
 x=sqlite3.connect(':memory:')
 x.executescript("CREATE TABLE market_listings(id,lifecycle,seller_id); INSERT INTO market_listings VALUES(1,'ACTIVE',''); CREATE TABLE processing_jobs(id,listing_id,source,state,attempt,last_error,updated_at); INSERT INTO processing_jobs VALUES(1,1,'SELLER_BACKFILL','COMPLETE',0,'parked: nessuno scroll attivo',0),(2,1,'SELLER_BACKFILL','COMPLETE',1,'parked: nessuno scroll attivo',0),(3,1,'SELLER_BACKFILL','COMPLETE',0,'done',0),(4,1,'AUTO','COMPLETE',0,'parked: nessuno scroll attivo',0);")

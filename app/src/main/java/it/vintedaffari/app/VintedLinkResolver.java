@@ -410,10 +410,14 @@ public final class VintedLinkResolver {
     private static final String GENERIC=" gioco giochi tavolo boardgame board game italiano italiana nuovo nuova ottime condizioni carte imbustate completo completa ";
     private static String norm(String s){if(s==null)return"";String n=Normalizer.normalize(s,Normalizer.Form.NFD).replaceAll("\\p{M}+","");return n.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim();}
     private static double jaccard(String a,String b){if(a.isEmpty()||b.isEmpty())return 0;java.util.Set<String>A=new java.util.HashSet<>(java.util.Arrays.asList(a.split(" ")));java.util.Set<String>B=new java.util.HashSet<>(java.util.Arrays.asList(b.split(" ")));java.util.Set<String>I=new java.util.HashSet<>(A);I.retainAll(B);java.util.Set<String>U=new java.util.HashSet<>(A);U.addAll(B);return U.isEmpty()?0:(double)I.size()/U.size();}
-    private static String enc(String s){return URLEncoder.encode(s==null?"":s, StandardCharsets.UTF_8);}
+    private static String enc(String s){
+        try{return URLEncoder.encode(s==null?"":s, StandardCharsets.UTF_8.name());}
+        catch(java.io.UnsupportedEncodingException impossible){
+            throw new IllegalStateException("UTF-8 is required by the Android runtime",impossible);
+        }
+    }
     private static String str(Object o){return o==null?"":String.valueOf(o);}
     private static Double parseMoney(Object o){try{if(o==null)return null;if(o instanceof Number)return((Number)o).doubleValue();if(o instanceof JSONObject){JSONObject j=(JSONObject)o;String a=j.optString("amount","");if(!a.isEmpty())return Double.parseDouble(a.replace(',','.'));}String s=String.valueOf(o).replace("€","").replace(" ","").trim().replace(',','.');return Double.parseDouble(s);}catch(Exception e){return null;}}
     private android.content.SharedPreferences diag(){return context.getSharedPreferences("va_v3_diag",android.content.Context.MODE_PRIVATE);}
     private static String safe(String s){return s==null?"":s.length()>180?s.substring(0,180):s;}
 }
-

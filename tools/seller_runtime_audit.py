@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local evidence only. No HTTP. Stops/reopens app to copy a consistent DB+WAL."""
 import argparse, sqlite3, subprocess, tempfile
+from contextlib import closing
 from pathlib import Path
 from catalog_phase1_audit import adb_path, dump, PKG, DB
 
@@ -20,7 +21,7 @@ def main():
     parser.add_argument('--db',type=Path,help='Read an already copied DB instead of accessing phone')
     args=parser.parse_args()
     if args.db:
-        with sqlite3.connect(args.db.resolve().as_uri()+'?mode=ro',uri=True) as db: report(db)
+        with closing(sqlite3.connect(args.db.resolve().as_uri()+'?mode=ro',uri=True)) as db: report(db)
         return
     adb=adb_path()
     p=subprocess.run([adb,'shell','dumpsys','package',PKG],capture_output=True,text=True,check=True)
@@ -32,7 +33,7 @@ def main():
             base=Path(td)/DB
             if not dump(adb,f'databases/{DB}',base): raise SystemExit('Database non leggibile via run-as')
             dump(adb,f'databases/{DB}-wal',str(base)+'-wal')
-            with sqlite3.connect(base.as_uri()+'?mode=ro',uri=True) as db: report(db)
+            with closing(sqlite3.connect(base.as_uri()+'?mode=ro',uri=True)) as db: report(db)
     finally:
         subprocess.run([adb,'shell','am','start','-n',PKG+'/.MainActivity'],check=True)
 
