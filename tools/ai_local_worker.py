@@ -66,6 +66,25 @@ def http_json(url,body=None,token=None,timeout=35):
 def post_local(path,body=None,timeout=35):
  return http_json(ENDPOINT+"/v1/local/"+path,{} if body is None else body,TOKEN,timeout)
 
+def http_error_detail(error):
+ try:
+  raw=error.read(1024)
+  text=raw.decode("utf-8","replace") if raw else ""
+  try:
+   data=json.loads(text)
+   status=data.get("status") if isinstance(data,dict) else None
+   if status: return str(status)[:120]
+  except Exception:
+   pass
+  compact=" ".join(text.split())
+  if "1027" in compact: return "CLOUDFLARE_1027"
+  return compact[:160]
+ except Exception:
+  return ""
+
+def broker_backoff_seconds(code,detail):
+ return 60 if code in (429,503) or "1027" in detail else 5
+
 def ollama_ready():
  try:
   with urllib.request.urlopen(OLLAMA+"/api/tags",timeout=3) as r:
@@ -180,7 +199,9 @@ def main():
      time.sleep(5);continue
     try: post_local("heartbeat",{"model":MODEL},timeout=8)
     except urllib.error.HTTPError as e:
-     print("Broker unavailable: HTTP",e.code);time.sleep(5);continue
+     detail=http_error_detail(e)
+     print("Broker unavailable: HTTP",e.code,("- "+detail) if detail else "")
+     time.sleep(broker_backoff_seconds(e.code,detail));continue
     except Exception as e:
      print("Broker unavailable:",type(e).__name__);time.sleep(5);continue
     print("Local AI online.")
@@ -211,8 +232,9 @@ def main():
    except urllib.error.HTTPError as e:
     processing=False
     healthy=False
-    print("Local AI error: HTTP",e.code,"- fallback will resume after heartbeat expires.")
-    time.sleep(3)
+    detail=http_error_detail(e)
+    print("Local AI error: HTTP",e.code,("- "+detail) if detail else "","- fallback will resume after heartbeat expires.")
+    time.sleep(broker_backoff_seconds(e.code,detail))
    except Exception as e:
     processing=False
     healthy=False
