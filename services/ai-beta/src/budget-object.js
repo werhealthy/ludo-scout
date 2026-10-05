@@ -48,7 +48,7 @@ export class BudgetObject extends DurableObject{
     if(value.expires<=now)continue;
     if(s==='LOCAL_PENDING'||(s==='LOCAL_CLAIMED'&&value.result.lease_until<=now)){if(!chosen||(value.created_at||0)<(chosen.value.created_at||0))chosen={id:row.id,value};}
    }
-   if(!chosen)return json({status:'NO_JOB'},204);
+   if(!chosen)return json({status:'NO_JOB'});
    const claimed={status:'LOCAL_CLAIMED',lease_until:now+LOCAL_LEASE_MS};chosen.value.result=claimed;this.put(chosen.id,chosen.value);this.put(chosen.value.cache_key,{result:claimed,expires:chosen.value.expires});
    return json({status:'JOB',job_id:chosen.id,request_id:chosen.value.request_id,contract:CONTRACT,records:chosen.value.records});
   }
