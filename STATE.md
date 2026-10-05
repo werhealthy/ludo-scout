@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — latest post-bridge audit still reflects pre-bridge failure; next retry due 22:47, 2026-10-05 Europe/Rome
+
+Owner attached ai-recovery-after-bridge.json captured at 1791232767005 (2026-10-05 20:39:27 UTC / 22:39:27 Europe/Rome). It found all three expected listings; each remains AUTO_FILTERED/AUTO_FILTERED_NON_GAME, local BASE_GAME, no BGG id/evidence, PENDING_ANALYSIS observation, one stored photo, no deal, no override. Cohort pass remains false.
+
+The latest diag:ai_engine is updated_at=1791232337910 (20:32:17 UTC / 22:32:17 Europe/Rome), state=STATUS_UNAVAILABLE, checked=0, held=0, recovered=0, checksTotal=96, holdsTotal=1, failedBatches=0, more=false, retryAt=1791233237910 (20:47:17 Europe/Rome). This is the failed attempt before the bridge was subsequently confirmed healthy from the PC at 22:35. Therefore this report does not test the healthy bridge. The retry deadline is about 8 minutes after the audit capture; no post-start AI status attempt is yet recorded.
+
+Keep the bridge process running, ADB USB reverse connected, and app available through the 22:47 retry and allow processing time. Then collect another audit. Do not reinstall. If status remains unavailable after that attempt, correlate with bridge logs/configuration; current evidence still does not establish app endpoint configuration.
+
 ## Backend — USB bridge status healthy again; awaiting post-recovery runtime audit, 2026-10-05
 
 After owner started the bridge from the repository checkout, a read-only request from this environment to http://127.0.0.1:8765/v1/status succeeded: enabled=true, local_online=true, transport=USB_LOCAL, gemini_available=false, calls_reserved=0 and reserved_micro=0. This verifies the PC-side bridge/Ollama readiness now, not that Android has successfully submitted a classification. No /v1/classify request was sent. The owner had previously confirmed adb reverse UsbFfs tcp:8765 tcp:8765; that mapping was not rechecked in this latest turn.
