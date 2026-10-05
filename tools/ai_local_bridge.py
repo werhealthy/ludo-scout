@@ -31,6 +31,8 @@ LOCK=threading.Lock()
 REQUEST_ID=re.compile(r"^[-a-zA-Z0-9]{8,80}$")
 
 def cache_path():
+ override=os.environ.get("LUDO_AI_LOCAL_CACHE")
+ if override:return Path(override)
  base=os.environ.get("LOCALAPPDATA")
  root=Path(base) if base else Path.home()
  return root/"LudoScout"/"ai-local-usb-cache.json"
