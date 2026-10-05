@@ -14,6 +14,10 @@ def report(db):
         print('maintenance_job',row)
     for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('diag:seller_backfill_schedule','diag:seller_backfill','diag:seller_backfill_result','vinted_paused','diag:t2b_exclusive','vinted_http_window_count','vinted_http_last_code','vinted_http_circuit_until','t2_ledger:last','t2_ledger:physical') OR name LIKE 'diag:vinted_trace:%' ORDER BY updated_at,value"):
         print('diagnostic',row)
+    traces=list(db.execute("SELECT value,text_value FROM queue_controls WHERE name LIKE 'diag:vinted_trace:%' AND name<>'diag:vinted_trace_sequence' ORDER BY value DESC LIMIT 64"))
+    seller=[row for row in traces if row[1] and ('sellerBackfill=true' in row[1] or 'source=SELLER_BACKFILL' in row[1] or 'SELLER_BACKFILL' in row[1])]
+    print('seller_trace_events=',len(seller))
+    for row in reversed(seller[-24:]): print('seller_trace',row)
     print('once_markers=',db.execute("SELECT COUNT(*) FROM queue_controls WHERE name LIKE 'seller_backfill_once:%'").fetchone()[0])
 
 def main():
