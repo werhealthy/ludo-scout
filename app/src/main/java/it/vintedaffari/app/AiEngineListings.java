@@ -26,7 +26,7 @@ final class AiEngineListings implements AiEngineSession.Source {
   }
  }
  private static JSONObject row(Cursor c)throws Exception {
-  return AiBetaListings.row(c).put("engine_verification",c.getString(11)).put("engine_confirmed",c.getInt(12)).put("engine_manual_review",c.getInt(13));
+  return AiBetaListings.row(c).put("engine_verification",c.getString(12)).put("engine_confirmed",c.getInt(13)).put("engine_manual_review",c.getInt(14));
  }
  @Override public JSONArray select(JSONObject j,long now)throws Exception {
   JSONArray selected=new JSONArray();JSONObject seen=j.getJSONObject("seen");
