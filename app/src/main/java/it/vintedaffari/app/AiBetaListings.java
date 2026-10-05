@@ -57,7 +57,7 @@ public final class AiBetaListings {
  /** Rich listing evidence may leave the phone for the private beta router; catalog identities/pricing stay local. */
  static JSONArray payload(JSONArray snapshot)throws Exception {
   java.util.ArrayList<JSONObject> sorted=new java.util.ArrayList<>();for(int i=0;i<snapshot.length();i++)sorted.add(snapshot.getJSONObject(i));sorted.sort((a,b)->Long.compare(a.optLong("listing_id"),b.optLong("listing_id")));
-  JSONArray rows=new JSONArray();for(JSONObject r:sorted){rows.put(new JSONObject().put("listing_id",r.getLong("listing_id")).put("title",r.getString("title")).put("brand",r.getString("brand")).put("source_text",r.optString("source_text")).put("photos",r.optJSONArray("photos")==null?new JSONArray():r.getJSONArray("photos")));}
+  JSONArray rows=new JSONArray();for(JSONObject r:sorted){String title=r.getString("title"),brand=r.getString("brand"),source=r.optString("source_text");JSONArray photos=r.optJSONArray("photos")==null?new JSONArray():r.getJSONArray("photos");if(title.trim().isEmpty()||title.length()>180||brand.length()>160||source.length()>2000||photos.length()>4)throw new Exception("input invalid");rows.put(new JSONObject().put("listing_id",r.getLong("listing_id")).put("title",title).put("brand",brand).put("source_text",source).put("photos",photos));}
   if(rows.length()>0&&new JSONObject().put("request_id","xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx").put("records",rows).toString().getBytes(StandardCharsets.UTF_8).length>32768)throw new Exception("input too large");
   return rows;
  }
