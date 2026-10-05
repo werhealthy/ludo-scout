@@ -22,11 +22,21 @@ final class AiEngineListings implements AiEngineSession.Source {
    +"LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) ";
  private static final String PROTECTED="NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id))";
  private static final String COMMON="l.id>0 AND TRIM(COALESCE(l.vinted_title,''))<>'' AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(d.confirmed,0)=0 AND COALESCE(d.verification_state,'')<>'USER_CONFIRMED' AND "+PROTECTED;
- private static final String RECOVERABLE="l.lifecycle='AUTO_FILTERED' AND (l.enrichment_state='AUTO_EXCLUDED' OR EXISTS(SELECT 1 FROM observations ar WHERE ar.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) AND COALESCE(ar.verification_reason,'') LIKE 'AI category recovery:%')) AND COALESCE(g.bgg_id,'')='' AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint))";
+ private static final String RECOVERABLE="l.lifecycle='AUTO_FILTERED' AND (l.enrichment_state='AUTO_EXCLUDED' OR (l.enrichment_state='AUTO_FILTERED' AND "+AiEnginePolicy.EVIDENCE_GAP_SQL+")) AND COALESCE(g.bgg_id,'')='' AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint))";
  private static final String ELIGIBLE=COMMON+" AND (l.lifecycle='ACTIVE' OR ("+RECOVERABLE+"))";
 
  AiEngineListings(SQLiteDatabase db){this.db=db;}
  int recoveredCount(){return recovered;}
+
+ /** Preserve the evidence on the exact pending observation being completed, not on deal trust. */
+ static void preserveRecoveryEvidence(SQLiteDatabase db,String signature,ContentValues incoming){
+  try(Cursor c=db.rawQuery("SELECT vinted_title,brand,verification_reason FROM observations WHERE signature=? AND analysis_status='pending' AND verification_state='PENDING_ANALYSIS' ORDER BY observed_at DESC LIMIT 1",new String[]{signature})){
+   if(c.moveToFirst()&&java.util.Objects.equals(c.getString(0),incoming.getAsString("vinted_title"))
+      &&java.util.Objects.equals(c.getString(1)==null?"":c.getString(1),incoming.getAsString("brand")==null?"":incoming.getAsString("brand"))
+      &&c.getString(2)!=null&&c.getString(2).startsWith("AI category recovery:"))
+    incoming.put("verification_reason",c.getString(2));
+  }
+ }
 
  /** Called by legacy upsert inside its writer transaction; user overrides are applied afterward. */
  static void preserveHold(SQLiteDatabase db,String signature,ContentValues incoming){
@@ -110,11 +120,12 @@ final class AiEngineListings implements AiEngineSession.Source {
      listing.putNull("game_id");listing.putNull("match_confidence");
      listing.put("deferred_retry_at",0);listing.put("manual_review_required",0);listing.putNull("manual_review_reason");
      listing.put("last_error","AI_CATEGORY_RECOVERED: gioco base riconosciuto da evidenza visiva; identità BGG ancora da verificare");
-     int changed=db.update("market_listings",listing,"id=? AND lifecycle='AUTO_FILTERED' AND COALESCE(manual_review_required,0)=0 AND (enrichment_state='AUTO_EXCLUDED' OR EXISTS(SELECT 1 FROM observations ar WHERE ar.signature=COALESCE(NULLIF(market_listings.legacy_signature,''),market_listings.temp_fingerprint) AND COALESCE(ar.verification_reason,'') LIKE 'AI category recovery:%'))",new String[]{id});
+     // current(snapshot) and the policy were rechecked in this same writer transaction.
+     int changed=db.update("market_listings",listing,"id=? AND lifecycle='AUTO_FILTERED' AND COALESCE(manual_review_required,0)=0",new String[]{id});
      if(changed>0&&!signature.isEmpty()){
       // Re-open the existing sighting instead of manufacturing a new observation timestamp.
       ContentValues observation=new ContentValues();observation.put("analysis_status","pending");observation.put("verification_state","PENDING_ANALYSIS");
-      observation.put("verification_reason","AI category recovery: base game visually recognized; BGG pending");
+      observation.put("verification_reason","AI category recovery:"+r.getString("input_key")+": base game visually recognized; BGG pending");
       db.update("observations",observation,"id=(SELECT id FROM observations WHERE signature=? ORDER BY observed_at DESC,id DESC LIMIT 1)",new String[]{signature});
       recovered+=changed;
      }

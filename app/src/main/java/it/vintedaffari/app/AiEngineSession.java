@@ -21,7 +21,8 @@ final class AiEngineSession {
   Result(String state,int checked,int held,boolean more){this.state=state;this.checked=checked;this.held=held;this.more=more;}
  }
  private AiEngineSession(){}
- static String localKey(JSONObject row){return AiBetaProtocol.fingerprint(row.toString(),"ai-engine-local","v1");}
+ // Reconsider locally skipped evidence gaps after the policy fix; remote cache/request IDs stay intact.
+ static String localKey(JSONObject row){return AiBetaProtocol.fingerprint(row.toString(),"ai-engine-local","v2");}
  static String remoteKey(JSONObject row)throws Exception {
   return AiBetaListings.key(new JSONArray().put(row));
  }

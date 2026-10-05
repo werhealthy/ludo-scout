@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.201 AI product evidence / BGG lifecycle candidate, 2026-10-05
+
+Status: candidate on backend/ai-product-bgg-state; NOT merged or Android/runtime verified. Open groups: frontend 7 / backend 6.
+
+Owner audit ai-recovery-audit.json contains six AUTO_FILTERED rows, no AI recovery observations: 1572,1573,1575,1577,1578,1581. Initial evidence-gap AUTO_FILTERED states were excluded by recovery selection; BASE_GAME local classifier was also excluded from durable-proof consumption. Weak BGG identity then quarantined accepted product evidence, and completed/repeated observations could hide the marker.
+
+Candidate allows only the demonstrated product-evidence gaps into visual recovery, binds positive evidence to current title/brand/text/photos across observation history, checks it under the commit writer transaction, and retains ACTIVE/BGG_MATCH_REQUIRED or BGG_MATCH_REVIEW/NEEDS_REVIEW when identity is insufficient. BGG remains the sole identity authority. Background missing-candidate, timeout and technical failure paths cannot erase valid visual product evidence. Manual overrides, confirmed deals, strong negative evidence, explicit incompatible categories and existing BGG identity remain protected. No schema change, Vinted pacing/budget/circuit change, pricing/trust change, catalog deletion, public endpoint or architecture change.
+
+Verified here: production SQLite selection against six audit states and negative controls; production JVM policy/gate probes and existing 10 policy checks; git diff --check. Android Gradle build and isolated native instrumentation remain pending because this workspace has no Android SDK. New AiRecoveryInstrumentation runs isolated offline database replay, repeated commits/rediscovery and protections; its audit mode opens the installed DB read-only and reports fingerprint-bound positive evidence, ACTIVE and next BGG state for the six IDs. Install only adb install -r. Do not close feature or merge on syntax/JVM checks alone. Autonomous LAN AI architecture remains deferred until real runtime closure and a concrete approved proposal.
+
 ## Backend — 5.12.198 conservative AI filtered recovery merged; phone proof pending, 2026-10-05
 
 Direct USB Qwen is now proven end-to-end on the owner PC/phone: local regressions and Gradle build passed, adb install -r succeeded, adb reverse exposed tcp:8765, and the bridge completed a real 8-listing request. The forced reanalysis path in 5.12.197 then produced fresh proposals for the same eight real listings. All eight were locally UNCERTAIN/AUTO_FILTERED and Qwen proposed BASE_GAME with grounded product evidence; Dutch packaging for Monopoly Extreem Bankieren, Dobble Harry Potter and Wie is het? was correctly proposed as NL after the prompt correction. This established the next bottleneck: strong positive visual product evidence could not recover an automatic false-negative filter.
