@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — Ollama/USB setup succeeds, loopback check still fails; process state pending, 2026-10-05
+
+Owner confirms ollama list contains exact model qwen3-vl:8b-instruct-q4_K_M. Running python tools/ai_local_bridge.py printed its listening URL and model; code prints that line only after ollama_ready() succeeds and ThreadingHTTPServer binds 127.0.0.1:8765. adb reverse tcp:8765 tcp:8765 returned 8765 and adb reverse --list showed UsbFfs tcp:8765 tcp:8765. A subsequent local GET /v1/status in the same transcript still failed with a connection error.
+
+Therefore Ollama's installed model and the USB reverse mapping are confirmed. The transcript does not establish whether the Python bridge process remained alive through the later GET, whether commands ran in the same session, or whether loopback connectivity failed for another local reason. No /v1/classify call was sent, and no phone retry result was captured. Next check listener ownership and bridge process from a second PowerShell window while keeping the bridge's original window open; if it has exited, capture its exit/error output. Do not rebuild/reinstall or force a new AI attempt until GET /v1/status succeeds.
+
 ## Backend — USB runtime services absent in latest owner checks; model availability not yet known, 2026-10-05
 
 Follow-up owner checks show no visible output from adb reverse --list, no TCP listener row for local port 8765, and ollama ps returned only its column header. Therefore no USB reverse mapping or local bridge listener was observed at this check, and Ollama reported no currently running model. This does not establish whether the required model is installed: ollama ps lists running models, while the bridge readiness check queries Ollama's installed tags for exact model qwen3-vl:8b-instruct-q4_K_M (default unless OLLAMA_MODEL overrides it). Check ollama list before starting anything.
