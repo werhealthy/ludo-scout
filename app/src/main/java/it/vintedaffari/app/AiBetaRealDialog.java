@@ -43,7 +43,7 @@ public final class AiBetaRealDialog {
      AiBetaRealListings.Snapshot old=AiBetaRealListings.restore(local);
      if(AiBetaRealListings.current(a,old)) { show(old,saved);return; }
     }
-    update(null,"Prepara un piccolo gruppo dagli annunci già acquisiti. Titolo e brand sono gli unici testi inviati. Nessuna modifica al catalogo.\n\n"+(enabled?"Analisi solo su richiesta manuale.":"Prova AI disattivata: puoi preparare gli annunci. Per analizzarli, usa Configura prova nel pannello precedente."),false);
+    update(null,"Prepara un piccolo gruppo dagli annunci già acquisiti. L’AI privata riceve titolo, brand, testo acquisito e fino a 4 foto Vinted; BGG e pricing restano locali. Nessuna modifica al catalogo.\n\n"+(enabled?"Analisi locale-first con fallback configurato dal servizio.":"Prova AI disattivata: puoi preparare gli annunci. Per analizzarli, usa Configura prova nel pannello precedente."),false);
    }catch(Exception e){update(null,"Archivio o configurazione non disponibili. Nessuna analisi avviata.",false);}
   });
  }
