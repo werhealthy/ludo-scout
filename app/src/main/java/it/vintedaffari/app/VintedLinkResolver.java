@@ -293,13 +293,27 @@ public final class VintedLinkResolver {
 
     private Candidate verifyPublicItem(String id)throws Exception{
         VintedPublicSession.Response hr=session.getPublic(VintedPublicSession.HOST+"/items/"+enc(id),"link_verify_item");diag().edit().putInt("linkPublicVerifyCode",hr.code).apply();if(hr.code!=200)return null;
-        String html=hr.body;boolean sold=isSoldHtml(html);JSONObject item=VintedStructuredData.item(html,id);Candidate c=item==null?null:parseCandidate(item);Matcher sm=LDJSON.matcher(html);
+        String html=hr.body;boolean sold=isSoldHtml(html);JSONObject item=VintedStructuredData.item(html,id);Candidate c=item==null?null:parseCandidate(item);if(c==null||TextUtils.isEmpty(c.sellerId))recordSellerShapeDiagnostic(html,id,item);Matcher sm=LDJSON.matcher(html);
         while(c==null&&sm.find()){String raw=sm.group(1).trim();try{Object parsed=new org.json.JSONTokener(raw).nextValue();Candidate x=candidateFromLd(parsed,id);if(x!=null){c=x;break;}}catch(Exception ignored){}}
         if(c==null&&sold){c=new Candidate();c.id=id;c.title="Articolo Vinted";c.url=VintedPublicSession.HOST+"/items/"+id;c.sold=true;return c;}if(c==null||Double.isNaN(c.price))return null;
         if(c.catalogId!=null&&!isBoardGameCatalog(c.catalogId)){diag().edit().putInt("linkRejectedCatalogId",c.catalogId).apply();return null;}c.sold=sold;
         enrichFromPublicHtml(c,html);if(TextUtils.isEmpty(c.publishedLabel))c.publishedLabel=extractPublishedLabelFromHtml(html);
         if(!TextUtils.isEmpty(c.sellerId)){SellerBundleScanner.ExtractedSnapshot snapshot=SellerBundleScanner.extractPageSnapshot(html,c.sellerId,id,32,"item-page");c.snapshotParser=snapshot.summary;c.sellerSnapshot.addAll(snapshot.items);}
         return TextUtils.isEmpty(c.title)?null:c;
+    }
+
+    /** Diagnostic only: record bounded structural hints when an exact HTTP 200 item page does not
+     * expose seller through the parser we currently trust. Values are deliberately reduced to key
+     * names / object shapes; raw HTML, descriptions, usernames and arbitrary page text are not stored. */
+    private void recordSellerShapeDiagnostic(String html,String itemId,JSONObject parsedItem){
+        try{
+            String raw=html==null?"":html;String lower=raw.toLowerCase(Locale.ROOT);
+            String[] needles={"user_id","seller_id","owner_id","userid","sellerid","ownerid","\"user\"","\"seller\"","\"owner\"","login","username"};
+            StringBuilder hits=new StringBuilder();for(String n:needles){int count=0,from=0;while(count<20&&(from=lower.indexOf(n,from))>=0){count++;from+=Math.max(1,n.length());}if(count>0){if(hits.length()>0)hits.append(',');hits.append(n.replace("\"","")).append(':').append(count);}}
+            String keys="";if(parsedItem!=null){java.util.List<String> names=new java.util.ArrayList<>();java.util.Iterator<String> it=parsedItem.keys();while(it.hasNext()&&names.size()<80){String k=it.next();String lk=k.toLowerCase(Locale.ROOT);if(lk.contains("user")||lk.contains("seller")||lk.contains("owner")||lk.contains("member")||lk.contains("profile"))names.add(k);}keys=android.text.TextUtils.join(",",names);}
+            VintedStructuredData.Scan scan=VintedStructuredData.scan(raw,null);
+            diag().edit().putString("sellerShapeDiagnostic","item="+safe(itemId)+";http=200;htmlBytes="+raw.length()+";tokens="+hits+";itemKeys="+keys+";structured="+scan.summary()).apply();
+        }catch(Throwable ignored){}
     }
 
     private void enrichFromPublicHtml(Candidate c,String html){
