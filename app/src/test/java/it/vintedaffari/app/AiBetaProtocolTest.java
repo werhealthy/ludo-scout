@@ -18,6 +18,10 @@ public class AiBetaProtocolTest {
  }
  @Test public void credentialsNeverFollowUntrustedRedirectEndpoint(){
   assertTrue(AiBetaProtocol.validEndpoint("https://ludo.example.workers.dev"));
-  for(String s:new String[]{"http://ludo.example.workers.dev","https://evil.test","https://evil.test@ludo.example.workers.dev","https://ludo.example.workers.dev/?key=x","https://ludo.example.workers.dev:8443","https://ludo.example.workers.dev/path"})assertFalse(s,AiBetaProtocol.validEndpoint(s));
+  assertTrue(AiBetaProtocol.validEndpoint(AiBetaProtocol.LOCAL_USB_ENDPOINT));
+  assertTrue(AiBetaProtocol.isLocalUsbEndpoint(AiBetaProtocol.LOCAL_USB_ENDPOINT));
+  assertTrue(AiBetaProtocol.validToken(AiBetaProtocol.LOCAL_USB_ENDPOINT,AiBetaProtocol.LOCAL_USB_TOKEN));
+  for(String s:new String[]{"http://ludo.example.workers.dev","http://localhost:8765","http://127.0.0.1:8766","https://evil.test","https://evil.test@ludo.example.workers.dev","https://ludo.example.workers.dev/?key=x","https://ludo.example.workers.dev:8443","https://ludo.example.workers.dev/path"})assertFalse(s,AiBetaProtocol.validEndpoint(s));
+  assertFalse(AiBetaProtocol.validToken(AiBetaProtocol.LOCAL_USB_ENDPOINT,"wrong"));
  }
 }
