@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — bridge failure diagnostics implemented; targeted regression verified, 2026-10-05
+
+Following owner approval, the USB bridge now emits a redacted failure line with validated request ID, stage, exception type and numeric HTTP code when proposal processing raises. It does not log exception text, listing title, photo URLs, tokens or model output; the HTTP 502 {status:FAILED} contract is unchanged. The existing regression now exercises the real ThreadingHTTPServer handler with an injected proposal exception and verifies response plus log redaction.
+
+TDD evidence: the regression was run against the unchanged bridge first and failed at the missing diagnostic assertion, then passed after implementation. Fresh rerun of regression/ai_local_usb_bridge.py passed both the pre-existing bridge cases and the new redaction case. The remote files' text exactly matches the tested workspace copies. No real Qwen request, Vinted photo fetch, Android build or install was performed for this code change. The user's local D: checkout was not modified; it remains at detached HEAD 7b89708 with pre-existing untracked files, so its running bridge does not automatically contain this change.
+
+Next: update the owner checkout carefully from backend/ai-category-state and restart the bridge so one naturally scheduled retry can expose only redacted failure context. Keep PR #310 draft until a real AI-positive batch stays ACTIVE and reaches BGG.
+
 ## Backend — post-wake submit returned FAILED; underlying exception unknown, 2026-10-05
 
 Owner's newest audit was captured at 1791233542975 (22:52:22 Europe/Rome). The three expected rows remain AUTO_FILTERED/AUTO_FILTERED_NON_GAME, no AI category evidence, no BGG IDs; cohort_pass=false. diag:ai_engine updated at 1791233309258 (22:48:29) to PENDING_FAILED, checked=0, held=0, recovered=0, failedBatches=0, more=false, retryAt=1791234209257 (23:03:29). This is a new attempt after the prior WAIT deadline.
