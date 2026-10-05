@@ -86,3 +86,15 @@ test('local worker authentication and richer listing fields are bounded',async()
   assert.equal(x.calls(),0);
  }finally{await x.close();}
 });
+
+
+test('local AI remains usable after Gemini monthly quota is exhausted',async()=>{
+ const x=await setup({seed:100,bindings:{FREE_TIER_VALID_UNTIL:'0'}});try{
+  await x.local('heartbeat');
+  const first=await x.request('request-local100');assert.equal(first.status,202);assert.equal(x.calls(),0);
+  const claim=await(await x.local('claim',{model:'qwen3-vl:8b-instruct-q4_K_M'})).json();assert.equal(claim.status,'JOB');
+  const result={job_id:claim.job_id,worker_model:'qwen3-vl:8b-instruct-q4_K_M',records:[{listing_id:1,proposed_type:'BASE_GAME',confidence:null,evidence:'standalone product evidence',language:'UNKNOWN',product_title:'Game'}]};
+  assert.equal((await x.local('result',result)).status,200);
+  const done=await(await x.request('request-local100')).json();assert.equal(done.provider,'LOCAL');assert.equal(done.budget.calls_reserved,100);assert.equal(x.calls(),0);
+ }finally{await x.close();}
+});
