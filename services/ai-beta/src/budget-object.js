@@ -5,6 +5,15 @@ import {generate} from './gemini.js';
 const LANGUAGES=new Set(['IT','EN','DE','FR','ES','PT','NL','MULTI','OTHER','UNKNOWN']);
 const TYPES=new Set(['BASE_GAME','EXPANSION','BUNDLE','ACCESSORY_COMPONENT','NON_GAME','UNKNOWN']);
 
+function blockedStatus(error){
+ const message=error instanceof Error?error.message:'';
+ if(message==='seed')return 'SEED_CONFIG_BLOCKED';
+ if(message==='seed conflict')return 'SEED_CONFLICT';
+ if(message==='uninitialized state')return 'SEED_STATE_BLOCKED';
+ if(['month index','missing month accounting','budget'].includes(message))return 'ACCOUNTING_STATE_BLOCKED';
+ return 'STORAGE_BLOCKED';
+}
+
 export class BudgetObject extends DurableObject{
  constructor(ctx,env){super(ctx,env);this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;this.sql.exec('CREATE TABLE IF NOT EXISTS state (id TEXT PRIMARY KEY,value TEXT NOT NULL)');}
  get(id){const rows=this.sql.exec('SELECT value FROM state WHERE id=?',id).toArray();return rows.length?JSON.parse(rows[0].value):null;}
@@ -96,5 +105,5 @@ export class BudgetObject extends DurableObject{
   const generated=await generate(input.records,this.env);const response={...generated,model:MODEL,contract:CONTRACT,provider:'GEMINI',request_id:input.request_id};delete response.circuit;
   this.ctx.storage.transactionSync(()=>{const current=this.get(key)||{content,records:input.records,request_id:input.request_id,cache_key:cachekey,created_at:now,expires};this.put(key,{...current,result:response});this.put(cachekey,{result:response,expires});if(generated.circuit)this.put('circuit',true);});
   return json({...response,budget:this.budget()},generated.status==='PROPOSAL'?200:502);
- }catch{return json({status:'STORAGE_OR_CONFIG_BLOCKED'},503);}}
+ }catch(error){return json({status:blockedStatus(error)},503);}}
 }
