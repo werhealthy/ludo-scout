@@ -2090,10 +2090,16 @@ public final class MarketStore {
         if(sellerBackfill==null)recordSellerBackfillExclusions(db);
         if(sellerBackfill!=null){
             enqueueListingJob(db,sellerBackfill,JOB_VINTED_DEEP,now,6,SELLER_BACKFILL_SOURCE);
-            ContentValues marker=new ContentValues();marker.put("name",SELLER_BACKFILL_MARKER_PREFIX+sellerBackfill);marker.put("value",1);marker.put("updated_at",now);marker.put("text_value","state=QUEUED;source="+SELLER_BACKFILL_SOURCE);
-            db.insertWithOnConflict("queue_controls",null,marker,SQLiteDatabase.CONFLICT_REPLACE);
-            setDiagnosticState("seller_backfill",1,"state=QUEUED;listing="+sellerBackfill+";serial=true;rate=existing-public-lane");
-            QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);return 1;
+            boolean queued=false;
+            try(Cursor q=db.rawQuery("SELECT 1 FROM processing_jobs WHERE listing_id=? AND source=? AND state IN (?,?,?) LIMIT 1",new String[]{String.valueOf(sellerBackfill),SELLER_BACKFILL_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE})){queued=q.moveToFirst();}
+            if(queued){
+                ContentValues marker=new ContentValues();marker.put("name",SELLER_BACKFILL_MARKER_PREFIX+sellerBackfill);marker.put("value",1);marker.put("updated_at",now);marker.put("text_value","state=QUEUED;source="+SELLER_BACKFILL_SOURCE);
+                db.insertWithOnConflict("queue_controls",null,marker,SQLiteDatabase.CONFLICT_REPLACE);
+                setDiagnosticState("seller_backfill",1,"state=QUEUED;listing="+sellerBackfill+";serial=true;rate=existing-public-lane");
+                QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);return 1;
+            }
+            setDiagnosticState("seller_backfill",0,"state=ENQUEUE_REJECTED;listing="+sellerBackfill+";marker=false");
+            return 0;
         }
 
         long cutoff=now-CATALOG_HEALTH_MAX_AGE_MS;
