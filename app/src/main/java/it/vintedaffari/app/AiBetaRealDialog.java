@@ -112,7 +112,7 @@ public final class AiBetaRealDialog {
     }
     if(!AiBetaRealListings.current(activity,chosen))message="Gli annunci sono cambiati durante il confronto. Prepara nuovamente il gruppo; il catalogo è invariato.";
    }catch(Exception e){message="Risposta non ricevuta o non valida. Il catalogo è invariato. Ripetere questo gruppo conserva l’identificativo; nessun reinvio automatico.";}finally{AiBetaTestDialog.BUSY.set(false);}
-   if(message!=null)update(null,message,false);else try{show(chosen,saved);}catch(Exception e){update(chosen,"Proposta non valida. Nessuna modifica al catalogo.",false);}
+   if(message!=null)update(chosen,message,false);else try{show(chosen,saved);}catch(Exception e){update(chosen,"Proposta non valida. Nessuna modifica al catalogo.",false);}
   });
  }
  private void review() {
