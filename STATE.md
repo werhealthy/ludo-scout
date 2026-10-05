@@ -1,5 +1,19 @@
 # Ludo Scout — Current state
 
+## Backend — AI retry audit checkpoint; runtime still unverified, 2026-10-05
+
+GitHub confirms PR #310 remains open, draft, unmerged, targeting beta. Its current head and branch HEAD are both 7b89708d3097b7c9278c3e9ee2cb40b75881df3a; beta remains ff1427a92d2caa20beef173f330c85ea383d53bc. This supersedes the prior abbreviated SHA and confirms no merge.
+
+The supplied later runtime report for listings 1572, 1577 and 1581 records zero AI evidence and all three still AUTO_FILTERED/AUTO_FILTERED_NON_GAME, with observations PENDING_ANALYSIS and no BGG identity. Its diag is PENDING_FAILED (checked=0, held=0, recovered=0, failedBatches=0); retryAt was about five minutes after capture. This report proves only the captured state; it does not show whether any subsequent retry ran.
+
+Code read at the current PR head: AiEngineSession returns PENDING_<remote status> when the transport response is not PROPOSAL; for PENDING_FAILED it saves the journal with next_at = now + the normal 15-minute backoff and more=false. AiEngineRunner schedules a durable wake only for WAIT or when more=true. Thus PENDING_FAILED is not the WAIT deadline path fixed in this PR, and the observed counters do not establish the cause. AiBetaClient returns parsed non-2xx response bodies when available, or throws for transport/read/redirect/size/contract failures. The USB bridge’s handler maps any otherwise uncaught classify exception to HTTP 502 with status FAILED, but the runtime report has no correlated bridge log or HTTP response, so attributing this event to that bridge path would be speculation. The current code also discards exception details from the runner log by design.
+
+A read-only ADB check was attempted from the Codex execution environment but adb itself stopped before device enumeration with “Cannot mkdir '\\.android': Permission denied”, including when Android user-home overrides pointed into the workspace. This is an execution-environment limitation, not evidence about phone connectivity, authorization, app state or runtime. No fresh DB audit was acquired here; no build, install or data mutation was performed.
+
+Next runtime step: in the owner’s normal PowerShell environment run `adb devices -l`; only if exactly one authorized device appears as `device`, read the installed package version and run `tools/ai_recovery_runtime_audit.py --ids 1572,1577,1581 --output <new-report-path>`. If ADB is absent, unauthorized or shows no device, reconnect/unlock the phone and check `adb devices`; do not interpret that as an application result. Keep PR #310 draft until real AI-positive listings remain ACTIVE and reach the next BGG state. No cause-specific code correction is justified without fresh correlated evidence or a reproducible regression.
+
+Frontend7/backend6 groups remain open.
+
 ## Backend — AI category state fix in review; Android build/phone proof pending, 2026-10-05
 
 Canonical beta is ff1427a92d2caa20beef173f330c85ea383d53bc (merged PR308, 5.12.200). The earlier top 5.12.198 handoff was stale. Owner reports the 5.12.200 local build/regressions and USB Qwen 8-record request succeeded; this session did not independently execute that phone run.
