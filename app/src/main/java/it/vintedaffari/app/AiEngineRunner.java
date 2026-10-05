@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Separate bounded lane: neither the Vinted lane, BGG lane nor the main thread waits on AI. */
 final class AiEngineRunner {
+ static final String RECOVERY_READY="it.vintedaffari.app.AI_RECOVERY_READY";
  private static final ExecutorService IO=Executors.newSingleThreadExecutor(r->new Thread(r,"ludo-ai-engine"));
  private static final AtomicBoolean BUSY=new AtomicBoolean();
  private static volatile boolean more;
@@ -55,14 +56,16 @@ final class AiEngineRunner {
        }
       };
       AiEngineSession.Result result=AiEngineSession.run(config,store,source,transport,System.currentTimeMillis());
+      int recovered=listings.recoveredCount();
       more=result.more;
       nextAttempt=System.currentTimeMillis()+(result.more?10000:AiEnginePolicy.BACKOFF);
       JSONObject progress=privateJournal.load();
       android.content.ContentValues diagnostic=new android.content.ContentValues();
       diagnostic.put("name","diag:ai_engine");diagnostic.put("value",result.checked);diagnostic.put("updated_at",System.currentTimeMillis());
-      diagnostic.put("text_value","build=ai-engine-v1;state="+result.state+";checked="+result.checked+";held="+result.held+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more);
+      diagnostic.put("text_value","build=ai-engine-v2;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more);
       db.insertWithOnConflict("queue_controls",null,diagnostic,SQLiteDatabase.CONFLICT_REPLACE);
-      if(result.held>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
+      if(result.held>0||recovered>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
+      if(recovered>0)app.sendBroadcast(new android.content.Intent(RECOVERY_READY).setPackage(app.getPackageName()));
       if(result.more)QueueWorkScheduler.scheduleAfter(app,10000);
      }
     }
