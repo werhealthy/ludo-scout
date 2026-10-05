@@ -2,11 +2,15 @@ package it.vintedaffari.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Color;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -17,7 +21,7 @@ public final class AiBetaRealDialog {
  private final Activity activity;
  private final AiBetaSettings settings;
  private final TextView status;
- private final Button prepare, analyze, review, inspect;
+ private final Button prepare, analyze, review, inspect, copy;
  private final AlertDialog dialog;
  private AiBetaRealListings.Snapshot snapshot;
  private boolean enabled, validProposal;
@@ -30,10 +34,11 @@ public final class AiBetaRealDialog {
   inspect=new Button(a);inspect.setText("Esamina dati locali");inspect.setEnabled(false);box.addView(inspect);
   analyze=new Button(a);analyze.setText("Chiedi proposte AI");analyze.setEnabled(false);box.addView(analyze);
   review=new Button(a);review.setText("Segna confronto come revisionato");review.setEnabled(false);box.addView(review);
-  status=new TextView(a);status.setTextColor(Color.rgb(225,223,236));status.setTextSize(15);status.setPadding(0,pad,0,pad);status.setText("Caricamento…");box.addView(status);
+  copy=new Button(a);copy.setText("Copia testo");copy.setEnabled(false);box.addView(copy);
+  status=new TextView(a);status.setTextColor(Color.rgb(225,223,236));status.setTextSize(15);status.setPadding(0,pad,0,pad);status.setTextIsSelectable(true);status.setText("Caricamento…");box.addView(status);
   ScrollView scroll=new ScrollView(a);scroll.addView(box);
   dialog=new AlertDialog.Builder(a).setTitle("Annunci reali · confronto AI").setView(scroll).setNegativeButton("Chiudi",null).create();dialog.show();
-  prepare.setOnClickListener(v->prepare());inspect.setOnClickListener(v->inspect());analyze.setOnClickListener(v->analyze());review.setOnClickListener(v->review());
+  prepare.setOnClickListener(v->prepare());inspect.setOnClickListener(v->inspect());analyze.setOnClickListener(v->analyze());review.setOnClickListener(v->review());copy.setOnClickListener(v->copyText());
   prepare.setEnabled(false);
   AiBetaTestDialog.IO.execute(()->{
    try {
@@ -50,7 +55,14 @@ public final class AiBetaRealDialog {
  public static AlertDialog show(Activity a){return new AiBetaRealDialog(a).dialog;}
  private boolean visible(){return !activity.isFinishing()&&!activity.isDestroyed()&&dialog.isShowing();}
  private void update(AiBetaRealListings.Snapshot next,String message,boolean proposed) {
-  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(message);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);inspect.setEnabled(idle&&next!=null&&next.rows.length()>0);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);review.setEnabled(idle&&proposed);});
+  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(message);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);inspect.setEnabled(idle&&next!=null&&next.rows.length()>0);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);review.setEnabled(idle&&proposed);copy.setEnabled(message!=null&&!message.trim().isEmpty());});
+ }
+ private void copyText() {
+  CharSequence value=status.getText();if(value==null||value.length()==0)return;
+  ClipboardManager clipboard=(ClipboardManager)activity.getSystemService(Context.CLIPBOARD_SERVICE);
+  if(clipboard==null)return;
+  clipboard.setPrimaryClip(ClipData.newPlainText("Confronto AI Ludo Scout",value));
+  Toast.makeText(activity,"Testo copiato",Toast.LENGTH_SHORT).show();
  }
  private boolean begin(String message) {
   if(!AiBetaTestDialog.BUSY.compareAndSet(false,true))return false;
