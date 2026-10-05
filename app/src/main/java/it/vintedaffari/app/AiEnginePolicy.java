@@ -20,9 +20,7 @@ final class AiEnginePolicy {
   if(!"AUTO_FILTERED".equals(row.optString("lifecycle")))return false;
   String enrichment=row.optString("engine_enrichment");
   boolean original="AUTO_EXCLUDED".equals(enrichment);
-  boolean bounced="AUTO_FILTERED".equals(enrichment)
-    && "AUTO_FILTERED_NON_GAME".equals(row.optString("listing_match_state"))
-    && "Nessuna prova positiva di prodotto gioco da tavolo".equals(row.optString("engine_last_error"));
+  boolean bounced="AUTO_FILTERED".equals(enrichment)&&row.optBoolean("engine_ai_recovered",false);
   if(!original&&!bounced)return false;
   if(!"UNCERTAIN".equals(row.optString("local_type")))return false;
   if(!row.optString("bgg_id").isEmpty())return false;
