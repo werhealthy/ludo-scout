@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.195 direct Qwen USB transport merged; local build/phone proof pending, 2026-10-05
+
+Owner reports hosted GitHub Actions quota exhausted and Cloudflare broker unavailable. The live broker diagnostic returned STORAGE_OR_CONFIG_BLOCKED, not a proven Cloudflare daily request cap. Cloudflare/GitHub-hosted execution is therefore no longer the operational dependency for the owner beta AI path.
+
+PR300 merged squash e42bdd6dfe19799ad9989b66a7c0c63e08a0dcf3. Debug beta now supports a direct owner-only route Android -> adb reverse tcp:8765 -> PC 127.0.0.1:8765 -> existing Ollama/Qwen classifier. The Python bridge binds only PC loopback, validates the existing listing-evidence-v2 payload, returns the same review-only proposal contract, never calls Gemini/Cloudflare, and persists a 7-day request_id cache so retries/restarts do not rerun an accepted request. Changed content under the same ID is rejected. Android accepts the exact HTTP loopback endpoint only under BuildConfig.DEBUG; workers.dev HTTPS remains supported. Cleartext is enabled only by the debug manifest. The configuration dialog adds “Usa Qwen sul PC via USB” and supplies a non-secret debug transport marker automatically.
+
+Verification actually executed: bridge core idempotency, request conflict and LOCAL_UNAVAILABLE paths passed with a stub classifier. Added regression/ai_local_usb_bridge.py, regression/ai_local_usb_android.py and Java protocol endpoint tests. GitHub PR run37320968109 failed before every step (steps=null), consistent with exhausted hosted Actions, so no hosted Gradle result exists. Local Android Gradle/build/install and physical phone -> USB -> Qwen proof remain pending.
+
+Seller backfill is now phone-verified on 5.12.194: coverage rose from2/154 to6/154; four SELLER_BACKFILL jobs completed with HTTP200, structured seller parse present and sellerPresent=true. This closes the claim-affinity bug. No Vinted rate/budget/circuit/filter/schema change.
+
+Frontend7/backend6 groups remain open. Single next backend step: owner local build 5.12.195 with versionCode above1002023, adb install -r, adb reverse tcp:8765 tcp:8765, run tools/ai_local_bridge.py from repo root, select “Usa Qwen sul PC via USB” in the app and run one real-listing AI comparison.
+
 ## Backend — 5.12.194 seller claim bind-affinity fix merged; phone proof pending, 2026-10-05
 
 Phone runtime on 5.12.193 disproved the stale-processing blocker: `vinted_processing_guard_blockers=0`, SELLER_BACKFILL job116/listing1133 remains PENDING due0, lane reports CLAIMING then “nessuna attività rivendicabile”, seller trace remains0 and seller_id remains2/154. This isolates the mismatch inside the claim gate rather than scheduler, queue owner or stale lease recovery.
