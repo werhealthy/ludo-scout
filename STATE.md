@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — USB runtime services absent in latest owner checks; model availability not yet known, 2026-10-05
+
+Follow-up owner checks show no visible output from adb reverse --list, no TCP listener row for local port 8765, and ollama ps returned only its column header. Therefore no USB reverse mapping or local bridge listener was observed at this check, and Ollama reported no currently running model. This does not establish whether the required model is installed: ollama ps lists running models, while the bridge readiness check queries Ollama's installed tags for exact model qwen3-vl:8b-instruct-q4_K_M (default unless OLLAMA_MODEL overrides it). Check ollama list before starting anything.
+
+With the earlier STATUS_UNAVAILABLE audit, absent local bridge/forwarding is a plausible explanation for the current transport failure, but checks were not simultaneous with that earlier attempt and the app endpoint/configuration remains unknown. Do not call the root cause proven. Next safe sequence: confirm the exact model in ollama list; if available, start tools/ai_local_bridge.py in a terminal, establish adb reverse tcp:8765 tcp:8765, then verify GET /v1/status reports enabled/local_online true. These checks do not submit classification requests. Only after the status path is healthy should runtime retry be evaluated. No build or install is indicated.
+
 ## Backend — local USB bridge status currently unreachable, 2026-10-05
 
 Owner ran GET http://127.0.0.1:8765/v1/status with the debug bearer header; PowerShell returned “Impossibile effettuare la connessione al server remoto.” This establishes that no service was reachable at that loopback address/port at the time of this check. It does not prove the listener state at the earlier runtime failure. The accompanying adb reverse --list produced no visible output in the supplied transcript, so the current reverse mapping remains unknown.
