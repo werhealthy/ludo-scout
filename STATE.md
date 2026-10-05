@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — latest bridge launch attempt used wrong working directory, 2026-10-05
+
+Owner tried python tools/ai_local_bridge.py from C:\Users\checc. Python correctly reported the script was not found at C:\Users\checc\tools\ai_local_bridge.py. No bridge process was started by this attempt and no phone data or app state was changed. Repository checkout is at D:\Users\defaultuser0\Documents\GitHub\ludo-scout per the owner's earlier PowerShell transcript.
+
+Next: in the PowerShell window intended to host the bridge, Set-Location to the repository path above, then run python -u tools\ai_local_bridge.py and leave it running. Verify /v1/status from another window. No build or reinstall is needed.
+
 ## Backend — bridge process confirmed absent at follow-up, 2026-10-05
 
 Owner's follow-up checks returned no listening socket on local port 8765, no python.exe command line containing ai_local_bridge.py, and Test-NetConnection 127.0.0.1:8765 returned False. Thus the bridge process was not alive at this follow-up, despite its earlier startup message. The prior invocation's termination cause is not shown. Ollama model installation and adb reverse mapping were separately confirmed; app retry has not been re-audited after these checks.
