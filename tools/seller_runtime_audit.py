@@ -30,7 +30,7 @@ def report(db):
         pass
     for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('processor_heartbeat','supervisor_heartbeat','vinted_paused','lane_vinted_status','lane_vinted_heartbeat') OR name LIKE 'lane_vinted_%' ORDER BY updated_at"):
         print('lane',row)
-    for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('diag:seller_backfill_schedule','diag:seller_backfill','diag:seller_backfill_result','vinted_paused','diag:t2b_exclusive','vinted_http_window_count','vinted_http_last_code','vinted_http_circuit_until','t2_ledger:last','t2_ledger:physical') OR name LIKE 'diag:vinted_trace:%' ORDER BY updated_at,value"):
+    for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('diag:seller_backfill_schedule','diag:seller_backfill','diag:seller_backfill_result','vinted_paused','t2b_exclusive','vinted_http_window_count','vinted_http_last_code','vinted_http_circuit_until','t2_ledger:last','t2_ledger:physical') OR name LIKE 'diag:vinted_trace:%' ORDER BY updated_at,value"):
         print('diagnostic',row)
     traces=list(db.execute("SELECT value,text_value FROM queue_controls WHERE name LIKE 'diag:vinted_trace:%' AND name<>'diag:vinted_trace_sequence' ORDER BY value DESC LIMIT 64"))
     seller=[row for row in traces if row[1] and ('sellerBackfill=true' in row[1] or 'source=SELLER_BACKFILL' in row[1] or 'SELLER_BACKFILL' in row[1])]
