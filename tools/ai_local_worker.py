@@ -106,7 +106,9 @@ Brand: {record.get('brand','')}
 Descrizione acquisita: {record.get('source_text','')}
 
 Vinted puo tradurre automaticamente titolo e descrizione: usali per capire COSA viene venduto, non per dedurre la lingua fisica.
-Se ci sono immagini, usale insieme: fronte, retro e componenti.
+Campi realmente disponibili: descrizione={bool(str(record.get('source_text','')).strip())}; foto={len(images)}.
+Non attribuire mai una prova a descrizione o foto se quel campo non e realmente disponibile.
+Se ci sono immagini, usale insieme: fronte, retro e componenti. Se foto=0, non citare immagini, foto o elementi visivi.
 BASE_GAME = gioco autonomo completo, incluse varianti standalone.
 EXPANSION = richiede o amplia un altro gioco.
 BUNDLE = piu prodotti distinti venduti insieme.
@@ -123,14 +125,33 @@ Non inventare. Evidence massimo 4 frasi brevi."""
  if status!=200: raise RuntimeError("ollama status")
  result=json.loads(response["message"]["content"])
  ptype=TYPE_MAP.get(result["product_type"],result["product_type"])
- evidence="; ".join(str(x).strip() for x in result.get("evidence",[]) if str(x).strip())[:500]
- if not evidence: evidence="Analisi locale senza evidenza sufficiente"
+ source_text=str(record.get("source_text","")).strip()
+ brand=str(record.get("brand","")).strip()
+ grounded=[]
+ for item in result.get("evidence",[]):
+  line=str(item).strip()
+  if not line: continue
+  low=line.lower()
+  if not images and any(word in low for word in ("immagin","foto","image","photo","visual")): continue
+  if not source_text and any(word in low for word in ("descrizion","description","testo acquisito")): continue
+  if not brand and "brand" in low: continue
+  grounded.append(line)
+ evidence="; ".join(grounded)[:500]
+ if not evidence:
+  available=[]
+  if str(record.get("title","")).strip(): available.append("titolo")
+  if brand: available.append("brand")
+  if source_text: available.append("testo acquisito")
+  if images: available.append(f"{len(images)} foto")
+  evidence="Proposta basata sui dati disponibili: "+(", ".join(available) if available else "nessuna evidenza sufficiente")
+ language=result.get("edition_language","UNKNOWN")
+ if not images: language="UNKNOWN"
  return {
   "listing_id":record["listing_id"],
   "proposed_type":ptype,
   "confidence":None,
   "evidence":evidence,
-  "language":result.get("edition_language","UNKNOWN"),
+  "language":language,
   "product_title":str(result.get("product_title",""))[:180]
  }
 
