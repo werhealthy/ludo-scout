@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.192 seller browser-provenance gate removed; phone verification pending, 2026-10-05
+
+Phone runtime evidence on 5.12.191 proved seller backfill was not scheduling: `reason=NO_CANDIDATE;BROWSER_OWNED=152;HAS_SELLER=2`, while the independent HTTP ledger entry was `bundle_snapshot_item|item|200|physical`. `browser_listing:<id>` is written by browser capture with `text_value=browser-public-capture-v1`, so it records acquisition provenance, not seller identity. It must not suppress an exact known-item seller lookup.
+
+This change removes that gate only from `SELLER_BACKFILL`; CATALOG_HEALTH and every other browser-owned behavior retain their gate. ACTIVE lifecycle, missing seller, exact item ID/URL, one serial idle job, once marker/retry semantics, 55-second public pacing, 60/hour budget, and 403/429 circuit/backoff are unchanged. Diagnostic partition now classifies such rows as ELIGIBLE. Regression executes the production candidate SQL and proves a browser-owned ACTIVE listing without seller is selected, while catalog health remains browser-gated.
+
+Verification: seller runtime, API28 compatibility, queue ownership and liveness regressions pass. `:app:clean :app:lintDebug :app:testDebugUnitTest :app:compileDebugJavaWithJavac :app:assembleDebug` passed locally (51 tasks; lint 0 error/fatal). Version 5.12.192-seller-browser-provenance. Phone success remains seller_id >2/154 after `adb install -r`; if it does not rise, inspect the existing trace through verifyPublicItem/parser for that same scheduled request, with no added speculative traffic.
+
+Frontend7/backend6 groups remain open. Single next backend step: install this beta over the existing app and run seller_runtime_audit.py twice with Motore idle.
+
 ## Backend — 5.12.191 seller runtime/API28 verified; phone proof pending, 2026-10-05
 
 PR283 targets beta from canonical537415c52444e716056cb1f31c47ba438f1cfa06. Seller backfill was queued while idle but excluded by the normal claim allow-list, then parked by reconcile with its one-shot marker retained. Idle seller jobs now survive parking, are claimable/countable, and stay blocked during active Motore observation. Restore at most one conclusively never-claimed parked seller job (attempt=0, exact parked reason, ACTIVE/missing seller) only when no maintenance job owns the serial lane; preserve markers, attempted jobs and browser-owned exclusions. Scheduling diagnostics distinguish active observation, maintenance owner and seller/identity/browser/marker/active-job exclusions.
