@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug-only: local USB AI uses adb reverse to 127.0.0.1:8765. Release/main manifest stays HTTPS-only. -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>

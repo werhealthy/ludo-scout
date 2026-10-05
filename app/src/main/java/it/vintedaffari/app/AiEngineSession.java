@@ -49,7 +49,7 @@ final class AiEngineSession {
   prune(j,now);store.save(j);return new Result(state,checked,held,more);
  }
  static Result run(JSONObject config,Journal store,Source source,Transport transport,long now)throws Exception {
-  if(!config.optBoolean("enabled")||!AiBetaProtocol.validEndpoint(config.optString("endpoint"))||config.optString("token").length()<16)
+  if(!config.optBoolean("enabled")||!AiBetaProtocol.validEndpoint(config.optString("endpoint"))||!AiBetaProtocol.validToken(config.optString("endpoint"),config.optString("token")))
    return new Result("LOCAL_DISABLED",0,0,false);
   String configKey=AiBetaProtocol.fingerprint(config.optString("endpoint")+"\n"+config.optString("token")+"\n"+AiBetaProtocol.MODEL+"\n"+AiBetaProtocol.CONTRACT,"ai-engine-config","v2");
   JSONObject j=store.load();

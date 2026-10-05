@@ -39,6 +39,10 @@ jobs:
           python3 regression/seller_shape_diagnostic.py
       - name: Verify AI real-listing read-only selection
         run: python3 regression/ai_real_listings.py
+      - name: Verify direct local USB AI transport
+        run: |
+          python3 regression/ai_local_usb_bridge.py
+          python3 regression/ai_local_usb_android.py
       - name: Execute read-only classification audit SQL
         run: python3 regression/classification_audit_export.py
       - name: Verify supplied Ludo visual universe
