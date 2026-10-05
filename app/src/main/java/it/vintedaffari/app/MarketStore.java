@@ -2062,7 +2062,7 @@ public final class MarketStore {
     }
 
     private void recordSellerBackfillExclusions(SQLiteDatabase db){
-        String sql="SELECT CASE WHEN seller_id IS NOT NULL AND seller_id<>'' THEN 'HAS_SELLER' WHEN COALESCE(vinted_item_id,'')='' OR COALESCE(vinted_url,'')='' THEN 'NO_IDENTITY' WHEN EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='browser_listing:'||l.id AND q.value=1) THEN 'BROWSER_OWNED' WHEN EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='seller_backfill_once:'||l.id) THEN 'ONCE_MARKER' WHEN EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) THEN 'ACTIVE_JOB' ELSE 'ELIGIBLE' END reason,COUNT(*) FROM market_listings l WHERE lifecycle='ACTIVE' GROUP BY reason";
+        String sql="SELECT CASE WHEN seller_id IS NOT NULL AND seller_id<>'' THEN 'HAS_SELLER' WHEN COALESCE(vinted_item_id,'')='' OR COALESCE(vinted_url,'')='' THEN 'NO_IDENTITY' WHEN EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='seller_backfill_once:'||l.id) THEN 'ONCE_MARKER' WHEN EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')) THEN 'ACTIVE_JOB' ELSE 'ELIGIBLE' END reason,COUNT(*) FROM market_listings l WHERE lifecycle='ACTIVE' GROUP BY reason";
         StringBuilder out=new StringBuilder("reason=NO_CANDIDATE");
         try(Cursor c=db.rawQuery(sql,null)){while(c.moveToNext())out.append(';').append(c.getString(0)).append('=').append(c.getLong(1));}
         setDiagnosticState("seller_backfill_schedule",0,out.toString());
@@ -2082,7 +2082,6 @@ public final class MarketStore {
                 "AND (l.seller_id IS NULL OR l.seller_id='') "+
                 "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
                 "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name=?||l.id) "+
-                "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='browser_listing:'||l.id AND q.value=1) "+
                 "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN (?,?,?)) "+
                 "ORDER BY l.last_seen DESC,l.id DESC LIMIT 1",
                 new String[]{SELLER_BACKFILL_MARKER_PREFIX,PENDING,PROCESSING,FAILED_RETRYABLE});
