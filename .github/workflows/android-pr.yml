@@ -32,6 +32,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Verify seller backfill runtime
+        run: |
+          python3 regression/seller_backfill_runtime.py
+          python3 regression/seller_backfill_phase1.py
+          python3 regression/seller_shape_diagnostic.py
       - name: Verify AI real-listing read-only selection
         run: python3 regression/ai_real_listings.py
       - name: Execute read-only classification audit SQL
@@ -553,6 +558,7 @@ jobs:
           timeout 60 adb shell am instrument -w it.vintedaffari.app.test/it.vintedaffari.app.AiBetaInstrumentation | tee browser-large-result.txt
           adb logcat -d -s LudoVisual:I AndroidRuntime:E '*:S'
           grep -F 'AI manual dialog rendered' browser-large-result.txt
+
 
 
 

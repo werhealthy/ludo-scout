@@ -76,12 +76,13 @@ public final class VintedLinkResolver {
         return until;
     }
 
-    public void resolve(DealRecord d,Callback cb){
+    public void resolve(DealRecord d,Callback cb){resolve(d,cb,null);}
+    public void resolve(DealRecord d,Callback cb,String owner){
         if(d==null||TextUtils.isEmpty(d.signature)||TextUtils.isEmpty(d.vintedTitle))return;
         long now=System.currentTimeMillis();if(now<diag().getLong("linkRetryAfter",0)){if(cb!=null)cb.onUnresolved(d.signature,"cooldown");return;}Long last=attempted.get(d.signature);if(last!=null&&now-last<RETRY_MS){if(cb!=null)cb.onUnresolved(d.signature,"cooldown");return;}attempted.put(d.signature,now);
         diag().edit().putInt("linkPublicVerifyCode",0).putInt("linkCandidateCount",0).putInt("linkBestScore",0).putInt("linkSecondScore",0).putString("linkBestTitle","").apply();
         if(cb!=null)cb.onProgress(d.signature,24,"preparo ricerca");
-        exec.execute(()->{try{Result r=!TextUtils.isEmpty(d.vintedUrl)?resolveExistingMetadata(d,cb):resolveSync(d,cb);if(r!=null){if(cb!=null)cb.onResolved(r);}else if(cb!=null)cb.onUnresolved(d.signature,explainUnresolved(d));}catch(Throwable t){Log.w(TAG,"resolve failed",t);if(cb!=null)cb.onUnresolved(d.signature,t.getClass().getSimpleName()+": "+safe(t.getMessage()));}});
+        exec.execute(()->{VintedRequestTrace.owner(owner);try{Result r=!TextUtils.isEmpty(d.vintedUrl)?resolveExistingMetadata(d,cb):resolveSync(d,cb);if(r!=null){if(cb!=null)cb.onResolved(r);}else if(cb!=null)cb.onUnresolved(d.signature,explainUnresolved(d));}catch(Throwable t){Log.w(TAG,"resolve failed",t);if(cb!=null)cb.onUnresolved(d.signature,t.getClass().getSimpleName()+": "+safe(t.getMessage()));}finally{VintedRequestTrace.owner(null);}});
     }
 
     private Result resolveExistingMetadata(DealRecord d,Callback cb)throws Exception{
@@ -292,13 +293,15 @@ public final class VintedLinkResolver {
     }
 
     private Candidate verifyPublicItem(String id)throws Exception{
+        VintedRequestTrace.record(context,"VERIFY_ITEM","item="+id);
         VintedPublicSession.Response hr=session.getPublic(VintedPublicSession.HOST+"/items/"+enc(id),"link_verify_item");diag().edit().putInt("linkPublicVerifyCode",hr.code).apply();if(hr.code!=200)return null;
-        String html=hr.body;boolean sold=isSoldHtml(html);JSONObject item=VintedStructuredData.item(html,id);Candidate c=item==null?null:parseCandidate(item);if(c==null||TextUtils.isEmpty(c.sellerId))recordSellerShapeDiagnostic(html,id,item);Matcher sm=LDJSON.matcher(html);
+        String html=hr.body;boolean sold=isSoldHtml(html);JSONObject item=VintedStructuredData.item(html,id);Candidate c=item==null?null:parseCandidate(item);if(c==null||TextUtils.isEmpty(c.sellerId))recordSellerShapeDiagnostic(html,id,item);VintedRequestTrace.record(context,"SELLER_PARSE","item="+id+";structured="+(item!=null)+";candidate="+(c!=null)+";sellerPresent="+(c!=null&&!TextUtils.isEmpty(c.sellerId)));Matcher sm=LDJSON.matcher(html);
         while(c==null&&sm.find()){String raw=sm.group(1).trim();try{Object parsed=new org.json.JSONTokener(raw).nextValue();Candidate x=candidateFromLd(parsed,id);if(x!=null){c=x;break;}}catch(Exception ignored){}}
-        if(c==null&&sold){c=new Candidate();c.id=id;c.title="Articolo Vinted";c.url=VintedPublicSession.HOST+"/items/"+id;c.sold=true;return c;}if(c==null||Double.isNaN(c.price))return null;
-        if(c.catalogId!=null&&!isBoardGameCatalog(c.catalogId)){diag().edit().putInt("linkRejectedCatalogId",c.catalogId).apply();return null;}c.sold=sold;
+        if(c==null&&sold){c=new Candidate();c.id=id;c.title="Articolo Vinted";c.url=VintedPublicSession.HOST+"/items/"+id;c.sold=true;return c;}if(c==null||Double.isNaN(c.price)){VintedRequestTrace.record(context,"VERIFY_RESULT","item="+id+";accepted=false;reason="+(c==null?"NO_CANDIDATE":"NO_PRICE"));return null;}
+        if(c.catalogId!=null&&!isBoardGameCatalog(c.catalogId)){VintedRequestTrace.record(context,"VERIFY_RESULT","item="+id+";accepted=false;reason=CATALOG");diag().edit().putInt("linkRejectedCatalogId",c.catalogId).apply();return null;}c.sold=sold;
         enrichFromPublicHtml(c,html);if(TextUtils.isEmpty(c.publishedLabel))c.publishedLabel=extractPublishedLabelFromHtml(html);
         if(!TextUtils.isEmpty(c.sellerId)){SellerBundleScanner.ExtractedSnapshot snapshot=SellerBundleScanner.extractPageSnapshot(html,c.sellerId,id,32,"item-page");c.snapshotParser=snapshot.summary;c.sellerSnapshot.addAll(snapshot.items);}
+        VintedRequestTrace.record(context,"VERIFY_RESULT","item="+id+";accepted="+(!TextUtils.isEmpty(c.title))+";sellerPresent="+(!TextUtils.isEmpty(c.sellerId)));
         return TextUtils.isEmpty(c.title)?null:c;
     }
 
@@ -312,7 +315,9 @@ public final class VintedLinkResolver {
             StringBuilder hits=new StringBuilder();for(String n:needles){int count=0,from=0;while(count<20&&(from=lower.indexOf(n,from))>=0){count++;from+=Math.max(1,n.length());}if(count>0){if(hits.length()>0)hits.append(',');hits.append(n.replace("\"","")).append(':').append(count);}}
             String keys="";if(parsedItem!=null){java.util.List<String> names=new java.util.ArrayList<>();java.util.Iterator<String> it=parsedItem.keys();while(it.hasNext()&&names.size()<80){String k=it.next();String lk=k.toLowerCase(Locale.ROOT);if(lk.contains("user")||lk.contains("seller")||lk.contains("owner")||lk.contains("member")||lk.contains("profile"))names.add(k);}keys=android.text.TextUtils.join(",",names);}
             VintedStructuredData.Scan scan=VintedStructuredData.scan(raw,null);
-            diag().edit().putString("sellerShapeDiagnostic","item="+safe(itemId)+";http=200;htmlBytes="+raw.length()+";tokens="+hits+";itemKeys="+keys+";structured="+scan.summary()).apply();
+            String shape="item="+safe(itemId)+";http=200;htmlBytes="+raw.length()+";tokens="+hits+";itemKeys="+keys+";structured="+scan.summary();
+            VintedRequestTrace.record(context,"SELLER_SHAPE",shape);
+            diag().edit().putString("sellerShapeDiagnostic",shape).apply();
         }catch(Throwable ignored){}
     }
 
@@ -411,3 +416,4 @@ public final class VintedLinkResolver {
     private android.content.SharedPreferences diag(){return context.getSharedPreferences("va_v3_diag",android.content.Context.MODE_PRIVATE);}
     private static String safe(String s){return s==null?"":s.length()>180?s.substring(0,180):s;}
 }
+

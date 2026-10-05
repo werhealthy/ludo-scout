@@ -94,6 +94,7 @@ public final class VintedPublicSession {
         if(cached!=null&&now-cached.at<PUBLIC_CACHE_MS){
             SharedPreferences d=diag();d.edit().putLong("vintedPublicCacheHits",d.getLong("vintedPublicCacheHits",0)+1).apply();
             recordLedger(parsed,purpose,true,cached.response.code);
+            VintedRequestTrace.record(context,"HTTP_RESULT","purpose="+purpose+";path="+tracePath(parsed)+";cache=true;http="+cached.response.code);
             return cached.response;
         }
 
@@ -106,16 +107,19 @@ public final class VintedPublicSession {
                 try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new java.io.IOException("richiesta interrotta",e);}continue;
             }
             String message="REMOTE_LIMIT".equals(permit.state.reason)?"Vinted ha chiesto di rallentare le richieste":"Ludo Scout distribuisce le richieste Vinted nel tempo";
+            VintedRequestTrace.record(context,"GATE","purpose="+purpose+";path="+tracePath(parsed)+";reason="+permit.state.reason+";until="+permit.state.allowedAt);
             throw new RateLimitedException(message,permit.state.allowedAt,permit.state.reason);
         }
 
+        VintedRequestTrace.record(context,"HTTP_START","purpose="+purpose+";path="+tracePath(parsed));
         Response response;
-        try{response=plainPublicGet(parsed);}catch(Exception e){diag().edit().putString("vintedPublicWaitReason","").apply();throw e;}
+        try{response=plainPublicGet(parsed);}catch(Exception e){VintedRequestTrace.record(context,"HTTP_ERROR","purpose="+purpose+";path="+tracePath(parsed)+";error="+e.getClass().getSimpleName());diag().edit().putString("vintedPublicWaitReason","").apply();throw e;}
         long finished=System.currentTimeMillis();
         recordResponse(response.code,finished);
         SharedPreferences d=diag();
         d.edit().putLong("vintedPublicRequests",d.getLong("vintedPublicRequests",0L)+1L).putInt("vintedPublicLastCode",response.code).apply();
         recordLedger(parsed,purpose,false,response.code);
+        VintedRequestTrace.record(context,"HTTP_RESULT","purpose="+purpose+";path="+tracePath(parsed)+";cache=false;http="+response.code);
 
         if(response.code==403||response.code==429){
             long until=finished+LIMIT_COOLDOWN_MS;setCircuit(until,response.code);mirrorWait(gateState(context));
@@ -132,6 +136,12 @@ public final class VintedPublicSession {
         if(purpose==null||purpose.trim().isEmpty())return "unspecified";
         String p=purpose.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_\\-]","_");
         return p.length()>48?p.substring(0,48):p;
+    }
+
+    private static String tracePath(URL url){
+        String path=url.getPath()==null?"":url.getPath();
+        java.util.regex.Matcher id=java.util.regex.Pattern.compile("^/(items|member)/([0-9]+)").matcher(path);
+        return id.find()?"/"+id.group(1)+"/"+id.group(2):"/"+routeKind(url);
     }
 
     private static String routeKind(URL url){
@@ -324,3 +334,4 @@ public final class VintedPublicSession {
     private static String browserUserAgent(){return "Mozilla/5.0 (Linux; Android "+Build.VERSION.RELEASE+"; "+Build.MODEL+") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36";}
     private static String read(InputStream in)throws Exception{if(in==null)return"";final int maxChars=4_000_000;try(BufferedReader br=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){StringBuilder b=new StringBuilder(Math.min(256_000,maxChars));char[] chunk=new char[8192];int n;while((n=br.read(chunk))!=-1){int room=maxChars-b.length();if(room<=0)break;b.append(chunk,0,Math.min(room,n));if(n>room)break;}return b.toString();}}
 }
+

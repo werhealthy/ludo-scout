@@ -226,6 +226,7 @@ public final class QueueJobRunner {
 
     private static void processVinted(Context context, DealDatabase db, MarketStore market,
                                       AutoLinkResolver resolver, MarketStore.Job job) {
+        VintedRequestTrace.record(context,"JOB_START","listing="+job.listingId+";job="+job.id+";source="+job.source+";sellerBackfill="+MarketStore.SELLER_BACKFILL_SOURCE.equals(job.source));
         MarketListingRecord listing = market.listing(job.listingId);
         if (listing == null || TextUtils.isEmpty(listing.title)) {
             market.failPermanent(job, "listing mancante o senza titolo");
@@ -250,7 +251,7 @@ public final class QueueJobRunner {
             @Override public void onUnresolved(String signature, String reason) { if(accepting.compareAndSet(true,false)){failure.set(reason);latch.countDown();} }
             @Override public void onProgress(String signature,int progress,String stage) { if(accepting.get())market.setJobProgress(job,progress); }
             @Override public void onCandidates(String signature,java.util.List<VintedLinkResolver.CandidateOption> candidates) { if(accepting.get())market.saveVintedCandidates(job.listingId,candidates); }
-        });
+        },"listing="+job.listingId+";job="+job.id+";source="+job.source+";sellerBackfill="+MarketStore.SELLER_BACKFILL_SOURCE.equals(job.source));
 
         try {
             long deadline=System.currentTimeMillis()+145_000L;
@@ -276,6 +277,7 @@ public final class QueueJobRunner {
         if(!market.isLeaseActive(job)){accepting.set(false);return;}
         market.setJobProgress(job, 62); // resolver returned a response, successful or not
         VintedLinkResolver.Result r = resolved.get();
+        VintedRequestTrace.record(context,"JOB_RESULT","listing="+job.listingId+";job="+job.id+";source="+job.source+";sellerBackfill="+MarketStore.SELLER_BACKFILL_SOURCE.equals(job.source)+";resolved="+(r!=null)+";sellerPresent="+(r!=null&&!TextUtils.isEmpty(r.sellerId)));
         if(r==null){VintedLinkResolver.CandidateOption eq=market.equivalentVintedCandidate(job.listingId);if(eq!=null){r=new VintedLinkResolver.Result();r.signature=candidate.signature;r.itemId=eq.id;r.url=!TextUtils.isEmpty(eq.url)?eq.url:"https://www.vinted.it/items/"+eq.id;r.imageUrl=eq.imageUrl;r.sellerId=eq.sellerId;r.sellerName=eq.sellerName;r.matchedTitle=eq.title;r.sold=eq.sold;r.confidence=93;r.needsDeepMetadata=true;r.reason="Auto-match: candidati Vinted equivalenti per titolo e prezzo";android.content.SharedPreferences p=context.getSharedPreferences("va_v3_diag",Context.MODE_PRIVATE);p.edit().putLong("vintedEquivalentAutoMatches",p.getLong("vintedEquivalentAutoMatches",0L)+1L).apply();}}
         if (r != null) {
             market.setJobProgress(job, 78);
@@ -320,6 +322,7 @@ public final class QueueJobRunner {
             market.setJobProgress(job, 96); // optional thumbnail scheduled
             market.clearVintedCandidates(job.listingId);
             market.completeResolvedVintedJob(job, canonical);
+            if(MarketStore.SELLER_BACKFILL_SOURCE.equals(job.source))market.setDiagnosticState("seller_backfill_result",1,"listing="+canonical+";job="+job.id+";state=APPLIED;sellerPresent="+(!TextUtils.isEmpty(r.sellerId)));
             if(MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source))market.setDiagnosticState("catalog_health",1,"build=catalog-health-v1;state=REFRESHED;listing="+canonical+";published="+(!TextUtils.isEmpty(r.publishedLabel))+";seller="+(!TextUtils.isEmpty(r.sellerId)));
             if(MarketStore.OPENED_VERIFY_SOURCE.equals(job.source))market.setDiagnosticState("opened_vinted_verify",1,"state=REFRESHED;listing="+canonical+";sold=false");
             if(canonical>0 && TextUtils.isEmpty(r.publishedLabel) && !MarketStore.CATALOG_HEALTH_SOURCE.equals(job.source)){
@@ -455,3 +458,4 @@ public final class QueueJobRunner {
         return s.length() > 220 ? s.substring(0, 220) : s;
     }
 }
+
