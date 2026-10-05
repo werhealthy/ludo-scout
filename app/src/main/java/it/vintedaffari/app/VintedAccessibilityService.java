@@ -131,7 +131,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private static final String MAINTENANCE_TASK="maintenance:missing-data";
     private final Runnable maintenancePump=new Runnable(){@Override public void run(){if(!manualMetadataRefresh)return;sweepCompletedQueuedTargets();if(TextUtils.isEmpty(manualRefreshTargetSignature))startNextManualRefreshTarget();updateMaintenanceTask();enrichBacklog();resolveBacklog();sweepCompletedQueuedTargets();maybeFinishCurrentManualTarget();if(manualMetadataRefresh)handler.postDelayed(this,1500L);}};
     private final BroadcastReceiver retryReceiver=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){
-        if(i!=null&&BrowserCapturePolicy.READY_ACTION.equals(i.getAction())){continuePersistentAnalysis();return;}
+        if(i!=null&&(BrowserCapturePolicy.READY_ACTION.equals(i.getAction())||AiEngineRunner.RECOVERY_READY.equals(i.getAction()))){continuePersistentAnalysis();return;}
         if(i!=null&&OperationCenter.REFRESH_MISSING.equals(i.getAction())){
             final String requestedSignature=i.getStringExtra("signature");
             final String requestedTask=i.getStringExtra("task_id");
@@ -211,7 +211,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
             int reset=bundleDatabase.resetRetryableDiagnostics();bundleDatabase.resetPipelineCounters();
             pipelinePrefs.edit().putInt("bundlePipelineGeneration",4).putInt("bundlePipelineResetRows",reset).apply();
         }
-        IntentFilter retryFilter=new IntentFilter(OperationCenter.RETRY);retryFilter.addAction(OperationCenter.REFRESH_MISSING);retryFilter.addAction(BrowserCapturePolicy.READY_ACTION);androidx.core.content.ContextCompat.registerReceiver(this,retryReceiver,retryFilter,androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);retryRegistered=true;
+        IntentFilter retryFilter=new IntentFilter(OperationCenter.RETRY);retryFilter.addAction(OperationCenter.REFRESH_MISSING);retryFilter.addAction(BrowserCapturePolicy.READY_ACTION);retryFilter.addAction(AiEngineRunner.RECOVERY_READY);androidx.core.content.ContextCompat.registerReceiver(this,retryReceiver,retryFilter,androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);retryRegistered=true;
         diag().edit()
                 .putBoolean("serviceConnected", true)
                 .putLong("serviceConnectedAt", System.currentTimeMillis())
