@@ -18,7 +18,12 @@ final class AiEnginePolicy {
  static boolean recoveryCandidate(JSONObject row){
   if(row==null)return false;
   if(!"AUTO_FILTERED".equals(row.optString("lifecycle")))return false;
-  if(!"AUTO_EXCLUDED".equals(row.optString("engine_enrichment")))return false;
+  String enrichment=row.optString("engine_enrichment");
+  boolean original="AUTO_EXCLUDED".equals(enrichment);
+  boolean bounced="AUTO_FILTERED".equals(enrichment)
+    && "AUTO_FILTERED_NON_GAME".equals(row.optString("listing_match_state"))
+    && "Nessuna prova positiva di prodotto gioco da tavolo".equals(row.optString("engine_last_error"));
+  if(!original&&!bounced)return false;
   if(!"UNCERTAIN".equals(row.optString("local_type")))return false;
   if(!row.optString("bgg_id").isEmpty())return false;
   if(row.optInt("engine_manual_review",0)!=0||row.optInt("engine_confirmed",0)!=0)return false;
