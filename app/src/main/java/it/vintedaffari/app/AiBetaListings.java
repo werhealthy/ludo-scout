@@ -30,12 +30,13 @@ public final class AiBetaListings {
    String source=card.rawDescription==null?"":card.rawDescription;
    int count=source.codePointCount(0,source.length());
    String excerpt=count>2000?source.substring(0,source.offsetByCodePoints(0,2000)):source;
+   String photosRaw=c.getColumnCount()>11?c.getString(11):"";
    return new JSONObject().put("listing_id",c.getLong(0)).put("title",card.title).put("brand",card.brand)
     .put("source_text",excerpt).put("source_truncated",count>2000)
     .put("local_type",local.type.name()).put("local_reason",local.reason).put("lifecycle",c.getString(6))
     .put("listing_match_state",c.getString(7)).put("bgg_id",c.getString(8)).put("game_title",c.getString(9)).put("game_match_state",c.getString(10))
-    .put("photos",photoUrls(c.getString(11)))
-    .put("input_key",AiBetaProtocol.fingerprint(new JSONArray().put(card.title).put(card.brand).put(card.rawDescription).put(c.getString(11)).toString(),"local","v2"));
+    .put("photos",photoUrls(photosRaw))
+    .put("input_key",AiBetaProtocol.fingerprint(new JSONArray().put(card.title).put(card.brand).put(card.rawDescription).put(photosRaw).toString(),"local","v2"));
  }
  static boolean current(SQLiteDatabase db,JSONArray snapshot)throws Exception {
   if(snapshot.length()<1||snapshot.length()>8)return false;
@@ -67,7 +68,7 @@ public final class AiBetaListings {
  static String category(String type)throws Exception {switch(type){case "BASE_GAME":return "Gioco base";case "EXPANSION":return "Espansione";case "BUNDLE":return "Bundle";case "ACCESSORY":return "Accessorio";case "COMPONENTS":return "Componenti";case "EMPTY_BOX":return "Scatola vuota";case "ACCESSORY_COMPONENT":return "Accessorio o componente";case "NON_GAME":return "Non gioco";case "UNCERTAIN":case "UNKNOWN":return "Da chiarire";default:throw new Exception("invalid category");}}
  static String evidence(JSONObject row)throws Exception {
   String brand=row.getString("brand"),source=row.getString("source_text"),bgg=row.getString("bgg_id");
-  return "Dati del gruppo preparato · solo sul telefono\nCatalogo invariato. BGG e lingua non verificati dall’AI.\n\n"
+  return "Dati del gruppo preparato · AI privata locale-first\nCatalogo invariato. BGG non verificato; la lingua AI resta una proposta.\n\n"
    +row.getString("title")+"\nMarca dichiarata: "+(brand.trim().isEmpty()?"non disponibile":brand)
    +"\n\nTesto acquisito: "+(source.trim().isEmpty()?"non disponibile":source)
    +(row.getBoolean("source_truncated")?"\n[Mostrati i primi 2.000 caratteri del testo acquisito]":"")
