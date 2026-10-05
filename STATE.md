@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — USB bridge status healthy again; awaiting post-recovery runtime audit, 2026-10-05
+
+After owner started the bridge from the repository checkout, a read-only request from this environment to http://127.0.0.1:8765/v1/status succeeded: enabled=true, local_online=true, transport=USB_LOCAL, gemini_available=false, calls_reserved=0 and reserved_micro=0. This verifies the PC-side bridge/Ollama readiness now, not that Android has successfully submitted a classification. No /v1/classify request was sent. The owner had previously confirmed adb reverse UsbFfs tcp:8765 tcp:8765; that mapping was not rechecked in this latest turn.
+
+QueueDrainWorker calls AiEngineRunner.schedule() at each worker invocation and ensures a 15-minute periodic recovery worker. AiEngineRunner schedules a delayed wake for WAIT, but STATUS_UNAVAILABLE itself does not explicitly schedule a one-shot follow-up. The last captured retryAt (1791232335669) has passed, but no diagnostic was captured after the bridge came online; whether a subsequent queue worker ran is unknown. Keep the bridge running and phone connected through the next queue recovery, then acquire a fresh AI runtime audit. No build/install is needed.
+
 ## Backend — latest bridge launch attempt used wrong working directory, 2026-10-05
 
 Owner tried python tools/ai_local_bridge.py from C:\Users\checc. Python correctly reported the script was not found at C:\Users\checc\tools\ai_local_bridge.py. No bridge process was started by this attempt and no phone data or app state was changed. Repository checkout is at D:\Users\defaultuser0\Documents\GitHub\ludo-scout per the owner's earlier PowerShell transcript.
