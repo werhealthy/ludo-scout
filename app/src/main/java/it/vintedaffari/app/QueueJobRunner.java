@@ -89,20 +89,20 @@ public final class QueueJobRunner {
                 else if(searchTimedOut){
                     // A CPU/index timeout is a technical failure, not an ambiguity the user can
                     // meaningfully resolve. Keep it out of review and out of trusted surfaces.
-                    timedOut++;market.autoQuarantineGame(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason);quarantined++;
+                    timedOut++;if(market.autoQuarantineGame(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason))quarantined++;
                 }else {
                     BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.unresolvedTitle(g.name,fuzzyCandidates,sawAmbiguousExact);
                     if(gate.action==BoardGameIntakeGate.Action.REVIEW){
                         reviewDecisions++;int changed=market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);
                         if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;
                     }
-                    else{market.autoQuarantineGame(g.id,gate.reason);quarantined++;}
+                    else{if(market.autoQuarantineGame(g.id,gate.reason))quarantined++;}
                 }
                 handled++;market.touchLaneHeartbeat("bgg");
             }catch(Throwable t){
                 // Infrastructure/parser faults must not become human review work. Preserve the raw
                 // observation, quarantine the provisional identity and surface the fault in diagnostics.
-                market.autoQuarantineGame(g.id,"Errore tecnico match locale: "+safe(t));quarantined++;handled++;
+                if(market.autoQuarantineGame(g.id,"Errore tecnico match locale: "+safe(t)))quarantined++;handled++;
                 market.setDiagnosticState("bgg_match_technical_drop",1,"game="+g.id+";name="+g.name+";error="+safe(t));
             }
         }
@@ -458,4 +458,5 @@ public final class QueueJobRunner {
         return s.length() > 220 ? s.substring(0, 220) : s;
     }
 }
+
 

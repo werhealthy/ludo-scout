@@ -36,8 +36,9 @@ public final class AiBetaListings {
     .put("local_type",local.type.name()).put("local_reason",local.reason).put("lifecycle",c.getString(6))
     .put("listing_match_state",c.getString(7)).put("bgg_id",c.getString(8)).put("game_title",c.getString(9)).put("game_match_state",c.getString(10))
     .put("photos",photoUrls(photosRaw))
-    .put("input_key",AiBetaProtocol.fingerprint(new JSONArray().put(card.title).put(card.brand).put(card.rawDescription).put(photosRaw).toString(),"local","v2"));
+    .put("input_key",inputKey(card,photosRaw));
  }
+ static String inputKey(VintedCard card,String photosRaw){return AiBetaProtocol.fingerprint(new JSONArray().put(card.title).put(card.brand).put(card.rawDescription).put(photosRaw).toString(),"local","v2");}
  static boolean current(SQLiteDatabase db,JSONArray snapshot)throws Exception {
   if(snapshot.length()<1||snapshot.length()>8)return false;
   for(int i=0;i<snapshot.length();i++){

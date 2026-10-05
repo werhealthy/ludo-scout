@@ -88,9 +88,17 @@ public final class BoardGameIntakeGate {
 
     /** Live Accessibility/JS decision after the local catalog matcher has had a chance to identify it. */
     public static Decision afterAnalysis(VintedCard card,ListingClassifier.Result product,GameAnalysis analysis){
+        return afterAnalysis(card,product,analysis,false);
+    }
+
+    /** Visual evidence establishes product type only; a missing BGG candidate is still unresolved identity. */
+    public static Decision afterAnalysis(VintedCard card,ListingClassifier.Result product,GameAnalysis analysis,boolean visualBaseGame){
         String title=card==null?"":card.title;
         String raw=card==null?"":card.rawDescription;
         if(isStrongNonGameText(title,raw))return new Decision(Action.QUARANTINE,"Segnali forti di categoria non gioco da tavolo");
+        if(visualBaseGame&&product!=null&&(product.type==ListingClassifier.Type.BASE_GAME||product.type==ListingClassifier.Type.UNCERTAIN)
+                &&(analysis==null||!"excluded".equals(analysis.status)))
+            return new Decision(Action.ACCEPT,"Prodotto gioco confermato da evidenza AI; identità BGG ancora da verificare");
         if(product==null||!product.hasPositiveBoardGameEvidence())
             return new Decision(Action.QUARANTINE,"Nessuna prova positiva di prodotto gioco da tavolo");
         if(analysis==null)return new Decision(Action.QUARANTINE,"Nessuna evidenza BGG disponibile");
