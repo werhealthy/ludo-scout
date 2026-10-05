@@ -100,7 +100,7 @@ def normalized_answer(answer):
   "product_title":str(answer.get("product_title",""))[:180],
  }
 
-def proposal(payload,classifier=classify):
+def proposal(payload,classifier=classify,ready=ollama_ready):
  request_id,rows=validate(payload)
  content=hashlib.sha256(compact_json(rows).encode("utf-8")).hexdigest()
  now=int(time.time()*1000)
@@ -111,7 +111,7 @@ def proposal(payload,classifier=classify):
    if prior.get("content")!=content:return 409,{"status":"CONFLICT"}
    response=prior.get("response")
    if isinstance(response,dict):return 200,response
- if not ollama_ready():return 503,{"status":"LOCAL_UNAVAILABLE"}
+ if not ready():return 503,{"status":"LOCAL_UNAVAILABLE"}
  started=time.time()
  answers=[normalized_answer(classifier(row)) for row in rows]
  response={
