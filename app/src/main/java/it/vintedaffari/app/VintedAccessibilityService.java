@@ -457,6 +457,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 String exactSig=marketStore.signatureForListing(exactListingId);if(!TextUtils.isEmpty(exactSig))currentProductDeal.signature=exactSig;
             }
             diag().edit().putString("lastOpenedVintedPage","title="+product.title+";sold="+product.sold+";exact="+exactOpened+";listing="+exactListingId+";deal="+(currentProductDeal!=null)).apply();
+            if(exactOpened)diag().edit().putString("lastOpenedProductTree",productTreeDiagnostic(root)).apply();
             handleProductPage(product,currentProductDeal,exactListingId);
             if(product.sold&&(currentProductDeal!=null||exactListingId>0)){
                 reconcileOpenedSold(currentProductDeal,exactListingId,exactOpened,"product-parser");
@@ -1153,6 +1154,27 @@ public final class VintedAccessibilityService extends AccessibilityService {
         diag().edit().putString("lastOpenedVintedReconcile","sold:"+(TextUtils.isEmpty(soldSig)?"listing#"+listingId:soldSig)+";exact="+exactOpened+";listing="+listingId+";source="+source).apply();
         OperationCenter.done(this,"sold:"+(TextUtils.isEmpty(soldSig)?String.valueOf(listingId):soldSig),OperationCenter.LINK,"Articolo venduto · rimosso");
         sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
+    }
+
+    private String productTreeDiagnostic(AccessibilityNodeInfo root){
+        StringBuilder out=new StringBuilder();collectProductTreeDiagnostic(root,out,0);
+        return truncate(out.toString(),6000);
+    }
+    private void collectProductTreeDiagnostic(AccessibilityNodeInfo node,StringBuilder out,int depth){
+        if(node==null||depth>14||out.length()>=6000)return;
+        String id=node.getViewIdResourceName();
+        String text=node.getText()==null?"":node.getText().toString().trim();
+        String desc=node.getContentDescription()==null?"":node.getContentDescription().toString().trim();
+        if(!TextUtils.isEmpty(id)||!TextUtils.isEmpty(text)||!TextUtils.isEmpty(desc)){
+            if(out.length()>0)out.append("\\n");
+            out.append(depth).append("|").append(id==null?"-":truncate(id,120))
+                    .append("|t=").append(truncate(text.replace("\\n"," "),180))
+                    .append("|d=").append(truncate(desc.replace("\\n"," "),180));
+        }
+        for(int i=0;i<node.getChildCount()&&out.length()<6000;i++){
+            AccessibilityNodeInfo child=node.getChild(i);
+            if(child!=null)collectProductTreeDiagnostic(child,out,depth+1);
+        }
     }
 
     private void handleProductPage(ProductPage page,DealRecord exactDeal,long exactListingId) {
