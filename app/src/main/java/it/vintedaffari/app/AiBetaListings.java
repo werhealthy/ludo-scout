@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 /** Bounded snapshot of saved announcements. Never opens a helper, upgrades or writes the catalog. */
 public final class AiBetaListings {
- static final String SELECTION_SQL = "SELECT l.id,COALESCE(l.vinted_title,''),COALESCE(l.brand,''),COALESCE(l.item_condition,''),COALESCE(l.current_price_cents,0),COALESCE(l.observed_text,''),COALESCE(l.lifecycle,''),COALESCE(l.match_state,''),COALESCE(g.bgg_id,''),COALESCE(g.canonical_name,''),COALESCE(g.match_state,''),COALESCE(l.listing_photos_csv,'') FROM market_listings l LEFT JOIN games g ON g.id=l.game_id WHERE l.id>0 AND TRIM(COALESCE(l.vinted_title,''))<>'' ORDER BY l.last_seen DESC,l.id DESC LIMIT 8";
+ static final String SELECTION_SQL = "SELECT l.id,COALESCE(l.vinted_title,''),COALESCE(l.brand,''),COALESCE(l.item_condition,''),COALESCE(l.current_price_cents,0),COALESCE(l.observed_text,''),COALESCE(l.lifecycle,''),COALESCE(l.match_state,''),COALESCE(g.bgg_id,''),COALESCE(g.canonical_name,''),COALESCE(g.match_state,''),COALESCE(NULLIF(l.listing_photos_csv,''),NULLIF(l.image_url,''),'') FROM market_listings l LEFT JOIN games g ON g.id=l.game_id WHERE l.id>0 AND TRIM(COALESCE(l.vinted_title,''))<>'' ORDER BY l.last_seen DESC,l.id DESC LIMIT 8";
  private static final String ONE_SQL=SELECTION_SQL.substring(0,SELECTION_SQL.indexOf(" WHERE "))+ " WHERE l.id=? LIMIT 1";
  private AiBetaListings(){}
  public static JSONArray read(Context context)throws Exception {
