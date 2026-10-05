@@ -24,6 +24,8 @@ OLLAMA=os.environ.get("OLLAMA_URL","http://127.0.0.1:11434").rstrip("/")
 MODEL=os.environ.get("OLLAMA_MODEL","qwen3-vl:8b-instruct-q4_K_M")
 healthy=False
 stop=False
+worked_since_idle=False
+idle_announced=False
 
 SCHEMA={
  "type":"object",
@@ -141,7 +143,7 @@ def heartbeat_loop():
   time.sleep(5)
 
 def main():
- global healthy,stop
+ global healthy,stop,worked_since_idle,idle_announced
  if not valid_endpoint(ENDPOINT) or len(TOKEN)<16:
   raise SystemExit("Set LUDO_AI_ENDPOINT to the Ludo .workers.dev root and LUDO_AI_WORKER_TOKEN")
  socket.setdefaulttimeout(35)
@@ -163,13 +165,22 @@ def main():
    try:
     status,job=post_local("claim",{"model":MODEL},timeout=10)
     if status==204 or job.get("status")=="NO_JOB":
+     if worked_since_idle and not idle_announced:
+      print("Coda Qwen vuota · tutti i job ricevuti finora sono completati.")
+      idle_announced=True
+      worked_since_idle=False
      time.sleep(1);continue
     if job.get("status")!="JOB":
      time.sleep(2);continue
     started=time.time()
-    print("Job",job.get("request_id"),"| records",len(job.get("records",[])))
-    answers=[classify(r) for r in job["records"]]
+    records=job.get("records",[])
+    with_photos=sum(1 for r in records if r.get("photos"))
+    total_photos=sum(min(4,len(r.get("photos",[]))) for r in records)
+    idle_announced=False
+    print("Job",job.get("request_id"),"| records",len(records),"| con foto",with_photos,"| foto",total_photos)
+    answers=[classify(r) for r in records]
     post_local("result",{"job_id":job["job_id"],"worker_model":MODEL,"records":answers},timeout=20)
+    worked_since_idle=True
     print("Done",job.get("request_id"),f"| {time.time()-started:.1f}s")
    except KeyboardInterrupt:
     break
