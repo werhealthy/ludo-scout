@@ -8,13 +8,33 @@ import ast
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 import sqlite3
 import sys
+import time
 
 ROOT=Path(__file__).resolve().parents[1]
 SRC=ROOT/'app/src/main/java/it/vintedaffari/app'
+
+class FixtureDirectory:
+    """Release the short-lived SQLite fixture without making Windows cleanup a test result."""
+    def __enter__(self):
+        self.path = tempfile.mkdtemp()
+        return self.path
+
+    def __exit__(self, exc_type, exc, traceback):
+        deadline = time.monotonic() + 3
+        while True:
+            try:
+                shutil.rmtree(self.path)
+                return False
+            except (PermissionError, NotADirectoryError):
+                if time.monotonic() >= deadline:
+                    shutil.rmtree(self.path, ignore_errors=True)
+                    return False
+                time.sleep(0.1)
 tree=ast.parse((ROOT/'regression/browser_engine_boundary.py').read_text(encoding='utf-8'))
 shared={}
 for node in tree.body:
@@ -122,7 +142,7 @@ public class AiRecoveryPipelineProbe {
 }''',
 })
 
-with tempfile.TemporaryDirectory() as tmp:
+with FixtureDirectory() as tmp:
     base=Path(tmp);server=base/'sqlite_server.py';server.write_text(shared['server'],encoding='utf-8');dbfile=base/'fixture.sqlite'
     db=sqlite3.connect(dbfile)
     # Production table declarations plus columns introduced by existing migrations.
