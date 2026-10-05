@@ -137,7 +137,7 @@ COMPONENT = pezzi, carte, dadi, miniature, token o ricambi separati.
 EMPTY_BOX = scatola vuota.
 NON_GAME = prodotto non tabletop.
 UNKNOWN = prove insufficienti.
-Per edition_language usa soprattutto testo realmente visibile sulla confezione; se non dimostrabile usa UNKNOWN.
+Per edition_language usa soprattutto testo realmente visibile sulla confezione; se non dimostrabile usa UNKNOWN. Distingui esplicitamente NL (olandese: spel, spelregels, het, straat, bankieren) da DE (tedesco: Spiel, Spielregeln, Straße, Bank). Non dedurre la lingua dal paese o dal titolo tradotto da Vinted.
 Non inventare. Evidence massimo 4 frasi brevi."""
  payload={"model":MODEL,"stream":False,"format":SCHEMA,"options":{"temperature":0,"num_predict":240},
           "messages":[{"role":"user","content":prompt,**({"images":images} if images else {})}]}
