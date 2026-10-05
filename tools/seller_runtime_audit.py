@@ -14,7 +14,7 @@ def report(db):
         print('maintenance_job',row)
     for row in db.execute("SELECT id,listing_id,state,attempt,next_attempt_at,last_error,updated_at FROM processing_jobs WHERE source='SELLER_BACKFILL' ORDER BY updated_at DESC,id DESC LIMIT 20"):
         print('seller_job',row)
-    for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('lane:vinted','processor_heartbeat','vinted_paused') OR name LIKE 'lane:vinted%' ORDER BY updated_at"):
+    for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('processor_heartbeat','supervisor_heartbeat','vinted_paused','lane_vinted_status','lane_vinted_heartbeat') OR name LIKE 'lane_vinted_%' ORDER BY updated_at"):
         print('lane',row)
     for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('diag:seller_backfill_schedule','diag:seller_backfill','diag:seller_backfill_result','vinted_paused','diag:t2b_exclusive','vinted_http_window_count','vinted_http_last_code','vinted_http_circuit_until','t2_ledger:last','t2_ledger:physical') OR name LIKE 'diag:vinted_trace:%' ORDER BY updated_at,value"):
         print('diagnostic',row)
