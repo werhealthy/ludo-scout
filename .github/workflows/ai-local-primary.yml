@@ -43,6 +43,12 @@ jobs:
           import assert from 'node:assert/strict';
           assert.match(process.env.LOCAL_WORKER_DIGEST,/^[a-f0-9]{64}$/);
           NODE
+      - name: Install local worker digest while current service remains unchanged
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LOCAL_WORKER_DIGEST: ${{ inputs.local_worker_digest }}
+        run: printf '%s' "$LOCAL_WORKER_DIGEST" | npx wrangler secret put LOCAL_WORKER_DIGEST
       - name: Deploy local-primary router with Gemini fallback closed
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -51,12 +57,6 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           npx wrangler deploy --var ENABLED:true --var FREE_TIER_VALID_UNTIL:0
-      - name: Install local worker digest
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          LOCAL_WORKER_DIGEST: ${{ inputs.local_worker_digest }}
-        run: printf '%s' "$LOCAL_WORKER_DIGEST" | npx wrangler secret put LOCAL_WORKER_DIGEST
       - name: Record scope
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'TEXT'
