@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.193 stale Vinted claim lease recovery merged; phone proof pending, 2026-10-05
+
+Phone evidence on 5.12.192 has a due SELLER_BACKFILL job but the Vinted lane reports CLAIMING then “nessuna attività rivendicabile”, with zero seller trace. Production claim has a global serial guard: any VINTED/VINTED_DEEP PROCESSING row returns null before candidate selection. The foreground watchdog previously released only PROCESSING rows with processing_started_at>0, so a legacy/partial lease with processing_started_at=0 could hold that guard indefinitely while runnableVintedDueCount still reported the pending seller job.
+
+PR292 merged squash 41b9b50569f6a67700abf5cae89cc25c6b7ab2a4. deferStuckVintedProcessing keeps the existing 180s stale threshold and one-request serial ownership, but uses processing_started_at when present and updated_at as fallback when missing. The cutoff is explicitly CAST to INTEGER because Android whereArgs are strings and a COALESCE expression has no numeric column affinity. Seller runtime audit now exposes exact Vinted PROCESSING blockers and lease age without seller values. No schema, filters, 55s pacing, 60/hour budget, 403/429 circuit/backoff or traffic increase changed.
+
+Verification actually executed: exact production watchdog WHERE against SQLite selected only stale missing-start and stale normal leases, preserving both fresh fixtures; audit fixture executed with privacy guard. GitHub Android PR validation run37309229611 and one controlled rerun both failed before any job step (steps=null), so no Gradle/build result exists for this PR. Physical adb install/runtime seller proof has not been executed in this environment. Success remains seller_id >2/154, otherwise require correlated seller HTTP/parser trace or the newly exposed PROCESSING blocker evidence.
+
+Cloudflare: PR290 source is merged with idle claim 30s, processing-only heartbeat 30s and LOCAL_HEARTBEAT_TTL_MS=90s. Production Worker deployment of that TTL is still unverified: PR CI only dry-runs and the deploy workflows are manual, so do not treat the broker-traffic issue as closed.
+
+Frontend7/backend6 groups remain open. Single next backend step: build merged beta with a versionCode above 1002021, install only with adb install -r, leave Motore idle, then run tools/seller_runtime_audit.py and accept only seller_id >2/154 or an unambiguous new trace/blocker.
+
 ## Backend — 5.12.192 seller browser-provenance gate removed; phone verification pending, 2026-10-05
 
 Phone runtime evidence on 5.12.191 proved seller backfill was not scheduling: `reason=NO_CANDIDATE;BROWSER_OWNED=152;HAS_SELLER=2`, while the independent HTTP ledger entry was `bundle_snapshot_item|item|200|physical`. `browser_listing:<id>` is written by browser capture with `text_value=browser-public-capture-v1`, so it records acquisition provenance, not seller identity. It must not suppress an exact known-item seller lookup.
