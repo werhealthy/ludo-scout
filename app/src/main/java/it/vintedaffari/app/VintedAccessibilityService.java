@@ -80,6 +80,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     private final LinkedHashSet<String> accessibilityIdentityProbeSeen = new LinkedHashSet<>();
     private String lastBundleExploreIntent="";
     private long lastDescriptionExpandAt=0L;
+    private long lastDescriptionScrollAt=0L;
     private int bundleExploreHintsThisIntent=0;
 
     private JsGameEngine engine;
@@ -460,9 +461,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
             diag().edit().putString("lastOpenedVintedPage","title="+product.title+";sold="+product.sold+";exact="+exactOpened+";listing="+exactListingId+";deal="+(currentProductDeal!=null)).apply();
             if(exactOpened){
                 diag().edit().putString("lastOpenedProductTree",productTreeDiagnostic(root)).apply();
-                if(TextUtils.isEmpty(product.detailsText)&&maybeExpandProductDescription(root)){
-                    diag().edit().putLong("lastDescriptionExpandAt",System.currentTimeMillis()).apply();
-                    scheduleScan(180L);
+                if(TextUtils.isEmpty(product.detailsText)){
+                    boolean changed=maybeExpandProductDescription(root);
+                    if(changed)diag().edit().putLong("lastDescriptionExpandAt",System.currentTimeMillis()).apply();
+                    else changed=maybeScrollProductDescriptionIntoView(root);
+                    if(changed)scheduleScan(220L);
                 }
             }
             handleProductPage(product,currentProductDeal,exactListingId);
@@ -1161,6 +1164,26 @@ public final class VintedAccessibilityService extends AccessibilityService {
         diag().edit().putString("lastOpenedVintedReconcile","sold:"+(TextUtils.isEmpty(soldSig)?"listing#"+listingId:soldSig)+";exact="+exactOpened+";listing="+listingId+";source="+source).apply();
         OperationCenter.done(this,"sold:"+(TextUtils.isEmpty(soldSig)?String.valueOf(listingId):soldSig),OperationCenter.LINK,"Articolo venduto · rimosso");
         sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
+    }
+
+    private boolean maybeScrollProductDescriptionIntoView(AccessibilityNodeInfo root){
+        long now=System.currentTimeMillis();if(root==null||now-lastDescriptionScrollAt<4_000L)return false;
+        AccessibilityNodeInfo description=findNodeByViewId(root,"item_description_content");
+        if(description==null)return false;
+        AccessibilityNodeInfo scrollable=description;
+        while(scrollable!=null&&!scrollable.isScrollable())scrollable=scrollable.getParent();
+        if(scrollable==null)return false;
+        lastDescriptionScrollAt=now;
+        boolean scrolled=false;
+        try{scrolled=scrollable.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);}catch(Throwable ignored){}
+        diag().edit().putBoolean("lastDescriptionScrollForward",scrolled).putLong("lastDescriptionScrollAt",now).apply();
+        return scrolled;
+    }
+    private AccessibilityNodeInfo findNodeByViewId(AccessibilityNodeInfo node,String suffix){
+        if(node==null)return null;
+        String id=node.getViewIdResourceName();if(id!=null&&id.endsWith(suffix))return node;
+        for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo child=node.getChild(i);AccessibilityNodeInfo found=findNodeByViewId(child,suffix);if(found!=null)return found;}
+        return null;
     }
 
     private boolean maybeExpandProductDescription(AccessibilityNodeInfo root){
