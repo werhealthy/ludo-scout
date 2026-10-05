@@ -5,6 +5,7 @@ import sqlite3
 policy=Path("app/src/main/java/it/vintedaffari/app/AiEnginePolicy.java").read_text(encoding="utf-8")
 listings=Path("app/src/main/java/it/vintedaffari/app/AiEngineListings.java").read_text(encoding="utf-8")
 runner=Path("app/src/main/java/it/vintedaffari/app/AiEngineRunner.java").read_text(encoding="utf-8")
+backoff=Path("app/src/main/java/it/vintedaffari/app/AiEngineBackoff.java").read_text(encoding="utf-8")
 radar=Path("app/src/main/java/it/vintedaffari/app/VintedAccessibilityService.java").read_text(encoding="utf-8")
 gradle=Path("app/build.gradle").read_text(encoding="utf-8")
 
@@ -22,7 +23,8 @@ checks={
  "existing observation reused":'ORDER BY observed_at DESC,id DESC LIMIT 1' in recover_block and 'observation.put("analysis_status","pending")' in recover_block,
  "recovery does not write BGG or deal trust":'db.update("games"' not in recover_block and 'db.update("deals"' not in recover_block,
  "local classifier wake is explicit":"AI_RECOVERY_READY" in runner and "AiEngineRunner.RECOVERY_READY" in radar and "continuePersistentAnalysis()" in radar,
- "version":"5.12.201-ai-category-state" in gradle,
+ "WAIT follows persisted retry deadline":"AiEngineBackoff.nextAttemptAt(result.state,completedAt,persistedNextAt,result.more,AiEnginePolicy.BACKOFF)" in runner and '"WAIT".equals(result.state)' in runner and "QueueWorkScheduler.scheduleAfter(app,Math.max(10000L,retryAt-System.currentTimeMillis()))" in runner,
+ "version":"5.12.202-ai-wait-deadline" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)
@@ -67,4 +69,3 @@ assert db.execute("SELECT lifecycle,enrichment_state,game_id FROM market_listing
 assert db.execute("SELECT observed_at,analysis_status,verification_state FROM observations WHERE id=1").fetchone()==(old_at,"pending","PENDING_ANALYSIS")
 assert db.execute("SELECT lifecycle,verification_state FROM deals WHERE signature='sig1'").fetchone()==("USER_HIDDEN","AUTO_EXCLUDED")
 print("PASS recovery state machine preserves history and leaves deal/BGG trust closed")
-

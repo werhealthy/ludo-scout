@@ -58,15 +58,19 @@ final class AiEngineRunner {
       AiEngineSession.Result result=AiEngineSession.run(config,store,source,transport,System.currentTimeMillis());
       int recovered=listings.recoveredCount();
       more=result.more;
-      nextAttempt=System.currentTimeMillis()+(result.more?10000:AiEnginePolicy.BACKOFF);
       JSONObject progress=privateJournal.load();
+      long completedAt=System.currentTimeMillis();
+      long persistedNextAt=progress.optLong("next_at");
+      long retryAt=AiEngineBackoff.nextAttemptAt(result.state,completedAt,persistedNextAt,result.more,AiEnginePolicy.BACKOFF);
+      nextAttempt=retryAt;
       android.content.ContentValues diagnostic=new android.content.ContentValues();
       diagnostic.put("name","diag:ai_engine");diagnostic.put("value",result.checked);diagnostic.put("updated_at",System.currentTimeMillis());
-      diagnostic.put("text_value","build=ai-engine-v2;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more);
+      diagnostic.put("text_value","build=ai-engine-v3;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more+";retryAt="+retryAt);
       db.insertWithOnConflict("queue_controls",null,diagnostic,SQLiteDatabase.CONFLICT_REPLACE);
       if(result.held>0||recovered>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
       if(recovered>0)app.sendBroadcast(new android.content.Intent(RECOVERY_READY).setPackage(app.getPackageName()));
       if(result.more)QueueWorkScheduler.scheduleAfter(app,10000);
+      else if("WAIT".equals(result.state))QueueWorkScheduler.scheduleAfter(app,Math.max(10000L,retryAt-System.currentTimeMillis()));
      }
     }
    }catch(Exception unavailable){

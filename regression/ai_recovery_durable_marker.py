@@ -18,7 +18,7 @@ checks={
  "matched collision gate accepts recovered product":"identità BGG valutata dal matcher locale" in radar,
  "strong non-game still blocks":"isStrongNonGameText(card.title,card.rawDescription)" in radar,
  "AI never writes BGG identity":'put("bgg_id"' not in listings and 'db.update("games"' not in listings,
- "version":"5.12.201-ai-category-state" in gradle,
+ "version":"5.12.202-ai-wait-deadline" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)

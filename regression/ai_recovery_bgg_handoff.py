@@ -18,7 +18,7 @@ checks={
  "recovered uncertain bypasses only product gate": "aiRecoveredProduct" in persist and "ListingClassifier.Type.UNCERTAIN" in persist,
  "BGG analysis still runs normally": "marketStore.applyAnalysis(card,ga,analyzedListing,t)" in persist,
  "AI does not set BGG identity": 'put("bgg_id"' not in listings and 'db.update("games"' not in listings,
- "version":"5.12.201-ai-category-state" in gradle,
+ "version":"5.12.202-ai-wait-deadline" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)

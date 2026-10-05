@@ -20,7 +20,7 @@ checks={
  "engine uses endpoint-aware auth": 'AiBetaProtocol.validToken(config.optString("endpoint"),config.optString("token"))' in engine,
  "main manifest stays cleartext-default": 'usesCleartextTraffic' not in main_manifest,
  "debug manifest owns cleartext": 'android:usesCleartextTraffic="true"' in debug_manifest,
- "version": "5.12.201-ai-category-state" in gradle,
+ "version": "5.12.202-ai-wait-deadline" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS" if ok else "FAIL"),name)
