@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Local evidence only. No HTTP. Stops/reopens app to copy a consistent DB+WAL."""
-import argparse, sqlite3, subprocess, tempfile
+import argparse, sqlite3, subprocess, tempfile, time
 from contextlib import closing
 from pathlib import Path
 from catalog_phase1_audit import adb_path, dump, PKG, DB
@@ -10,6 +10,14 @@ def report(db):
     print(f'ACTIVE={total};seller_id={ids or 0}/{total};seller_coverage={names or 0}/{total}')
     pairs=db.execute("SELECT COALESCE(SUM(n*(n-1)/2),0) FROM (SELECT COUNT(*) n FROM market_listings WHERE lifecycle='ACTIVE' AND COALESCE(seller_id,'')<>'' GROUP BY seller_id)").fetchone()[0]
     print(f'same_seller_pairs={pairs}')
+    now_ms=int(time.time()*1000)
+    blockers=0
+    for row in db.execute("SELECT id,listing_id,job_type,source,attempt,COALESCE(processing_started_at,0),updated_at,next_attempt_at,last_error FROM processing_jobs WHERE job_type IN ('VINTED_LINK','VINTED_DEEP_ENRICHMENT') AND state='PROCESSING' ORDER BY COALESCE(NULLIF(processing_started_at,0),updated_at),id"):
+        blockers+=1
+        lease_at=row[5] if row[5]>0 else row[6]
+        age=max(0,now_ms-lease_at) if lease_at else -1
+        print('vinted_processing',row,'lease_age_ms=',age)
+    print('vinted_processing_guard_blockers=',blockers)
     for row in db.execute("SELECT source,state,COUNT(*),MIN(next_attempt_at) FROM processing_jobs WHERE source IN ('SELLER_BACKFILL','CATALOG_HEALTH','CATALOG_RECOVERY') GROUP BY source,state"):
         print('maintenance_job',row)
     for row in db.execute("SELECT id,listing_id,state,attempt,next_attempt_at,last_error,updated_at FROM processing_jobs WHERE source='SELLER_BACKFILL' ORDER BY updated_at DESC,id DESC LIMIT 20"):

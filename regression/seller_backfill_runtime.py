@@ -53,11 +53,20 @@ health=source.split('long cutoff=',1)[1].split('if(listingId!=null)',1)[0]
 assert "browser_listing:'||l.id" in health
 print('PASS browser-owned ACTIVE listing is eligible only for seller backfill')
 
+# The serial claim guard must not be held forever by legacy PROCESSING rows that lack
+# processing_started_at. Execute the exact production watchdog WHERE clause.
+watchdog_where=re.search(r'deferStuckVintedProcessing.*?update\("processing_jobs",v,"([^\"]+)"',source,re.S).group(1)
+w=sqlite3.connect(':memory:')
+w.executescript("CREATE TABLE processing_jobs(id,job_type,state,processing_started_at,updated_at); INSERT INTO processing_jobs VALUES(1,'VINTED_DEEP_ENRICHMENT','PROCESSING',0,100),(2,'VINTED_DEEP_ENRICHMENT','PROCESSING',0,900),(3,'VINTED_LINK','PROCESSING',100,900),(4,'VINTED_LINK','PROCESSING',900,100);")
+rows=w.execute('SELECT id FROM processing_jobs WHERE '+watchdog_where,('VINTED_LINK','VINTED_DEEP_ENRICHMENT','PROCESSING','500')).fetchall()
+assert rows==[(1,),(3,)], rows
+print('PASS stale Vinted watchdog recovers missing-start leases without touching fresh work')
+
 import sys,io,contextlib
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from seller_runtime_audit import report
 z=sqlite3.connect(':memory:')
-z.executescript("CREATE TABLE market_listings(lifecycle,seller_id,seller_name); INSERT INTO market_listings VALUES('ACTIVE','10','PRIVATE_USER'),('ACTIVE','10','PRIVATE_USER'),('ACTIVE','',''); CREATE TABLE processing_jobs(source,state,next_attempt_at); CREATE TABLE queue_controls(name,value,updated_at,text_value);")
+z.executescript("CREATE TABLE market_listings(id,lifecycle,seller_id,seller_name,legacy_signature,temp_fingerprint); INSERT INTO market_listings VALUES(1,'ACTIVE','10','PRIVATE_USER','a','a'),(2,'ACTIVE','10','PRIVATE_USER','b','b'),(3,'ACTIVE','','','c','c'); CREATE TABLE processing_jobs(id,listing_id,job_type,source,state,attempt,next_attempt_at,last_error,updated_at,processing_started_at); CREATE TABLE queue_controls(name,value,updated_at,text_value);")
 output=io.StringIO()
 with contextlib.redirect_stdout(output): report(z)
 assert 'seller_coverage=2/3' in output.getvalue() and 'same_seller_pairs=1' in output.getvalue() and 'PRIVATE_USER' not in output.getvalue()
