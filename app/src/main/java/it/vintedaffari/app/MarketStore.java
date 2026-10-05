@@ -150,6 +150,8 @@ public final class MarketStore {
     public static final String HISTORICAL_SOURCE = "LEGACY_V9";
     public static final String CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH";
     public static final String CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY";
+    public static final String SELLER_BACKFILL_SOURCE = "SELLER_BACKFILL";
+    private static final String SELLER_BACKFILL_MARKER_PREFIX = "seller_backfill_once:";
     public static final String MANUAL_RECOVERY_SOURCE = "MANUAL_RECOVERY";
     public static final String OPENED_VERIFY_SOURCE = "OPENED_VERIFY";
     private static final long CATALOG_HEALTH_MAX_AGE_MS=24L*60L*60_000L;
@@ -2062,6 +2064,28 @@ public final class MarketStore {
         // live Motore run, and it materialises at most one Vinted request at a time.
         if(helper.activeObservationSession()!=null)return 0;SQLiteDatabase db=helper.getWritableDatabase();
         try(Cursor active=db.rawQuery("SELECT 1 FROM processing_jobs WHERE source IN (?,?) AND state IN (?,?,?) LIMIT 1",new String[]{CATALOG_HEALTH_SOURCE,CATALOG_RECOVERY_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE})){if(active.moveToFirst())return 0;}
+        // Phase 1 seller backfill: one exact already-known item at a time, only while Motore is idle.
+        // This reuses the existing public-page lane and its 55 s / hourly circuit; it does not raise
+        // request frequency. Each listing is attempted once automatically so a missing seller cannot
+        // create an endless background loop. Seller identity unlocks deterministic same-seller bundles.
+        Long sellerBackfill=scalarLong(db,
+                "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' "+
+                "AND (l.seller_id IS NULL OR l.seller_id='') "+
+                "AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>'' "+
+                "AND g.database_visible=1 AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED' AND g.rating>=? "+
+                "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name=?||l.id) "+
+                "AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='browser_listing:'||l.id AND q.value=1) "+
+                "AND NOT EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=l.id AND j.state IN (?,?,?)) "+
+                "ORDER BY l.last_seen DESC,l.id DESC LIMIT 1",
+                new String[]{String.valueOf(DealPolicy.MIN_BGG_RATING),SELLER_BACKFILL_MARKER_PREFIX,PENDING,PROCESSING,FAILED_RETRYABLE});
+        if(sellerBackfill!=null){
+            enqueueListingJob(db,sellerBackfill,JOB_VINTED_DEEP,now,6,SELLER_BACKFILL_SOURCE);
+            ContentValues marker=new ContentValues();marker.put("name",SELLER_BACKFILL_MARKER_PREFIX+sellerBackfill);marker.put("value",1);marker.put("updated_at",now);marker.put("text_value","state=QUEUED;source="+SELLER_BACKFILL_SOURCE);
+            db.insertWithOnConflict("queue_controls",null,marker,SQLiteDatabase.CONFLICT_REPLACE);
+            setDiagnosticState("seller_backfill",1,"state=QUEUED;listing="+sellerBackfill+";serial=true;rate=existing-public-lane");
+            QueueKeepAliveService.ensureRunning(context);QueueWorkScheduler.schedule(context);return 1;
+        }
+
         long cutoff=now-CATALOG_HEALTH_MAX_AGE_MS;
         Long listingId=scalarLong(db,
                 "SELECT l.id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE l.lifecycle='ACTIVE' "+
