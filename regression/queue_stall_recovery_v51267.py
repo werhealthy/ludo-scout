@@ -46,7 +46,7 @@ checks=[
      "marketDiag.processingLeaseSummary(queueNow)" in diagnostics),
     ("Vinted stale recovery falls back to updated_at when a legacy lease has no start timestamp",
      "public int deferStuckVintedProcessing(long maxAgeMs,long retryDelayMs)" in market and
-     "COALESCE(NULLIF(processing_started_at,0),updated_at)<?" in market and
+     "COALESCE(NULLIF(processing_started_at,0),updated_at)<CAST(? AS INTEGER)" in market and
      "new String[]{JOB_VINTED,JOB_VINTED_DEEP,PROCESSING,String.valueOf(cutoff)}" in market),
     ("foreground watchdog applies a bounded stale-work lease to BGG",
      "market.deferStuckBggProcessing(180_000L,10*60_000L)" in service),
