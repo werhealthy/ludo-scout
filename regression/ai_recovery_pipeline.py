@@ -24,6 +24,10 @@ for node in tree.body:
                 shared[target.id]=ast.literal_eval(node.value)
 stubs=shared['stubs']
 stubs['android/database/sqlite/SQLiteDatabase.java']=stubs['android/database/sqlite/SQLiteDatabase.java'].replace('new ProcessBuilder("python3",', 'new ProcessBuilder('+json.dumps(sys.executable)+',')
+stubs['android/database/sqlite/SQLiteDatabase.java']=stubs['android/database/sqlite/SQLiteDatabase.java'].replace(
+    'public void close(){process.destroy();}',
+    'public void close(){out.close();try{process.waitFor();}catch(InterruptedException e){Thread.currentThread().interrupt();process.destroyForcibly();}if(process.isAlive()){process.destroyForcibly();try{process.waitFor();}catch(InterruptedException e){Thread.currentThread().interrupt();}}}',
+)
 
 def method(file,signature):
     text=(SRC/file).read_text(encoding='utf-8');start=text.index(signature);pos=text.index('{',start);depth=1;end=pos+1
