@@ -1,5 +1,18 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.198 conservative AI filtered recovery merged; phone proof pending, 2026-10-05
+
+Direct USB Qwen is now proven end-to-end on the owner PC/phone: local regressions and Gradle build passed, adb install -r succeeded, adb reverse exposed tcp:8765, and the bridge completed a real 8-listing request. The forced reanalysis path in 5.12.197 then produced fresh proposals for the same eight real listings. All eight were locally UNCERTAIN/AUTO_FILTERED and Qwen proposed BASE_GAME with grounded product evidence; Dutch packaging for Monopoly Extreem Bankieren, Dobble Harry Potter and Wie is het? was correctly proposed as NL after the prompt correction. This established the next bottleneck: strong positive visual product evidence could not recover an automatic false-negative filter.
+
+Owner explicitly approved conservative AI recovery. PR304 merged squash b00bfc05486491bc2da37f6b880986f15e7b73b2. Automatic AI can now reopen only rows that are AUTO_FILTERED + AUTO_EXCLUDED, locally UNCERTAIN, have at least one stored Vinted photo and an existing observation, have no saved BGG id, no manual review/confirmation/override and no explicit incompatible Vinted category. The proposal must be BASE_GAME, contain a non-empty product title and at least two grounded evidence fragments. Other filtered states, explicit non-games, existing BGG identities and human decisions remain closed.
+
+Recovery does not publish or certify the item. It changes only the canonical listing back to ACTIVE/PENDING_ANALYSIS, clears any provisional game link/confidence, reopens the existing observation without changing observed_at, and wakes the existing local classifier/BGG pipeline. The legacy deal remains USER_HIDDEN/AUTO_EXCLUDED until normal verification materializes a valid result. No games/deals trust, BGG id, pricing or language is written by the recovery action. No database schema, Vinted request, 55s pacing, 60/hour budget, 403/429 circuit/backoff or serial network ownership changed. Shared VintedAccessibilityService change is limited to an internal recovery-ready broadcast.
+
+Verification actually executed for PR304: 13 source-policy guards passed against the branch; executable SQLite state-machine checks passed for candidate selection, override protection, human confirmation protection, existing-BGG protection, ACTIVE/PENDING_ANALYSIS reopening, observation timestamp preservation and closed deal trust. Hosted GitHub Actions remain unavailable/unreliable, so no hosted Gradle result or physical-phone recovery proof exists yet for 5.12.198.
+
+Frontend7/backend6 groups remain open. Single next backend step: pull beta, build 5.12.198 with versionCode above1002026, install only with adb install -r, restore adb reverse/USB bridge, let the automatic AI pass process the filtered candidates, then verify aiEngine recovered count and that the same comparison shows recovered rows leaving filtered state before evaluating BGG outcomes.
+
+
 ## Backend — 5.12.195 direct Qwen USB transport merged; local build/phone proof pending, 2026-10-05
 
 Owner reports hosted GitHub Actions quota exhausted and Cloudflare broker unavailable. The live broker diagnostic returned STORAGE_OR_CONFIG_BLOCKED, not a proven Cloudflare daily request cap. Cloudflare/GitHub-hosted execution is therefore no longer the operational dependency for the owner beta AI path.
