@@ -1527,6 +1527,9 @@ public final class MarketStore {
             put(v, "seller_name", emptyToNull(r.sellerName));
             put(v, "listing_photos_csv", emptyToNull(r.photosCsv));
             put(v, "published_label", emptyToNull(r.publishedLabel));
+            // Reuse rich text already returned by the exact public item page. This does not add a
+            // Vinted request; it prevents description evidence from being discarded after parsing.
+            if(!TextUtils.isEmpty(r.detailsText))v.put("observed_text",safe(r.detailsText.trim()));
             v.put("enriched_at", System.currentTimeMillis());
             v.put("last_error", "");
             v.put("manual_review_required",0);v.putNull("manual_review_reason");
