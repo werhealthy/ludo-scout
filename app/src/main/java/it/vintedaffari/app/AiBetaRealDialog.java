@@ -21,7 +21,7 @@ public final class AiBetaRealDialog {
  private final Activity activity;
  private final AiBetaSettings settings;
  private final TextView status;
- private final Button prepare, analyze, review, inspect, copy;
+ private final Button prepare, analyze, reanalyze, review, inspect, copy;
  private final AlertDialog dialog;
  private AiBetaRealListings.Snapshot snapshot;
  private boolean enabled, validProposal;
@@ -33,12 +33,13 @@ public final class AiBetaRealDialog {
   prepare=new Button(a);prepare.setText("Prepara fino a 8 annunci reali");box.addView(prepare);
   inspect=new Button(a);inspect.setText("Esamina dati locali");inspect.setEnabled(false);box.addView(inspect);
   analyze=new Button(a);analyze.setText("Chiedi proposte AI");analyze.setEnabled(false);box.addView(analyze);
+  reanalyze=new Button(a);reanalyze.setText("Rianalizza con Qwen");reanalyze.setEnabled(false);box.addView(reanalyze);
   review=new Button(a);review.setText("Segna confronto come revisionato");review.setEnabled(false);box.addView(review);
   copy=new Button(a);copy.setText("Copia testo");copy.setEnabled(false);box.addView(copy);
   status=new TextView(a);status.setTextColor(Color.rgb(225,223,236));status.setTextSize(15);status.setPadding(0,pad,0,pad);status.setTextIsSelectable(true);status.setText("Caricamento…");box.addView(status);
   ScrollView scroll=new ScrollView(a);scroll.addView(box);
   dialog=new AlertDialog.Builder(a).setTitle("Annunci reali · confronto AI").setView(scroll).setNegativeButton("Chiudi",null).create();dialog.show();
-  prepare.setOnClickListener(v->prepare());inspect.setOnClickListener(v->inspect());analyze.setOnClickListener(v->analyze());review.setOnClickListener(v->review());copy.setOnClickListener(v->copyText());
+  prepare.setOnClickListener(v->prepare());inspect.setOnClickListener(v->inspect());analyze.setOnClickListener(v->analyze(false));reanalyze.setOnClickListener(v->analyze(true));review.setOnClickListener(v->review());copy.setOnClickListener(v->copyText());
   prepare.setEnabled(false);
   AiBetaTestDialog.IO.execute(()->{
    try {
@@ -55,7 +56,7 @@ public final class AiBetaRealDialog {
  public static AlertDialog show(Activity a){return new AiBetaRealDialog(a).dialog;}
  private boolean visible(){return !activity.isFinishing()&&!activity.isDestroyed()&&dialog.isShowing();}
  private void update(AiBetaRealListings.Snapshot next,String message,boolean proposed) {
-  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(message);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);inspect.setEnabled(idle&&next!=null&&next.rows.length()>0);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);review.setEnabled(idle&&proposed);copy.setEnabled(message!=null&&!message.trim().isEmpty());});
+  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(message);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);inspect.setEnabled(idle&&next!=null&&next.rows.length()>0);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);reanalyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0&&proposed);review.setEnabled(idle&&proposed);copy.setEnabled(message!=null&&!message.trim().isEmpty());});
  }
  private void copyText() {
   CharSequence value=status.getText();if(value==null||value.length()==0)return;
@@ -66,7 +67,7 @@ public final class AiBetaRealDialog {
  }
  private boolean begin(String message) {
   if(!AiBetaTestDialog.BUSY.compareAndSet(false,true))return false;
-  prepare.setEnabled(false);inspect.setEnabled(false);analyze.setEnabled(false);review.setEnabled(false);status.setText(message);return true;
+  prepare.setEnabled(false);inspect.setEnabled(false);analyze.setEnabled(false);reanalyze.setEnabled(false);review.setEnabled(false);status.setText(message);return true;
  }
  private void inspect() {
   final AiBetaRealListings.Snapshot chosen=snapshot;
@@ -102,7 +103,7 @@ public final class AiBetaRealDialog {
    if(error!=null)update(null,error,false);else try{show(next,saved);}catch(Exception e){update(next,"Proposta salvata non valida. Nessuna modifica al catalogo.",false);}
   });
  }
- private void analyze() {
+ private void analyze(boolean force) {
   final AiBetaRealListings.Snapshot chosen=snapshot;
   if(chosen==null||!begin("Analisi manuale degli annunci preparati…"))return;
   AiBetaTestDialog.IO.execute(()->{
@@ -111,10 +112,12 @@ public final class AiBetaRealDialog {
     saved=settings.load();enabled=saved.optBoolean("enabled",false);
     if(!enabled)message="Prova AI disattivata. Nessuna analisi avviata.";
     else if(!AiBetaRealListings.current(activity,chosen))message="Gli annunci sono cambiati. Prepara nuovamente il confronto; nessuna richiesta inviata.";
-    else if(cached(saved,chosen)!=null) { /* Reuse valid proposals without transport. */ }
+    else if(!force&&cached(saved,chosen)!=null) { /* Reuse valid proposals without transport. */ }
     else {
-     String id=AiBetaProtocol.requestId(chosen.key,saved.optString("real_pending_key"),saved.optString("real_pending_id"));
-     saved.put("real_pending_key",chosen.key).put("real_pending_id",id);settings.save(saved);
+     if(force){saved.remove("real_response");saved.remove("real_display_key");saved.remove("real_display_at");saved.remove("real_review_key");saved.remove("real_pending_key");saved.remove("real_pending_id");settings.save(saved);}
+     String requestKey=force?chosen.key+"|rerun|"+System.currentTimeMillis():chosen.key;
+     String id=AiBetaProtocol.requestId(requestKey,saved.optString("real_pending_key"),saved.optString("real_pending_id"));
+     saved.put("real_pending_key",requestKey).put("real_pending_id",id);settings.save(saved);
      JSONObject response=AiBetaClient.submit(saved.optString("endpoint"),saved.optString("token"),id,chosen.rows);
      if("PROPOSAL".equals(response.optString("status"))) {
       comparison(response,chosen,false);
