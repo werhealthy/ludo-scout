@@ -33,7 +33,7 @@ public final class ProductPageParser {
             else if(id.endsWith("total_price") && !desc.isEmpty()) p.protectedPrice=firstPrice(desc);
             // Capture only semantically product-specific text. Do not concatenate the whole screen:
             // recommendation/seller carousels can contain unrelated products and would poison language/type.
-            if((lid.contains("description")||lid.contains("details")||lid.contains("category")||lid.contains("catalog")||lid.contains("language")) && (!text.isEmpty()||!desc.isEmpty())){
+            if(isProductDetailField(lid) && (!text.isEmpty()||!desc.isEmpty())){
                 String hint=(text+" "+desc).trim();
                 if(!hint.isEmpty()&&!p.detailsText.contains(hint)){
                     if(!p.detailsText.isEmpty())p.detailsText += " · ";
@@ -88,6 +88,15 @@ public final class ProductPageParser {
                 ||lower.contains("non è disponibile")
                 ||lower.contains("articolo non disponibile")
                 ||lower.contains("item unavailable");
+    }
+
+    static boolean isProductDetailField(String lid){
+        if(lid==null||lid.isEmpty())return false;
+        // Vinted's Compose accessibility IDs vary by app release/localisation. Keep this bounded
+        // to item-page semantic fields so seller/recommendation rails cannot poison description.
+        return lid.contains("description")||lid.contains("details")||lid.contains("category")||lid.contains("catalog")||lid.contains("language")
+                ||lid.contains("item_description")||lid.contains("item_details")||lid.contains("item_attributes")
+                ||lid.contains("item_info")||lid.contains("item_information")||lid.contains("item_about");
     }
 
     private static void parseSummary(String s, ProductPage p){
