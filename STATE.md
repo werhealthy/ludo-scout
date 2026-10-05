@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — post-wake submit returned FAILED; underlying exception unknown, 2026-10-05
+
+Owner's newest audit was captured at 1791233542975 (22:52:22 Europe/Rome). The three expected rows remain AUTO_FILTERED/AUTO_FILTERED_NON_GAME, no AI category evidence, no BGG IDs; cohort_pass=false. diag:ai_engine updated at 1791233309258 (22:48:29) to PENDING_FAILED, checked=0, held=0, recovered=0, failedBatches=0, more=false, retryAt=1791234209257 (23:03:29). This is a new attempt after the prior WAIT deadline.
+
+Code interpretation: Session.run got past WAIT and status (a status exception would report STATUS_UNAVAILABLE), then received a non-PROPOSAL response whose status is FAILED. Because failedBatches remains zero, it did not match the terminal failure envelope (which requires request_id/model/contract and increments failedBatches); this is consistent with a bare FAILED response. The local USB bridge catches any uncaught POST/classifier exception and returns HTTP 502 {status:FAILED}, so that path is plausible. It is not proven that the app used this bridge for this POST, nor is the underlying exception known. The PC /v1/status endpoint is currently healthy; status readiness does not test inference.
+
+Do not infer AI evidence or BGG progress: none was recorded. Before the next retryAt, capture whether the bridge terminal printed a successful Done request line and run ollama ps; these are read-only. The bridge handler suppresses exception detail, so absence of Done only narrows but does not identify the exception. Do not rebuild/install or change request policies. PR remains draft pending successful real cohort progression.
+
 ## Backend — wait deadline passed recently, no post-deadline diagnostic yet, 2026-10-05
 
 Owner supplied a newer audit captured 1791233269700 (22:47:49 Europe/Rome). It still lists all three expected rows AUTO_FILTERED/AUTO_FILTERED_NON_GAME, BASE_GAME, no AI proof or BGG identity, with observations PENDING_ANALYSIS. diag:ai_engine itself is timestamped 1791232772566 (22:39:32) and remains WAIT; retryAt=1791233235224 (22:47:15). The snapshot is only 34 seconds after that deadline, and the diagnostic did not update. This does not yet prove a missed scheduled wake; WorkManager may dispatch later.
