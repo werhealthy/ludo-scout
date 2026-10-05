@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — wait deadline passed recently, no post-deadline diagnostic yet, 2026-10-05
+
+Owner supplied a newer audit captured 1791233269700 (22:47:49 Europe/Rome). It still lists all three expected rows AUTO_FILTERED/AUTO_FILTERED_NON_GAME, BASE_GAME, no AI proof or BGG identity, with observations PENDING_ANALYSIS. diag:ai_engine itself is timestamped 1791232772566 (22:39:32) and remains WAIT; retryAt=1791233235224 (22:47:15). The snapshot is only 34 seconds after that deadline, and the diagnostic did not update. This does not yet prove a missed scheduled wake; WorkManager may dispatch later.
+
+Read-only PC GET /v1/status was reconfirmed healthy after this report: enabled/local_online=true, USB_LOCAL, Gemini unavailable, zero remote reservations. No classify request is evidenced. Keep bridge, phone and app available for a few more minutes, then take another audit to check whether the due attempt ran. If diag remains unchanged beyond that interval, investigate WorkManager wake delivery and current queue recovery diagnostic before changing code. No reinstall required.
+
 ## Backend — latest post-bridge audit still reflects pre-bridge failure; next retry due 22:47, 2026-10-05 Europe/Rome
 
 Owner attached ai-recovery-after-bridge.json captured at 1791232767005 (2026-10-05 20:39:27 UTC / 22:39:27 Europe/Rome). It found all three expected listings; each remains AUTO_FILTERED/AUTO_FILTERED_NON_GAME, local BASE_GAME, no BGG id/evidence, PENDING_ANALYSIS observation, one stored photo, no deal, no override. Cohort pass remains false.
