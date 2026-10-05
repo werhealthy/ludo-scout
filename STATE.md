@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — bridge process confirmed absent at follow-up, 2026-10-05
+
+Owner's follow-up checks returned no listening socket on local port 8765, no python.exe command line containing ai_local_bridge.py, and Test-NetConnection 127.0.0.1:8765 returned False. Thus the bridge process was not alive at this follow-up, despite its earlier startup message. The prior invocation's termination cause is not shown. Ollama model installation and adb reverse mapping were separately confirmed; app retry has not been re-audited after these checks.
+
+Next: start the bridge in a dedicated PowerShell window using the repo's Python executable and leave that window running. Confirm it remains alive with the listener/process checks from a second window, then verify GET /v1/status before evaluating the app or waiting for a new AI attempt. No classify request, build or install is warranted until status succeeds.
+
 ## Backend — Ollama/USB setup succeeds, loopback check still fails; process state pending, 2026-10-05
 
 Owner confirms ollama list contains exact model qwen3-vl:8b-instruct-q4_K_M. Running python tools/ai_local_bridge.py printed its listening URL and model; code prints that line only after ollama_ready() succeeds and ThreadingHTTPServer binds 127.0.0.1:8765. adb reverse tcp:8765 tcp:8765 returned 8765 and adb reverse --list showed UsbFfs tcp:8765 tcp:8765. A subsequent local GET /v1/status in the same transcript still failed with a connection error.
