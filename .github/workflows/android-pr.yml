@@ -475,8 +475,24 @@ jobs:
 
 
 
+  ai-service:
+    if: github.head_ref == 'backend/local-ai-primary'
+    name: Hybrid AI service tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/ai-beta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm test
+
   ai-visual:
-    if: github.head_ref == 'backend/ai-engine-integration' || github.head_ref == 'backend/ai-beta-runtime' || github.head_ref == 'frontend/ai-real-listings-review' || github.head_ref == 'backend/ai-real-listings' || github.head_ref == 'backend/ai-local-evidence'
+    if: github.head_ref == 'backend/ai-engine-integration' || github.head_ref == 'backend/ai-beta-runtime' || github.head_ref == 'frontend/ai-real-listings-review' || github.head_ref == 'backend/ai-real-listings' || github.head_ref == 'backend/ai-local-evidence' || github.head_ref == 'backend/local-ai-primary'
     name: AI Android manual dialog
     runs-on: ubuntu-latest
     timeout-minutes: 12
