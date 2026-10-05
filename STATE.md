@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Backend — current phone audit summary; row-level report pending, 2026-10-05
+
+Owner PowerShell confirms one authorized Pixel 8 (37311FDJH00AX8, state device). Installed package is 5.12.202-ai-wait-deadline, versionCode 1002032. The owner ran tools/ai_recovery_runtime_audit.py --ids 1572,1577,1581; it completed and relaunched MainActivity. Its console summary is AI evidence=0, AI-positive filtered=0, BGG progressed=0, cohort_pass=false.
+
+This summary does not expose listing_count, matched row details or diagnostics. In particular, filtered=0 is the count of AI-positive rows that remain filtered, not a count of all filtered listings. The JSON is on the owner machine at %TEMP%\ai-recovery-current.json, outside this execution environment, so the selected IDs’ row state and current diag:ai_engine remain unverified here. No cause can be assigned from this summary. No build, install or code change was made.
+
+Next: inspect the JSON’s listing_count, each selected row’s lifecycle/enrichment_state/match_state/last_error/observations and the complete diagnostics. If listing_count is zero, reconcile these values with the canonical market_listings IDs before drawing conclusions. Keep PR #310 draft until a real AI-positive cohort is ACTIVE and reaches the next BGG state.
+
 ## Backend — AI retry audit checkpoint; runtime still unverified, 2026-10-05
 
 GitHub confirms PR #310 remains open, draft, unmerged, targeting beta. At the initial inspection its head and branch HEAD were both 7b89708d3097b7c9278c3e9ee2cb40b75881df3a; beta was ff1427a92d2caa20beef173f330c85ea383d53bc. This checkpoint was then committed to STATE.md on the PR branch as 9a4616f86e4294e040f7115cf7dcdd56c33819f5; that documentation-only commit is now the branch and PR head. No application code changed.
