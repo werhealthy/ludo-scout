@@ -22,7 +22,7 @@ $oldVersion = [int]$match.Groups[1].Value
 $previousVersionEnv = $env:LUDO_VERSION_CODE
 $env:LUDO_VERSION_CODE = [string][Math]::Max(1, $oldVersion - 1000000 + 1)
 try {
-    foreach ($test in @('ai_engine_wait_backoff','ai_recovery_state_machine','ai_recovery_pipeline','ai_real_listings','ai_local_usb_android','ai_local_usb_bridge','ai_filtered_recovery','ai_recovery_bgg_handoff','ai_recovery_durable_marker','bgg_state_monotonicity_v51211','bgg_review_write_accountability_v51212','bgg_sqlite_state_machine_v51215','bgg_version_affinity_v51214')) {
+    foreach ($test in @('ai_engine_wait_backoff','ai_recovery_state_machine','ai_recovery_pipeline','ai_real_listings','ai_local_usb_android','ai_local_usb_bridge','ai_local_worker_context','ai_filtered_recovery','ai_recovery_bgg_handoff','ai_recovery_durable_marker','bgg_state_monotonicity_v51211','bgg_review_write_accountability_v51212','bgg_sqlite_state_machine_v51215','bgg_version_affinity_v51214')) {
         & $python "regression\$test.py"
         Require-Exit "Regressione $test"
     }

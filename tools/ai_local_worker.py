@@ -139,7 +139,7 @@ NON_GAME = prodotto non tabletop.
 UNKNOWN = prove insufficienti.
 Per edition_language usa soprattutto testo realmente visibile sulla confezione; se non dimostrabile usa UNKNOWN. Distingui esplicitamente NL (olandese: spel, spelregels, het, straat, bankieren) da DE (tedesco: Spiel, Spielregeln, Straße, Bank). Non dedurre la lingua dal paese o dal titolo tradotto da Vinted.
 Non inventare. Evidence massimo 4 frasi brevi."""
- payload={"model":MODEL,"stream":False,"format":SCHEMA,"options":{"temperature":0,"num_predict":240},
+ payload={"model":MODEL,"stream":False,"format":SCHEMA,"options":{"temperature":0,"num_predict":240,"num_ctx":8192},
           "messages":[{"role":"user","content":prompt,**({"images":images} if images else {})}]}
  status,response=http_json(OLLAMA+"/api/chat",payload,timeout=180)
  if status!=200: raise RuntimeError("ollama status")

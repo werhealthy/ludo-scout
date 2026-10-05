@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend — local Qwen photo requests exceeded Ollama context; fix verified locally, 2026-10-05
+
+The prior “underlying exception unknown” checkpoint is superseded by the owner’s next runtime evidence. Audit `ai-recovery-current.json` was captured at 1791236118196 (23:35:18 Europe/Rome): listings 1572, 1577 and 1581 still had zero AI evidence, all remained AUTO_FILTERED/AUTO_FILTERED_NON_GAME, and cohort_pass=false. `diag:ai_engine` updated at 1791235986104 (23:33:06) to PENDING_FAILED, checked=0, held=0, recovered=0, failedBatches=0, retryAt=1791236886104 (23:48:06). This is the phone state at capture only.
+
+At the same interval, the USB bridge logged HTTP 400 for the app request (request ID redacted here as `4a5f766c…`). Ollama’s local `server.log` at 23:33:02 records the direct cause: `request (4518 tokens) exceeds the available context size (4096 tokens)`. A synthetic no-photo classification returned HTTP 200. Thus the bridge’s generic FAILED response was caused by the local Qwen chat request exceeding Ollama’s default context, not ADB or a guessed transport failure. Android’s PENDING_FAILED and unchanged batch counters are consistent with the bridge returning its generic HTTP 502 `{status:FAILED}` envelope; BGG/category persistence did not progress.
+
+Minimal fix in `tools/ai_local_worker.py`: set the Ollama request option `num_ctx` to 8192. Added `regression/ai_local_worker_context.py`, which was run RED against the prior code and failed because the outgoing image request lacked a sufficient context, then GREEN after the fix. The test is included in the local AI recovery installer’s regression list. The existing `ai_local_usb_bridge.py` and `ai_local_usb_android.py` regressions also pass. A direct local Ollama classification with a generated synthetic image completed successfully; `ollama ps` showed context 8192 and 100% GPU. Its returned UNKNOWN category is only a synthetic smoke-test output, not product-accuracy evidence.
+
+No Vinted photo request was made by these tests; image fetch was replaced with an in-memory synthetic image for the integration check. No database was read or written by the synthetic classification. No Gradle build, Android install, or real phone retry has been performed for this Python-only fix. PR #310 remains open/draft/unmerged; retain draft until a real AI-positive batch remains ACTIVE and advances to BGG. Remaining runtime proof: update/restart the local bridge and confirm a real phone cohort reaches the BGG state. Open groups remain frontend 7 / backend 6.
+
 ## Backend — bridge failure diagnostics implemented; targeted regression verified, 2026-10-05
 
 Following owner approval, the USB bridge now emits a redacted failure line with validated request ID, stage, exception type and numeric HTTP code when proposal processing raises. It does not log exception text, listing title, photo URLs, tokens or model output; the HTTP 502 {status:FAILED} contract is unchanged. The existing regression now exercises the real ThreadingHTTPServer handler with an injected proposal exception and verifies response plus log redaction.
