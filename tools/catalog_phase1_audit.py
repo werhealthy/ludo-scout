@@ -62,7 +62,7 @@ def main():
             ("Venditore","(seller_id IS NOT NULL AND TRIM(seller_id)<>'') OR (seller_name IS NOT NULL AND TRIM(seller_name)<>'')"),
             ("Pubblicazione","published_label IS NOT NULL AND TRIM(published_label)<>''"),
             ("Lingua","language_code IS NOT NULL AND TRIM(language_code)<>''"),
-            ("Descrizione","observed_text IS NOT NULL AND TRIM(observed_text)<>''"),
+            ("Testo osservato","observed_text IS NOT NULL AND TRIM(observed_text)<>''"),
             ("Gioco collegato","game_id IS NOT NULL"),
         ]
 
@@ -104,7 +104,7 @@ def main():
           SUM(CASE WHEN language_code IS NOT NULL AND TRIM(language_code)<>'' THEN 1 ELSE 0 END),
           SUM(CASE WHEN observed_text IS NOT NULL AND TRIM(observed_text)<>'' THEN 1 ELSE 0 END)
           FROM (SELECT * FROM market_listings WHERE {active} ORDER BY last_seen DESC LIMIT 50)""").fetchone()
-        labels=["righe","foto","seller","pub","lingua","descr"]
+        labels=["righe","foto","seller","pub","lingua","testo"]
         print(" · ".join(f"{k}={int(v or 0)}" for k,v in zip(labels,fresh)))
 
         print("\n=== MANCANZE PRIORITARIE ===")
@@ -113,6 +113,8 @@ def main():
                 FROM market_listings WHERE {active} AND NOT ({cond})
                 ORDER BY last_seen DESC LIMIT 5""").fetchall()
             print(label+": "+(" | ".join(f"#{r[0]} {r[1][:55]}" for r in rows) if rows else "nessuna"))
+
+        db.close()
 
 if __name__=="__main__":
     main()
