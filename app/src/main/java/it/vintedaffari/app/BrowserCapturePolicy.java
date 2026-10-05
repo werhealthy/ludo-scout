@@ -11,7 +11,8 @@ final class BrowserCapturePolicy {
     static String photo(String url) {
         if(url==null||url.length()>2048)return "";
         try{java.net.URI u=new java.net.URI(url);String h=u.getHost();
-            return "https".equals(u.getScheme())&&u.getUserInfo()==null&&h!=null&&(h.equals("vinted.net")||h.endsWith(".vinted.net"))?url:"";
+            boolean trusted=h!=null&&(h.equals("vinted.net")||h.endsWith(".vinted.net")||h.equals("vinted.com")||h.endsWith(".vinted.com"));
+            return "https".equals(u.getScheme())&&u.getUserInfo()==null&&trusted?url:"";
         }catch(Exception ignored){return "";}
     }
     static boolean explicitRequest(String source) {
