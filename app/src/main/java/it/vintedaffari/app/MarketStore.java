@@ -279,10 +279,11 @@ public final class MarketStore {
         SQLiteDatabase db=helper.getWritableDatabase();int changed=listingId>0?db.delete("queue_controls","name=? AND value=?",new String[]{OPENED_VINTED_TARGET,String.valueOf(listingId)}):db.delete("queue_controls","name=?",new String[]{OPENED_VINTED_TARGET});
         if(changed>0)setDiagnosticState("opened_vinted_target",0,"state=IDLE;clearedListing="+listingId);
     }
-    public boolean updateExactProductMetadata(long listingId,String sellerName,String publishedLabel,Integer priceCents,Integer protectedPriceCents){
+    public boolean updateExactProductMetadata(long listingId,String sellerName,String publishedLabel,String detailsText,Integer priceCents,Integer protectedPriceCents){
         if(listingId<=0)return false;SQLiteDatabase db=helper.getWritableDatabase();ContentValues v=new ContentValues();
         if(!TextUtils.isEmpty(sellerName))v.put("seller_name",sellerName.trim());
         if(!TextUtils.isEmpty(publishedLabel))v.put("published_label",publishedLabel.trim());
+        if(!TextUtils.isEmpty(detailsText))v.put("observed_text",safe(detailsText.trim()));
         if(v.size()>0){v.put("enriched_at",System.currentTimeMillis());db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)});}
         boolean priceChanged=priceCents!=null&&priceCents>0&&updateVerifiedCurrentPrice(listingId,priceCents,protectedPriceCents);
         return v.size()>0||priceChanged;
