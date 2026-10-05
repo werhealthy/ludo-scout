@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.181 browser capture recovery merged; phone verification pending, 2026-10-05
+
+Read-only phone diagnostic on installed 5.12.180 confirmed the current completeness failure is pre-AI/acquisition, not a later DB/deals sync loss. Latest50 market_listings: brand49/50, rich observed text0/50, item ID50/50, Vinted URL50/50, image_url0/50, listing_photos_csv0/50, seller0/50, published_label0/50, language1/50. Matching browser snapshots:50 inspected,0 with photos,0 with description,0 cases where a browser photo was present but lost before DB. Local ThumbnailStore files:0. The latest8 rows used by the AI comparison all had ID/URL/brand but zero photos and no rich text. Therefore Qwen was receiving degraded evidence because the browser capturer produced sparse DOM-level records.
+
+PR272 “Backend: recover browser listing evidence before AI” merged squash c1fe6a3135f1ccc8142c06d4a7c0211e24eb02f1. Version 5.12.181-browser-capture-recovery. The passive capturer still performs zero extra network requests: it now observes all same-origin versioned Vinted JSON responses instead of a narrow historical endpoint list, searches bounded nearby card markup for the correct item image, reads picture/source srcset variants, accepts trusted vinted.com photo CDN hosts consistently with the AI URL validator, and reports description/photo coverage alongside existing seller/publication/json-vs-dom counters. No schema, filter, threshold, service, cost or request-rate change.
+
+Verification: PR diff reviewed and mergeable. GitHub Android PR validation run37289068141/job111694909562 failed before any step executed (steps=null); dependents skipped, so no CI code result exists. Local 5.12.181 build/install and phone capture proof are still pending. Single next backend step: locally run browser_engine_intake.py + Android unit/Javac/build, install versionCode1002008 over the existing app, run one normal Motore/Vinted capture page, then repeat the same read-only completeness check. Do not rerun Qwen until photo/description coverage is measured on fresh 5.12.181 captures.
+
+Frontend7/backend6 groups remain open.
+
 ## Backend — 5.12.180 installed; acquisition completeness under diagnosis, 2026-10-05
 
 Owner locally verified 5.12.179-ai-copy-status after updating beta correctly: regression/ai_copy_idle_status.py PASS (copy button, clipboard, selectable text, feedback, worker photo count/queue idle/version), Gradle clean + :app:testDebugUnitTest + :app:compileDebugJavaWithJavac + assembleDebug BUILD SUCCESSFUL in 53s (41 tasks), and adb install -r succeeded over 5.12.178 without clearing data. Installed package moved from versionCode1002005/versionName5.12.178-ai-photo-evidence to versionCode1002006/versionName5.12.179-ai-copy-status.
