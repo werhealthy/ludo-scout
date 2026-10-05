@@ -1341,7 +1341,7 @@ public final class MarketStore {
         v.put("last_error","interrotto automaticamente: elaborazione troppo lunga");
         v.put("progress",15);
         v.put("processing_started_at",0);
-        int changed=helper.getWritableDatabase().update("processing_jobs",v,"job_type IN (?,?) AND state=? AND COALESCE(NULLIF(processing_started_at,0),updated_at)<?",new String[]{JOB_VINTED,JOB_VINTED_DEEP,PROCESSING,String.valueOf(cutoff)});
+        int changed=helper.getWritableDatabase().update("processing_jobs",v,"job_type IN (?,?) AND state=? AND COALESCE(NULLIF(processing_started_at,0),updated_at)<CAST(? AS INTEGER)",new String[]{JOB_VINTED,JOB_VINTED_DEEP,PROCESSING,String.valueOf(cutoff)});
         if(changed>0){notifyQueueChanged();Log.w(TAG,"watchdog deferred "+changed+" stuck Vinted job(s)");}
         return changed;
     }
