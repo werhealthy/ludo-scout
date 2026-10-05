@@ -113,7 +113,7 @@ final class AiEngineSession {
     j.remove("pending");j.put("failed_batches",j.optInt("failed_batches")+1);
     return finish(store,j,now,"TERMINAL_FAILED",checkedCached,heldCached,true);
    }
-   if(!"PROPOSAL".equals(response.optString("status")))return finish(store,j,now,"PENDING_"+response.optString("status","UNAVAILABLE"),checkedCached,heldCached,false);
+   if(!"PROPOSAL".equals(response.optString("status"))){String remoteState=response.optString("status","UNAVAILABLE");boolean localPending="LOCAL_PENDING".equals(remoteState);return finish(store,j,now,"PENDING_"+remoteState,checkedCached,heldCached,localPending);}
    if(!id.equals(response.optString("request_id"))||!AiBetaProtocol.MODEL.equals(response.optString("model"))||!AiBetaProtocol.CONTRACT.equals(response.optString("contract")))
     return finish(store,j,now,"INVALID_RESPONSE",checkedCached,heldCached,false);
    try{AiBetaListings.display(remoteRows,response);}catch(Exception invalid){return finish(store,j,now,"INVALID_RESPONSE",checkedCached,heldCached,false);}
