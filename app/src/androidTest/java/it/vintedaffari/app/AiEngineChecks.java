@@ -19,7 +19,7 @@ final class AiEngineChecks {
   public JSONObject submit(String request,JSONArray payload)throws Exception {
    calls++;if(id!=null)check(id.equals(request),"recovery allocated another reservation ID");id=request;
    lastPayload=new JSONArray(payload.toString());
-   check(payload.length()<=8,"unbounded batch");for(int i=0;i<payload.length();i++)check(payload.getJSONObject(i).length()==3,"private fields transmitted");
+   check(payload.length()<=8,"unbounded batch");for(int i=0;i<payload.length();i++){JSONObject row=payload.getJSONObject(i);check(row.length()==5&&row.has("source_text")&&row.has("photos"),"rich evidence contract missing");check(!row.has("local_type")&&!row.has("bgg_id")&&!row.has("game_title"),"private identity fields transmitted");}
    if(during!=null)during.run();if(fail)throw new Exception("simulated lost response");
    JSONArray answers=new JSONArray();for(int i=0;i<payload.length();i++)answers.put(AiBetaRealChecks.answer(payload.getJSONObject(i).getLong("listing_id"),"NON_GAME"));
    if(invalid)answers.getJSONObject(0).put("bgg_verified",true);
@@ -28,12 +28,12 @@ final class AiEngineChecks {
  }
  private static SQLiteDatabase fixture(){
   SQLiteDatabase db=SQLiteDatabase.create(null);
-  db.execSQL("CREATE TABLE market_listings(id INTEGER PRIMARY KEY,vinted_title TEXT,brand TEXT,item_condition TEXT,current_price_cents INTEGER,observed_text TEXT,game_id INTEGER,last_seen INTEGER,lifecycle TEXT,match_state TEXT,legacy_signature TEXT,temp_fingerprint TEXT,vinted_item_id TEXT,manual_review_required INTEGER,last_error TEXT)");
+  db.execSQL("CREATE TABLE market_listings(id INTEGER PRIMARY KEY,vinted_title TEXT,brand TEXT,item_condition TEXT,current_price_cents INTEGER,observed_text TEXT,game_id INTEGER,last_seen INTEGER,lifecycle TEXT,match_state TEXT,legacy_signature TEXT,temp_fingerprint TEXT,vinted_item_id TEXT,manual_review_required INTEGER,last_error TEXT,listing_photos_csv TEXT)");
   db.execSQL("CREATE TABLE games(id INTEGER PRIMARY KEY,bgg_id TEXT,canonical_name TEXT,match_state TEXT)");
   db.execSQL("CREATE TABLE deals(signature TEXT PRIMARY KEY,verification_state TEXT,confirmed INTEGER,lifecycle TEXT,bgg_id TEXT,vinted_title TEXT,brand TEXT,verification_reason TEXT,total_cents INTEGER)");
   db.execSQL("CREATE TABLE listing_overrides(signature TEXT,item_id TEXT,payload TEXT)");
   db.execSQL("INSERT INTO games VALUES(1,'123','Catan','MATCHED')");
-  db.execSQL("INSERT INTO market_listings VALUES(1,'Catan gioco da tavolo','Kosmos','buono',1000,'Testo completo',1,100,'ACTIVE','MATCHED','sig1','temp1','999',0,NULL)");
+  db.execSQL("INSERT INTO market_listings VALUES(1,'Catan gioco da tavolo','Kosmos','buono',1000,'Testo completo',1,100,'ACTIVE','MATCHED','sig1','temp1','999',0,NULL,'https://images1.vinted.net/t/catan.webp')");
   db.execSQL("INSERT INTO deals VALUES('sig1','OK',0,'ACTIVE','123','Catan gioco da tavolo','Kosmos',NULL,2000)");
   return db;
  }
@@ -100,7 +100,7 @@ final class AiEngineChecks {
   }
  }
  private static void addSecond(SQLiteDatabase db){
-  db.execSQL("INSERT INTO market_listings VALUES(2,'Azul gioco da tavolo','Next Move','buono',1000,'Testo completo',1,100,'ACTIVE','MATCHED','sig2','temp2','1000',0,NULL)");
+  db.execSQL("INSERT INTO market_listings VALUES(2,'Azul gioco da tavolo','Next Move','buono',1000,'Testo completo',1,100,'ACTIVE','MATCHED','sig2','temp2','1000',0,NULL,'')");
   db.execSQL("INSERT INTO deals VALUES('sig2','OK',0,'ACTIVE','123','Azul gioco da tavolo','Next Move',NULL,2000)");
  }
  private static void reviewChecks(long now)throws Exception {
