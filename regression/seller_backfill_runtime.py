@@ -38,8 +38,20 @@ section=source.split('private void recordSellerBackfillExclusions',1)[1]
 query=re.search(r'String sql="([^"]+)"',section).group(1)
 z=sqlite3.connect(':memory:')
 z.executescript("CREATE TABLE market_listings(id,lifecycle,seller_id,vinted_item_id,vinted_url); CREATE TABLE queue_controls(name,value); CREATE TABLE processing_jobs(listing_id,state); INSERT INTO market_listings VALUES(1,'ACTIVE','123','1','url'),(2,'ACTIVE','','',''),(3,'ACTIVE','','3','url'),(4,'ACTIVE','','4','url'),(5,'ACTIVE','','5','url'),(6,'ACTIVE','','6','url'); INSERT INTO queue_controls VALUES('browser_listing:3',1),('seller_backfill_once:4',1); INSERT INTO processing_jobs VALUES(5,'PENDING');")
-assert dict(z.execute(query))==dict(HAS_SELLER=1,NO_IDENTITY=1,BROWSER_OWNED=1,ONCE_MARKER=1,ACTIVE_JOB=1,ELIGIBLE=1)
+assert dict(z.execute(query))==dict(HAS_SELLER=1,NO_IDENTITY=1,ONCE_MARKER=1,ACTIVE_JOB=1,ELIGIBLE=2)
 print('PASS scheduling exclusions SQLite partition')
+
+# Browser provenance must not suppress seller recovery. Execute the exact production candidate query.
+candidate=re.search(r'Long sellerBackfill=scalarLong\(db,\s*"(SELECT l.id.*?LIMIT 1)",\s*new String\[\]\{SELLER_BACKFILL_MARKER_PREFIX,PENDING,PROCESSING,FAILED_RETRYABLE\}',source,re.S).group(1)
+candidate=re.sub(r'//[^\n]*','',candidate)
+candidate=re.sub(r'"\s*\+\s*"','',candidate)
+b=sqlite3.connect(':memory:')
+b.executescript("CREATE TABLE market_listings(id,lifecycle,seller_id,vinted_item_id,vinted_url,last_seen); CREATE TABLE queue_controls(name,value); CREATE TABLE processing_jobs(listing_id,state); INSERT INTO market_listings VALUES(71,'ACTIVE','','71','url',1),(72,'ACTIVE','','72','url',2); INSERT INTO queue_controls VALUES('browser_listing:72',1);")
+assert b.execute(candidate,('seller_backfill_once:','PENDING','PROCESSING','FAILED_RETRYABLE')).fetchall()==[(72,)]
+# Other maintenance still owns its browser gate.
+health=source.split('long cutoff=',1)[1].split('if(listingId!=null)',1)[0]
+assert "browser_listing:'||l.id" in health
+print('PASS browser-owned ACTIVE listing is eligible only for seller backfill')
 
 import sys,io,contextlib
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
