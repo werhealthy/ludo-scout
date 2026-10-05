@@ -6,6 +6,7 @@ checks=[
  ("dedicated source",'SELLER_BACKFILL_SOURCE = "SELLER_BACKFILL"' in market),
  ("missing seller only","(l.seller_id IS NULL OR l.seller_id='')" in market),
  ("exact identity only","l.vinted_item_id IS NOT NULL" in market and "l.vinted_url IS NOT NULL" in market),
+ ("all active independent of BGG","SELECT l.id FROM market_listings l WHERE l.lifecycle='ACTIVE'" in market),
  ("one shot marker","SELLER_BACKFILL_MARKER_PREFIX" in market and "state=QUEUED;source=" in market),
  ("serial owner","source IN (?,?,?)" in market and "SELLER_BACKFILL_SOURCE" in market),
  ("same paced lane","JOB_VINTED_DEEP" in market and "PUBLIC_MIN_INTERVAL_MS=55_000L" in session and "PUBLIC_HOURLY_BUDGET=60" in session),
