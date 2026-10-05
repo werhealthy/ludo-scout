@@ -16,7 +16,7 @@ final class BrowserCapturePolicy {
         }catch(Exception ignored){return "";}
     }
     static boolean explicitRequest(String source) {
-        return "MANUAL_PRIORITY".equals(source)||"MANUAL_RECOVERY".equals(source)||"OPENED_VERIFY".equals(source)||"HUNT_PRIORITY".equals(source);
+        return "MANUAL_PRIORITY".equals(source)||"MANUAL_RECOVERY".equals(source)||"OPENED_VERIFY".equals(source)||"HUNT_PRIORITY".equals(source)||"SELLER_BACKFILL".equals(source);
     }
     private BrowserCapturePolicy() {}
 }

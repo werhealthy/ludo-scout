@@ -7,9 +7,11 @@ checks=[
  ("missing seller only","(l.seller_id IS NULL OR l.seller_id='')" in market),
  ("exact identity only","l.vinted_item_id IS NOT NULL" in market and "l.vinted_url IS NOT NULL" in market),
  ("all active independent of BGG","SELECT l.id FROM market_listings l WHERE l.lifecycle='ACTIVE'" in market),
+ ("browser-owned seller eligible","AND NOT EXISTS(SELECT 1 FROM queue_controls q WHERE q.name='browser_listing:'||l.id AND q.value=1)" not in market[market.index("Long sellerBackfill=scalarLong"):market.index("if(sellerBackfill==null)")]),
  ("one shot marker","SELLER_BACKFILL_MARKER_PREFIX" in market and "state=QUEUED;source=" in market),
  ("serial owner","source IN (?,?,?)" in market and "SELLER_BACKFILL_SOURCE" in market),
  ("same paced lane","JOB_VINTED_DEEP" in market and "PUBLIC_MIN_INTERVAL_MS=55_000L" in session and "PUBLIC_HOURLY_BUDGET=60" in session),
+ ("browser-owned enqueue allowed","SELLER_BACKFILL" in (ROOT/"app/src/main/java/it/vintedaffari/app/BrowserCapturePolicy.java").read_text(encoding="utf-8")),
  ("motore idle","activeObservationSession()!=null" in market),
 ]
 bad=[name for name,ok in checks if not ok]
