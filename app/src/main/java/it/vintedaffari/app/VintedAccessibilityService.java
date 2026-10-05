@@ -671,11 +671,11 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     // An unresolved title is no longer automatically turned into human BGG work.
                     // It must show positive board-game evidence; otherwise keep it in a reversible
                     // auto-filtered quarantine and let the fast discovery pipeline continue.
+                    boolean aiRecoveredProduct=marketStore!=null
+                            && analyzedListing.type==ListingClassifier.Type.UNCERTAIN
+                            && !BoardGameIntakeGate.isStrongNonGameText(card.title,card.rawDescription)
+                            && marketStore.hasAiCategoryRecoveryEvidence(card);
                     if(ga==null||!"matched".equals(ga.status)||TextUtils.isEmpty(ga.bggId)){
-                        boolean aiRecoveredProduct=marketStore!=null
-                                && analyzedListing.type==ListingClassifier.Type.UNCERTAIN
-                                && !BoardGameIntakeGate.isStrongNonGameText(card.title,card.rawDescription)
-                                && marketStore.hasAiCategoryRecoveryEvidence(card);
                         BoardGameIntakeGate.Decision gate=aiRecoveredProduct
                                 ? new BoardGameIntakeGate.Decision(BoardGameIntakeGate.Action.ACCEPT,"Prodotto gioco confermato da evidenza AI; identità BGG ancora da verificare")
                                 : BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
@@ -691,7 +691,9 @@ public final class VintedAccessibilityService extends AccessibilityService {
                         // game Watergate vs books titled Watergate). For titles with learned/seeded
                         // cross-category collisions require a second board-game signal.
                         boolean collisionRisk=marketStore!=null&&marketStore.isCollisionRiskTitle(card.title);
-                        BoardGameIntakeGate.Decision matchedGate=BoardGameIntakeGate.matchedAnalysis(card,analyzedListing,ga,collisionRisk);
+                        BoardGameIntakeGate.Decision matchedGate=aiRecoveredProduct
+                                ? new BoardGameIntakeGate.Decision(BoardGameIntakeGate.Action.ACCEPT,"Prodotto gioco confermato da evidenza AI; identità BGG valutata dal matcher locale")
+                                : BoardGameIntakeGate.matchedAnalysis(card,analyzedListing,ga,collisionRisk);
                         if(matchedGate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                             if(noisy!=null&&card.capturedSignature.isEmpty())database.exclude(noisy,"Scarto automatico post-match: "+matchedGate.reason);
