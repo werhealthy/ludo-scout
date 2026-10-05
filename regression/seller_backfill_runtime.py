@@ -55,7 +55,7 @@ print('PASS browser-owned ACTIVE listing is eligible only for seller backfill')
 
 # The serial claim guard must not be held forever by legacy PROCESSING rows that lack
 # processing_started_at. Execute the exact production watchdog WHERE clause.
-watchdog_where=re.search(r'deferStuckVintedProcessing.*?db\.update\("processing_jobs",v,"([^\"]+)"',source,re.S).group(1)
+watchdog_where=re.search(r'deferStuckVintedProcessing.*?update\("processing_jobs",v,"([^\"]+)"',source,re.S).group(1)
 w=sqlite3.connect(':memory:')
 w.executescript("CREATE TABLE processing_jobs(id,job_type,state,processing_started_at,updated_at); INSERT INTO processing_jobs VALUES(1,'VINTED_DEEP_ENRICHMENT','PROCESSING',0,100),(2,'VINTED_DEEP_ENRICHMENT','PROCESSING',0,900),(3,'VINTED_LINK','PROCESSING',100,900),(4,'VINTED_LINK','PROCESSING',900,100);")
 rows=w.execute('SELECT id FROM processing_jobs WHERE '+watchdog_where,('VINTED_LINK','VINTED_DEEP_ENRICHMENT','PROCESSING','500')).fetchall()
