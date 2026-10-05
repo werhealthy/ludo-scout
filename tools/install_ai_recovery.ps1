@@ -66,16 +66,13 @@ $installed = & $adb shell dumpsys package it.vintedaffari.app
 Require-Exit 'Verifica versione aggiornata'
 $installed | Select-String 'versionCode=|versionName='
 if (($installed -join "`n") -notmatch 'versionName=5\.12\.201-ai-category-state') { throw 'La versione installata non coincide con il fix.' }
-Write-Host 'Lascia l app aperta con AI via USB attiva. Attendo il pass automatico e BGG (massimo 18 minuti).'
+Write-Host 'Lascia l app aperta con AI via USB attiva. Attendo il batch e BGG per 18 minuti senza riavviarla.'
 $after = Join-Path $reports 'ai-recovery-after.json'
-$passed = $false
-foreach ($attempt in 1..18) {
-    Start-Sleep -Seconds 60
-    & $python tools\ai_recovery_runtime_audit.py --ids $ListingIds --output $after
-    Require-Exit 'Audit runtime'
-    $result = Get-Content $after -Raw | ConvertFrom-Json
-    if ($result.cohort_pass) { $passed = $true; break }
-}
+Start-Sleep -Seconds 1080
+& $python tools\ai_recovery_runtime_audit.py --ids $ListingIds --output $after
+Require-Exit 'Audit runtime'
+$result = Get-Content $after -Raw | ConvertFrom-Json
+$passed = $result.cohort_pass
 if ($passed) { Write-Host 'Batch verificato: tutti gli annunci richiesti hanno prova AI e sono ACTIVE nello stato BGG successivo.' }
 else { Write-Host 'Prova ancora aperta: il report conserva il punto di arresto; non dichiarare il bug chiuso.' }
 Write-Host "Carica questo file in chat: $after"
