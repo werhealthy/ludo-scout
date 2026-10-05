@@ -14,6 +14,12 @@ def report(db):
         print('maintenance_job',row)
     for row in db.execute("SELECT id,listing_id,state,attempt,next_attempt_at,last_error,updated_at FROM processing_jobs WHERE source='SELLER_BACKFILL' ORDER BY updated_at DESC,id DESC LIMIT 20"):
         print('seller_job',row)
+    for row in db.execute("SELECT j.id,j.job_type,j.source,j.state,j.next_attempt_at,l.lifecycle,COALESCE(l.legacy_signature,''),COALESCE(l.temp_fingerprint,'') FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id WHERE j.source='SELLER_BACKFILL' ORDER BY j.updated_at DESC LIMIT 5"):
+        print('seller_claim_shape',row)
+    try:
+        print('active_observation',db.execute("SELECT start_at,end_at FROM observation_sessions WHERE end_at=(SELECT MAX(end_at) FROM observation_sessions) LIMIT 1").fetchone())
+    except sqlite3.Error:
+        pass
     for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('processor_heartbeat','supervisor_heartbeat','vinted_paused','lane_vinted_status','lane_vinted_heartbeat') OR name LIKE 'lane_vinted_%' ORDER BY updated_at"):
         print('lane',row)
     for row in db.execute("SELECT name,value,updated_at,text_value FROM queue_controls WHERE name IN ('diag:seller_backfill_schedule','diag:seller_backfill','diag:seller_backfill_result','vinted_paused','diag:t2b_exclusive','vinted_http_window_count','vinted_http_last_code','vinted_http_circuit_until','t2_ledger:last','t2_ledger:physical') OR name LIKE 'diag:vinted_trace:%' ORDER BY updated_at,value"):
