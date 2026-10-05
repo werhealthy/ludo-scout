@@ -2864,13 +2864,17 @@ public final class MarketStore {
     public boolean hasAiCategoryRecoveryEvidence(VintedCard card){
         if(card==null)return false;SQLiteDatabase db=helper.getReadableDatabase();
         Long listingId=listingIdForCard(db,card);if(listingId==null)return false;
-        try(Cursor c=db.rawQuery("SELECT lifecycle,enrichment_state,match_state,last_error,COALESCE(manual_review_required,0) FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)})){
+        String sql="SELECT l.lifecycle,l.enrichment_state,l.match_state,COALESCE(l.manual_review_required,0),"+
+                "CASE WHEN EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "AND COALESCE(o.verification_reason,'') LIKE 'AI category recovery:%') THEN 1 ELSE 0 END "+
+                "FROM market_listings l WHERE l.id=?";
+        try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(listingId)})){
             if(!c.moveToFirst())return false;
             return "ACTIVE".equals(c.getString(0))
                 && "PENDING_ANALYSIS".equals(c.getString(1))
                 && "PENDING_ANALYSIS".equals(c.getString(2))
-                && c.getString(3)!=null&&c.getString(3).startsWith("AI_CATEGORY_RECOVERED:")
-                && c.getInt(4)==0;
+                && c.getInt(3)==0
+                && c.getInt(4)==1;
         }
     }
 
