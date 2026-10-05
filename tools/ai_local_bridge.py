@@ -136,6 +136,14 @@ def proposal(payload,classifier=classify,ready=ollama_ready):
  print(f"Done request={request_id} records={len(rows)} elapsed={time.time()-started:.1f}s")
  return 200,response
 
+def failed_response(request_id,stage,error):
+ safe_id=request_id if isinstance(request_id,str) and REQUEST_ID.fullmatch(request_id) else "unknown"
+ safe_stage=stage if stage in ("request","proposal") else "request"
+ code=getattr(error,"code",None)
+ suffix=f" http={code}" if type(code) is int and 100<=code<=599 else ""
+ print(f"Failed request={safe_id} stage={safe_stage} error={type(error).__name__}{suffix}",flush=True)
+ return 502,{"status":"FAILED"}
+
 class Handler(BaseHTTPRequestHandler):
  server_version="LudoScoutLocalUSB/1.0"
  def log_message(self,format,*args):
@@ -163,18 +171,23 @@ class Handler(BaseHTTPRequestHandler):
  def do_POST(self):
   if self.path!="/v1/classify":return self.send_json(404,{"status":"NOT_FOUND"})
   if not self.authorized():return self.send_json(401,{"status":"UNAUTHORIZED"})
+  request_id="unknown";stage="request"
   try:
    size=int(self.headers.get("Content-Length","0"))
    if size<1 or size>MAX_BODY:return self.send_json(400,{"status":"INVALID_INPUT"})
    raw=self.rfile.read(size)
    if len(raw)!=size:return self.send_json(400,{"status":"INVALID_INPUT"})
    payload=json.loads(raw.decode("utf-8"))
+   candidate=payload.get("request_id") if isinstance(payload,dict) else None
+   if isinstance(candidate,str) and REQUEST_ID.fullmatch(candidate):request_id=candidate
+   stage="proposal"
    status,body=proposal(payload)
    return self.send_json(status,body)
   except (ValueError,UnicodeDecodeError,json.JSONDecodeError):
    return self.send_json(400,{"status":"INVALID_INPUT"})
-  except Exception:
-   return self.send_json(502,{"status":"FAILED"})
+  except Exception as error:
+   status,body=failed_response(request_id,stage,error)
+   return self.send_json(status,body)
  
 def main():
  if PORT!=8765:raise SystemExit("LUDO_AI_LOCAL_PORT must remain 8765 for the Android debug contract")
