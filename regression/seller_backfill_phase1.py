@@ -11,6 +11,7 @@ checks=[
  ("one shot marker","SELLER_BACKFILL_MARKER_PREFIX" in market and "state=QUEUED;source=" in market),
  ("serial owner","source IN (?,?,?)" in market and "SELLER_BACKFILL_SOURCE" in market),
  ("same paced lane","JOB_VINTED_DEEP" in market and "PUBLIC_MIN_INTERVAL_MS=55_000L" in session and "PUBLIC_HOURLY_BUDGET=60" in session),
+ ("browser-owned enqueue allowed","SELLER_BACKFILL" in (ROOT/"app/src/main/java/it/vintedaffari/app/BrowserCapturePolicy.java").read_text(encoding="utf-8")),
  ("motore idle","activeObservationSession()!=null" in market),
 ]
 bad=[name for name,ok in checks if not ok]
