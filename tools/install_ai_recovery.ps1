@@ -65,7 +65,7 @@ Require-Exit 'Apertura app'
 $installed = & $adb shell dumpsys package it.vintedaffari.app
 Require-Exit 'Verifica versione aggiornata'
 $installed | Select-String 'versionCode=|versionName='
-if (($installed -join "`n") -notmatch 'versionName=5\.12\.201-ai-category-state') { throw 'La versione installata non coincide con il fix.' }
+if (($installed -join "`n") -notmatch 'versionName=5\.12\.202-ai-wait-deadline') { throw 'La versione installata non coincide con il fix.' }
 Write-Host 'Lascia l app aperta con AI via USB attiva. Attendo il batch e BGG per 18 minuti senza riavviarla.'
 $after = Join-Path $reports 'ai-recovery-after.json'
 Start-Sleep -Seconds 1080
