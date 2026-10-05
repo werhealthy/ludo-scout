@@ -51,7 +51,7 @@ final class AiEngineSession {
  static Result run(JSONObject config,Journal store,Source source,Transport transport,long now)throws Exception {
   if(!config.optBoolean("enabled")||!AiBetaProtocol.validEndpoint(config.optString("endpoint"))||config.optString("token").length()<16)
    return new Result("LOCAL_DISABLED",0,0,false);
-  String configKey=AiBetaProtocol.fingerprint(config.optString("endpoint")+ "\n"+config.optString("token"),"ai-engine-config","v1");
+  String configKey=AiBetaProtocol.fingerprint(config.optString("endpoint")+"\n"+config.optString("token")+"\n"+AiBetaProtocol.MODEL+"\n"+AiBetaProtocol.CONTRACT,"ai-engine-config","v2");
   JSONObject j=store.load();
   if(!configKey.equals(j.optString("config_key")))j=new JSONObject().put("config_key",configKey);
   prune(j,now);
@@ -66,7 +66,7 @@ final class AiEngineSession {
    rows=source.select(j,now);
    if(rows.length()==0)return finish(store,j,now,"NO_WORK",0,0,j.optBoolean("scan_more"));
   }
-  // Reuse each validated title/brand proposal locally, even when batch grouping or identity changes.
+  // Reuse each validated listing-evidence proposal locally, even when batch grouping or identity changes.
   JSONArray cached=new JSONArray(),cachedRows=new JSONArray(),remoteRows=new JSONArray();JSONObject cache=j.getJSONObject("cache");
   int checkedCached=0,heldCached=0;
   if(pending!=null)remoteRows=rows;
@@ -97,7 +97,8 @@ final class AiEngineSession {
       ||((Number)micro).doubleValue()!=((Number)micro).longValue()||((Number)calls).longValue()<0||((Number)calls).longValue()>100
       ||((Number)micro).longValue()<((Number)calls).longValue()*10000||((Number)micro).longValue()>1000000)
     return finish(store,j,now,"INVALID_BUDGET",checkedCached,heldCached,false);
-   if(pending==null&&(((Number)calls).longValue()>=100||((Number)micro).longValue()+10000>1000000))
+   boolean localOnline=Boolean.TRUE.equals(status.opt("local_online"));
+   if(pending==null&&!localOnline&&(((Number)calls).longValue()>=100||((Number)micro).longValue()+10000>1000000))
     return finish(store,j,now,"BUDGET_BLOCKED",checkedCached,heldCached,false);
    if(!source.current(rows))return finish(store,j,now,"STALE_INPUT",checkedCached,heldCached,true);
    if(pending==null){
@@ -113,7 +114,7 @@ final class AiEngineSession {
     j.remove("pending");j.put("failed_batches",j.optInt("failed_batches")+1);
     return finish(store,j,now,"TERMINAL_FAILED",checkedCached,heldCached,true);
    }
-   if(!"PROPOSAL".equals(response.optString("status")))return finish(store,j,now,"PENDING_"+response.optString("status","UNAVAILABLE"),checkedCached,heldCached,false);
+   if(!"PROPOSAL".equals(response.optString("status"))){String remoteState=response.optString("status","UNAVAILABLE");boolean localPending="LOCAL_PENDING".equals(remoteState);return finish(store,j,now,"PENDING_"+remoteState,checkedCached,heldCached,localPending);}
    if(!id.equals(response.optString("request_id"))||!AiBetaProtocol.MODEL.equals(response.optString("model"))||!AiBetaProtocol.CONTRACT.equals(response.optString("contract")))
     return finish(store,j,now,"INVALID_RESPONSE",checkedCached,heldCached,false);
    try{AiBetaListings.display(remoteRows,response);}catch(Exception invalid){return finish(store,j,now,"INVALID_RESPONSE",checkedCached,heldCached,false);}

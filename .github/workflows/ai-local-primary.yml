@@ -1,0 +1,67 @@
+name: AI local-primary deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      workers_free_confirmed:
+        description: "I verified this Cloudflare account uses Workers Free (no paid upgrade)"
+        required: true
+        type: boolean
+        default: false
+      local_worker_digest:
+        description: "SHA256 of the Windows local-worker token (never the token itself)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-beta-cloudflare-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-local:
+    if: github.ref == 'refs/heads/beta' && inputs.workers_free_confirmed == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/ai-beta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - name: Validate local worker digest
+        env:
+          LOCAL_WORKER_DIGEST: ${{ inputs.local_worker_digest }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          assert.match(process.env.LOCAL_WORKER_DIGEST,/^[a-f0-9]{64}$/);
+          NODE
+      - name: Install local worker digest while current service remains unchanged
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LOCAL_WORKER_DIGEST: ${{ inputs.local_worker_digest }}
+        run: printf '%s' "$LOCAL_WORKER_DIGEST" | npx wrangler secret put LOCAL_WORKER_DIGEST
+      - name: Deploy local-primary router with Gemini fallback closed
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler deploy --var ENABLED:true --var FREE_TIER_VALID_UNTIL:0
+      - name: Record scope
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'TEXT'
+          Local-primary AI router deployed with ENABLED=true.
+          FREE_TIER_VALID_UNTIL=0 keeps Gemini fallback closed by default, so this deployment cannot create new Gemini calls.
+          Windows worker authentication is digest-only in Cloudflare; the raw token remains on the owner's PC.
+          Existing durable accounting/cache is preserved.
+          TEXT

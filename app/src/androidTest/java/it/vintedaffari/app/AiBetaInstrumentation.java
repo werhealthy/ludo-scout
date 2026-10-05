@@ -64,8 +64,9 @@ public final class AiBetaInstrumentation extends Instrumentation {
    AiBetaRealListings.Snapshot snapshot=AiBetaRealListings.select(db);
    if(snapshot.rows.length()!=2||snapshot.rows.getJSONObject(0).getLong("listing_id")!=1||snapshot.local.getJSONObject(0).getLong("listing_id")!=2)throw new AssertionError("selection bounds/canonical order/tie failed");
    if(!"COMPONENTS".equals(snapshot.local.getJSONObject(0).getString("local_type")))throw new AssertionError("local subtype lost");
-   for(int i=0;i<snapshot.rows.length();i++)if(snapshot.rows.getJSONObject(i).length()!=3||snapshot.rows.getJSONObject(i).has("observed_text")||snapshot.rows.getJSONObject(i).has("local_type"))throw new AssertionError("remote payload leaked local fields");
-   if(new org.json.JSONObject().put("request_id","00000000-0000-0000-0000-000000000000").put("records",snapshot.rows).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length>4096)throw new AssertionError("payload oversized");
+   for(int i=0;i<snapshot.rows.length();i++){org.json.JSONObject row=snapshot.rows.getJSONObject(i);if(row.length()!=5||!row.has("source_text")||!row.has("photos")||row.has("local_type")||row.has("local_reason")||row.has("bgg_id")||row.has("game_title"))throw new AssertionError("remote evidence contract leaked private identity fields");}
+   if(!"Contesto locale, venditore e prezzo mai inviati".equals(snapshot.rows.getJSONObject(0).getString("source_text")))throw new AssertionError("acquired source text missing from AI evidence");
+   if(new org.json.JSONObject().put("request_id","00000000-0000-0000-0000-000000000000").put("records",snapshot.rows).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length>32768)throw new AssertionError("payload oversized");
    if(!AiBetaRealListings.current(db,snapshot)||before!=android.database.DatabaseUtils.longForQuery(db,"SELECT total_changes()",null))throw new AssertionError("read-only selection changed archive");
    org.json.JSONObject answer=response(snapshot);String display=AiBetaRealDialog.comparison(answer,snapshot,false);
    if(!display.contains("Componenti")||!display.contains("sottotipo locale conservato"))throw new AssertionError("grouped proposal overwrote local subtype");
@@ -79,12 +80,12 @@ public final class AiBetaInstrumentation extends Instrumentation {
    db.execSQL("UPDATE market_listings SET observed_text='Solo scatola vuota' WHERE id=2");
    if(AiBetaRealListings.current(db,snapshot))throw new AssertionError("description edit retained stale comparison");
    AiBetaRealListings.Snapshot edited=AiBetaRealListings.select(db);
-   if(!snapshot.key.equals(edited.key)||snapshot.localKey().equals(edited.localKey()))throw new AssertionError("remote reuse/local revision scope failed");
+   if(snapshot.key.equals(edited.key)||snapshot.localKey().equals(edited.localKey()))throw new AssertionError("description edit did not invalidate remote/local evidence");
    db.execSQL("DELETE FROM market_listings WHERE id=1");if(AiBetaRealListings.current(db,edited))throw new AssertionError("deleted listing retained stale proposal");
    for(int i=100;i<109;i++)insert(db,i,"Gioco "+i,"","ACTIVE",i);
    if(AiBetaRealListings.select(db).rows.length()!=8)throw new AssertionError("eight-row bound failed");
    insert(db,4,new String(new char[4096]).replace('\0','界'),"","ACTIVE",999);
-   boolean bounded=false;try{AiBetaRealListings.select(db);}catch(Exception expected){bounded=true;}if(!bounded)throw new AssertionError("oversized multibyte input accepted");
+   boolean bounded=false;try{AiBetaRealListings.select(db);}catch(Exception expected){bounded=true;}if(!bounded)throw new AssertionError("oversized title input accepted");
   }
  }
  private void renderRealComparison(Activity a,AiBetaSettings settings)throws Exception {

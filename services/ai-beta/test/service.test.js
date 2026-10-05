@@ -5,21 +5,24 @@ import {createHash} from 'node:crypto';
 import {mkdtemp,rm,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
-const token='test-device-secret-only',month=new Date().toISOString().slice(0,7);
+const token='test-device-secret-only',workerToken='test-local-worker-secret',month=new Date().toISOString().slice(0,7);
 const rows=[{listing_id:1,title:'Game + playmat',brand:'Maker'}];
 const answer=[{listing_id:1,category:'BUNDLE',confidence:90,evidence:'Game plus playmat',needs_review:false,language:'UNKNOWN',bgg_verdict:'UNKNOWN'}];
 const hash=x=>createHash('sha256').update(x).digest('hex');
 async function setup(options={}){
  const dir=options.dir||await mkdtemp(join(tmpdir(),'ludo-ai-'));let calls=0;
- const mf=new Miniflare({modules:true,modulesRules:[{type:'ESModule',include:['**/*.js']}],scriptPath:new URL('../src/worker.js',import.meta.url).pathname,
+ const mf=new Miniflare({modules:true,modulesRules:[{type:'ESModule',include:['**/*.js']}],scriptPath:fileURLToPath(new URL('../src/worker.js',import.meta.url)),
  compatibilityDate:'2026-07-30',durableObjects:{BUDGET:{className:'BudgetObject',useSQLite:true}},durableObjectsPersist:dir,
  bindings:{ENABLED:'true',FREE_TIER_VALID_UNTIL:String(Date.now()+3600000),GEMINI_API_KEY:'fake-test-key',
- DEVICE_DIGESTS:JSON.stringify({d1:hash(token)}),SEED_MANIFEST:JSON.stringify({version:1,source_sha256:'a'.repeat(64),benchmark_disabled:true,months:{[month]:{calls_reserved:options.seed??8,reserved_micro:(options.seed??8)*10000}}}),...options.bindings},
+ DEVICE_DIGESTS:JSON.stringify({d1:hash(token)}),LOCAL_WORKER_DIGEST:hash(workerToken),SEED_MANIFEST:JSON.stringify({version:1,source_sha256:'a'.repeat(64),benchmark_disabled:true,months:{[month]:{calls_reserved:options.seed??8,reserved_micro:(options.seed??8)*10000}}}),...options.bindings},
  outboundService:async request=>{calls++; if(options.provider)return options.provider(request);
  return Response.json({candidates:[{content:{parts:[{text:JSON.stringify(answer)}]}}],usageMetadata:{promptTokenCount:100,candidatesTokenCount:100}});}});
- const request=async(id='request-0001',r=rows,auth=token)=>mf.dispatchFetch('https://local/v1/classify',{method:'POST',headers:{authorization:'Bearer '+auth,'content-type':'application/json'},body:JSON.stringify({request_id:id,records:r})});
- return {mf,request,calls:()=>calls,dir,async close(){await mf.dispose();if(!options.dir)await rm(dir,{recursive:true,force:true});}};
+ const normalizeRows=r=>r.map(x=>({source_text:'',photos:[],...x}));
+ const request=async(id='request-0001',r=rows,auth=token)=>mf.dispatchFetch('https://local/v1/classify',{method:'POST',headers:{authorization:'Bearer '+auth,'content-type':'application/json'},body:JSON.stringify({request_id:id,records:normalizeRows(r)})});
+ const local=async(path,body={},auth=workerToken)=>mf.dispatchFetch('https://local/v1/local/'+path,{method:'POST',headers:{authorization:'Bearer '+auth,'content-type':'application/json'},body:path==='heartbeat'?undefined:JSON.stringify(body)});
+ return {mf,request,local,calls:()=>calls,dir,async close(){await mf.dispose();if(!options.dir)await rm(dir,{recursive:true,force:true});}};
 }
 test('manual result stays a proposal and imported reservations survive',async()=>{const x=await setup();try{const r=await x.request();assert.equal(r.status,200);const b=await r.json();assert.equal(b.status,'PROPOSAL');assert.equal(b.budget.calls_reserved,9);assert.equal(b.records[0].apply_authorized,false);assert.equal(x.calls(),1);}finally{await x.close();}});
 test('last slot contested by two devices requests permits one fetch',async()=>{const x=await setup({seed:99});try{const a=await Promise.all([x.request('request-0001'),x.request('request-0002',[{...rows[0],title:'Other'}])]);assert.deepEqual(a.map(r=>r.status).sort(),[200,429]);assert.equal(x.calls(),1);}finally{await x.close();}});
@@ -62,3 +65,37 @@ test('missing recorded month cannot silently reset the global quota',async()=>{c
  x=await setup({dir,seed:99});assert.equal((await x.request('request-0002',[{...rows[0],title:'Another game'}])).status,503);assert.equal(x.calls(),0);
  }finally{await x.close();await rm(dir,{recursive:true,force:true});}});
 test('a legitimate new UTC month starts once and survives restart',async()=>{const dir=await mkdtemp(join(tmpdir(),'ludo-rollover-'));const seed=JSON.stringify({version:1,source_sha256:'a'.repeat(64),benchmark_disabled:true,months:{'2020-01':{calls_reserved:8,reserved_micro:80000}}});let x=await setup({dir,bindings:{SEED_MANIFEST:seed}});try{const body=await(await x.request()).json();assert.equal(body.budget.calls_reserved,1);await x.close();x=await setup({dir,bindings:{SEED_MANIFEST:seed}});assert.equal((await(await x.request()).json()).budget.calls_reserved,1);assert.equal(x.calls(),0);}finally{await x.close();await rm(dir,{recursive:true,force:true});}});
+
+
+test('online local worker gets first refusal without spending Gemini budget',async()=>{
+ const x=await setup();try{
+  assert.equal((await x.local('heartbeat')).status,200);
+  const first=await x.request();assert.equal(first.status,202);const pending=await first.json();assert.equal(pending.status,'LOCAL_PENDING');assert.equal(pending.budget.calls_reserved,8);assert.equal(x.calls(),0);
+  const claim=await(await x.local('claim',{model:'qwen3-vl:8b-instruct-q4_K_M'})).json();assert.equal(claim.status,'JOB');assert.equal(claim.records[0].title,'Game + playmat');
+  const result={job_id:claim.job_id,worker_model:'qwen3-vl:8b-instruct-q4_K_M',records:[{listing_id:1,proposed_type:'BUNDLE',confidence:null,evidence:'title and listing evidence indicate multiple products',language:'UNKNOWN',product_title:'Game'}]};
+  assert.equal((await x.local('result',result)).status,200);
+  const done=await x.request();assert.equal(done.status,200);const proposal=await done.json();assert.equal(proposal.provider,'LOCAL');assert.equal(proposal.records[0].proposed_type,'BUNDLE');assert.equal(proposal.budget.calls_reserved,8);assert.equal(x.calls(),0);
+ }finally{await x.close();}
+});
+test('local worker authentication and richer listing fields are bounded',async()=>{
+ const x=await setup();try{
+  assert.equal((await x.local('heartbeat',{},'wrong-worker')).status,401);
+  const enriched=[{listing_id:1,title:'Catan Junior',brand:'Kosmos',source_text:'lingua tedesca',photos:['https://images1.vinted.net/t/01_test.webp']}];
+  await x.local('heartbeat');assert.equal((await x.request('request-rich1',enriched)).status,202);
+  const claim=await(await x.local('claim',{model:'qwen'})).json();assert.equal(claim.records[0].source_text,'lingua tedesca');assert.equal(claim.records[0].photos.length,1);
+  const bad=[{...enriched[0],photos:['http://127.0.0.1/private']}];assert.equal((await x.request('request-rich2',bad)).status,400);
+  assert.equal(x.calls(),0);
+ }finally{await x.close();}
+});
+
+
+test('local AI remains usable after Gemini monthly quota is exhausted',async()=>{
+ const x=await setup({seed:100,bindings:{FREE_TIER_VALID_UNTIL:'0'}});try{
+  await x.local('heartbeat');
+  const first=await x.request('request-local100');assert.equal(first.status,202);assert.equal(x.calls(),0);
+  const claim=await(await x.local('claim',{model:'qwen3-vl:8b-instruct-q4_K_M'})).json();assert.equal(claim.status,'JOB');
+  const result={job_id:claim.job_id,worker_model:'qwen3-vl:8b-instruct-q4_K_M',records:[{listing_id:1,proposed_type:'BASE_GAME',confidence:null,evidence:'standalone product evidence',language:'UNKNOWN',product_title:'Game'}]};
+  assert.equal((await x.local('result',result)).status,200);
+  const done=await(await x.request('request-local100')).json();assert.equal(done.provider,'LOCAL');assert.equal(done.budget.calls_reserved,100);assert.equal(x.calls(),0);
+ }finally{await x.close();}
+});

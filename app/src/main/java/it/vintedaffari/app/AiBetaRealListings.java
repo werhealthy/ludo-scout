@@ -6,7 +6,7 @@ import org.json.JSONArray;
 import java.io.File;
 
 /** Stable manual snapshot using the existing frontend read-only announcement source.
- * No helper, upgrades, catalog writes or network. Local evidence and BGG stay local.
+ * No helper, upgrades or catalog writes. BGG/local classification stay local; bounded listing text/photos may be routed to private AI.
  */
 public final class AiBetaRealListings {
  private AiBetaRealListings() {}
