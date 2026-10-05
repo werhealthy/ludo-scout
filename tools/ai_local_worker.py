@@ -26,6 +26,7 @@ healthy=False
 stop=False
 worked_since_idle=False
 idle_announced=False
+processing=False
 
 SCHEMA={
  "type":"object",
@@ -158,13 +159,13 @@ Non inventare. Evidence massimo 4 frasi brevi."""
 def heartbeat_loop():
  global healthy
  while not stop:
-  if healthy:
+  if healthy and processing:
    try: post_local("heartbeat",{"model":MODEL},timeout=8)
    except Exception: pass
-  time.sleep(5)
+  time.sleep(30)
 
 def main():
- global healthy,stop,worked_since_idle,idle_announced
+ global healthy,stop,worked_since_idle,idle_announced,processing
  if not valid_endpoint(ENDPOINT) or len(TOKEN)<16:
   raise SystemExit("Set LUDO_AI_ENDPOINT to the Ludo .workers.dev root and LUDO_AI_WORKER_TOKEN")
  socket.setdefaulttimeout(35)
@@ -190,10 +191,11 @@ def main():
       print("Coda Qwen vuota · tutti i job ricevuti finora sono completati.")
       idle_announced=True
       worked_since_idle=False
-     time.sleep(1);continue
+     time.sleep(30);continue
     if job.get("status")!="JOB":
      time.sleep(2);continue
     started=time.time()
+    processing=True
     records=job.get("records",[])
     with_photos=sum(1 for r in records if r.get("photos"))
     total_photos=sum(min(4,len(r.get("photos",[]))) for r in records)
@@ -201,15 +203,18 @@ def main():
     print("Job",job.get("request_id"),"| records",len(records),"| con foto",with_photos,"| foto",total_photos)
     answers=[classify(r) for r in records]
     post_local("result",{"job_id":job["job_id"],"worker_model":MODEL,"records":answers},timeout=20)
+    processing=False
     worked_since_idle=True
     print("Done",job.get("request_id"),f"| {time.time()-started:.1f}s")
    except KeyboardInterrupt:
     break
    except urllib.error.HTTPError as e:
+    processing=False
     healthy=False
     print("Local AI error: HTTP",e.code,"- fallback will resume after heartbeat expires.")
     time.sleep(3)
    except Exception as e:
+    processing=False
     healthy=False
     print("Local AI error:",type(e).__name__,str(e)[:160],"- fallback will resume after heartbeat expires.")
     time.sleep(3)
