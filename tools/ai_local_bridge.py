@@ -90,14 +90,18 @@ def validate(payload):
  return request_id,rows
 
 def normalized_answer(answer):
+ types={"BASE_GAME","EXPANSION","BUNDLE","ACCESSORY_COMPONENT","NON_GAME","UNKNOWN"}
+ languages={"IT","EN","DE","FR","ES","PT","NL","MULTI","OTHER","UNKNOWN"}
+ ptype=answer.get("proposed_type");language=answer.get("language","UNKNOWN");evidence=str(answer.get("evidence","")).strip()
+ if ptype not in types or language not in languages or not evidence:raise ValueError("local output")
  return {
   "listing_id":answer["listing_id"],
-  "proposed_type":answer["proposed_type"],
+  "proposed_type":ptype,
   "confidence":None,
-  "evidence":str(answer.get("evidence",""))[:500],
+  "evidence":evidence[:500],
   "needs_review":True,
   "apply_authorized":False,
-  "language":answer.get("language","UNKNOWN"),
+  "language":language,
   "bgg_verified":False,
   "product_title":str(answer.get("product_title",""))[:180],
  }
