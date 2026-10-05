@@ -2,7 +2,7 @@
 
 ## Backend — AI retry audit checkpoint; runtime still unverified, 2026-10-05
 
-GitHub confirms PR #310 remains open, draft, unmerged, targeting beta. Its current head and branch HEAD are both 7b89708d3097b7c9278c3e9ee2cb40b75881df3a; beta remains ff1427a92d2caa20beef173f330c85ea383d53bc. This supersedes the prior abbreviated SHA and confirms no merge.
+GitHub confirms PR #310 remains open, draft, unmerged, targeting beta. At the initial inspection its head and branch HEAD were both 7b89708d3097b7c9278c3e9ee2cb40b75881df3a; beta was ff1427a92d2caa20beef173f330c85ea383d53bc. This checkpoint was then committed to STATE.md on the PR branch as 9a4616f86e4294e040f7115cf7dcdd56c33819f5; that documentation-only commit is now the branch and PR head. No application code changed.
 
 The supplied later runtime report for listings 1572, 1577 and 1581 records zero AI evidence and all three still AUTO_FILTERED/AUTO_FILTERED_NON_GAME, with observations PENDING_ANALYSIS and no BGG identity. Its diag is PENDING_FAILED (checked=0, held=0, recovered=0, failedBatches=0); retryAt was about five minutes after capture. This report proves only the captured state; it does not show whether any subsequent retry ran.
 
