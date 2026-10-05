@@ -2063,7 +2063,7 @@ public final class MarketStore {
         // Catalog maintenance is deliberately serial and opportunistic. It never competes with a
         // live Motore run, and it materialises at most one Vinted request at a time.
         if(helper.activeObservationSession()!=null)return 0;SQLiteDatabase db=helper.getWritableDatabase();
-        try(Cursor active=db.rawQuery("SELECT 1 FROM processing_jobs WHERE source IN (?,?) AND state IN (?,?,?) LIMIT 1",new String[]{CATALOG_HEALTH_SOURCE,CATALOG_RECOVERY_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE})){if(active.moveToFirst())return 0;}
+        try(Cursor active=db.rawQuery("SELECT 1 FROM processing_jobs WHERE source IN (?,?,?) AND state IN (?,?,?) LIMIT 1",new String[]{CATALOG_HEALTH_SOURCE,CATALOG_RECOVERY_SOURCE,SELLER_BACKFILL_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE})){if(active.moveToFirst())return 0;}
         // Phase 1 seller backfill: one exact already-known item at a time, only while Motore is idle.
         // This reuses the existing public-page lane and its 55 s / hourly circuit; it does not raise
         // request frequency. Each listing is attempted once automatically so a missing seller cannot
