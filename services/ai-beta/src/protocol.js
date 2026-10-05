@@ -1,5 +1,5 @@
 export const MODEL='ludo-hybrid-v1',CONTRACT='listing-evidence-v2',GEMINI_MODEL='gemini-3.1-flash-lite';
-export const MAX_INPUT_BYTES=32768,LOCAL_HEARTBEAT_TTL_MS=20000,LOCAL_LEASE_MS=10*60*1000;
+export const MAX_INPUT_BYTES=32768,LOCAL_HEARTBEAT_TTL_MS=90000,LOCAL_LEASE_MS=10*60*1000;
 export const json=(body,status=200)=>Response.json(body,{status,headers:{'cache-control':'no-store'}});
 export async function digest(value){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');}
 const photoHostOk=value=>{try{const u=new URL(value);const h=u.hostname.toLowerCase();return u.protocol==='https:'&&(h==='vinted.net'||h.endsWith('.vinted.net')||h==='vinted.com'||h.endsWith('.vinted.com'));}catch{return false;}};
