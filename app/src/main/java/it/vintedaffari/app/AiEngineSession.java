@@ -51,7 +51,7 @@ final class AiEngineSession {
  static Result run(JSONObject config,Journal store,Source source,Transport transport,long now)throws Exception {
   if(!config.optBoolean("enabled")||!AiBetaProtocol.validEndpoint(config.optString("endpoint"))||config.optString("token").length()<16)
    return new Result("LOCAL_DISABLED",0,0,false);
-  String configKey=AiBetaProtocol.fingerprint(config.optString("endpoint")+ "\n"+config.optString("token"),"ai-engine-config","v1");
+  String configKey=AiBetaProtocol.fingerprint(config.optString("endpoint")+"\n"+config.optString("token")+"\n"+AiBetaProtocol.MODEL+"\n"+AiBetaProtocol.CONTRACT,"ai-engine-config","v2");
   JSONObject j=store.load();
   if(!configKey.equals(j.optString("config_key")))j=new JSONObject().put("config_key",configKey);
   prune(j,now);
