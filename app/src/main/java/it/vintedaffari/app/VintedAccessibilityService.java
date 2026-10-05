@@ -79,6 +79,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
     /** Diagnostic-only dedupe for the Accessibility identity probe. This never determines listing identity. */
     private final LinkedHashSet<String> accessibilityIdentityProbeSeen = new LinkedHashSet<>();
     private String lastBundleExploreIntent="";
+    private long lastDescriptionExpandAt=0L;
     private int bundleExploreHintsThisIntent=0;
 
     private JsGameEngine engine;
@@ -457,7 +458,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 String exactSig=marketStore.signatureForListing(exactListingId);if(!TextUtils.isEmpty(exactSig))currentProductDeal.signature=exactSig;
             }
             diag().edit().putString("lastOpenedVintedPage","title="+product.title+";sold="+product.sold+";exact="+exactOpened+";listing="+exactListingId+";deal="+(currentProductDeal!=null)).apply();
-            if(exactOpened)diag().edit().putString("lastOpenedProductTree",productTreeDiagnostic(root)).apply();
+            if(exactOpened){
+                diag().edit().putString("lastOpenedProductTree",productTreeDiagnostic(root)).apply();
+                if(TextUtils.isEmpty(product.detailsText)&&maybeExpandProductDescription(root)){
+                    diag().edit().putLong("lastDescriptionExpandAt",System.currentTimeMillis()).apply();
+                    scheduleScan(180L);
+                }
+            }
             handleProductPage(product,currentProductDeal,exactListingId);
             if(product.sold&&(currentProductDeal!=null||exactListingId>0)){
                 reconcileOpenedSold(currentProductDeal,exactListingId,exactOpened,"product-parser");
@@ -1154,6 +1161,35 @@ public final class VintedAccessibilityService extends AccessibilityService {
         diag().edit().putString("lastOpenedVintedReconcile","sold:"+(TextUtils.isEmpty(soldSig)?"listing#"+listingId:soldSig)+";exact="+exactOpened+";listing="+listingId+";source="+source).apply();
         OperationCenter.done(this,"sold:"+(TextUtils.isEmpty(soldSig)?String.valueOf(listingId):soldSig),OperationCenter.LINK,"Articolo venduto · rimosso");
         sendBroadcast(new Intent("it.vintedaffari.app.DEALS_UPDATED").setPackage(getPackageName()));
+    }
+
+    private boolean maybeExpandProductDescription(AccessibilityNodeInfo root){
+        long now=System.currentTimeMillis();if(root==null||now-lastDescriptionExpandAt<2_000L)return false;
+        AccessibilityNodeInfo target=findDescriptionAction(root,false);
+        if(target==null)return false;
+        lastDescriptionExpandAt=now;
+        boolean clicked=false;
+        try{clicked=target.performAction(AccessibilityNodeInfo.ACTION_CLICK);}catch(Throwable ignored){}
+        diag().edit().putBoolean("lastDescriptionExpandClicked",clicked).apply();
+        return clicked;
+    }
+    private AccessibilityNodeInfo findDescriptionAction(AccessibilityNodeInfo node,boolean inDescription){
+        if(node==null)return null;
+        String id=node.getViewIdResourceName();String lid=id==null?"":id.toLowerCase(Locale.ROOT);
+        String text=node.getText()==null?"":node.getText().toString().trim();
+        String desc=node.getContentDescription()==null?"":node.getContentDescription().toString().trim();
+        String label=(text+" "+desc).trim().toLowerCase(Locale.ROOT);
+        boolean section=inDescription||lid.contains("item_description_content");
+        boolean descriptionLabel=label.equals("descrizione")||label.equals("description")||label.equals("beschreibung")
+                ||label.equals("description de l'article")||label.equals("omschrijving");
+        if(section&&(descriptionLabel||lid.contains("label_text"))&&node.isClickable())return node;
+        if(section&&node.isClickable()&&!TextUtils.isEmpty(label))return node;
+        for(int i=0;i<node.getChildCount();i++){
+            AccessibilityNodeInfo child=node.getChild(i);AccessibilityNodeInfo found=findDescriptionAction(child,section);
+            if(found!=null)return found;
+        }
+        if(section&&node.isClickable())return node;
+        return null;
     }
 
     private String productTreeDiagnostic(AccessibilityNodeInfo root){
