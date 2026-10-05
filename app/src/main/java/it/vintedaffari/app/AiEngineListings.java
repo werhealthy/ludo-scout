@@ -15,13 +15,13 @@ final class AiEngineListings implements AiEngineSession.Source {
  private int recovered;
  private static final String SELECT=AiBetaListings.SELECTION_SQL.substring(0,AiBetaListings.SELECTION_SQL.indexOf(" FROM "))
    +",COALESCE(d.verification_state,''),COALESCE(d.confirmed,0),COALESCE(l.manual_review_required,0),"
-   +"COALESCE(l.enrichment_state,''),COALESCE(l.category_normalized,''),"
+   +"COALESCE(l.enrichment_state,''),COALESCE(l.category_normalized,''),COALESCE(l.last_error,''),"
    +"CASE WHEN EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)) THEN 1 ELSE 0 END "
    +"FROM market_listings l LEFT JOIN games g ON g.id=l.game_id "
    +"LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) ";
  private static final String PROTECTED="NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id))";
  private static final String COMMON="l.id>0 AND TRIM(COALESCE(l.vinted_title,''))<>'' AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(d.confirmed,0)=0 AND COALESCE(d.verification_state,'')<>'USER_CONFIRMED' AND "+PROTECTED;
- private static final String RECOVERABLE="l.lifecycle='AUTO_FILTERED' AND l.enrichment_state='AUTO_EXCLUDED' AND COALESCE(g.bgg_id,'')='' AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint))";
+ private static final String RECOVERABLE="l.lifecycle='AUTO_FILTERED' AND (l.enrichment_state='AUTO_EXCLUDED' OR (l.enrichment_state='AUTO_FILTERED' AND l.match_state='AUTO_FILTERED_NON_GAME' AND COALESCE(l.last_error,'')='Nessuna prova positiva di prodotto gioco da tavolo')) AND COALESCE(g.bgg_id,'')='' AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint))";
  private static final String ELIGIBLE=COMMON+" AND (l.lifecycle='ACTIVE' OR ("+RECOVERABLE+"))";
 
  AiEngineListings(SQLiteDatabase db){this.db=db;}
@@ -45,7 +45,8 @@ final class AiEngineListings implements AiEngineSession.Source {
     .put("engine_manual_review",c.getInt(14))
     .put("engine_enrichment",c.getString(15))
     .put("engine_category",c.getString(16))
-    .put("engine_has_observation",c.getInt(17)!=0);
+    .put("engine_last_error",c.getString(17))
+    .put("engine_has_observation",c.getInt(18)!=0);
  }
 
  @Override public JSONArray select(JSONObject j,long now)throws Exception {
@@ -107,7 +108,7 @@ final class AiEngineListings implements AiEngineSession.Source {
      listing.putNull("game_id");listing.putNull("match_confidence");
      listing.put("deferred_retry_at",0);listing.put("manual_review_required",0);listing.putNull("manual_review_reason");
      listing.put("last_error","AI_CATEGORY_RECOVERED: gioco base riconosciuto da evidenza visiva; identità BGG ancora da verificare");
-     int changed=db.update("market_listings",listing,"id=? AND lifecycle='AUTO_FILTERED' AND enrichment_state='AUTO_EXCLUDED' AND COALESCE(manual_review_required,0)=0",new String[]{id});
+     int changed=db.update("market_listings",listing,"id=? AND lifecycle='AUTO_FILTERED' AND COALESCE(manual_review_required,0)=0 AND (enrichment_state='AUTO_EXCLUDED' OR (enrichment_state='AUTO_FILTERED' AND match_state='AUTO_FILTERED_NON_GAME' AND COALESCE(last_error,'')='Nessuna prova positiva di prodotto gioco da tavolo'))",new String[]{id});
      if(changed>0&&!signature.isEmpty()){
       // Re-open the existing sighting instead of manufacturing a new observation timestamp.
       ContentValues observation=new ContentValues();observation.put("analysis_status","pending");observation.put("verification_state","PENDING_ANALYSIS");
