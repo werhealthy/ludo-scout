@@ -672,7 +672,13 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     // It must show positive board-game evidence; otherwise keep it in a reversible
                     // auto-filtered quarantine and let the fast discovery pipeline continue.
                     if(ga==null||!"matched".equals(ga.status)||TextUtils.isEmpty(ga.bggId)){
-                        BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
+                        boolean aiRecoveredProduct=marketStore!=null
+                                && analyzedListing.type==ListingClassifier.Type.UNCERTAIN
+                                && !BoardGameIntakeGate.isStrongNonGameText(card.title,card.rawDescription)
+                                && marketStore.hasAiCategoryRecoveryEvidence(card);
+                        BoardGameIntakeGate.Decision gate=aiRecoveredProduct
+                                ? new BoardGameIntakeGate.Decision(BoardGameIntakeGate.Action.ACCEPT,"Prodotto gioco confermato da evidenza AI; identità BGG ancora da verificare")
+                                : BoardGameIntakeGate.afterAnalysis(card,analyzedListing,ga);
                         if(gate.action==BoardGameIntakeGate.Action.QUARANTINE){
                             DealRecord noisy=database.findByTitlePrice(card.title,(int)Math.round(card.itemPrice*100.0));
                             if(noisy!=null&&card.capturedSignature.isEmpty())database.exclude(noisy,"Scarto automatico pre-BGG: "+gate.reason);

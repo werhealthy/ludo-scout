@@ -2860,6 +2860,20 @@ public final class MarketStore {
     }
 
 
+    /** Product-type evidence from Qwen is allowed to reopen the BGG pipeline, never to set BGG identity. */
+    public boolean hasAiCategoryRecoveryEvidence(VintedCard card){
+        if(card==null)return false;SQLiteDatabase db=helper.getReadableDatabase();
+        Long listingId=listingIdForCard(db,card);if(listingId==null)return false;
+        try(Cursor c=db.rawQuery("SELECT lifecycle,enrichment_state,match_state,last_error,COALESCE(manual_review_required,0) FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)})){
+            if(!c.moveToFirst())return false;
+            return "ACTIVE".equals(c.getString(0))
+                && "PENDING_ANALYSIS".equals(c.getString(1))
+                && "PENDING_ANALYSIS".equals(c.getString(2))
+                && c.getString(3)!=null&&c.getString(3).startsWith("AI_CATEGORY_RECOVERED:")
+                && c.getInt(4)==0;
+        }
+    }
+
     /** Hide one unresolved observation before it can become a human BGG review. The raw row is
      * retained for diagnostics, but it no longer participates in prices, queues or the visible DB. */
     public boolean quarantineUnresolvedObservation(VintedCard card,String reason,long now){
