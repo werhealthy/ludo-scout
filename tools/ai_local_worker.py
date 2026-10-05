@@ -53,7 +53,7 @@ def valid_endpoint(value):
 
 def http_json(url,body=None,token=None,timeout=35):
  data=None if body is None else json.dumps(body,separators=(",",":")).encode()
- headers={"content-type":"application/json"}
+ headers={"content-type":"application/json","user-agent":"LudoScoutLocalAI/1.0","accept":"application/json"}
  if token: headers["authorization"]="Bearer "+token
  req=urllib.request.Request(url,data=data,headers=headers,method="POST" if body is not None else "GET")
  with NO_REDIRECT.open(req,timeout=timeout) as r:
@@ -155,6 +155,8 @@ def main():
      print("Ollama/model unavailable; Gemini fallback will remain available.")
      time.sleep(5);continue
     try: post_local("heartbeat",{"model":MODEL},timeout=8)
+    except urllib.error.HTTPError as e:
+     print("Broker unavailable: HTTP",e.code);time.sleep(5);continue
     except Exception as e:
      print("Broker unavailable:",type(e).__name__);time.sleep(5);continue
     print("Local AI online.")
@@ -171,6 +173,10 @@ def main():
     print("Done",job.get("request_id"),f"| {time.time()-started:.1f}s")
    except KeyboardInterrupt:
     break
+   except urllib.error.HTTPError as e:
+    healthy=False
+    print("Local AI error: HTTP",e.code,"- fallback will resume after heartbeat expires.")
+    time.sleep(3)
    except Exception as e:
     healthy=False
     print("Local AI error:",type(e).__name__,str(e)[:160],"- fallback will resume after heartbeat expires.")
