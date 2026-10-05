@@ -37,12 +37,26 @@ SCHEMA={
 }
 TYPE_MAP={"ACCESSORY":"ACCESSORY_COMPONENT","COMPONENT":"ACCESSORY_COMPONENT","EMPTY_BOX":"ACCESSORY_COMPONENT"}
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+ def redirect_request(self,req,fp,code,msg,headers,newurl):
+  return None
+
+NO_REDIRECT=urllib.request.build_opener(NoRedirect)
+
+def valid_endpoint(value):
+ try:
+  u=urllib.parse.urlparse(value)
+  host=(u.hostname or "").lower()
+  return u.scheme=="https" and host.endswith(".workers.dev") and u.username is None and u.password is None and u.port is None and (u.path in ("","/")) and not u.query and not u.fragment
+ except Exception:
+  return False
+
 def http_json(url,body=None,token=None,timeout=35):
  data=None if body is None else json.dumps(body,separators=(",",":")).encode()
  headers={"content-type":"application/json"}
  if token: headers["authorization"]="Bearer "+token
  req=urllib.request.Request(url,data=data,headers=headers,method="POST" if body is not None else "GET")
- with urllib.request.urlopen(req,timeout=timeout) as r:
+ with NO_REDIRECT.open(req,timeout=timeout) as r:
   raw=r.read(1024*1024)
   return r.status, (json.loads(raw) if raw else {})
 
@@ -69,7 +83,8 @@ def fetch_image(url):
  if not allowed_photo(url): return None
  req=urllib.request.Request(url,headers={"User-Agent":"LudoScoutLocalAI/1.0"})
  try:
-  with urllib.request.urlopen(req,timeout=10) as r:
+  with NO_REDIRECT.open(req,timeout=10) as r:
+   if not allowed_photo(r.geturl()): return None
    length=r.headers.get("content-length")
    if length and int(length)>8*1024*1024: return None
    data=r.read(8*1024*1024+1)
@@ -127,8 +142,8 @@ def heartbeat_loop():
 
 def main():
  global healthy,stop
- if not ENDPOINT.startswith("https://") or len(TOKEN)<16:
-  raise SystemExit("Set LUDO_AI_ENDPOINT (https) and LUDO_AI_WORKER_TOKEN")
+ if not valid_endpoint(ENDPOINT) or len(TOKEN)<16:
+  raise SystemExit("Set LUDO_AI_ENDPOINT to the Ludo .workers.dev root and LUDO_AI_WORKER_TOKEN")
  socket.setdefaulttimeout(35)
  threading.Thread(target=heartbeat_loop,daemon=True).start()
  print(f"Ludo local AI worker | model={MODEL}")
