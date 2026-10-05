@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Backend — local USB bridge status currently unreachable, 2026-10-05
+
+Owner ran GET http://127.0.0.1:8765/v1/status with the debug bearer header; PowerShell returned “Impossibile effettuare la connessione al server remoto.” This establishes that no service was reachable at that loopback address/port at the time of this check. It does not prove the listener state at the earlier runtime failure. The accompanying adb reverse --list produced no visible output in the supplied transcript, so the current reverse mapping remains unknown.
+
+Repository code for tools/ai_local_bridge.py binds only 127.0.0.1:8765, and main exits before starting the server if ollama_ready() is false. Thus an unavailable local model can prevent this bridge from listening; however, bridge process state, port conflicts, model readiness and the app's configured endpoint are not established by the supplied output. No AI classify request, build or install was run. Next read-only checks: capture adb reverse --list separately; check whether local Ollama/model is available and whether a process owns port 8765. Start nothing and do not reinstall until those results explain the status path.
+
 ## Backend — phone audit identifies AI status transport as current stop; cause unknown, 2026-10-05
 
 Owner supplied the full read-only runtime audit for canonical listings 1572, 1577 and 1581. listing_count=3; all three rows are BASE_GAME, AUTO_FILTERED/AUTO_FILTERED_NON_GAME, with last_error “Nessun candidato BGG sufficientemente forte: scarto automatico, non fact-check”, null BGG IDs, no AI category evidence, observations still PENDING_ANALYSIS, no deals and zero overrides. The audit captured at 1791231560952.
