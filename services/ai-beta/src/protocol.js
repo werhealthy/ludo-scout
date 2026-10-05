@@ -12,6 +12,7 @@ export function validate(input){
  }
  return input;
 }
-export function serviceActive(env){const until=Number(env.FREE_TIER_VALID_UNTIL),now=Date.now();return env.ENABLED==='true'&&Number.isFinite(until)&&until>now&&until<=now+86400000&&(!!env.GEMINI_API_KEY||!!env.LOCAL_WORKER_DIGEST);}
-export function geminiActive(env){return serviceActive(env)&&!!env.GEMINI_API_KEY;}
+const geminiWindowActive=env=>{const until=Number(env.FREE_TIER_VALID_UNTIL),now=Date.now();return Number.isFinite(until)&&until>now&&until<=now+86400000;};
+export function serviceActive(env){return env.ENABLED==='true'&&(!!env.LOCAL_WORKER_DIGEST||geminiWindowActive(env)&&!!env.GEMINI_API_KEY);}
+export function geminiActive(env){return env.ENABLED==='true'&&geminiWindowActive(env)&&!!env.GEMINI_API_KEY;}
 export function localWorkerAuthorized(env,tokenDigest){return typeof env.LOCAL_WORKER_DIGEST==='string'&&/^[a-f0-9]{64}$/.test(env.LOCAL_WORKER_DIGEST)&&tokenDigest===env.LOCAL_WORKER_DIGEST;}
