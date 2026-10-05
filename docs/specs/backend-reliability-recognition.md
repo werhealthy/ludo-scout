@@ -1,5 +1,11 @@
 # Ludo Scout — Backend reliability, acquisition and recognition
 
+## AI recovery category/identity contract — owner authorized, 2026-10-05
+A fresh visually grounded AI BASE_GAME result can recover enumerated automatic missing-product or missing-identity filters, including local BASE_GAME and UNCERTAIN. It is listing-specific category proof, never a BGG identity, price change, trust promotion or override of a user decision. Persist evidence independently of mutable analysis reasons and bind it to title, brand, full source text and photos. Incompatible Vinted category, explicit negative product evidence and manual decisions remain authoritative.
+
+Local analysis must reach BGG matching. Missing/ambiguous BGG identity and technical matching faults leave the proven listing ACTIVE in the existing BGG_MATCH_REVIEW/NEEDS_REVIEW state; other listings sharing a provisional game are handled independently. Strong BGG identity follows normal matching/metadata/quality/trust gates. An incomplete or re-filtered expected-positive real cohort cannot satisfy acceptance. Regression fixtures/build alone are insufficient: physical-phone proof is pending. Autonomous private local AI architecture is a separate proposal after this milestone; requires owner approval before implementation.
+
+
 ## Backend — automatic AI engine175 verified; distribution blocked, 2026-10-04
 
 PR263 HEADbe306c6c52eb303f3575f66e0035ae23a836a372 merged squash99b269ffd36f79775630609d54a06da8516824f0. Existing owner AI configuration now enables bounded automatic checks of current ACTIVE announcements in foreground and recovery queue owners; switch explicitly labels engine and manual use. Unconfigured/disabled phones send nothing. Separate encrypted no-backup journal, cross-process file lease,8records/4096bytes of ID/title/brand only; current local description/identity stays private. Per-record7day cache, maximum800entries/850KB, preserves original expiry during local rechecks; mixed groups submit only uncached records. Status/OFF/valid100attempts/EUR1theoretical reservation checks and15minute backoff; unknown transport keeps original requestID, including at exhausted new-reservation budget. Terminal provider FAILED retains its reservation and advances unrelated work. No reset/refund, service activation, paid upgrade, schema/dependency/pricing/filter change.
@@ -795,3 +801,4 @@ Interfacce: evidence(JSONObject row)→String locale; source_text/source_truncat
 - [x] Implementare estrattoUnicode2000 e formatter locale; bottone Esamina dati locali attivo ancheAIoff; controllare snapshot prima di apertura, niente network/catalogwriters.
 - [x] Test GREEN: SQLiteinvariato, payloadtrecampi/cachekey invariata con modifiche solo testo, hashcompleto rileva coda cambiata, legacy snapshot non riutilizzabile; dettaglio reale leggibile100/200%, cacheAI/richiestaID/review invariati.
 - [x] Run workflow AndroidPR completo, reviewindipendente, riallinearebeta, merge; beta firmata certificato/uploadFirebase/distribuzione distinti. Checkpoint STATE/spec con verifiche e limiti.
+

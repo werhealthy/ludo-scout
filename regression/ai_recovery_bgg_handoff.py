@@ -13,14 +13,15 @@ checks={
  "bounce retry remains filtered-only": "AUTO_FILTERED" in policy and "AUTO_EXCLUDED" in policy,
  "existing BGG still blocks recovery": '!row.optString("bgg_id").isEmpty()' in policy,
  "human protections retained": "engine_manual_review" in policy and "engine_confirmed" in policy and "listing_overrides" in listings,
- "AI marker is one-shot state": 'startsWith("AI_CATEGORY_RECOVERED:")' in market and '"PENDING_ANALYSIS".equals(c.getString(1))' in market,
+ "AI proof survives analysis state changes": "AiCategoryEvidence.has(db,listingId,card)" in market,
  "local strong non-game still wins": "isStrongNonGameText(card.title,card.rawDescription)" in persist,
  "recovered uncertain bypasses only product gate": "aiRecoveredProduct" in persist and "ListingClassifier.Type.UNCERTAIN" in persist,
  "BGG analysis still runs normally": "marketStore.applyAnalysis(card,ga,analyzedListing,t)" in persist,
  "AI does not set BGG identity": 'put("bgg_id"' not in listings and 'db.update("games"' not in listings,
- "version":"5.12.199-ai-recovery-bgg-handoff" in gradle,
+ "version":"5.12.201-ai-category-state" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)
 if not all(checks.values()):
  raise SystemExit(1)
+

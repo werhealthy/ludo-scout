@@ -22,7 +22,7 @@ final class AiEngineListings implements AiEngineSession.Source {
    +"LEFT JOIN deals d ON d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) ";
  private static final String PROTECTED="NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id))";
  private static final String COMMON="l.id>0 AND TRIM(COALESCE(l.vinted_title,''))<>'' AND COALESCE(l.manual_review_required,0)=0 AND COALESCE(d.confirmed,0)=0 AND COALESCE(d.verification_state,'')<>'USER_CONFIRMED' AND "+PROTECTED;
- private static final String RECOVERABLE="l.lifecycle='AUTO_FILTERED' AND (l.enrichment_state='AUTO_EXCLUDED' OR EXISTS(SELECT 1 FROM observations ar WHERE ar.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) AND COALESCE(ar.verification_reason,'') LIKE 'AI category recovery:%')) AND COALESCE(g.bgg_id,'')='' AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint))";
+ private static final String RECOVERABLE=AiEnginePolicy.RECOVERABLE_SQL+" AND COALESCE(g.bgg_id,'')='' AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint))";
  private static final String ELIGIBLE=COMMON+" AND (l.lifecycle='ACTIVE' OR ("+RECOVERABLE+"))";
 
  AiEngineListings(SQLiteDatabase db){this.db=db;}
@@ -110,8 +110,10 @@ final class AiEngineListings implements AiEngineSession.Source {
      listing.putNull("game_id");listing.putNull("match_confidence");
      listing.put("deferred_retry_at",0);listing.put("manual_review_required",0);listing.putNull("manual_review_reason");
      listing.put("last_error","AI_CATEGORY_RECOVERED: gioco base riconosciuto da evidenza visiva; identità BGG ancora da verificare");
-     int changed=db.update("market_listings",listing,"id=? AND lifecycle='AUTO_FILTERED' AND COALESCE(manual_review_required,0)=0 AND (enrichment_state='AUTO_EXCLUDED' OR EXISTS(SELECT 1 FROM observations ar WHERE ar.signature=COALESCE(NULLIF(market_listings.legacy_signature,''),market_listings.temp_fingerprint) AND COALESCE(ar.verification_reason,'') LIKE 'AI category recovery:%'))",new String[]{id});
+     // current(snapshot) was checked inside this writer transaction, including overrides/BGG.
+     int changed=db.update("market_listings",listing,"id=? AND lifecycle='AUTO_FILTERED' AND COALESCE(manual_review_required,0)=0",new String[]{id});
      if(changed>0&&!signature.isEmpty()){
+      AiCategoryEvidence.remember(db,r.getLong("listing_id"),r.getString("input_key"),System.currentTimeMillis());
       // Re-open the existing sighting instead of manufacturing a new observation timestamp.
       ContentValues observation=new ContentValues();observation.put("analysis_status","pending");observation.put("verification_state","PENDING_ANALYSIS");
       observation.put("verification_reason","AI category recovery: base game visually recognized; BGG pending");

@@ -10,10 +10,10 @@ gradle=Path("app/build.gradle").read_text(encoding="utf-8")
 
 recover_block=listings[listings.index("if(AiEnginePolicy.recover"):listings.index("if(!AiEnginePolicy.hold")]
 checks={
- "only automatic exclusion is selectable":"l.lifecycle='AUTO_FILTERED' AND l.enrichment_state='AUTO_EXCLUDED'" in listings,
+ "only automatic product misses are selectable":"AiEnginePolicy.RECOVERABLE_SQL" in listings and "automaticProductMiss" in policy,
  "existing BGG identity excluded":"COALESCE(g.bgg_id,'')=''" in listings and '!row.optString("bgg_id").isEmpty()' in policy,
  "human confirmation and overrides protected":"COALESCE(d.confirmed,0)=0" in listings and "USER_CONFIRMED" in listings and "listing_overrides" in listings,
- "local classifier must be uncertain":'!"UNCERTAIN".equals(row.optString("local_type"))' in policy,
+ "local classifier rejects explicit negative types":'Arrays.asList("UNCERTAIN","BASE_GAME")' in policy,
  "AI must say base game":'!"BASE_GAME".equals(answer.optString("proposed_type"))' in policy,
  "visual evidence required":'photos.length()>0' in policy and 'strong>=2' in policy,
  "explicit non-game category cannot recover":"isExplicitNonGameCategory" in policy,
@@ -22,7 +22,7 @@ checks={
  "existing observation reused":'ORDER BY observed_at DESC,id DESC LIMIT 1' in recover_block and 'observation.put("analysis_status","pending")' in recover_block,
  "recovery does not write BGG or deal trust":'db.update("games"' not in recover_block and 'db.update("deals"' not in recover_block,
  "local classifier wake is explicit":"AI_RECOVERY_READY" in runner and "AiEngineRunner.RECOVERY_READY" in radar and "continuePersistentAnalysis()" in radar,
- "version":"5.12.198-ai-filter-recovery" in gradle,
+ "version":"5.12.201-ai-category-state" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)
@@ -67,3 +67,4 @@ assert db.execute("SELECT lifecycle,enrichment_state,game_id FROM market_listing
 assert db.execute("SELECT observed_at,analysis_status,verification_state FROM observations WHERE id=1").fetchone()==(old_at,"pending","PENDING_ANALYSIS")
 assert db.execute("SELECT lifecycle,verification_state FROM deals WHERE signature='sig1'").fetchone()==("USER_HIDDEN","AUTO_EXCLUDED")
 print("PASS recovery state machine preserves history and leaves deal/BGG trust closed")
+
