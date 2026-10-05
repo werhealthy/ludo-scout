@@ -1145,7 +1145,7 @@ public final class MarketStore {
             trace.phase("HELPER_CALL");
             DealDatabase.ObservationSession activeRun=test2bOwner?null:helper.activeObservationSession();
             trace.phase("TRANSACTION");
-            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY','OPENED_VERIFY') OR (? = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH','CATALOG_RECOVERY','SELLER_BACKFILL')) OR (? > 0 AND j.source<>'SELLER_BACKFILL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
+            String runGate=test2bOwner?"":"AND (j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','MANUAL_RECOVERY','OPENED_VERIFY') OR (CAST(? AS INTEGER) = 0 AND j.source IN ('LIVE_DEAL','CATALOG_HEALTH','CATALOG_RECOVERY','SELLER_BACKFILL')) OR (CAST(? AS INTEGER) > 0 AND j.source<>'SELLER_BACKFILL' AND COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) IN (SELECT signature FROM observations WHERE observed_at>=? AND observed_at<=?))) ";
             String sql = "SELECT j.id,j.job_key,j.job_type,j.listing_id,j.game_id,j.state,j.attempt,j.next_attempt_at,j.last_error,j.priority,j.source " +
                     "FROM processing_jobs j JOIN market_listings l ON l.id=j.listing_id " +
                     "WHERE j.job_type IN (?,?) AND j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE' " +

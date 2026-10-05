@@ -7,8 +7,10 @@ db.executescript("CREATE TABLE processing_jobs(job_type,state,source); INSERT IN
 parking=re.search(r'String automatic="([^"]+)";',s).group(1)
 assert db.execute('SELECT COUNT(*) FROM processing_jobs WHERE '+parking,('VINTED_LINK','VINTED_DEEP_ENRICHMENT','PENDING','FAILED_RETRYABLE','HISTORICAL')).fetchone()[0]==0, 'seller job must survive idle parking'
 gate=re.search(r'String runGate=test2bOwner\?"":"([^"]+)";',s).group(1)
-# The idle arm is the real source allow-list in the production claim query.
-idle=re.search(r'\(\? = 0 AND (j.source IN \([^)]+\))\)',gate).group(1)
+# Android rawQuery binds String[] values. Execute the production run gate with string "0":
+# without the CAST, SQLite evaluates "0" = 0 false and "0" > 0 true by storage-class order,
+# which silently routes idle work through the active-run branch and excludes SELLER_BACKFILL.
+idle=re.search(r'\(CAST\(\? AS INTEGER\) = 0 AND (j.source IN \([^)]+\))\)',gate).group(1)
 assert db.execute('SELECT COUNT(*) FROM processing_jobs j WHERE '+idle).fetchone()[0]==1, 'idle seller job must be claimable'
 for source in ('AUTO','DEEP_METADATA','DEFERRED_LINK'):
  db.execute('UPDATE processing_jobs SET source=?',(source,))
@@ -16,8 +18,16 @@ for source in ('AUTO','DEEP_METADATA','DEFERRED_LINK'):
  assert db.execute('SELECT COUNT(*) FROM processing_jobs WHERE '+parking,('VINTED_LINK','VINTED_DEEP_ENRICHMENT','PENDING','FAILED_RETRYABLE','HISTORICAL')).fetchone()[0]==1
 print('PASS seller idle SQL gates and ordinary parking')
 
+claim_db=sqlite3.connect(':memory:')
+claim_db.executescript("CREATE TABLE processing_jobs(id,source); CREATE TABLE market_listings(id,legacy_signature,temp_fingerprint); CREATE TABLE observations(signature,observed_at); INSERT INTO processing_jobs VALUES(116,'SELLER_BACKFILL'); INSERT INTO market_listings VALUES(1133,'browser:10117335863','browser:10117335863');")
+claim_sql="SELECT j.id FROM processing_jobs j JOIN market_listings l ON l.id=1133 WHERE j.id=116 "+gate
+assert claim_db.execute(claim_sql,('0','0','0','0')).fetchall()==[(116,)], 'string-bound idle run must claim seller backfill'
+claim_db.execute("INSERT INTO observations VALUES('browser:10117335863',150)")
+assert claim_db.execute(claim_sql,('100','100','100','200')).fetchall()==[], 'active run must still exclude seller backfill'
+print('PASS production claim run gate handles Android string binds')
+
 # Active Motore must never claim backfill, even for an observation in the run.
-assert "? > 0 AND j.source<>'SELLER_BACKFILL'" in gate
+assert "CAST(? AS INTEGER) > 0 AND j.source<>'SELLER_BACKFILL'" in gate
 for method in ('runnableVintedDueCount','oldestRunnableVintedAgeMs','nextRunnableVintedDueAt'):
  section=(Path(__file__).resolve().parents[1]/'app/src/main/java/it/vintedaffari/app/MarketStore.java').read_text(encoding='utf-8').split(method+'(',1)[1].split('\n    }',1)[0]
  assert "'CATALOG_HEALTH','SELLER_BACKFILL')" in section
