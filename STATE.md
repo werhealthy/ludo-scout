@@ -1,6 +1,6 @@
 # Ludo Scout — Current state
 
-## Backend — 5.12.180 grounded AI evidence merged; local install pending, 2026-10-05
+## Backend — 5.12.180 installed; acquisition completeness under diagnosis, 2026-10-05
 
 Owner locally verified 5.12.179-ai-copy-status after updating beta correctly: regression/ai_copy_idle_status.py PASS (copy button, clipboard, selectable text, feedback, worker photo count/queue idle/version), Gradle clean + :app:testDebugUnitTest + :app:compileDebugJavaWithJavac + assembleDebug BUILD SUCCESSFUL in 53s (41 tasks), and adb install -r succeeded over 5.12.178 without clearing data. Installed package moved from versionCode1002005/versionName5.12.178-ai-photo-evidence to versionCode1002006/versionName5.12.179-ai-copy-status.
 
@@ -8,7 +8,7 @@ Phone screenshot of “Prova AI · beta” after “Test AI su 8 annunci” expo
 
 PR271 “Backend: fix AI test copy and ground Qwen evidence” merged squash ce9519284c67054a767718829c1aa787f1a36ce5. Android label is 5.12.180-ai-grounded-copy. The fixture dialog now exposes a fixed AlertDialog “Copia testo” action and selectable result text. The local worker explicitly tells Qwen which description/photo fields are actually present, drops generated evidence that cites absent photos/descriptions/brand, and forces edition_language=UNKNOWN when no photo reached the model. Catalog remains proposal-only/read-only; no BGG identity, pricing, schema, threshold, budget, service or network-rate change.
 
-Verification for PR271: exact diff reviewed and PR was mergeable. GitHub Android PR validation run37287543588 failed before executing code on job111689930117 (steps=null); dependent jobs were skipped, so this is not compile/test evidence. 5.12.180 has NOT yet been locally built or installed. Single next backend step: on owner Windows PC pull beta, restart the local Qwen worker so the new guardrails are loaded, run regression/ai_copy_idle_status.py + Android unit/Javac/build, install as versionCode1002007 over the existing app, then rerun “Test AI su 8 annunci” and copy the complete output plus worker Job/Done/queue-empty lines.
+Verification for PR271: exact diff reviewed and PR was mergeable. GitHub Android PR validation run37287543588 failed before executing code on job111689930117 (steps=null); dependent jobs were skipped, so this is not compile/test evidence. Owner subsequently confirmed the 5.12.180 local build/install command finished with `Success`; no uninstall/data clear was used. Before rerunning Qwen, owner reported that app cards since the prior day appear to miss listing photos and possibly other metadata. Code inspection establishes two separate evidence paths: Accessibility can persist a local `ThumbnailStore` screenshot, while `AiBetaListings` sends Qwen only persisted Vinted photo URLs from `listing_photos_csv`/`image_url`; local screenshots are not AI payload. Browser intake can persist remote photo URLs when captured. Root cause of the current phone symptom is not yet established. Single next backend step: run a read-only phone acquisition-completeness diagnostic comparing recent `market_listings`, matching `deals`, stored browser snapshots and local thumbnail-file count; only then change acquisition/persistence/rendering.
 
 Frontend7/backend6 groups remain open.
 
