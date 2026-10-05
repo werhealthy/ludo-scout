@@ -1,5 +1,17 @@
 # Ludo Scout — Current state
 
+## Backend — 5.12.194 seller claim bind-affinity fix merged; phone proof pending, 2026-10-05
+
+Phone runtime on 5.12.193 disproved the stale-processing blocker: `vinted_processing_guard_blockers=0`, SELLER_BACKFILL job116/listing1133 remains PENDING due0, lane reports CLAIMING then “nessuna attività rivendicabile”, seller trace remains0 and seller_id remains2/154. This isolates the mismatch inside the claim gate rather than scheduler, queue owner or stale lease recovery.
+
+Root cause is SQLite bind affinity in claimNextVintedJobInternal. The production runGate compared raw String[] placeholders with numeric literals (`? = 0`, `? > 0`). With Android-style bound string "0", SQLite evaluates the bare equality false and the greater-than branch true by storage-class ordering, so idle work falls through the active-run branch where SELLER_BACKFILL is explicitly excluded. PR294 merged squash950f3ef3891d2e204bfa0f367309c58eed4a2724 and casts only those two run-state placeholders to INTEGER. Active Motore exclusion remains unchanged. Runtime audit also now reads the real `t2b_exclusive` key.
+
+Verification actually executed: direct SQLite reproduction confirmed old gate returns no seller row for string "0"; fixed production gate returns job116 at idle and still excludes seller for active-run binds. GitHub Android validation run37310984318 failed before any step (steps=null), so no Gradle/build result exists for this PR. No schema, filters, 55s pacing, 60/hour budget, 403/429 circuit/backoff or request-count change.
+
+Cloudflare TTL deployment remains unverified; source still has idle claim30s, processing-only heartbeat30s and LOCAL_HEARTBEAT_TTL_MS=90s, but no production Worker deploy proof is recorded.
+
+Frontend7/backend6 groups remain open. Single next backend step: build merged beta as versionCode above1002022, install only with adb install -r, Motore idle, then run seller_runtime_audit.py. Accept success only if seller_id rises above2/154 or seller trace exposes the next HTTP/parser bottleneck.
+
 ## Backend — 5.12.193 stale Vinted claim lease recovery merged; phone proof pending, 2026-10-05
 
 Phone evidence on 5.12.192 has a due SELLER_BACKFILL job but the Vinted lane reports CLAIMING then “nessuna attività rivendicabile”, with zero seller trace. Production claim has a global serial guard: any VINTED/VINTED_DEEP PROCESSING row returns null before candidate selection. The foreground watchdog previously released only PROCESSING rows with processing_started_at>0, so a legacy/partial lease with processing_started_at=0 could hold that guard indefinitely while runnableVintedDueCount still reported the pending seller job.
