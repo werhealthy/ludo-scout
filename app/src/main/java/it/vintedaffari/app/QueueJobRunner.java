@@ -216,7 +216,7 @@ public final class QueueJobRunner {
             // automatic AI disagreement holds without any Vinted or AI request.
             market.resolveMatchedAiCategoryHolds();
             // Local inference is intentionally independent from the Vinted HTTP gate.
-            market.inferDeferredLanguages(120);
+            market.inferDeferredLanguages(750);
             if(now-last>=30*60_000L){
                 // Ordinary missing-link work exists to complete the current scroll, not to create an
                 // invisible permanent backlog while Motore is idle. LIVE/HUNT/MANUAL enqueue their
