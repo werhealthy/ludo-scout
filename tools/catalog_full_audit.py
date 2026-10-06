@@ -376,6 +376,11 @@ def main():
     for row in ai.get("holds",[]):
         print(f"  AI-HOLD #{row.get('listing_id')} {row.get('title','')} | {row.get('verification_reason','')}")
     print(f"Contraddizioni={len(result['state_contradictions'])}; duplicati item={len(result['duplicate_vinted_items'])}")
+    replay=next((d for d in result.get("diagnostics",[]) if d.get("name")=="diag:browser_snapshot_metadata"),None)
+    if replay:
+        print(f"Replay snapshot: value={replay.get('value',0)} updated_at={replay.get('updated_at',0)} | {replay.get('text_value') or ''}")
+    else:
+        print("Replay snapshot: diagnostica assente")
     local=result.get("browser_snapshot_recoverable",{}).get("counts",{})
     print("Snapshot locali recuperabili: "+
           f"seller={local.get('seller',0)} published={local.get('published',0)} "+
