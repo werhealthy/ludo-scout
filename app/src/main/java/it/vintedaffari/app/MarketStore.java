@@ -774,14 +774,14 @@ public final class MarketStore {
             try{setDiagnosticState("browser_snapshot_metadata",-1,
                     "build=browser-snapshot-metadata-v6;scanned="+scanned+";parsed="+parsed+
                     ";preTxScanned="+preTxScanned+";preTxPublicationRaw="+preTxPublicationRaw+
-                    ";preTxScanned="+preTxScanned+";preTxPublicationRaw="+preTxPublicationRaw+
-                ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
+                    ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
                     ";usable="+usable+";changed="+changed+";failure="+failure.getClass().getSimpleName()+":"+safe(message)+
                     ";zeroNetwork=true");}catch(Throwable ignored){}
             throw failure;
         }
         setDiagnosticState("browser_snapshot_metadata",changed,
                 "build=browser-snapshot-metadata-v6;scanned="+scanned+";parsed="+parsed+
+                ";preTxScanned="+preTxScanned+";preTxPublicationRaw="+preTxPublicationRaw+
                 ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
                 ";usable="+usable+";changed="+changed+";failure=none;zeroNetwork=true");
         return changed;
