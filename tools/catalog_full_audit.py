@@ -319,6 +319,10 @@ def report(db):
         r for r in intruders
         if r["lifecycle"]=="AUTO_FILTERED" and r.get("bgg_id")
     ]
+    filtered_historical_bgg_reasons={}
+    for r in filtered_historical_bgg:
+        reason=(r.get("last_error") or "(none)").strip() or "(none)"
+        filtered_historical_bgg_reasons[reason]=filtered_historical_bgg_reasons.get(reason,0)+1
 
     completeness_summary={
         name:{
@@ -346,6 +350,7 @@ def report(db):
         },
         "excluded_live_listings":blocked_live,
         "filtered_with_historical_bgg":filtered_historical_bgg,
+        "filtered_with_historical_bgg_reasons":filtered_historical_bgg_reasons,
         "potential_intruders":intruders,
         "state_contradictions":contradictions,
         "missing_active_fields":missing_rows,
@@ -392,6 +397,8 @@ def main():
     for row in ai.get("still_filtered_rows",[]):
         print(f"  AI-FILTERED #{row['id']} {row['title']} | match={row['match_state']} | error={row['last_error']}")
     print(f"AI holds={len(ai.get('holds',[]))}; live-ma-esclusi={len(result['excluded_live_listings'])}; filtered-con-BGG-storico={len(result['filtered_with_historical_bgg'])}")
+    for reason,count in sorted(result.get("filtered_with_historical_bgg_reasons",{}).items(),key=lambda x:(-x[1],x[0])):
+        print(f"  FILTERED-BGG {count}x | {reason}")
     for row in ai.get("holds",[]):
         listing=row.get("listing") or {}
         obs=listing.get("latest_observation") or {}
