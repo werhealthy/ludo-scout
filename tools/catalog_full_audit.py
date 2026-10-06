@@ -412,6 +412,109 @@ def report(db):
           (SELECT COUNT(*) FROM catalog_rows) catalog_rows
         """).fetchone()
         catalog_visibility=dict(row) if row else None
+        catalog_visibility_reasons={"unbridged_core":[],"base_drop":[],"review_drop":[],"listing_drop":[]}
+        for r in db.execute("""
+          WITH core AS (
+            SELECT l.id listing_id,l.vinted_title,l.legacy_signature,l.temp_fingerprint,l.vinted_item_id
+            FROM market_listings l JOIN games g ON g.id=l.game_id
+            WHERE l.lifecycle='ACTIVE' AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'
+            AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0
+            AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''
+            AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND COALESCE(l.manual_review_required,0)=0
+          )
+          SELECT c.listing_id,c.vinted_title,c.vinted_item_id
+          FROM core c
+          WHERE NOT EXISTS(
+            SELECT 1 FROM deals d
+            WHERE d.signature=COALESCE(NULLIF(c.legacy_signature,''),c.temp_fingerprint)
+               OR (d.vinted_item_id IS NOT NULL AND d.vinted_item_id=c.vinted_item_id)
+          )
+          ORDER BY c.listing_id
+        """):
+            catalog_visibility_reasons["unbridged_core"].append(dict(r))
+
+        for r in db.execute("""
+          WITH core AS (
+            SELECT l.id listing_id,l.vinted_title,l.legacy_signature,l.temp_fingerprint,l.vinted_item_id
+            FROM market_listings l JOIN games g ON g.id=l.game_id
+            WHERE l.lifecycle='ACTIVE' AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'
+            AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0
+            AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''
+            AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND COALESCE(l.manual_review_required,0)=0
+          ), bridged AS (
+            SELECT DISTINCT c.listing_id,d.id deal_id,d.lifecycle,d.tier,d.rating,d.verification_state,d.verification_reason,d.listing_type,
+                   d.bgg_id,d.vinted_item_id,d.vinted_url
+            FROM core c JOIN deals d ON (
+              d.signature=COALESCE(NULLIF(c.legacy_signature,''),c.temp_fingerprint)
+              OR (d.vinted_item_id IS NOT NULL AND d.vinted_item_id=c.vinted_item_id)
+            )
+          )
+          SELECT * FROM bridged
+          WHERE NOT (lifecycle='ACTIVE' AND tier IN ('hot','good','offer','fair','insufficient','hunt')
+                     AND rating IS NOT NULL AND rating>=6.0)
+          ORDER BY deal_id
+        """):
+            reason=[]
+            if r["lifecycle"]!="ACTIVE": reason.append("deal_not_active")
+            if r["tier"] not in ("hot","good","offer","fair","insufficient","hunt"): reason.append("tier_"+str(r["tier"] or "(empty)"))
+            if r["rating"] is None: reason.append("rating_missing")
+            elif float(r["rating"])<6.0: reason.append("rating_below_6")
+            x=dict(r);x["reasons"]=reason;catalog_visibility_reasons["base_drop"].append(x)
+
+        for r in db.execute("""
+          WITH core AS (
+            SELECT l.id listing_id,l.legacy_signature,l.temp_fingerprint,l.vinted_item_id
+            FROM market_listings l JOIN games g ON g.id=l.game_id
+            WHERE l.lifecycle='ACTIVE' AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'
+            AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0
+            AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''
+            AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND COALESCE(l.manual_review_required,0)=0
+          ), base AS (
+            SELECT DISTINCT c.listing_id,d.id deal_id,d.lifecycle,d.tier,d.rating,d.verification_state,d.verification_reason,
+                   d.listing_type,d.bgg_id,d.vinted_item_id,d.vinted_url
+            FROM core c JOIN deals d ON (
+              d.signature=COALESCE(NULLIF(c.legacy_signature,''),c.temp_fingerprint)
+              OR (d.vinted_item_id IS NOT NULL AND d.vinted_item_id=c.vinted_item_id)
+            )
+            WHERE d.lifecycle='ACTIVE' AND d.tier IN ('hot','good','offer','fair','insufficient','hunt')
+              AND d.rating IS NOT NULL AND d.rating>=6.0
+              AND d.bgg_id IS NOT NULL AND d.bgg_id<>''
+              AND d.vinted_item_id IS NOT NULL AND d.vinted_item_id<>''
+              AND d.vinted_url IS NOT NULL AND d.vinted_url<>''
+          )
+          SELECT * FROM base
+          WHERE COALESCE(verification_state,'') NOT IN ('OK','USER_CONFIRMED')
+             OR COALESCE(listing_type,'') NOT IN ('BASE_GAME','EXPANSION','GAME')
+          ORDER BY deal_id
+        """):
+            reason=[]
+            if (r["verification_state"] or "") not in ("OK","USER_CONFIRMED"): reason.append("verify_"+str(r["verification_state"] or "(empty)"))
+            if (r["listing_type"] or "") not in ("BASE_GAME","EXPANSION","GAME"): reason.append("type_"+str(r["listing_type"] or "(empty)"))
+            x=dict(r);x["reasons"]=reason;catalog_visibility_reasons["review_drop"].append(x)
+
+        for r in db.execute("""
+          WITH base AS (
+            SELECT d.id deal_id,d.signature,d.vinted_item_id
+            FROM deals d WHERE d.lifecycle='ACTIVE'
+            AND d.tier IN ('hot','good','offer','fair','insufficient','hunt') AND d.rating IS NOT NULL AND d.rating>=6.0
+            AND d.bgg_id IS NOT NULL AND d.bgg_id<>'' AND d.vinted_item_id IS NOT NULL AND d.vinted_item_id<>''
+            AND d.vinted_url IS NOT NULL AND d.vinted_url<>''
+            AND COALESCE(d.verification_state,'') IN ('OK','USER_CONFIRMED')
+            AND COALESCE(d.listing_type,'') IN ('BASE_GAME','EXPANSION','GAME')
+          )
+          SELECT b.deal_id,b.signature,b.vinted_item_id
+          FROM base b
+          WHERE NOT EXISTS(
+            SELECT 1 FROM market_listings l
+            WHERE (l.legacy_signature=b.signature OR (b.vinted_item_id IS NOT NULL AND l.vinted_item_id=b.vinted_item_id))
+              AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED'
+              AND COALESCE(l.manual_review_required,0)=0
+          )
+          ORDER BY b.deal_id
+        """):
+            catalog_visibility_reasons["listing_drop"].append(dict(r))
+    else:
+        catalog_visibility_reasons=None
 
     completeness_summary={
         name:{
@@ -440,6 +543,7 @@ def report(db):
         "game_match_state":bgg_states,
         "active_completeness":completeness_summary,
         "catalog_visibility":catalog_visibility,
+        "catalog_visibility_reasons":catalog_visibility_reasons,
         "ai_category_evidence":{
             "total":ai_positive,
             "still_filtered":ai_positive_filtered,
@@ -551,6 +655,19 @@ def main():
               f"base={visibility.get('catalog_base')} identity={visibility.get('deal_identity')} "+
               f"reviewClear={visibility.get('review_clear')} listingMatched={visibility.get('listing_matched')} "+
               f"bggAgreement={visibility.get('bgg_agreement')} jobClear={visibility.get('job_clear')} rows={visibility.get('catalog_rows')}")
+        vr=result.get("catalog_visibility_reasons") or {}
+        print("Catalog funnel drops: "+
+              f"unbridged={len(vr.get('unbridged_core',[]))} base={len(vr.get('base_drop',[]))} "+
+              f"review={len(vr.get('review_drop',[]))} listing={len(vr.get('listing_drop',[]))}")
+        from collections import Counter
+        for label,key in (("BASE","base_drop"),("REVIEW","review_drop")):
+            counts=Counter(reason for row in vr.get(key,[]) for reason in row.get("reasons",[]))
+            for reason,count in counts.most_common():
+                print(f"  CATALOG-{label} {count}x | {reason}")
+        for row in vr.get("unbridged_core",[]):
+            print(f"  CATALOG-UNBRIDGED #{row.get('listing_id')} {row.get('vinted_title','')} | item={row.get('vinted_item_id')}")
+        for row in vr.get("listing_drop",[]):
+            print(f"  CATALOG-LISTING-DROP deal={row.get('deal_id')} | item={row.get('vinted_item_id')} signature={row.get('signature')}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
