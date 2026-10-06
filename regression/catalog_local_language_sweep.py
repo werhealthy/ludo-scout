@@ -8,7 +8,7 @@ detector=(ROOT/"app/src/main/java/it/vintedaffari/app/ListingLanguageDetector.ja
 
 checks=[
  ("automatic sweep covers full current active catalog","market.inferDeferredLanguages(750);" in runner),
- ("language inference stays local","HttpURLConnection" not in detector and "Vinted" not in detector and "BggSearchClient" not in detector),
+ ("language inference stays local",all(x not in detector for x in ["HttpURLConnection","java.net.","okhttp","BggSearchClient"]) and "import java.text.Normalizer;" in detector and "import java.util.Locale;" in detector),
  ("weak evidence stays unknown",'return "";' in detector),
  ("supported hints remain bounded",all(code in detector for code in ['return "IT"','return "EN"','return "DE"','return "FR"','return "ES"','return "NL"','return "PT"'])),
  ("dependency markers preserved","mergeWithDependency" in detector and '"|DEP"' in detector and '"|IND"' in detector),
