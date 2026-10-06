@@ -207,6 +207,10 @@ public final class QueueJobRunner {
         try {
             android.content.SharedPreferences auto=context.getSharedPreferences("ludo_queue_maintenance",Context.MODE_PRIVATE);
             long last=auto.getLong("last_missing_sweep",0L),now=System.currentTimeMillis();
+            // Persist category evidence before the bridge evaluates product type, so an already
+            // BGG-matched recovery can materialize in this same zero-network maintenance pass.
+            int aiTypeRepaired=market.repairAiRecoveredObservationType(100);
+            auto.edit().putInt("last_ai_recovery_type_repair",aiTypeRepaired).apply();
             if(market.claimCatalogBridgeSweep(now,60_000L)){int bridged=market.materializeCanonicalCatalogBatch(24);auto.edit().putInt("last_catalog_bridge_materialized",bridged).apply();}
             // AI recovery proves only product type. Materialize a provisional game locally so the
             // existing BGG identity matcher can take ownership without depending on the JS radar.
