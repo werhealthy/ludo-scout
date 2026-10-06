@@ -7,6 +7,8 @@ force-stopping the app; the copied snapshot is then opened read-only.
 """
 import argparse
 import json
+import hashlib
+import struct
 import re
 import sqlite3
 import subprocess
@@ -32,6 +34,15 @@ def norm(value):
 
 def text_value(value):
     return str(value or "").strip()
+
+def ai_input_key(title,brand,source,photos):
+    body=json.dumps([title or "",brand or "",source or "",photos or ""],ensure_ascii=False,separators=(",",":"))
+    digest=hashlib.sha256()
+    for part in ("local","v2",body):
+        raw=part.encode("utf-8")
+        digest.update(struct.pack(">I",len(raw)))
+        digest.update(raw)
+    return digest.hexdigest()
 
 def table_exists(db,name):
     return db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(name,)).fetchone() is not None
@@ -438,6 +449,23 @@ def report(db):
             retry=db.execute("SELECT value,text_value,updated_at FROM queue_controls WHERE name=?",
                              ("catalog_bridge_retry:"+str(r["listing_id"]),)).fetchone()
             x["bridge_retry"]=dict(retry) if retry else None
+            ai_marker=db.execute("SELECT value,text_value,updated_at FROM queue_controls WHERE name=?",
+                                 ("ai_category_evidence:"+str(r["listing_id"]),)).fetchone()
+            listing_ai=db.execute("""SELECT COALESCE(vinted_title,''),COALESCE(brand,''),COALESCE(observed_text,''),
+                                      COALESCE(NULLIF(listing_photos_csv,''),NULLIF(image_url,''),''),
+                                      COALESCE(category_normalized,'')
+                               FROM market_listings WHERE id=?""",(r["listing_id"],)).fetchone()
+            if listing_ai:
+                current_key=ai_input_key(listing_ai[0],listing_ai[1],listing_ai[2],listing_ai[3])
+                x["ai_evidence"]={
+                    "present":bool(ai_marker),
+                    "stored_key":ai_marker["text_value"] if ai_marker else None,
+                    "current_key":current_key,
+                    "fingerprint_match":bool(ai_marker and ai_marker["text_value"]==current_key),
+                    "category":listing_ai[4],
+                    "override_count":one(db,"""SELECT COUNT(*) FROM listing_overrides u
+                        WHERE u.signature=? OR (u.item_id IS NOT NULL AND u.item_id=?)""",(sig,r["vinted_item_id"])) or 0,
+                }
             catalog_visibility_reasons["unbridged_core"].append(x)
 
         for r in db.execute("""
@@ -692,9 +720,12 @@ def main():
         for row in vr.get("unbridged_core",[]):
             obs=row.get("latest_observation") or {}
             retry=row.get("bridge_retry") or {}
+            ai=row.get("ai_evidence") or {}
             print(f"  CATALOG-UNBRIDGED #{row.get('listing_id')} {row.get('vinted_title','')} | item={row.get('vinted_item_id')} "+
                   f"obs={obs.get('listing_type')}/{obs.get('verification_state')} obsReason={obs.get('verification_reason') or '(none)'} "+
-                  f"bridgeRetry={retry.get('text_value') or '(none)'}")
+                  f"bridgeRetry={retry.get('text_value') or '(none)'} "+
+                  f"aiMarker={ai.get('present')} aiFingerprint={ai.get('fingerprint_match')} overrides={ai.get('override_count')} "+
+                  f"category={ai.get('category') or '(none)'}")
         for row in vr.get("listing_drop",[]):
             print(f"  CATALOG-LISTING-DROP deal={row.get('deal_id')} | item={row.get('vinted_item_id')} signature={row.get('signature')} | "+
                   f"listing=#{row.get('listing_id')} {row.get('listing_lifecycle')}/{row.get('listing_enrichment')}/{row.get('listing_match')} "+
