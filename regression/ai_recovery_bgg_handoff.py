@@ -39,6 +39,7 @@ checks={
  "changed AI recovery evidence can refresh": "refreshRecoveredProductEvidence" in policy and "engine_latest_ai_recovered" in listings and "AiCategoryEvidence.remember" in listings and "refreshedCount()" in listings,
  "AI refresh still writes no BGG identity": 'put("bgg_id"' not in listings[listings.index("if(AiEnginePolicy.refreshRecoveredProductEvidence"):listings.index("if(!AiEnginePolicy.hold",listings.index("if(AiEnginePolicy.refreshRecoveredProductEvidence"))],
  "AI refresh wakes local bridge": "refreshed=listings.refreshedCount()" in ai_runner and "recovered>0||refreshed>0" in ai_runner,
+ "pending AI recovery reschedules itself": '"PENDING_RECOVERY".equals(result.state)' in ai_runner and "QueueWorkScheduler.scheduleAfter" in ai_runner,
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)
