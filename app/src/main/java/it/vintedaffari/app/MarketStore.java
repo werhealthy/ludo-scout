@@ -2046,7 +2046,7 @@ public final class MarketStore {
         try{
         trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         long now=System.currentTimeMillis();
-        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+repairOptionalDeepMetadataListingState()+normalizeAutomaticPriceFilteredDeals()+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+repairAiRecoveredObservationType(100)+repairOptionalDeepMetadataListingState()+normalizeAutomaticPriceFilteredDeals()+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -2415,6 +2415,50 @@ public final class MarketStore {
         return changed;
     }
 
+    /** Backfill product-type evidence for recoveries written before the category was persisted.
+     * This never assigns BGG identity: it only promotes the exact AI recovery observation from
+     * UNCERTAIN/PENDING_ANALYSIS to BASE_GAME/MATCH_UNCERTAIN and lets the canonical BGG bridge decide. */
+    public int repairAiRecoveredObservationType(int limit){
+        SQLiteDatabase db=helper.getWritableDatabase();int bounded=Math.max(1,Math.min(100,limit)),changed=0;
+        ArrayList<Long> listingIds=new ArrayList<>();ArrayList<Long> observationIds=new ArrayList<>();
+        try(Cursor c=db.rawQuery(
+                "SELECT l.id,o.id FROM market_listings l JOIN observations o ON o.id=(SELECT x.id FROM observations x "+
+                "WHERE x.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "ORDER BY x.observed_at DESC,x.id DESC LIMIT 1) "+
+                "WHERE l.lifecycle='ACTIVE' AND COALESCE(l.manual_review_required,0)=0 "+
+                "AND o.verification_reason='AI category recovery: base game visually recognized; BGG pending' "+
+                "AND COALESCE(o.listing_type,'UNCERTAIN')='UNCERTAIN' AND o.verification_state='PENDING_ANALYSIS' "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id)) "+
+                "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?",
+                new String[]{String.valueOf(bounded)})){
+            while(c.moveToNext()){listingIds.add(c.getLong(0));observationIds.add(c.getLong(1));}
+        }
+        if(listingIds.isEmpty())return 0;
+        db.beginTransaction();try{
+            for(int i=0;i<listingIds.size();i++){
+                long listingId=listingIds.get(i),observationId=observationIds.get(i);
+                if(!AiCategoryEvidence.has(db,listingId))continue;
+                ContentValues o=new ContentValues();o.put("listing_type","BASE_GAME");o.put("verification_state","MATCH_UNCERTAIN");
+                int updated=db.update("observations",o,
+                        "id=? AND COALESCE(listing_type,'UNCERTAIN')='UNCERTAIN' AND verification_state='PENDING_ANALYSIS' "+
+                        "AND verification_reason='AI category recovery: base game visually recognized; BGG pending'",
+                        new String[]{String.valueOf(observationId)});
+                if(updated>0){
+                    db.delete("queue_controls","name=?",new String[]{"catalog_bridge_retry:"+listingId});
+                    changed+=updated;
+                }
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0){
+            setDiagnosticState("ai_recovery_product_type_repair",changed,
+                    "build=ai-recovery-product-type-v1;repaired="+changed+";identityOwner=BGG;zeroNetwork=true");
+            notifyQueueChanged();
+        }
+        return changed;
+    }
+
     /** Bridge AI product recovery into the existing zero-network BGG identity matcher.
      * AI proves only "board-game product"; BGG remains the sole owner of game identity. */
     public int materializeAiRecoveredBggCandidates(int limit){
@@ -2430,7 +2474,9 @@ public final class MarketStore {
                 "AND EXISTS(SELECT 1 FROM observations o WHERE o.id=(SELECT x.id FROM observations x "+
                 "WHERE x.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
                 "ORDER BY x.observed_at DESC,x.id DESC LIMIT 1) "+
-                "AND o.verification_state='PENDING_ANALYSIS' AND o.listing_type IN ('UNCERTAIN','BASE_GAME')) "+
+                "AND ((o.verification_state='PENDING_ANALYSIS' AND o.listing_type IN ('UNCERTAIN','BASE_GAME')) "+
+                "OR (o.verification_state='MATCH_UNCERTAIN' AND o.listing_type='BASE_GAME' "+
+                "AND o.verification_reason='AI category recovery: base game visually recognized; BGG pending'))) "+
                 "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE "+
                 "u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
                 "OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id)) "+
