@@ -396,6 +396,9 @@ def main():
         print(f"Replay snapshot: value={replay.get('value',0)} updated_at={replay.get('updated_at',0)} | {replay.get('text_value') or ''}")
     else:
         print("Replay snapshot: diagnostica assente")
+    ui_replay=next((d for d in result.get("diagnostics",[]) if d.get("name")=="diag:browser_snapshot_ui_replay"),None)
+    if ui_replay:
+        print(f"UI replay snapshot: value={ui_replay.get('value',0)} updated_at={ui_replay.get('updated_at',0)} | {ui_replay.get('text_value') or ''}")
     local=result.get("browser_snapshot_recoverable",{}).get("counts",{})
     print("Snapshot locali recuperabili: "+
           f"seller={local.get('seller',0)} published={local.get('published',0)} "+
