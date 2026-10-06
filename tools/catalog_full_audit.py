@@ -114,6 +114,8 @@ def report(db):
         FROM market_listings ORDER BY id""").fetchall()
 
     completeness={name:0 for name in completeness_fields}
+    snapshot_recoverable={"seller":0,"published":0,"photos":0,"language":0,"any":0}
+    snapshot_recoverable_rows=[]
     missing_rows=[]
     intruders=[]
     contradictions=[]
@@ -157,6 +159,38 @@ def report(db):
                     "id":rid,"title":row["vinted_title"] or "","missing":missing,
                     "match_state":row["match_state"],"enrichment_state":row["enrichment_state"],
                 })
+
+            if has_queue and row["vinted_item_id"] is not None and str(row["vinted_item_id"]).strip():
+                snap=one(db,"SELECT text_value FROM queue_controls WHERE name=?",
+                         ("browser_snapshot:"+str(row["vinted_item_id"]).strip(),))
+                if snap:
+                    try:
+                        payload=json.loads(snap)
+                    except Exception:
+                        payload={}
+                    available=[]
+                    seller_missing=("seller" in missing)
+                    published_missing=("published" in missing)
+                    photos_missing=("photos" in missing)
+                    language_missing=("language" in missing)
+                    seller_value=str(payload.get("sellerId") or payload.get("sellerName") or "").strip()
+                    publication=payload.get("publication") or {}
+                    publication_value=str(publication.get("raw") if isinstance(publication,dict) else "").strip()
+                    photos_value=payload.get("photos") if isinstance(payload.get("photos"),list) else []
+                    language_value=str(payload.get("language") or "").strip()
+                    if seller_missing and seller_value:
+                        snapshot_recoverable["seller"]+=1;available.append("seller")
+                    if published_missing and publication_value:
+                        snapshot_recoverable["published"]+=1;available.append("published")
+                    if photos_missing and photos_value:
+                        snapshot_recoverable["photos"]+=1;available.append("photos")
+                    if language_missing and language_value:
+                        snapshot_recoverable["language"]+=1;available.append("language")
+                    if available:
+                        snapshot_recoverable["any"]+=1
+                        snapshot_recoverable_rows.append({
+                            "id":rid,"title":row["vinted_title"] or "","available":available,
+                        })
 
         signature=(row["legacy_signature"] or row["temp_fingerprint"] or "")
         obs=latest_observation(db,signature)
@@ -296,6 +330,10 @@ def report(db):
         "potential_intruders":intruders,
         "state_contradictions":contradictions,
         "missing_active_fields":missing_rows,
+        "browser_snapshot_recoverable":{
+            "counts":snapshot_recoverable,
+            "rows":snapshot_recoverable_rows,
+        },
         "duplicate_vinted_items":duplicate_items,
         "auto_filtered_reasons":filtered_reasons,
         "diagnostics":diagnostics,
@@ -338,6 +376,10 @@ def main():
     for row in ai.get("holds",[]):
         print(f"  AI-HOLD #{row.get('listing_id')} {row.get('title','')} | {row.get('verification_reason','')}")
     print(f"Contraddizioni={len(result['state_contradictions'])}; duplicati item={len(result['duplicate_vinted_items'])}")
+    local=result.get("browser_snapshot_recoverable",{}).get("counts",{})
+    print("Snapshot locali recuperabili: "+
+          f"seller={local.get('seller',0)} published={local.get('published',0)} "+
+          f"photos={local.get('photos',0)} language={local.get('language',0)} any={local.get('any',0)}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
