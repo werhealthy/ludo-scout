@@ -115,7 +115,10 @@ final class AiEngineListings implements AiEngineSession.Source {
      if(changed>0&&!signature.isEmpty()){
       AiCategoryEvidence.remember(db,r.getLong("listing_id"),r.getString("input_key"),System.currentTimeMillis());
       // Re-open the existing sighting instead of manufacturing a new observation timestamp.
-      ContentValues observation=new ContentValues();observation.put("analysis_status","pending");observation.put("verification_state","PENDING_ANALYSIS");
+      ContentValues observation=new ContentValues();observation.put("analysis_status","pending");
+      // Qwen owns product category only. Persist BASE_GAME as category evidence while identity
+      // remains explicitly uncertain until the independent BGG matcher succeeds.
+      observation.put("listing_type","BASE_GAME");observation.put("verification_state","MATCH_UNCERTAIN");
       observation.put("verification_reason","AI category recovery: base game visually recognized; BGG pending");
       db.update("observations",observation,"id=(SELECT id FROM observations WHERE signature=? ORDER BY observed_at DESC,id DESC LIMIT 1)",new String[]{signature});
       recovered+=changed;
