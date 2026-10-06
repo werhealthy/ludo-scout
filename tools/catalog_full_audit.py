@@ -335,6 +335,8 @@ def main():
     for row in ai.get("still_filtered_rows",[]):
         print(f"  AI-FILTERED #{row['id']} {row['title']} | match={row['match_state']} | error={row['last_error']}")
     print(f"AI holds={len(ai.get('holds',[]))}; live-ma-esclusi={len(result['excluded_live_listings'])}; filtered-con-BGG-storico={len(result['filtered_with_historical_bgg'])}")
+    for row in ai.get("holds",[]):
+        print(f"  AI-HOLD #{row.get('listing_id')} {row.get('title','')} | {row.get('verification_reason','')}")
     print(f"Contraddizioni={len(result['state_contradictions'])}; duplicati item={len(result['duplicate_vinted_items'])}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
