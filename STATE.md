@@ -1,5 +1,9 @@
 # Ludo Scout — Current state
 
+## Cross-project workstation hold — 2026-10-06
+
+Model-heavy local Ludo Scout work on the owner's Windows workstation is temporarily gated on the approved resource supervisor in `werhealthy/personal-ai-stack`. Hermes will be the orchestration/control plane and an independent lightweight supervisor will own CPU/RAM/VRAM admission plus managed workload lifecycle. Until that supervisor is runtime-validated, avoid intentionally overlapping Ludo local AI workloads with Hermes/other local models. This does not reopen the completed backend AI recovery work and does not change Ludo's product behavior; it is an operational safety constraint for development/runtime on the shared workstation.
+
 ## Backend AI recovery closure — 2026-10-06
 
 The real-device recovery cohort is now accepted. After the transient-service wake fix, the owner built the current branch successfully with `:app:assembleDebug`, installed it with `adb install -r`, kept the USB-local bridge active, and ran `tools/ai_recovery_runtime_audit.py --ids '1605,1610'`. Runtime result: AI evidence=2, filtered=0, BGG progressed=2, cohort_pass=True. Panic Lab (#1605) and Escape room puzzel (#1610) therefore both advanced through the intended AI-category-to-BGG handoff without AI assigning BGG identity.
