@@ -688,7 +688,7 @@ public final class MarketStore {
      * Exact Vinted item identity is the only join key; existing non-empty values always win. */
     public int materializeBrowserSnapshotMetadataBatch(int limit) {
         SQLiteDatabase db=helper.getWritableDatabase();
-        int changed=0,scanned=0,parsed=0,usable=0,max=Math.max(1,Math.min(500,limit));
+        int changed=0,scanned=0,parsed=0,publicationObjects=0,publicationRaw=0,publishedBlank=0,usable=0,max=Math.max(1,Math.min(500,limit));
         RuntimeException failure=null;
         db.beginTransaction();
         try(Cursor c=db.rawQuery(
@@ -714,7 +714,10 @@ public final class MarketStore {
                 String sellerName=snap.optString("sellerName").trim();
                 if(currentSellerName.trim().isEmpty()&&!sellerName.isEmpty())v.put("seller_name",sellerName);
                 JSONObject publication=snap.optJSONObject("publication");
+                if(publication!=null)publicationObjects++;
                 String published=(publication==null?"":publication.optString("raw")).trim();
+                if(!published.isEmpty())publicationRaw++;
+                if(currentPublished.trim().isEmpty())publishedBlank++;
                 boolean fillPublished=currentPublished.trim().isEmpty()&&!published.isEmpty();
                 if(fillPublished)v.put("published_label",published);
                 JSONArray photos=snap.optJSONArray("photos");String image="",photoCsv="";
@@ -755,13 +758,15 @@ public final class MarketStore {
         if(failure!=null){
             String message=failure.getMessage()==null?"":failure.getMessage();
             try{setDiagnosticState("browser_snapshot_metadata",-1,
-                    "build=browser-snapshot-metadata-v4;scanned="+scanned+";parsed="+parsed+
+                    "build=browser-snapshot-metadata-v5;scanned="+scanned+";parsed="+parsed+
+                    ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
                     ";usable="+usable+";changed="+changed+";failure="+failure.getClass().getSimpleName()+":"+safe(message)+
                     ";zeroNetwork=true");}catch(Throwable ignored){}
             throw failure;
         }
         setDiagnosticState("browser_snapshot_metadata",changed,
-                "build=browser-snapshot-metadata-v4;scanned="+scanned+";parsed="+parsed+
+                "build=browser-snapshot-metadata-v5;scanned="+scanned+";parsed="+parsed+
+                ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
                 ";usable="+usable+";changed="+changed+";failure=none;zeroNetwork=true");
         return changed;
     }
