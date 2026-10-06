@@ -33,7 +33,7 @@ checks={
  "AI recovery handoff is zero network": all(token not in handoff for token in ["HttpURLConnection","VintedPublicSession","AiBetaClient","BggSearchClient"]),
  "queue maintenance materializes AI recoveries": "market.materializeAiRecoveredBggCandidates(40)" in runner,
  "AI recovery wakes queue owner": "QueueKeepAliveService.ensureRunning(app)" in ai_runner and "QueueWorkScheduler.schedule(app)" in ai_runner,
- "AI recovery persists product type not identity": 'observation.put("listing_type","BASE_GAME")' in ai_listings and 'observation.put("verification_state","MATCH_UNCERTAIN")' in ai_listings and 'put("bgg_id"' not in ai_listings[ai_listings.index("if(AiEnginePolicy.recover"):ai_listings.index("continue;",ai_listings.index("if(AiEnginePolicy.recover"))+9],
+ "AI recovery persists product type not identity": 'observation.put("listing_type","BASE_GAME")' in listings and 'observation.put("verification_state","MATCH_UNCERTAIN")' in listings and 'put("bgg_id"' not in listings[listings.index("if(AiEnginePolicy.recover"):listings.index("continue;",listings.index("if(AiEnginePolicy.recover"))+9],
  "historical AI recovery type repair exists": "public int repairAiRecoveredObservationType" in market and "identityOwner=BGG" in market,
  "historical AI recovery type repair is zero network": all(token not in market[market.index("public int repairAiRecoveredObservationType"):market.index("/** Bridge AI product recovery",market.index("public int repairAiRecoveredObservationType"))] for token in ["HttpURLConnection","VintedPublicSession","AiBetaClient","BggSearchClient"]),
 }
@@ -50,7 +50,7 @@ CREATE TABLE market_listings(
  legacy_signature TEXT,temp_fingerprint TEXT,lifecycle TEXT,game_id INTEGER,
  enrichment_state TEXT,match_state TEXT,manual_review_required INTEGER,last_error TEXT,last_seen INTEGER);
 CREATE TABLE observations(
- id INTEGER PRIMARY KEY,signature TEXT,observed_at INTEGER,verification_state TEXT,listing_type TEXT);
+ id INTEGER PRIMARY KEY,signature TEXT,observed_at INTEGER,verification_state TEXT,listing_type TEXT,verification_reason TEXT);
 CREATE TABLE listing_overrides(signature TEXT,item_id TEXT);
 """)
 db.executemany("INSERT INTO market_listings VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",[
@@ -58,10 +58,10 @@ db.executemany("INSERT INTO market_listings VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",[
  (2,"Human override","22","https://vinted/items/22","s2","s2","ACTIVE",None,"PENDING_ANALYSIS","PENDING_ANALYSIS",0,"AI_CATEGORY_RECOVERED: proof",9),
  (3,"Ordinary pending","33","https://vinted/items/33","s3","s3","ACTIVE",None,"PENDING_ANALYSIS","PENDING_ANALYSIS",0,"",8),
 ])
-db.executemany("INSERT INTO observations VALUES(?,?,?,?,?)",[
- (1,"s1",10,"PENDING_ANALYSIS","UNCERTAIN"),
- (2,"s2",9,"PENDING_ANALYSIS","UNCERTAIN"),
- (3,"s3",8,"PENDING_ANALYSIS","UNCERTAIN"),
+db.executemany("INSERT INTO observations VALUES(?,?,?,?,?,?)",[
+ (1,"s1",10,"PENDING_ANALYSIS","UNCERTAIN",None),
+ (2,"s2",9,"PENDING_ANALYSIS","UNCERTAIN",None),
+ (3,"s3",8,"PENDING_ANALYSIS","UNCERTAIN",None),
 ])
 db.execute("INSERT INTO listing_overrides VALUES('s2',NULL)")
 candidate_sql="""SELECT l.id FROM market_listings l
