@@ -68,7 +68,13 @@ final class AiEngineRunner {
       diagnostic.put("text_value","build=ai-engine-v3;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more+";retryAt="+retryAt);
       db.insertWithOnConflict("queue_controls",null,diagnostic,SQLiteDatabase.CONFLICT_REPLACE);
       if(result.held>0||recovered>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
-      if(recovered>0)app.sendBroadcast(new android.content.Intent(RECOVERY_READY).setPackage(app.getPackageName()));
+      if(recovered>0){
+       app.sendBroadcast(new android.content.Intent(RECOVERY_READY).setPackage(app.getPackageName()));
+       // The queue owner performs the zero-network AI -> provisional BGG handoff even when
+       // Accessibility/JS analysis is not running.
+       QueueKeepAliveService.ensureRunning(app);
+       QueueWorkScheduler.schedule(app);
+      }
       if(result.more)QueueWorkScheduler.scheduleAfter(app,10000);
       else if("WAIT".equals(result.state))QueueWorkScheduler.scheduleAfter(app,Math.max(10000L,retryAt-System.currentTimeMillis()));
      }
