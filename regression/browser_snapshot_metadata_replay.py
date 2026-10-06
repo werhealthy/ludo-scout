@@ -5,6 +5,7 @@ import sqlite3
 ROOT=Path(__file__).resolve().parents[1]
 market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")
 runner=(ROOT/"app/src/main/java/it/vintedaffari/app/QueueJobRunner.java").read_text(encoding="utf-8")
+main=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
 
 start=market.index("public int materializeBrowserSnapshotMetadataBatch")
 end=market.index("/** Persist validated public captures",start)
@@ -24,6 +25,12 @@ checks=[
  ("maintenance replays before language/network scheduling",
   "materializeBrowserSnapshotMetadataBatch(200)" in runner and
   runner.index("materializeBrowserSnapshotMetadataBatch(200)") < runner.index("inferDeferredLanguages(120)")),
+ ("ui process replays before queue start",
+  "browser-snapshot-ui-replay-v1" in main and
+  "materializeBrowserSnapshotMetadataBatch(500)" in main and
+  main.index("materializeBrowserSnapshotMetadataBatch(500)") < main.index("QueueKeepAliveService.ensureRunning(getApplicationContext())")),
+ ("ui replay stays zero-network",
+  "browser_snapshot_ui_replay" in main and "zeroNetwork=true" in main),
 ]
 
 for name,ok in checks:
