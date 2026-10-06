@@ -120,6 +120,7 @@ def report(db):
     ai_positive=0
     ai_positive_filtered=0
     ai_positive_progressed=0
+    ai_positive_filtered_rows=[]
 
     evidence_times={}
     if has_queue:
@@ -195,7 +196,20 @@ def report(db):
         evidence_at=evidence_times.get(rid)
         if evidence_at is not None:
             ai_positive+=1
-            if lifecycle=="AUTO_FILTERED": ai_positive_filtered+=1
+            if lifecycle=="AUTO_FILTERED":
+                ai_positive_filtered+=1
+                ai_positive_filtered_rows.append({
+                    "id":rid,
+                    "title":row["vinted_title"] or "",
+                    "evidence_at":evidence_at,
+                    "enrichment_state":row["enrichment_state"],
+                    "match_state":row["match_state"],
+                    "last_error":row["last_error"],
+                    "game_id":row["game_id"],
+                    "bgg_id":bgg,
+                    "game_match_state":game_state,
+                    "latest_observation":obs,
+                })
             if lifecycle=="ACTIVE" and row["match_state"] in ("MATCHED","BGG_MATCH_REQUIRED","BGG_MATCH_REVIEW") and row["enrichment_state"]!="PENDING_ANALYSIS":
                 ai_positive_progressed+=1
 
@@ -243,6 +257,7 @@ def report(db):
             "total":ai_positive,
             "still_filtered":ai_positive_filtered,
             "progressed_to_bgg":ai_positive_progressed,
+            "still_filtered_rows":ai_positive_filtered_rows,
         },
         "potential_intruders":intruders,
         "state_contradictions":contradictions,
@@ -283,6 +298,8 @@ def main():
     ai=result["ai_category_evidence"]
     print(f"Catalogo: all={c['all']} active={c['active']} filtered={c['auto_filtered']}")
     print(f"AI evidence: total={ai['total']} filtered={ai['still_filtered']} BGG-progressed={ai['progressed_to_bgg']}")
+    for row in ai.get("still_filtered_rows",[]):
+        print(f"  AI-FILTERED #{row['id']} {row['title']} | match={row['match_state']} | error={row['last_error']}")
     print(f"Potenziali intrusi={len(result['potential_intruders'])}; contraddizioni={len(result['state_contradictions'])}; duplicati item={len(result['duplicate_vinted_items'])}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
