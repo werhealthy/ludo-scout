@@ -684,6 +684,8 @@ public final class MarketStore {
         Log.i(TAG, "migration=v8->v9 market schema backfill completed at=" + now);
     }
 
+    /** Replays metadata already captured by the embedded browser. Zero network, zero AI.
+     * Exact Vinted item identity is the only join key; existing non-empty values always win. */
     /** Persist validated public captures by exact ID. Missing-price snapshots remain durable,
      * but cannot become zero-price observations. Called exclusively on the browser IO lane. */
     public long captureBrowserItem(JSONObject item,long now) throws org.json.JSONException {
@@ -858,6 +860,7 @@ public final class MarketStore {
         try {
             Long listingId = listingIdForCard(db,card);
             if (listingId == null) { db.setTransactionSuccessful(); return; }
+            if(AiCategoryEvidence.has(db,listingId)&&!AiCategoryEvidence.has(db,listingId,card)){db.setTransactionSuccessful();return;}
             String listingLifecycle=scalarString(db,"SELECT lifecycle FROM market_listings WHERE id=?",new String[]{String.valueOf(listingId)});
             // Analyses can finish after a classifier/quarantine decision. Never let stale async work
             // resurrect an inactive listing or overwrite its terminal state.
@@ -869,7 +872,8 @@ public final class MarketStore {
                 String why=scalarString(db,"SELECT filter_reason FROM games WHERE id=?",new String[]{String.valueOf(oldGameId)});if(!TextUtils.isEmpty(why))hold.put("last_error",why);
                 db.update("market_listings",hold,"id=?",new String[]{String.valueOf(listingId)});db.setTransactionSuccessful();return;
             }
-            if("AUTO_QUARANTINED".equals(oldGameState)){
+            boolean aiProduct=hasAiCategoryRecoveryEvidence(card);
+            if("AUTO_QUARANTINED".equals(oldGameState)&&!aiProduct){
                 ContentValues hold=new ContentValues();hold.put("lifecycle","AUTO_FILTERED");hold.put("enrichment_state","AUTO_FILTERED");hold.put("match_state","AUTO_FILTERED_NON_GAME");
                 String why=scalarString(db,"SELECT filter_reason FROM games WHERE id=?",new String[]{String.valueOf(oldGameId)});if(!TextUtils.isEmpty(why))hold.put("last_error",why);
                 db.update("market_listings",hold,"id=?",new String[]{String.valueOf(listingId)});db.setTransactionSuccessful();return;
@@ -881,6 +885,13 @@ public final class MarketStore {
                 gameId = upsertProvisionalGame(db, card.title, "BGG_MATCH_REQUIRED", analysis.matchConfidence, now);
                 String persisted=scalarString(db,"SELECT match_state FROM games WHERE id=?",new String[]{String.valueOf(gameId)});
                 matchState=TextUtils.isEmpty(persisted)?"BGG_MATCH_REQUIRED":persisted;
+                if("AUTO_QUARANTINED".equals(matchState)&&aiProduct){
+                    // Fresh listing-specific product proof changes a type quarantine, never identity.
+                    ContentValues pending=new ContentValues();pending.put("match_state","BGG_MATCH_REQUIRED");
+                    pending.put("database_visible",1);pending.putNull("filter_reason");
+                    db.update("games",pending,"id=? AND (bgg_id IS NULL OR bgg_id='') AND match_state='AUTO_QUARANTINED'",new String[]{String.valueOf(gameId)});
+                    matchState="BGG_MATCH_REQUIRED";
+                }
                 if("AUTO_QUARANTINED".equals(matchState)){
                     ContentValues q=new ContentValues();q.put("lifecycle","AUTO_FILTERED");q.put("enrichment_state","AUTO_FILTERED");q.put("match_state","AUTO_FILTERED_NON_GAME");
                     q.put("last_error",safe(scalarString(db,"SELECT filter_reason FROM games WHERE id=?",new String[]{String.valueOf(gameId)})));
@@ -896,7 +907,8 @@ public final class MarketStore {
             v.put("game_id", gameId); v.put("match_state", matchState); put(v, "match_confidence", analysis.matchConfidence);
             String detected=ListingLanguageDetector.detect(card.title,card.rawDescription,card.brand);
             v.put("language_code", ListingLanguageDetector.mergeWithDependency(detected,resolvedLanguage(analysis)));
-            v.put("observed_text",safe(card.rawDescription));
+            // Acquisition owns source evidence. Do not truncate/replace a proven source on analysis.
+            if(!aiProduct)v.put("observed_text",safe(card.rawDescription));
             v.put("enrichment_state", hasUrl ? "CORE_COMPLETE" : (liveResolve ? "PENDING_ENRICHMENT" : (eventualLink?"DEFERRED_LINK":"LOCAL_ONLY")));
             if(eventualLink)v.put("deferred_retry_at",0);
             v.put("last_error", ""); db.update("market_listings", v, "id=?", new String[]{String.valueOf(listingId)});
@@ -910,6 +922,9 @@ public final class MarketStore {
             if(!card.capturedSignature.isEmpty())syncBrowserDeal(db,listingId);
             db.setTransactionSuccessful();
         } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
+        // BGG compatibility is authoritative for product type; clear only stale automatic holds
+        // that also satisfy the strict matched/core-complete/base-game repair predicate.
+        resolveMatchedAiCategoryHolds();
     
         }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
@@ -1373,7 +1388,15 @@ public final class MarketStore {
                 ? helper.getWritableDatabase().update("processing_jobs",v,"id=? AND state=? AND processing_started_at=?",new String[]{String.valueOf(job.id),PROCESSING,String.valueOf(job.processingStartedAt)})
                 : helper.getWritableDatabase().update("processing_jobs",v,"id=?",new String[]{String.valueOf(job.id)});
         if(changed==0)return;
-        updateListingState(job.listingId, FAILED_RETRYABLE, error);
+        boolean optionalDeep=JOB_VINTED_DEEP.equals(job.type)&&!MANUAL_RECOVERY_SOURCE.equals(job.source);
+        if(optionalDeep){
+            // Seller/date/photo enrichment is optional once exact Vinted + BGG identity is already core.
+            // Keep the retry on the job only; degrading the listing would wrongly remove it from Catalog.
+            ContentValues note=new ContentValues();note.put("last_error","");
+            helper.getWritableDatabase().update("market_listings",note,
+                    "id=? AND lifecycle='ACTIVE' AND enrichment_state IN ('COMPLETE','CORE_COMPLETE')",
+                    new String[]{String.valueOf(job.listingId)});
+        }else updateListingState(job.listingId, FAILED_RETRYABLE, error);
         Log.w(TAG, "job=" + job.id + " state=FAILED_RETRYABLE attempt=" + job.attempt + " next=" + nextAt + " error=" + safe(error));
         notifyQueueChanged();
     }
@@ -1987,12 +2010,43 @@ public final class MarketStore {
         return changed;
     }
 
+    /** Ordinary deep metadata is optional after exact Vinted + authoritative BGG identity.
+     * Repair rows demoted by older retryJob() behavior without touching manual recovery. */
+    public int repairOptionalDeepMetadataListingState(){
+        SQLiteDatabase db=helper.getWritableDatabase();ContentValues v=new ContentValues();
+        v.put("enrichment_state","CORE_COMPLETE");v.put("last_error","");
+        int changed=db.update("market_listings",v,
+                "lifecycle='ACTIVE' AND enrichment_state='FAILED_RETRYABLE' AND match_state='MATCHED' "+
+                "AND TRIM(COALESCE(vinted_item_id,''))<>'' AND TRIM(COALESCE(vinted_url,''))<>'' "+
+                "AND game_id IN (SELECT id FROM games WHERE match_state='MATCHED' AND database_visible=1 AND TRIM(COALESCE(bgg_id,''))<>'') "+
+                "AND EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=market_listings.id AND j.job_type=? "+
+                "AND COALESCE(j.source,'AUTO')<>? AND j.state IN (?,?,?))",
+                new String[]{JOB_VINTED_DEEP,MANUAL_RECOVERY_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE});
+        if(changed>0)setDiagnosticState("optional_deep_core_repair",changed,
+                "build=optional-deep-core-repair-v1;repaired="+changed+";zeroNetwork=true");
+        return changed;
+    }
+
+    /** PRICE_FILTERED is an automatic terminal visibility state unless the row was explicitly
+     * user-confirmed. Keep lifecycle/tier aligned with that decision. */
+    public int normalizeAutomaticPriceFilteredDeals(){
+        SQLiteDatabase db=helper.getWritableDatabase();ContentValues v=new ContentValues();
+        v.put("lifecycle","REMOVED");v.put("tier","filtered");v.put("tier_label","");
+        int changed=db.update("deals",v,
+                "lifecycle='ACTIVE' AND verification_state='PRICE_FILTERED' AND COALESCE(confirmed,0)=0 "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=deals.signature AND u.payload IS NOT NULL AND COALESCE(u.excluded,0)=0)",
+                null);
+        if(changed>0)setDiagnosticState("price_filtered_state_repair",changed,
+                "build=price-filtered-state-repair-v1;normalized="+changed+";zeroNetwork=true");
+        return changed;
+    }
+
     public int reconcileQueue() {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.reconcileQueue");
         try{
         trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         long now=System.currentTimeMillis();
-        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+repairAiRecoveredObservationType(100)+repairOptionalDeepMetadataListingState()+normalizeAutomaticPriceFilteredDeals()+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
@@ -2320,6 +2374,174 @@ public final class MarketStore {
             ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","deferred: "+safe(reason));db.update("processing_jobs",j,"id=?",new String[]{String.valueOf(job.id)});
             ContentValues l=new ContentValues();l.put("enrichment_state","DEFERRED_LINK");l.put("deferred_retry_at",Math.max(now+60_000L,retryAt));l.put("last_error",safe(reason));db.update("market_listings",l,"id=?",new String[]{String.valueOf(job.listingId)});db.setTransactionSuccessful();
         }finally{db.endTransaction();}notifyQueueChanged();
+    }
+
+    /** Clear only stale automatic AI type holds after canonical BGG has independently confirmed
+     * both identity and BASE_GAME product compatibility. Human/manual decisions are excluded. */
+    public int resolveMatchedAiCategoryHolds(){
+        SQLiteDatabase db=helper.getWritableDatabase();
+        String eligible="d.lifecycle='ACTIVE' AND d.verification_state='MATCH_UNCERTAIN' "+
+                "AND d.verification_reason LIKE 'AI_CATEGORY_REVIEW:%' AND COALESCE(d.confirmed,0)=0 "+
+                "AND d.listing_type='BASE_GAME' "+
+                "AND EXISTS(SELECT 1 FROM market_listings l JOIN games g ON g.id=l.game_id "+
+                "WHERE COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=d.signature "+
+                "AND l.lifecycle='ACTIVE' AND l.enrichment_state='CORE_COMPLETE' AND l.match_state='MATCHED' "+
+                "AND COALESCE(l.manual_review_required,0)=0 AND g.match_state='MATCHED' "+
+                "AND g.database_visible=1 AND g.bgg_id=d.bgg_id "+
+                "AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=d.signature "+
+                "AND o.id=(SELECT id FROM observations x WHERE x.signature=d.signature ORDER BY x.observed_at DESC,x.id DESC LIMIT 1) "+
+                "AND o.listing_type='BASE_GAME')) "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=d.signature OR (u.item_id IS NOT NULL AND u.item_id=d.vinted_item_id))";
+        ArrayList<String> signatures=new ArrayList<>();
+        try(Cursor c=db.rawQuery("SELECT d.signature FROM deals d WHERE "+eligible,null)){
+            while(c.moveToNext())signatures.add(c.getString(0));
+        }
+        if(signatures.isEmpty())return 0;
+        int changed=0;db.beginTransaction();try{
+            for(String signature:signatures){
+                ContentValues listing=new ContentValues();listing.put("last_error","");
+                db.update("market_listings",listing,
+                        "lifecycle='ACTIVE' AND last_error LIKE 'AI_CATEGORY_REVIEW:%' AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint)=?",
+                        new String[]{signature});
+                ContentValues deal=new ContentValues();deal.put("verification_state","OK");deal.putNull("verification_reason");
+                changed+=db.update("deals",deal,
+                        "signature=? AND lifecycle='ACTIVE' AND verification_state='MATCH_UNCERTAIN' AND verification_reason LIKE 'AI_CATEGORY_REVIEW:%' AND COALESCE(confirmed,0)=0",
+                        new String[]{signature});
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0){setDiagnosticState("ai_hold_bgg_resolution",changed,
+                "build=ai-hold-bgg-resolution-v1;resolved="+changed+";requires=matched+core_complete+base_game+visible;zeroNetwork=true");notifyQueueChanged();}
+        return changed;
+    }
+
+    /** Backfill product-type evidence for recoveries written before the category was persisted.
+     * This never assigns BGG identity: it only promotes the exact AI recovery observation from
+     * UNCERTAIN/PENDING_ANALYSIS to BASE_GAME/MATCH_UNCERTAIN and lets the canonical BGG bridge decide. */
+    public int repairAiRecoveredObservationType(int limit){
+        SQLiteDatabase db=helper.getWritableDatabase();int bounded=Math.max(1,Math.min(100,limit)),changed=0;
+        ArrayList<Long> listingIds=new ArrayList<>();ArrayList<Long> observationIds=new ArrayList<>();
+        try(Cursor c=db.rawQuery(
+                "SELECT l.id,o.id FROM market_listings l JOIN observations o ON o.id=(SELECT x.id FROM observations x "+
+                "WHERE x.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "ORDER BY x.observed_at DESC,x.id DESC LIMIT 1) "+
+                "WHERE l.lifecycle='ACTIVE' AND COALESCE(l.manual_review_required,0)=0 "+
+                "AND o.verification_reason='AI category recovery: base game visually recognized; BGG pending' "+
+                "AND COALESCE(o.listing_type,'UNCERTAIN')='UNCERTAIN' AND o.verification_state='PENDING_ANALYSIS' "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id)) "+
+                "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?",
+                new String[]{String.valueOf(bounded)})){
+            while(c.moveToNext()){listingIds.add(c.getLong(0));observationIds.add(c.getLong(1));}
+        }
+        if(listingIds.isEmpty())return 0;
+        db.beginTransaction();try{
+            for(int i=0;i<listingIds.size();i++){
+                long listingId=listingIds.get(i),observationId=observationIds.get(i);
+                if(!AiCategoryEvidence.has(db,listingId))continue;
+                ContentValues o=new ContentValues();o.put("listing_type","BASE_GAME");o.put("verification_state","MATCH_UNCERTAIN");
+                int updated=db.update("observations",o,
+                        "id=? AND COALESCE(listing_type,'UNCERTAIN')='UNCERTAIN' AND verification_state='PENDING_ANALYSIS' "+
+                        "AND verification_reason='AI category recovery: base game visually recognized; BGG pending'",
+                        new String[]{String.valueOf(observationId)});
+                if(updated>0){
+                    db.delete("queue_controls","name=?",new String[]{"catalog_bridge_retry:"+listingId});
+                    changed+=updated;
+                }
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0){
+            setDiagnosticState("ai_recovery_product_type_repair",changed,
+                    "build=ai-recovery-product-type-v1;repaired="+changed+";identityOwner=BGG;zeroNetwork=true");
+            notifyQueueChanged();
+        }
+        return changed;
+    }
+
+    /** Bridge AI product recovery into the existing zero-network BGG identity matcher.
+     * AI proves only "board-game product"; BGG remains the sole owner of game identity. */
+    public int materializeAiRecoveredBggCandidates(int limit){
+        SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        int bounded=Math.max(1,Math.min(100,limit)),changed=0;
+        ArrayList<Long> ids=new ArrayList<>();ArrayList<String> titles=new ArrayList<>();
+        try(Cursor c=db.rawQuery(
+                "SELECT l.id,COALESCE(l.vinted_title,'') FROM market_listings l "+
+                "WHERE l.lifecycle='ACTIVE' AND l.game_id IS NULL "+
+                "AND l.enrichment_state='PENDING_ANALYSIS' AND l.match_state='PENDING_ANALYSIS' "+
+                "AND COALESCE(l.manual_review_required,0)=0 "+
+                "AND COALESCE(l.last_error,'') LIKE 'AI_CATEGORY_RECOVERED:%' "+
+                "AND EXISTS(SELECT 1 FROM observations o WHERE o.id=(SELECT x.id FROM observations x "+
+                "WHERE x.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "ORDER BY x.observed_at DESC,x.id DESC LIMIT 1) "+
+                "AND ((o.verification_state='PENDING_ANALYSIS' AND o.listing_type IN ('UNCERTAIN','BASE_GAME')) "+
+                "OR (o.verification_state='MATCH_UNCERTAIN' AND o.listing_type='BASE_GAME' "+
+                "AND o.verification_reason='AI category recovery: base game visually recognized; BGG pending'))) "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE "+
+                "u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id)) "+
+                "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?",
+                new String[]{String.valueOf(bounded)})){
+            while(c.moveToNext()){ids.add(c.getLong(0));titles.add(c.getString(1));}
+        }
+        if(ids.isEmpty())return 0;
+        db.beginTransaction();try{
+            for(int i=0;i<ids.size();i++){
+                long listingId=ids.get(i);String title=titles.get(i);
+                if(TextUtils.isEmpty(title)||!AiCategoryEvidence.has(db,listingId))continue;
+                long gameId=upsertProvisionalGame(db,title,"BGG_MATCH_REQUIRED",null,now);
+                String gameState="",gameBgg="",gameReason="";
+                try(Cursor game=db.rawQuery(
+                        "SELECT COALESCE(match_state,''),COALESCE(bgg_id,''),COALESCE(filter_reason,'') FROM games WHERE id=?",
+                        new String[]{String.valueOf(gameId)})){
+                    if(game.moveToFirst()){gameState=game.getString(0);gameBgg=game.getString(1);gameReason=game.getString(2);}
+                }
+                // A previous automatic product quarantine is exactly what fresh AI product evidence
+                // may reopen. A real BGG ambiguity/human-review state remains monotonic.
+                if(TextUtils.isEmpty(gameBgg)&&"AUTO_QUARANTINED".equals(gameState)){
+                    ContentValues reopen=new ContentValues();reopen.put("match_state","BGG_MATCH_REQUIRED");
+                    reopen.put("database_visible",1);reopen.putNull("filter_reason");
+                    db.update("games",reopen,"id=? AND (bgg_id IS NULL OR bgg_id='') AND match_state='AUTO_QUARANTINED'",
+                            new String[]{String.valueOf(gameId)});
+                    gameState="BGG_MATCH_REQUIRED";
+                }
+                if("BGG_MATCH_REVIEW".equals(gameState)){
+                    ContentValues review=new ContentValues();review.put("game_id",gameId);
+                    review.put("match_state","BGG_MATCH_REVIEW");review.put("enrichment_state","NEEDS_REVIEW");
+                    review.put("manual_review_required",1);
+                    review.put("manual_review_reason",TextUtils.isEmpty(gameReason)?"Match BGG ambiguo":gameReason);
+                    review.put("last_error",TextUtils.isEmpty(gameReason)?"Match BGG ambiguo":gameReason);
+                    int updated=db.update("market_listings",review,
+                            "id=? AND lifecycle='ACTIVE' AND game_id IS NULL AND match_state='PENDING_ANALYSIS'",
+                            new String[]{String.valueOf(listingId)});
+                    changed+=updated;continue;
+                }
+                // Never infer identity from a terminal/matched game row reached only through a title key.
+                if(!TextUtils.isEmpty(gameBgg)||(!TextUtils.isEmpty(gameState)&&!"BGG_MATCH_REQUIRED".equals(gameState)
+                        &&!"PENDING_ANALYSIS".equals(gameState)&&!"EPOCH_ARCHIVED_REVIEW".equals(gameState)))continue;
+                boolean exactIdentity=false;
+                try(Cursor identity=db.rawQuery(
+                        "SELECT 1 FROM market_listings WHERE id=? AND TRIM(COALESCE(vinted_item_id,''))<>'' "+
+                        "AND TRIM(COALESCE(vinted_url,''))<>'' LIMIT 1",
+                        new String[]{String.valueOf(listingId)})){exactIdentity=identity.moveToFirst();}
+                ContentValues listing=new ContentValues();listing.put("game_id",gameId);
+                listing.put("match_state","BGG_MATCH_REQUIRED");
+                listing.put("enrichment_state",exactIdentity?"CORE_COMPLETE":"PENDING_ANALYSIS");
+                listing.putNull("match_confidence");listing.put("last_error","");
+                int updated=db.update("market_listings",listing,
+                        "id=? AND lifecycle='ACTIVE' AND game_id IS NULL AND match_state='PENDING_ANALYSIS'",
+                        new String[]{String.valueOf(listingId)});
+                if(updated>0){addAlias(db,gameId,title,"VINTED");changed+=updated;}
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0){
+            helper.invalidateActiveObservationSessionCache();
+            setDiagnosticState("ai_recovery_bgg_handoff",changed,
+                    "build=ai-recovery-bgg-handoff-v1;materialized="+changed+";identityOwner=BGG;zeroNetwork=true");
+            notifyQueueChanged();
+        }
+        return changed;
     }
 
     /** Zero-network maintenance keeps useful work moving even while Vinted is in cooldown. */
@@ -2864,18 +3086,13 @@ public final class MarketStore {
     public boolean hasAiCategoryRecoveryEvidence(VintedCard card){
         if(card==null)return false;SQLiteDatabase db=helper.getReadableDatabase();
         Long listingId=listingIdForCard(db,card);if(listingId==null)return false;
-        String sql="SELECT l.lifecycle,l.enrichment_state,l.match_state,COALESCE(l.manual_review_required,0),"+
-                "CASE WHEN EXISTS(SELECT 1 FROM observations o WHERE o.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
-                "AND COALESCE(o.verification_reason,'') LIKE 'AI category recovery:%') THEN 1 ELSE 0 END "+
-                "FROM market_listings l WHERE l.id=?";
-        try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(listingId)})){
-            if(!c.moveToFirst())return false;
-            return "ACTIVE".equals(c.getString(0))
-                && "PENDING_ANALYSIS".equals(c.getString(1))
-                && "PENDING_ANALYSIS".equals(c.getString(2))
-                && c.getInt(3)==0
-                && c.getInt(4)==1;
-        }
+        return AiCategoryEvidence.has(db,listingId,card);
+    }
+
+    public boolean isStaleAiCategoryAnalysis(VintedCard card){
+        if(card==null)return false;SQLiteDatabase db=helper.getReadableDatabase();
+        Long listingId=listingIdForCard(db,card);
+        return listingId!=null&&AiCategoryEvidence.has(db,listingId)&&!AiCategoryEvidence.has(db,listingId,card);
     }
 
     /** Hide one unresolved observation before it can become a human BGG review. The raw row is
@@ -2951,17 +3168,42 @@ public final class MarketStore {
     }
 
     public boolean autoQuarantineGame(long gameId,String reason){
-        if(gameId<=0)return false;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();List<String> signatures=new ArrayList<>();
-        try(Cursor c=db.rawQuery("SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE game_id=?",new String[]{String.valueOf(gameId)})){while(c.moveToNext())if(!TextUtils.isEmpty(c.getString(0)))signatures.add(c.getString(0));}
+        if(gameId<=0)return false;SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        List<String> signatures=new ArrayList<>();List<Long> keepActive=new ArrayList<>(),protectedIds=new ArrayList<>();
         db.beginTransaction();try{
-            String confirmed=scalarString(db,"SELECT bgg_id FROM games WHERE id=?",new String[]{String.valueOf(gameId)});if(!TextUtils.isEmpty(confirmed)){db.setTransactionSuccessful();return false;}
-            ContentValues g=new ContentValues();g.put("database_visible",0);g.put("filter_reason","AUTO_QUARANTINE: "+safe(reason));g.put("match_state","AUTO_QUARANTINED");g.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);db.update("games",g,"id=?",new String[]{String.valueOf(gameId)});
-            ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_FILTERED");l.put("match_state","AUTO_FILTERED_NON_GAME");l.put("last_error",safe(reason));db.update("market_listings",l,"game_id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(gameId)});
-            ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","scarto automatico: "+safe(reason));db.update("processing_jobs",j,"game_id=? OR listing_id IN (SELECT id FROM market_listings WHERE game_id=?)",new String[]{String.valueOf(gameId),String.valueOf(gameId)});
+            String confirmed=scalarString(db,"SELECT bgg_id FROM games WHERE id=?",new String[]{String.valueOf(gameId)});
+            if(!TextUtils.isEmpty(confirmed)){db.setTransactionSuccessful();return false;}
+            String selection="SELECT l.id,COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),COALESCE(l.manual_review_required,0),"+
+                    "CASE WHEN EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id)) "+
+                    "OR EXISTS(SELECT 1 FROM deals d WHERE d.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) AND (COALESCE(d.confirmed,0)<>0 OR d.verification_state='USER_CONFIRMED')) THEN 1 ELSE 0 END "+
+                    "FROM market_listings l WHERE l.game_id=? AND l.lifecycle='ACTIVE'";
+            try(Cursor c=db.rawQuery(selection,new String[]{String.valueOf(gameId)})){
+                while(c.moveToNext()){
+                    long id=c.getLong(0);
+                    if(c.getInt(2)!=0||c.getInt(3)!=0)protectedIds.add(id);
+                    else if(AiCategoryEvidence.has(db,id)){keepActive.add(id);protectedIds.add(id);}
+                    else if(!TextUtils.isEmpty(c.getString(1)))signatures.add(c.getString(1));
+                }
+            }
+            ContentValues g=new ContentValues();g.put("database_visible",protectedIds.isEmpty()?0:1);
+            g.put("filter_reason",protectedIds.isEmpty()?"AUTO_QUARANTINE: "+safe(reason):"Identità BGG da chiarire: "+safe(reason));
+            g.put("match_state",protectedIds.isEmpty()?"AUTO_QUARANTINED":"BGG_MATCH_REVIEW");g.put("match_algorithm_version",BGG_MATCH_ALGORITHM_VERSION);
+            db.update("games",g,"id=?",new String[]{String.valueOf(gameId)});
+            String retained="";for(Long id:protectedIds)retained+=(retained.isEmpty()?"":",")+id;
+            ContentValues l=new ContentValues();l.put("lifecycle","AUTO_FILTERED");l.put("enrichment_state","AUTO_FILTERED");l.put("match_state","AUTO_FILTERED_NON_GAME");l.put("last_error",safe(reason));
+            db.update("market_listings",l,"game_id=? AND lifecycle='ACTIVE'"+(retained.isEmpty()?"":" AND id NOT IN ("+retained+")"),new String[]{String.valueOf(gameId)});
+            for(Long id:keepActive){
+                ContentValues pending=new ContentValues();pending.put("match_state","BGG_MATCH_REVIEW");pending.put("enrichment_state","NEEDS_REVIEW");
+                pending.put("last_error","Prodotto confermato da AI; identità BGG da chiarire: "+safe(reason));
+                db.update("market_listings",pending,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(id)});
+            }
+            ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);
+            j.put("last_error",protectedIds.isEmpty()?"scarto automatico: "+safe(reason):"identità BGG da chiarire: "+safe(reason));
+            db.update("processing_jobs",j,"game_id=? OR listing_id IN (SELECT id FROM market_listings WHERE game_id=?)",new String[]{String.valueOf(gameId),String.valueOf(gameId)});
             db.setTransactionSuccessful();
         }finally{db.endTransaction();}
         for(String sig:signatures){DealRecord d=helper.findBySignature(sig);if(d!=null)helper.exclude(d,"Scarto automatico: "+safe(reason));}
-        notifyQueueChanged();return true;
+        notifyQueueChanged();return protectedIds.isEmpty();
     }
 
     /** v5.11.24 one-time reset requested by the product owner: the old BGG review queue had become
@@ -3733,7 +3975,7 @@ public final class MarketStore {
         }
     }
     private static boolean bggRefreshDue(SQLiteDatabase db,long gameId,long now){try(Cursor c=db.rawQuery("SELECT metadata_updated_at,image_url,rating FROM games WHERE id=?",new String[]{String.valueOf(gameId)})){if(!c.moveToFirst())return true;long updated=c.getLong(0);return updated<=0||TextUtils.isEmpty(c.getString(1))||c.isNull(2)||now-updated>=7L*24*60*60_000L;}}
-    private static Long listingIdForCard(SQLiteDatabase db,VintedCard card){if(card==null)return null;if(!card.capturedSignature.isEmpty())return scalarLong(db,"SELECT id FROM market_listings WHERE (legacy_signature=? OR temp_fingerprint=?) AND vinted_title=? AND current_price_cents=? AND COALESCE(observed_text,'')=? AND COALESCE(brand,'')=? AND COALESCE(item_condition,'')=? AND COALESCE(protected_price_cents,-1)=CAST(? AS INTEGER) LIMIT 1",new String[]{card.capturedSignature,card.capturedSignature,card.title,String.valueOf(cents(card.itemPrice)),safe(card.rawDescription),card.brand==null?"":card.brand,card.condition==null?"":card.condition,String.valueOf(card.protectedPrice==null?-1:cents(card.protectedPrice))});String fp=fingerprint(card),legacy=DealDatabase.signature(card);return scalarLong(db,"SELECT id FROM market_listings WHERE temp_fingerprint=? OR (legacy_signature=? AND temp_fingerprint=legacy_signature) ORDER BY CASE WHEN temp_fingerprint=? THEN 0 ELSE 1 END LIMIT 1",new String[]{fp,legacy,fp});}
+    private static Long listingIdForCard(SQLiteDatabase db,VintedCard card){if(card==null)return null;if(!card.capturedSignature.isEmpty())return scalarLong(db,"SELECT id FROM market_listings WHERE (legacy_signature=? OR temp_fingerprint=?) AND vinted_title=? AND current_price_cents=? AND COALESCE(observed_text,'')=? AND COALESCE(brand,'')=? AND COALESCE(item_condition,'')=? AND COALESCE(protected_price_cents,-1)=CAST(? AS INTEGER) LIMIT 1",new String[]{card.capturedSignature,card.capturedSignature,card.title,String.valueOf(cents(card.itemPrice)),card.rawDescription==null?"":card.rawDescription,card.brand==null?"":card.brand,card.condition==null?"":card.condition,String.valueOf(card.protectedPrice==null?-1:cents(card.protectedPrice))});String fp=fingerprint(card),legacy=DealDatabase.signature(card);return scalarLong(db,"SELECT id FROM market_listings WHERE temp_fingerprint=? OR (legacy_signature=? AND temp_fingerprint=legacy_signature) ORDER BY CASE WHEN temp_fingerprint=? THEN 0 ELSE 1 END LIMIT 1",new String[]{fp,legacy,fp});}
     private static Long scalarLong(SQLiteDatabase db,String sql,String[] args){try(Cursor c=db.rawQuery(sql,args)){return c.moveToFirst()&&!c.isNull(0)?c.getLong(0):null;}}
     private static String scalarString(SQLiteDatabase db,String sql,String[] args){try(Cursor c=db.rawQuery(sql,args)){return c.moveToFirst()&&!c.isNull(0)?c.getString(0):null;}}
     private static boolean same(Integer a,Integer b){return a==null?b==null:a.equals(b);}
@@ -3746,4 +3988,3 @@ public final class MarketStore {
     private static String safe(String s){return s==null?"":(s.length()>600?s.substring(0,600):s);}
     private static void put(ContentValues v,String k,Object o){if(o==null)v.putNull(k);else if(o instanceof String)v.put(k,(String)o);else if(o instanceof Integer)v.put(k,(Integer)o);else if(o instanceof Long)v.put(k,(Long)o);else if(o instanceof Double)v.put(k,(Double)o);else v.put(k,String.valueOf(o));}
 }
-

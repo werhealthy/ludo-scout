@@ -10,6 +10,21 @@ final class AiEnginePolicy {
  static final long TTL=7L*86400000, BACKOFF=15L*60000;
  private AiEnginePolicy(){}
 
+ // These automatic product/identity misses are reversible with fresh visual product evidence.
+ // Category incompatibility, supported collisions and user decisions are never recovery states.
+ static final String RECOVERABLE_SQL="l.lifecycle='AUTO_FILTERED' AND (l.enrichment_state='AUTO_EXCLUDED' OR "
+   +"(l.enrichment_state='AUTO_FILTERED' AND ((l.match_state='AUTO_FILTERED_NON_GAME' AND l.last_error IN "
+   +"('Nessuna prova positiva di prodotto gioco da tavolo','Nessuna evidenza BGG disponibile',"
+   +"'Nessun candidato BGG sufficientemente forte: scarto automatico, non fact-check')) OR "
+   +"(l.match_state='AUTO_FILTERED_COLLISION' AND l.last_error='Il titolo coincide con BGG ma manca una prova indipendente che l''oggetto sia un gioco da tavolo'))))";
+
+ static boolean automaticProductMiss(String state,String reason){
+  if("AUTO_FILTERED_COLLISION".equals(state))return "Il titolo coincide con BGG ma manca una prova indipendente che l'oggetto sia un gioco da tavolo".equals(reason);
+  return "AUTO_FILTERED_NON_GAME".equals(state)&&java.util.Arrays.asList(
+   "Nessuna prova positiva di prodotto gioco da tavolo","Nessuna evidenza BGG disponibile",
+   "Nessun candidato BGG sufficientemente forte: scarto automatico, non fact-check").contains(reason);
+ }
+
  static boolean hold(String local,String proposed){
   return ("BASE_GAME".equals(local)||"UNCERTAIN".equals(local))
     && java.util.Arrays.asList("NON_GAME","EXPANSION","BUNDLE","ACCESSORY_COMPONENT").contains(proposed);
@@ -20,9 +35,10 @@ final class AiEnginePolicy {
   if(!"AUTO_FILTERED".equals(row.optString("lifecycle")))return false;
   String enrichment=row.optString("engine_enrichment");
   boolean original="AUTO_EXCLUDED".equals(enrichment);
-  boolean bounced="AUTO_FILTERED".equals(enrichment)&&row.optBoolean("engine_ai_recovered",false);
+  boolean bounced="AUTO_FILTERED".equals(enrichment)&&automaticProductMiss(row.optString("listing_match_state"),row.optString("engine_last_error"));
   if(!original&&!bounced)return false;
-  if(!"UNCERTAIN".equals(row.optString("local_type")))return false;
+  if(!java.util.Arrays.asList("UNCERTAIN","BASE_GAME").contains(row.optString("local_type")))return false;
+  if(BoardGameIntakeGate.isStrongNonGameText(row.optString("title"),row.optString("source_text")))return false;
   if(!row.optString("bgg_id").isEmpty())return false;
   if(row.optInt("engine_manual_review",0)!=0||row.optInt("engine_confirmed",0)!=0)return false;
   if(!row.optBoolean("engine_has_observation",false))return false;
@@ -32,9 +48,8 @@ final class AiEnginePolicy {
   return photos!=null&&photos.length()>0;
  }
 
- static boolean recover(JSONObject row,JSONObject answer){
-  if(!recoveryCandidate(row)||answer==null)return false;
-  if(!"BASE_GAME".equals(answer.optString("proposed_type")))return false;
+ static boolean strongBaseGameProposal(JSONObject answer){
+  if(answer==null||!"BASE_GAME".equals(answer.optString("proposed_type")))return false;
   String title=answer.optString("product_title","").trim();
   if(title.length()<3)return false;
   String evidence=answer.optString("evidence","").trim();
@@ -42,6 +57,21 @@ final class AiEnginePolicy {
   int strong=0;
   for(String part:evidence.split("[;\\n]"))if(part.trim().length()>=8)strong++;
   return strong>=2;
+ }
+
+ static boolean recover(JSONObject row,JSONObject answer){
+  return recoveryCandidate(row)&&strongBaseGameProposal(answer);
+ }
+
+ static boolean refreshRecoveredProductEvidence(JSONObject row,JSONObject answer){
+  if(row==null||!"ACTIVE".equals(row.optString("lifecycle"))||!row.optBoolean("engine_latest_ai_recovered",false))return false;
+  if(!java.util.Arrays.asList("UNCERTAIN","BASE_GAME").contains(row.optString("local_type")))return false;
+  if(BoardGameIntakeGate.isStrongNonGameText(row.optString("title"),row.optString("source_text")))return false;
+  if(row.optInt("engine_manual_review",0)!=0||row.optInt("engine_confirmed",0)!=0)return false;
+  String category=row.optString("engine_category","");
+  if(!category.isEmpty()&&ListingClassifier.isExplicitNonGameCategory(category))return false;
+  JSONArray photos=row.optJSONArray("photos");
+  return photos!=null&&photos.length()>0&&strongBaseGameProposal(answer);
  }
 
  static boolean fresh(long at,long now){return at>0&&at<=now&&now-at<TTL;}

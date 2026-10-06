@@ -660,6 +660,7 @@ public final class VintedAccessibilityService extends AccessibilityService {
                 int committed=0,quarantined=0;
                 for (int i = 0; i < count; i++) {
                     VintedCard card = cards.get(i);
+                    if(marketStore!=null&&marketStore.isStaleAiCategoryAnalysis(card))continue;
                     GameAnalysis ga=analyses.get(i);
                     GameRecord scanTarget=activeMarketScanGame();if(scanTarget!=null&&ga!=null&&!BoardGameIntakeGate.isStrongNonGameText(card.title,card.rawDescription)&&BoardGameIntakeGate.plausibleOverlap(card.title,scanTarget.name))ga=ga.withCanonicalIdentity(scanTarget,"Ricerca prezzi Vinted esplicita");
                     ListingClassifier.Result analyzedListing=ListingClassifier.classify(card);
@@ -672,9 +673,12 @@ public final class VintedAccessibilityService extends AccessibilityService {
                     // It must show positive board-game evidence; otherwise keep it in a reversible
                     // auto-filtered quarantine and let the fast discovery pipeline continue.
                     boolean aiRecoveredProduct=marketStore!=null
-                            && analyzedListing.type==ListingClassifier.Type.UNCERTAIN
+                            && (analyzedListing.type==ListingClassifier.Type.UNCERTAIN||analyzedListing.type==ListingClassifier.Type.BASE_GAME)
                             && !BoardGameIntakeGate.isStrongNonGameText(card.title,card.rawDescription)
                             && marketStore.hasAiCategoryRecoveryEvidence(card);
+                    if(aiRecoveredProduct)analyzedListing=new ListingClassifier.Result(ListingClassifier.Type.BASE_GAME,
+                            "Prodotto gioco base confermato da evidenza visiva AI; identità valutata da BGG",
+                            true,analyzedListing.allowPriceModel);
                     if(ga==null||!"matched".equals(ga.status)||TextUtils.isEmpty(ga.bggId)){
                         BoardGameIntakeGate.Decision gate=aiRecoveredProduct
                                 ? new BoardGameIntakeGate.Decision(BoardGameIntakeGate.Action.ACCEPT,"Prodotto gioco confermato da evidenza AI; identità BGG ancora da verificare")
@@ -1955,7 +1959,5 @@ public final class VintedAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
-
-
 
 

@@ -56,17 +56,28 @@ final class AiEngineRunner {
        }
       };
       AiEngineSession.Result result=AiEngineSession.run(config,store,source,transport,System.currentTimeMillis());
-      int recovered=listings.recoveredCount();
+      int recovered=listings.recoveredCount(),refreshed=listings.refreshedCount();
       more=result.more;
-      nextAttempt=System.currentTimeMillis()+(result.more?10000:AiEnginePolicy.BACKOFF);
       JSONObject progress=privateJournal.load();
+      long completedAt=System.currentTimeMillis();
+      long persistedNextAt=progress.optLong("next_at");
+      long retryAt=AiEngineBackoff.nextAttemptAt(result.state,completedAt,persistedNextAt,result.more,AiEnginePolicy.BACKOFF);
+      nextAttempt=retryAt;
       android.content.ContentValues diagnostic=new android.content.ContentValues();
       diagnostic.put("name","diag:ai_engine");diagnostic.put("value",result.checked);diagnostic.put("updated_at",System.currentTimeMillis());
-      diagnostic.put("text_value","build=ai-engine-v2;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more);
+      diagnostic.put("text_value","build=ai-engine-v3;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";refreshed="+refreshed+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more+";retryAt="+retryAt);
       db.insertWithOnConflict("queue_controls",null,diagnostic,SQLiteDatabase.CONFLICT_REPLACE);
-      if(result.held>0||recovered>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
-      if(recovered>0)app.sendBroadcast(new android.content.Intent(RECOVERY_READY).setPackage(app.getPackageName()));
+      if(result.held>0||recovered>0||refreshed>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
+      if(recovered>0||refreshed>0){
+       app.sendBroadcast(new android.content.Intent(RECOVERY_READY).setPackage(app.getPackageName()));
+       // The queue owner performs the zero-network AI -> provisional BGG handoff even when
+       // Accessibility/JS analysis is not running.
+       QueueKeepAliveService.ensureRunning(app);
+       QueueWorkScheduler.schedule(app);
+      }
       if(result.more)QueueWorkScheduler.scheduleAfter(app,10000);
+      else if("WAIT".equals(result.state)||retryableServiceState(result.state))
+       QueueWorkScheduler.scheduleAfter(app,Math.max(10000L,retryAt-System.currentTimeMillis()));
      }
     }
    }catch(Exception unavailable){
@@ -75,6 +86,10 @@ final class AiEngineRunner {
     android.util.Log.w("LudoAI","Automatic AI pass unavailable; reserved request retained");
    }finally{if(nextAttempt<=System.currentTimeMillis())nextAttempt=System.currentTimeMillis()+10000;BUSY.set(false);}
   });
+ }
+ private static boolean retryableServiceState(String state){
+  return "STATUS_UNAVAILABLE".equals(state)||"SERVICE_OFF".equals(state)||"BUDGET_BLOCKED".equals(state)
+   ||"INVALID_BUDGET".equals(state)||"INVALID_RESPONSE".equals(state)||(state!=null&&state.startsWith("PENDING_"));
  }
  private static boolean sameConfiguration(JSONObject expected,JSONObject current){
   return current.optBoolean("enabled")&&expected.optString("endpoint").equals(current.optString("endpoint"))&&expected.optString("token").equals(current.optString("token"));

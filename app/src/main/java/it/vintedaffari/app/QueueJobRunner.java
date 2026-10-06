@@ -35,7 +35,7 @@ public final class QueueJobRunner {
         long batchStarted=android.os.SystemClock.elapsedRealtime();
         try{
         List<GameRecord> pending=market.provisionalGamesForMatching(Math.max(1,Math.min(40,limit)));
-        int handled=0,fuzzySearches=0,matched=0,reviewDecisions=0,reviewWrites=0,reviewWriteMisses=0,quarantined=0,timedOut=0;
+        int handled=0,fuzzySearches=0,matched=0,reviewDecisions=0,reviewWrites=0,reviewWriteMisses=0,quarantined=0,timedOut=0,retained=0;
         for(GameRecord g:pending){
             if(g==null)continue;
             try{
@@ -89,20 +89,20 @@ public final class QueueJobRunner {
                 else if(searchTimedOut){
                     // A CPU/index timeout is a technical failure, not an ambiguity the user can
                     // meaningfully resolve. Keep it out of review and out of trusted surfaces.
-                    timedOut++;market.autoQuarantineGame(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason);quarantined++;
+                    timedOut++;if(market.autoQuarantineGame(g.id,TextUtils.isEmpty(reviewReason)?"Ricerca BGG locale troppo lenta":reviewReason))quarantined++;else retained++;
                 }else {
                     BoardGameIntakeGate.Decision gate=BoardGameIntakeGate.unresolvedTitle(g.name,fuzzyCandidates,sawAmbiguousExact);
                     if(gate.action==BoardGameIntakeGate.Action.REVIEW){
                         reviewDecisions++;int changed=market.markBggMatchReview(g.id,TextUtils.isEmpty(reviewReason)?gate.reason:reviewReason);
                         if(changed>0)reviewWrites+=changed;else reviewWriteMisses++;
                     }
-                    else{market.autoQuarantineGame(g.id,gate.reason);quarantined++;}
+                    else{if(market.autoQuarantineGame(g.id,gate.reason))quarantined++;else retained++;}
                 }
                 handled++;market.touchLaneHeartbeat("bgg");
             }catch(Throwable t){
                 // Infrastructure/parser faults must not become human review work. Preserve the raw
                 // observation, quarantine the provisional identity and surface the fault in diagnostics.
-                market.autoQuarantineGame(g.id,"Errore tecnico match locale: "+safe(t));quarantined++;handled++;
+                if(market.autoQuarantineGame(g.id,"Errore tecnico match locale: "+safe(t)))quarantined++;else retained++;handled++;
                 market.setDiagnosticState("bgg_match_technical_drop",1,"game="+g.id+";name="+g.name+";error="+safe(t));
             }
         }
@@ -111,7 +111,7 @@ public final class QueueJobRunner {
         market.setDiagnosticState("bgg_local_match",handled,
                 "build=bgg-local-match-v4;state=DONE;singleFlight=true;handled="+handled+";fuzzy="+fuzzySearches+";matched="+matched+
                         ";reviewDecisions="+reviewDecisions+";reviewWrites="+reviewWrites+";reviewWriteMisses="+reviewWriteMisses+
-                        ";quarantined="+quarantined+";timedOut="+timedOut+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
+                        ";quarantined="+quarantined+";retained="+retained+";timedOut="+timedOut+";remainingRequired="+remainingRequired+";elapsedMs="+elapsed+";"+matcher.localIndexSummary());
         return handled;
         }finally{BGG_IDENTITY_RUNNING.set(false);}
     }
@@ -207,9 +207,20 @@ public final class QueueJobRunner {
         try {
             android.content.SharedPreferences auto=context.getSharedPreferences("ludo_queue_maintenance",Context.MODE_PRIVATE);
             long last=auto.getLong("last_missing_sweep",0L),now=System.currentTimeMillis();
+            // Persist category evidence before the bridge evaluates product type, so an already
+            // BGG-matched recovery can materialize in this same zero-network maintenance pass.
+            int aiTypeRepaired=market.repairAiRecoveredObservationType(100);
+            auto.edit().putInt("last_ai_recovery_type_repair",aiTypeRepaired).apply();
             if(market.claimCatalogBridgeSweep(now,60_000L)){int bridged=market.materializeCanonicalCatalogBatch(24);auto.edit().putInt("last_catalog_bridge_materialized",bridged).apply();}
+            // AI recovery proves only product type. Materialize a provisional game locally so the
+            // existing BGG identity matcher can take ownership without depending on the JS radar.
+            int aiBgg=market.materializeAiRecoveredBggCandidates(40);
+            auto.edit().putInt("last_ai_recovery_bgg_handoff",aiBgg).apply();
+            // Purely local repair: authoritative BGG + canonical BASE_GAME evidence can close stale
+            // automatic AI disagreement holds without any Vinted or AI request.
+            market.resolveMatchedAiCategoryHolds();
             // Local inference is intentionally independent from the Vinted HTTP gate.
-            market.inferDeferredLanguages(120);
+            market.inferDeferredLanguages(750);
             if(now-last>=30*60_000L){
                 // Ordinary missing-link work exists to complete the current scroll, not to create an
                 // invisible permanent backlog while Motore is idle. LIVE/HUNT/MANUAL enqueue their
@@ -458,4 +469,3 @@ public final class QueueJobRunner {
         return s.length() > 220 ? s.substring(0, 220) : s;
     }
 }
-

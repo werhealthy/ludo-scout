@@ -1,5 +1,148 @@
 # Ludo Scout — Current state
 
+## Backend AI recovery closure — 2026-10-06
+
+The real-device recovery cohort is now accepted. After the transient-service wake fix, the owner built the current branch successfully with `:app:assembleDebug`, installed it with `adb install -r`, kept the USB-local bridge active, and ran `tools/ai_recovery_runtime_audit.py --ids '1605,1610'`. Runtime result: AI evidence=2, filtered=0, BGG progressed=2, cohort_pass=True. Panic Lab (#1605) and Escape room puzzel (#1610) therefore both advanced through the intended AI-category-to-BGG handoff without AI assigning BGG identity.
+
+The final bug was a scheduling gap for transient AI service states: `STATUS_UNAVAILABLE` and `PENDING_*` could persist a retry deadline without guaranteeing a durable queue wake. `AiEngineRunner` now reschedules transient service states while preserving the existing backoff and request reservation. No Vinted pacing/rate-limit behavior, schema, pricing, trust or BGG-identity ownership changed.
+
+Verification actually performed: `regression/ai_recovery_bgg_handoff.py` PASS 27/27; Android `:app:assembleDebug` BUILD SUCCESSFUL; `adb install -r` Success; final real-device cohort PASS as above. GitHub comparison immediately before merge preparation: backend/ai-category-state is 0 behind beta and PR #310 is mergeable. Hosted Actions/Cloudflare remain non-authoritative for this local backend flow.
+
+Open groups for this workstream: frontend 7 / backend 0. The AI recovery backend objective is complete; any new backend objective should start as a separate workstream.
+
+## Catalog full-audit follow-up — 2026-10-06
+
+Read-only full-catalog audit on the Pixel: 1598 listings, 532 ACTIVE, 1061 AUTO_FILTERED; 337 AI category evidence rows, 333 progressed to BGG, 4 later re-filtered only by the intentional BGG Children's Game product rule; 5 active deals are held as AI_CATEGORY_REVIEW. No state contradictions or duplicate Vinted item IDs were found. ACTIVE completeness before the local metadata fix: title/item ID/URL/observed text 100%, photos 81.4%, seller 4.7%, published 4.7%, language 45.9%, game link 95.7%.
+
+The audit proved all 507 missing publication labels already exist in durable browser_snapshot:<itemId> records; missing seller/photo/language values do not. Branch now replays browser snapshot metadata locally via MarketStore.materializeBrowserSnapshotMetadataBatch() during QueueJobRunner.sweepMissing(), filling only empty canonical/deal metadata and performing zero Vinted/AI/network calls. Regression: regression/browser_snapshot_metadata_replay.py. Runtime verification still requires local build + adb install -r, then re-run tools/catalog_full_audit.py; expected publication coverage is approximately 532/532. Seller backfill remains deliberately parked while an observation/Motore session is active and retains the existing 55 s / 60 h public-request limits.
+
+## Operating constraint — cloud quota unavailable; local workstation is authoritative, 2026-10-06
+
+GitHub Actions and Cloudflare are currently exhausted/unavailable (quota zero). When either cloud path is unavailable, do not wait for, depend on, or interpret missing cloud runs as product/runtime evidence. Build, regression, audit, USB bridge/Qwen inference, and runtime validation must run from the owner workstation/local Android setup instead. GitHub remains the code/PR source of truth; Cloudflare and hosted Actions are not required for this backend flow. Local Android builds use a monotonic fallback versionCode (currently 1002033) when LUDO_VERSION_CODE is absent, so adb install -r can upgrade the installed beta without -d or data loss.
+
+## Backend — local Qwen photo requests exceeded Ollama context; fix verified locally, 2026-10-05
+
+The prior “underlying exception unknown” checkpoint is superseded by the owner’s next runtime evidence. Audit `ai-recovery-current.json` was captured at 1791236118196 (23:35:18 Europe/Rome): listings 1572, 1577 and 1581 still had zero AI evidence, all remained AUTO_FILTERED/AUTO_FILTERED_NON_GAME, and cohort_pass=false. `diag:ai_engine` updated at 1791235986104 (23:33:06) to PENDING_FAILED, checked=0, held=0, recovered=0, failedBatches=0, retryAt=1791236886104 (23:48:06). This is the phone state at capture only.
+
+At the same interval, the USB bridge logged HTTP 400 for the app request (request ID redacted here as `4a5f766c…`). Ollama’s local `server.log` at 23:33:02 records the direct cause: `request (4518 tokens) exceeds the available context size (4096 tokens)`. A synthetic no-photo classification returned HTTP 200. Thus the bridge’s generic FAILED response was caused by the local Qwen chat request exceeding Ollama’s default context, not ADB or a guessed transport failure. Android’s PENDING_FAILED and unchanged batch counters are consistent with the bridge returning its generic HTTP 502 `{status:FAILED}` envelope; BGG/category persistence did not progress.
+
+Minimal fix in `tools/ai_local_worker.py`: set the Ollama request option `num_ctx` to 8192. Added `regression/ai_local_worker_context.py`, which was run RED against the prior code and failed because the outgoing image request lacked a sufficient context, then GREEN after the fix. The test is included in the local AI recovery installer’s regression list. The existing `ai_local_usb_bridge.py` and `ai_local_usb_android.py` regressions also pass. A direct local Ollama classification with a generated synthetic image completed successfully; `ollama ps` showed context 8192 and 100% GPU. Its returned UNKNOWN category is only a synthetic smoke-test output, not product-accuracy evidence.
+
+No Vinted photo request was made by these tests; image fetch was replaced with an in-memory synthetic image for the integration check. No database was read or written by the synthetic classification. No Gradle build, Android install, or real phone retry has been performed for this Python-only fix. PR #310 remains open/draft/unmerged; retain draft until a real AI-positive batch remains ACTIVE and advances to BGG. Remaining runtime proof: update/restart the local bridge and confirm a real phone cohort reaches the BGG state. Open groups remain frontend 7 / backend 6.
+
+## Backend — bridge failure diagnostics implemented; targeted regression verified, 2026-10-05
+
+Following owner approval, the USB bridge now emits a redacted failure line with validated request ID, stage, exception type and numeric HTTP code when proposal processing raises. It does not log exception text, listing title, photo URLs, tokens or model output; the HTTP 502 {status:FAILED} contract is unchanged. The existing regression now exercises the real ThreadingHTTPServer handler with an injected proposal exception and verifies response plus log redaction.
+
+TDD evidence: the regression was run against the unchanged bridge first and failed at the missing diagnostic assertion, then passed after implementation. Fresh rerun of regression/ai_local_usb_bridge.py passed both the pre-existing bridge cases and the new redaction case. The remote files' text exactly matches the tested workspace copies. No real Qwen request, Vinted photo fetch, Android build or install was performed for this code change. The user's local D: checkout was not modified; it remains at detached HEAD 7b89708 with pre-existing untracked files, so its running bridge does not automatically contain this change.
+
+Next: update the owner checkout carefully from backend/ai-category-state and restart the bridge so one naturally scheduled retry can expose only redacted failure context. Keep PR #310 draft until a real AI-positive batch stays ACTIVE and reaches BGG.
+
+## Backend — post-wake submit returned FAILED; underlying exception unknown, 2026-10-05
+
+Owner's newest audit was captured at 1791233542975 (22:52:22 Europe/Rome). The three expected rows remain AUTO_FILTERED/AUTO_FILTERED_NON_GAME, no AI category evidence, no BGG IDs; cohort_pass=false. diag:ai_engine updated at 1791233309258 (22:48:29) to PENDING_FAILED, checked=0, held=0, recovered=0, failedBatches=0, more=false, retryAt=1791234209257 (23:03:29). This is a new attempt after the prior WAIT deadline.
+
+Code interpretation: Session.run got past WAIT and status (a status exception would report STATUS_UNAVAILABLE), then received a non-PROPOSAL response whose status is FAILED. Because failedBatches remains zero, it did not match the terminal failure envelope (which requires request_id/model/contract and increments failedBatches); this is consistent with a bare FAILED response. The local USB bridge catches any uncaught POST/classifier exception and returns HTTP 502 {status:FAILED}, so that path is plausible. It is not proven that the app used this bridge for this POST, nor is the underlying exception known. The PC /v1/status endpoint is currently healthy; status readiness does not test inference.
+
+Do not infer AI evidence or BGG progress: none was recorded. Before the next retryAt, capture whether the bridge terminal printed a successful Done request line and run ollama ps; these are read-only. The bridge handler suppresses exception detail, so absence of Done only narrows but does not identify the exception. Do not rebuild/install or change request policies. PR remains draft pending successful real cohort progression.
+
+## Backend — wait deadline passed recently, no post-deadline diagnostic yet, 2026-10-05
+
+Owner supplied a newer audit captured 1791233269700 (22:47:49 Europe/Rome). It still lists all three expected rows AUTO_FILTERED/AUTO_FILTERED_NON_GAME, BASE_GAME, no AI proof or BGG identity, with observations PENDING_ANALYSIS. diag:ai_engine itself is timestamped 1791232772566 (22:39:32) and remains WAIT; retryAt=1791233235224 (22:47:15). The snapshot is only 34 seconds after that deadline, and the diagnostic did not update. This does not yet prove a missed scheduled wake; WorkManager may dispatch later.
+
+Read-only PC GET /v1/status was reconfirmed healthy after this report: enabled/local_online=true, USB_LOCAL, Gemini unavailable, zero remote reservations. No classify request is evidenced. Keep bridge, phone and app available for a few more minutes, then take another audit to check whether the due attempt ran. If diag remains unchanged beyond that interval, investigate WorkManager wake delivery and current queue recovery diagnostic before changing code. No reinstall required.
+
+## Backend — latest post-bridge audit still reflects pre-bridge failure; next retry due 22:47, 2026-10-05 Europe/Rome
+
+Owner attached ai-recovery-after-bridge.json captured at 1791232767005 (2026-10-05 20:39:27 UTC / 22:39:27 Europe/Rome). It found all three expected listings; each remains AUTO_FILTERED/AUTO_FILTERED_NON_GAME, local BASE_GAME, no BGG id/evidence, PENDING_ANALYSIS observation, one stored photo, no deal, no override. Cohort pass remains false.
+
+The latest diag:ai_engine is updated_at=1791232337910 (20:32:17 UTC / 22:32:17 Europe/Rome), state=STATUS_UNAVAILABLE, checked=0, held=0, recovered=0, checksTotal=96, holdsTotal=1, failedBatches=0, more=false, retryAt=1791233237910 (20:47:17 Europe/Rome). This is the failed attempt before the bridge was subsequently confirmed healthy from the PC at 22:35. Therefore this report does not test the healthy bridge. The retry deadline is about 8 minutes after the audit capture; no post-start AI status attempt is yet recorded.
+
+Keep the bridge process running, ADB USB reverse connected, and app available through the 22:47 retry and allow processing time. Then collect another audit. Do not reinstall. If status remains unavailable after that attempt, correlate with bridge logs/configuration; current evidence still does not establish app endpoint configuration.
+
+## Backend — USB bridge status healthy again; awaiting post-recovery runtime audit, 2026-10-05
+
+After owner started the bridge from the repository checkout, a read-only request from this environment to http://127.0.0.1:8765/v1/status succeeded: enabled=true, local_online=true, transport=USB_LOCAL, gemini_available=false, calls_reserved=0 and reserved_micro=0. This verifies the PC-side bridge/Ollama readiness now, not that Android has successfully submitted a classification. No /v1/classify request was sent. The owner had previously confirmed adb reverse UsbFfs tcp:8765 tcp:8765; that mapping was not rechecked in this latest turn.
+
+QueueDrainWorker calls AiEngineRunner.schedule() at each worker invocation and ensures a 15-minute periodic recovery worker. AiEngineRunner schedules a delayed wake for WAIT, but STATUS_UNAVAILABLE itself does not explicitly schedule a one-shot follow-up. The last captured retryAt (1791232335669) has passed, but no diagnostic was captured after the bridge came online; whether a subsequent queue worker ran is unknown. Keep the bridge running and phone connected through the next queue recovery, then acquire a fresh AI runtime audit. No build/install is needed.
+
+## Backend — latest bridge launch attempt used wrong working directory, 2026-10-05
+
+Owner tried python tools/ai_local_bridge.py from C:\Users\checc. Python correctly reported the script was not found at C:\Users\checc\tools\ai_local_bridge.py. No bridge process was started by this attempt and no phone data or app state was changed. Repository checkout is at D:\Users\defaultuser0\Documents\GitHub\ludo-scout per the owner's earlier PowerShell transcript.
+
+Next: in the PowerShell window intended to host the bridge, Set-Location to the repository path above, then run python -u tools\ai_local_bridge.py and leave it running. Verify /v1/status from another window. No build or reinstall is needed.
+
+## Backend — bridge process confirmed absent at follow-up, 2026-10-05
+
+Owner's follow-up checks returned no listening socket on local port 8765, no python.exe command line containing ai_local_bridge.py, and Test-NetConnection 127.0.0.1:8765 returned False. Thus the bridge process was not alive at this follow-up, despite its earlier startup message. The prior invocation's termination cause is not shown. Ollama model installation and adb reverse mapping were separately confirmed; app retry has not been re-audited after these checks.
+
+Next: start the bridge in a dedicated PowerShell window using the repo's Python executable and leave that window running. Confirm it remains alive with the listener/process checks from a second window, then verify GET /v1/status before evaluating the app or waiting for a new AI attempt. No classify request, build or install is warranted until status succeeds.
+
+## Backend — Ollama/USB setup succeeds, loopback check still fails; process state pending, 2026-10-05
+
+Owner confirms ollama list contains exact model qwen3-vl:8b-instruct-q4_K_M. Running python tools/ai_local_bridge.py printed its listening URL and model; code prints that line only after ollama_ready() succeeds and ThreadingHTTPServer binds 127.0.0.1:8765. adb reverse tcp:8765 tcp:8765 returned 8765 and adb reverse --list showed UsbFfs tcp:8765 tcp:8765. A subsequent local GET /v1/status in the same transcript still failed with a connection error.
+
+Therefore Ollama's installed model and the USB reverse mapping are confirmed. The transcript does not establish whether the Python bridge process remained alive through the later GET, whether commands ran in the same session, or whether loopback connectivity failed for another local reason. No /v1/classify call was sent, and no phone retry result was captured. Next check listener ownership and bridge process from a second PowerShell window while keeping the bridge's original window open; if it has exited, capture its exit/error output. Do not rebuild/reinstall or force a new AI attempt until GET /v1/status succeeds.
+
+## Backend — USB runtime services absent in latest owner checks; model availability not yet known, 2026-10-05
+
+Follow-up owner checks show no visible output from adb reverse --list, no TCP listener row for local port 8765, and ollama ps returned only its column header. Therefore no USB reverse mapping or local bridge listener was observed at this check, and Ollama reported no currently running model. This does not establish whether the required model is installed: ollama ps lists running models, while the bridge readiness check queries Ollama's installed tags for exact model qwen3-vl:8b-instruct-q4_K_M (default unless OLLAMA_MODEL overrides it). Check ollama list before starting anything.
+
+With the earlier STATUS_UNAVAILABLE audit, absent local bridge/forwarding is a plausible explanation for the current transport failure, but checks were not simultaneous with that earlier attempt and the app endpoint/configuration remains unknown. Do not call the root cause proven. Next safe sequence: confirm the exact model in ollama list; if available, start tools/ai_local_bridge.py in a terminal, establish adb reverse tcp:8765 tcp:8765, then verify GET /v1/status reports enabled/local_online true. These checks do not submit classification requests. Only after the status path is healthy should runtime retry be evaluated. No build or install is indicated.
+
+## Backend — local USB bridge status currently unreachable, 2026-10-05
+
+Owner ran GET http://127.0.0.1:8765/v1/status with the debug bearer header; PowerShell returned “Impossibile effettuare la connessione al server remoto.” This establishes that no service was reachable at that loopback address/port at the time of this check. It does not prove the listener state at the earlier runtime failure. The accompanying adb reverse --list produced no visible output in the supplied transcript, so the current reverse mapping remains unknown.
+
+Repository code for tools/ai_local_bridge.py binds only 127.0.0.1:8765, and main exits before starting the server if ollama_ready() is false. Thus an unavailable local model can prevent this bridge from listening; however, bridge process state, port conflicts, model readiness and the app's configured endpoint are not established by the supplied output. No AI classify request, build or install was run. Next read-only checks: capture adb reverse --list separately; check whether local Ollama/model is available and whether a process owns port 8765. Start nothing and do not reinstall until those results explain the status path.
+
+## Backend — phone audit identifies AI status transport as current stop; cause unknown, 2026-10-05
+
+Owner supplied the full read-only runtime audit for canonical listings 1572, 1577 and 1581. listing_count=3; all three rows are BASE_GAME, AUTO_FILTERED/AUTO_FILTERED_NON_GAME, with last_error “Nessun candidato BGG sufficientemente forte: scarto automatico, non fact-check”, null BGG IDs, no AI category evidence, observations still PENDING_ANALYSIS, no deals and zero overrides. The audit captured at 1791231560952.
+
+At 1791231435669, diag:ai_engine was build=ai-engine-v3; state=STATUS_UNAVAILABLE; checked=0; held=0; recovered=0; checksTotal=96; holdsTotal=1; failedBatches=0; more=false; retryAt=1791232335669. The installed app is 5.12.202-ai-wait-deadline, versionCode 1002032, and the owner confirmed an authorized Pixel 8. The retry deadline was still in the future at capture.
+
+Code path: AiEngineSession maps an exception from Transport.status() to STATUS_UNAVAILABLE before any classification submission; checked=0 is consistent with no batch being checked. AiBetaClient.status can throw for invalid endpoint/token configuration, non-200 response, connection/read errors, oversized or malformed response. AiEngineRunner intentionally logs no exception detail. The report does not identify which condition occurred, and no correlated bridge log, endpoint status response or USB reverse listing was supplied. Therefore no specific failure cause is established.
+
+Next evidence-only checks on the owner PC: query the local bridge GET /v1/status with its existing debug bearer token (no classify request), and read adb reverse --list. Preserve their exact outputs and correlate with bridge logs; do not build/install or increase AI requests until the status path is understood. Keep PR #310 draft until an AI-positive real batch remains ACTIVE and advances to BGG.
+
+## Backend — current phone audit summary; row-level report pending, 2026-10-05
+
+Owner PowerShell confirms one authorized Pixel 8 (37311FDJH00AX8, state device). Installed package is 5.12.202-ai-wait-deadline, versionCode 1002032. The owner ran tools/ai_recovery_runtime_audit.py --ids 1572,1577,1581; it completed and relaunched MainActivity. Its console summary is AI evidence=0, AI-positive filtered=0, BGG progressed=0, cohort_pass=false.
+
+This summary does not expose listing_count, matched row details or diagnostics. In particular, filtered=0 is the count of AI-positive rows that remain filtered, not a count of all filtered listings. The JSON is on the owner machine at %TEMP%\ai-recovery-current.json, outside this execution environment, so the selected IDs’ row state and current diag:ai_engine remain unverified here. No cause can be assigned from this summary. No build, install or code change was made.
+
+Next: inspect the JSON’s listing_count, each selected row’s lifecycle/enrichment_state/match_state/last_error/observations and the complete diagnostics. If listing_count is zero, reconcile these values with the canonical market_listings IDs before drawing conclusions. Keep PR #310 draft until a real AI-positive cohort is ACTIVE and reaches the next BGG state.
+
+## Backend — AI retry audit checkpoint; runtime still unverified, 2026-10-05
+
+GitHub confirms PR #310 remains open, draft, unmerged, targeting beta. At the initial inspection its head and branch HEAD were both 7b89708d3097b7c9278c3e9ee2cb40b75881df3a; beta was ff1427a92d2caa20beef173f330c85ea383d53bc. This checkpoint was then committed to STATE.md on the PR branch as 9a4616f86e4294e040f7115cf7dcdd56c33819f5; that documentation-only commit is now the branch and PR head. No application code changed.
+
+The supplied later runtime report for listings 1572, 1577 and 1581 records zero AI evidence and all three still AUTO_FILTERED/AUTO_FILTERED_NON_GAME, with observations PENDING_ANALYSIS and no BGG identity. Its diag is PENDING_FAILED (checked=0, held=0, recovered=0, failedBatches=0); retryAt was about five minutes after capture. This report proves only the captured state; it does not show whether any subsequent retry ran.
+
+Code read at the current PR head: AiEngineSession returns PENDING_<remote status> when the transport response is not PROPOSAL; for PENDING_FAILED it saves the journal with next_at = now + the normal 15-minute backoff and more=false. AiEngineRunner schedules a durable wake only for WAIT or when more=true. Thus PENDING_FAILED is not the WAIT deadline path fixed in this PR, and the observed counters do not establish the cause. AiBetaClient returns parsed non-2xx response bodies when available, or throws for transport/read/redirect/size/contract failures. The USB bridge’s handler maps any otherwise uncaught classify exception to HTTP 502 with status FAILED, but the runtime report has no correlated bridge log or HTTP response, so attributing this event to that bridge path would be speculation. The current code also discards exception details from the runner log by design.
+
+A read-only ADB check was attempted from the Codex execution environment but adb itself stopped before device enumeration with “Cannot mkdir '\\.android': Permission denied”, including when Android user-home overrides pointed into the workspace. This is an execution-environment limitation, not evidence about phone connectivity, authorization, app state or runtime. No fresh DB audit was acquired here; no build, install or data mutation was performed.
+
+Next runtime step: in the owner’s normal PowerShell environment run `adb devices -l`; only if exactly one authorized device appears as `device`, read the installed package version and run `tools/ai_recovery_runtime_audit.py --ids 1572,1577,1581 --output <new-report-path>`. If ADB is absent, unauthorized or shows no device, reconnect/unlock the phone and check `adb devices`; do not interpret that as an application result. Keep PR #310 draft until real AI-positive listings remain ACTIVE and reach the next BGG state. No cause-specific code correction is justified without fresh correlated evidence or a reproducible regression.
+
+Frontend7/backend6 groups remain open.
+
+## Backend — AI category state fix in review; Android build/phone proof pending, 2026-10-05
+
+Canonical beta is ff1427a92d2caa20beef173f330c85ea383d53bc (merged PR308, 5.12.200). The earlier top 5.12.198 handoff was stale. Owner reports the 5.12.200 local build/regressions and USB Qwen 8-record request succeeded; this session did not independently execute that phone run.
+
+The supplied recovery audit contains six canonical listings, all AUTO_FILTERED/AUTO_FILTERED_NON_GAME, no saved BGG, manual review, legacy deal or overrides, and no AI recovery marker in any exported observation. Three are local BASE_GAME rejected for no sufficiently strong BGG candidate; three are local UNCERTAIN rejected for missing positive product evidence. Absence of the marker does not prove whether AI recovery never ran or a later write removed it. Production code definitively excludes these states from recovery: only AUTO_EXCLUDED or an existing recovery marker is eligible, and policy only permits UNCERTAIN. The exact radar branch is persistAnalysisResults -> BoardGameIntakeGate.afterAnalysis -> quarantineUnresolvedObservation. Additional downstream barriers are applyAnalysis inheriting a shared AUTO_QUARANTINED provisional game, and QueueJobRunner calling autoQuarantineGame after a BGG miss/timeout/error. DealDatabase.record also overwrites observation verification_reason, so that marker is not an independent durable category fact.
+
+Branch backend/ai-category-state (5.12.201-ai-category-state) admits only enumerated automatic product/identity misses with BASE_GAME or UNCERTAIN, stored photos, an existing sighting and a fresh grounded AI BASE_GAME proposal. Known BGG identity, incompatible category, strong non-game evidence, manual review, confirmation and any signature/item override stay protected. Product evidence lives in an existing queue_controls key tied to the exact title/brand/full source/photo fingerprint; no schema change. Changed inputs invalidate its use. Radar consumes category proof without enabling the previous classifier's pricing permission. BGG still chooses identity. On a downstream identity miss, only proven listings remain ACTIVE/BGG_MATCH_REVIEW/NEEDS_REVIEW; unproven siblings stay quarantined and manual siblings retain their own state. Shared provisional identity can re-enter BGG matching after fresh product proof, with no invented BGG id or trust.
+
+Executed: six real-title/type cases failed with baseline Java policy, then 20 policy checks passed. Production Java category proof and autoQuarantineGame ran against real SQLite via existing host adapters: 27 checks passed (input edits, long stored source, stale asynchronous cards, overwritten observation reason, category/user precedence, positive/unproven/manual siblings, unchanged price/BGG/trust/time). Reverting autoQuarantineGame reproduced the expected quarantine failure. Runtime-audit fixtures reject incomplete or re-filtered cohorts. Independent code review found two source-consistency issues; exact card/source comparison and preserved proven source now address both, confirmed by re-review with no remaining concrete Critical/Important finding. Twelve targeted recovery, USB, read-only listing and BGG state/version/accountability regression scripts pass. Historical version/source guards were updated to the new authorized state contract; protections retained and behavioral tests added. Existing engine_local_activity check could not run because javac is not on PATH; the two new host tests use the installed JDK compiler module instead.
+
+Android SDK/Gradle dependencies, physical phone and Ollama are unavailable here. No full Android compile/unit/lint/APK/signature/install, Firebase upload/distribution or real post-fix cohort proof is claimed. Keep PR as draft until owner local checks pass; merge remains authorized, but not executed without the Android build. No hosted Actions dependency/dispatch, Cloudflare/provider/production/security change, Vinted pacing/budget/circuit change or phone data deletion. Do not close this feature or start implementing autonomous AI architecture before a real expected-positive cohort stays active and reaches BGG matching/review.
+
+Frontend7/backend6 remain open. Single next step: run the supplied local PowerShell build/regression/signature/adb install -r verification for backend/ai-category-state and return ai-recovery-after.json; then merge the validated PR to beta and record physical-phone evidence.
+
+
 ## Backend — 5.12.198 conservative AI filtered recovery merged; phone proof pending, 2026-10-05
 
 Direct USB Qwen is now proven end-to-end on the owner PC/phone: local regressions and Gradle build passed, adb install -r succeeded, adb reverse exposed tcp:8765, and the bridge completed a real 8-listing request. The forced reanalysis path in 5.12.197 then produced fresh proposals for the same eight real listings. All eight were locally UNCERTAIN/AUTO_FILTERED and Qwen proposed BASE_GAME with grounded product evidence; Dutch packaging for Monopoly Extreem Bankieren, Dobble Harry Potter and Wie is het? was correctly proposed as NL after the prompt correction. This established the next bottleneck: strong positive visual product evidence could not recover an automatic false-negative filter.
@@ -1532,4 +1675,5 @@ PR100 Android validation passed all regressions and Java compilation. Signed bet
 Latest user diagnostic on v87 reports five post-install UI crashes and one ANR; SQLiteDatabaseLockedException; busy_timeout8000ms; Activity snapshot load5751ms; Vinted PROCESSING lease around94min; queue heartbeat around95min; eight runnable Vinted jobs; current scroll active over five hours. Root cause of queue stalling and lock contention is not yet established. This Home step does not fix those crashes/ANR or claim to unblock the queue.
 
 L'elenco operativo attuale è il backlog prioritario consolidato in testa a questo file e in docs/specs/2026-09-30-ui-refinement.md. Le vecchie indicazioni su selector Catalogo, faccione Ludo e prossimi step sono superate dalle consegne e dal feedback2026-10-01.
+
 
