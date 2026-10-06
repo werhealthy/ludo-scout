@@ -208,6 +208,9 @@ public final class QueueJobRunner {
             android.content.SharedPreferences auto=context.getSharedPreferences("ludo_queue_maintenance",Context.MODE_PRIVATE);
             long last=auto.getLong("last_missing_sweep",0L),now=System.currentTimeMillis();
             if(market.claimCatalogBridgeSweep(now,60_000L)){int bridged=market.materializeCanonicalCatalogBatch(24);auto.edit().putInt("last_catalog_bridge_materialized",bridged).apply();}
+            // Purely local repair: authoritative BGG + canonical BASE_GAME evidence can close stale
+            // automatic AI disagreement holds without any Vinted or AI request.
+            market.resolveMatchedAiCategoryHolds();
             // Local inference is intentionally independent from the Vinted HTTP gate.
             market.inferDeferredLanguages(120);
             if(now-last>=30*60_000L){
