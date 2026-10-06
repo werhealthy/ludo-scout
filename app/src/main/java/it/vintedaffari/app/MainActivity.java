@@ -104,27 +104,10 @@ public final class MainActivity extends Activity {
     /** SQLite reconciliation can contend with :radar. Keep it off the UI thread so a queue pulse
      * cannot turn app launch/navigation into an input-dispatch ANR. */
     private void startPostCreateMaintenance(){
-        // Browser snapshots are written by :ui. Replay their already-captured metadata here before
-        // starting the default-process queue so this one local backfill observes the same WAL view.
-        maintenanceIo.execute(()->{
-            int recovered=0,passes=0;
-            try{
-                for(int i=0;i<2;i++){
-                    int changed=marketStore.materializeBrowserSnapshotMetadataBatch(500);
-                    recovered+=changed;passes++;
-                    if(changed<500)break;
-                }
-                marketStore.setDiagnosticState("browser_snapshot_ui_replay",recovered,
-                        "build=browser-snapshot-ui-replay-v1;passes="+passes+";recovered="+recovered+";zeroNetwork=true");
-            }catch(Throwable t){
-                try{marketStore.setDiagnosticState("browser_snapshot_ui_replay",-1,
-                        "build=browser-snapshot-ui-replay-v1;failure="+t.getClass().getSimpleName()+";zeroNetwork=true");}catch(Throwable ignored){}
-            }finally{
-                QueueKeepAliveService.ensureRunning(getApplicationContext());
-            }
-        });
+        // The foreground queue process owns reconciliation and maintenance writes. Running the
+        // same sweeps from :ui competed with :radar/:queue for the single SQLite writer.
+        QueueKeepAliveService.ensureRunning(this);
     }
-
     @Override protected void onResume(){super.onResume();petResumed=true;petLoadedAt=0;syncPetVisibility();engineUiResumed=true;if(getSharedPreferences("ludo_journey",MODE_PRIVATE).getBoolean("return_search",false)){getSharedPreferences("ludo_journey",MODE_PRIVATE).edit().putBoolean("return_search",false).putLong("baseline_end",System.currentTimeMillis()).apply();openLudoExploration();ludoRoomPanelOpen=true;ludoShowResults=true;}if("activity".equals(tab)||ludoExplorationVisible()){engineEnteredAt=System.currentTimeMillis();requestEngineOverviewSnapshot();}if(marketStore!=null)maintenanceIo.execute(()->{try{long now=System.currentTimeMillis();MarketStore.ManualVintedRecovery opened=marketStore.activeOpenedVintedTarget(now);if(opened!=null&&opened.active(now)&&opened.listingId>0)marketStore.enqueueOpenedListingVerification(opened.listingId);marketStore.clearManualVintedRecovery(0L);marketStore.clearOpenedVintedTarget(0L);}catch(Throwable ignored){}});if(!receiverRegistered){IntentFilter f=new IntentFilter("it.vintedaffari.app.DEALS_UPDATED");f.addAction(OperationCenter.CHANGED);androidx.core.content.ContextCompat.registerReceiver(this,receiver,f,androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);receiverRegistered=true;}if((activeDetailDialog!=null&&activeDetailDialog.isShowing())||(activeResolutionDialog!=null&&activeResolutionDialog.isShowing()))updateActivityIndicator();else scheduleRender(0);}
     @Override protected void onPause(){petResumed=false;syncPetVisibility();engineUiResumed=false;clearEngineHistoryPull();uiUpdates.removeCallbacks(activityStatusPulse);persistTransientUiSession();super.onPause();}
     @Override public void onTrimMemory(int level){
