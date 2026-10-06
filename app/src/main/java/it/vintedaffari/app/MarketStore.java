@@ -688,7 +688,7 @@ public final class MarketStore {
      * Exact Vinted item identity is the only join key; existing non-empty values always win. */
     public int materializeBrowserSnapshotMetadataBatch(int limit) {
         SQLiteDatabase db=helper.getWritableDatabase();
-        int changed=0,scanned=0,max=Math.max(1,Math.min(500,limit));
+        int changed=0,scanned=0,parsed=0,usable=0,max=Math.max(1,Math.min(500,limit));
         db.beginTransaction();
         try(Cursor c=db.rawQuery(
                 "SELECT l.id,l.vinted_item_id,COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),q.text_value,"+
@@ -706,7 +706,7 @@ public final class MarketStore {
                 String currentSellerId=c.getString(4),currentSellerName=c.getString(5),currentPublished=c.getString(6);
                 String currentImage=c.getString(7),currentPhotos=c.getString(8),currentLanguage=c.getString(9);
                 if(TextUtils.isEmpty(raw))continue;
-                JSONObject snap;try{snap=new JSONObject(raw);}catch(org.json.JSONException malformed){continue;}
+                JSONObject snap;try{snap=new JSONObject(raw);parsed++;}catch(org.json.JSONException malformed){continue;}
                 ContentValues v=new ContentValues();
                 String sellerId=snap.optString("sellerId");
                 if(TextUtils.isEmpty(currentSellerId)&&sellerId.matches("[1-9][0-9]{0,18}"))v.put("seller_id",sellerId);
@@ -727,6 +727,7 @@ public final class MarketStore {
                 String language=snap.optString("language");
                 if(TextUtils.isEmpty(currentLanguage)&&!TextUtils.isEmpty(language))v.put("language_code",language);
                 if(v.size()==0)continue;
+                usable++;
                 StringBuilder set=new StringBuilder();ArrayList<Object> args=new ArrayList<>();
                 for(String key:v.keySet()){
                     if(set.length()>0)set.append(',');
@@ -747,7 +748,8 @@ public final class MarketStore {
             db.setTransactionSuccessful();
         }finally{db.endTransaction();}
         setDiagnosticState("browser_snapshot_metadata",changed,
-                "build=browser-snapshot-metadata-v1;scanned="+scanned+";changed="+changed+";zeroNetwork=true");
+                "build=browser-snapshot-metadata-v2;scanned="+scanned+";parsed="+parsed+
+                ";usable="+usable+";changed="+changed+";zeroNetwork=true");
         return changed;
     }
 
