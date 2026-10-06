@@ -459,6 +459,7 @@ def report(db):
                 current_key=ai_input_key(listing_ai[0],listing_ai[1],listing_ai[2],listing_ai[3])
                 x["ai_evidence"]={
                     "present":bool(ai_marker),
+                    "updated_at":ai_marker["updated_at"] if ai_marker else None,
                     "stored_key":ai_marker["text_value"] if ai_marker else None,
                     "current_key":current_key,
                     "fingerprint_match":bool(ai_marker and ai_marker["text_value"]==current_key),
@@ -651,6 +652,9 @@ def main():
     for row in ai.get("still_filtered_rows",[]):
         print(f"  AI-FILTERED #{row['id']} {row['title']} | match={row['match_state']} | error={row['last_error']}")
     print(f"AI holds={len(ai.get('holds',[]))}; live-ma-esclusi={len(result['excluded_live_listings'])}; filtered-con-BGG-storico={len(result['filtered_with_historical_bgg'])}")
+    for d in result.get("diagnostics",[]):
+        if d.get("name") in ("diag:ai_engine","diag:ai_recovery_product_type_repair","diag:ai_recovery_bgg_handoff"):
+            print(f"  {d.get('name')} | value={d.get('value')} updated={d.get('updated_at')} | {d.get('text_value') or ''}")
     for reason,count in sorted(result.get("filtered_with_historical_bgg_reasons",{}).items(),key=lambda x:(-x[1],x[0])):
         print(f"  FILTERED-BGG {count}x | {reason}")
     for row in result.get("filtered_with_historical_bgg",[]):
@@ -724,8 +728,8 @@ def main():
             print(f"  CATALOG-UNBRIDGED #{row.get('listing_id')} {row.get('vinted_title','')} | item={row.get('vinted_item_id')} "+
                   f"obs={obs.get('listing_type')}/{obs.get('verification_state')} obsReason={obs.get('verification_reason') or '(none)'} "+
                   f"bridgeRetry={retry.get('text_value') or '(none)'} "+
-                  f"aiMarker={ai.get('present')} aiFingerprint={ai.get('fingerprint_match')} overrides={ai.get('override_count')} "+
-                  f"category={ai.get('category') or '(none)'}")
+                  f"aiMarker={ai.get('present')} aiFingerprint={ai.get('fingerprint_match')} aiUpdated={ai.get('updated_at')} "+
+                  f"overrides={ai.get('override_count')} category={ai.get('category') or '(none)'}")
         for row in vr.get("listing_drop",[]):
             print(f"  CATALOG-LISTING-DROP deal={row.get('deal_id')} | item={row.get('vinted_item_id')} signature={row.get('signature')} | "+
                   f"listing=#{row.get('listing_id')} {row.get('listing_lifecycle')}/{row.get('listing_enrichment')}/{row.get('listing_match')} "+
