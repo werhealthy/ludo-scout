@@ -686,6 +686,63 @@ public final class MarketStore {
 
     /** Replays metadata already captured by the embedded browser. Zero network, zero AI.
      * Exact Vinted item identity is the only join key; existing non-empty values always win. */
+    public int materializeBrowserSnapshotMetadataBatch(int limit){
+        SQLiteDatabase db=helper.getWritableDatabase();int changed=0,inspected=0;long now=System.currentTimeMillis();
+        int bounded=Math.max(1,Math.min(1000,limit));
+        String sql="SELECT l.id,l.vinted_item_id,l.image_url,l.listing_photos_csv,l.seller_id,l.seller_name,l.published_label,l.language_code,q.text_value "+
+                "FROM market_listings l JOIN queue_controls q ON q.name='browser_snapshot:'||l.vinted_item_id "+
+                "WHERE l.lifecycle='ACTIVE' AND TRIM(COALESCE(l.vinted_item_id,''))<>'' AND ("+
+                "COALESCE(TRIM(l.image_url),'')='' OR COALESCE(TRIM(l.listing_photos_csv),'')='' OR "+
+                "COALESCE(TRIM(l.seller_id),'')='' OR COALESCE(TRIM(l.seller_name),'')='' OR "+
+                "COALESCE(TRIM(l.published_label),'')='' OR COALESCE(TRIM(l.language_code),'')='') "+
+                "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?";
+        db.beginTransaction();
+        try(Cursor c=db.rawQuery(sql,new String[]{String.valueOf(bounded)})){
+            while(c.moveToNext()){
+                inspected++;long listingId=c.getLong(0);JSONObject snapshot;
+                try{snapshot=new JSONObject(c.isNull(8)?"{}":c.getString(8));}catch(org.json.JSONException ignored){continue;}
+                ContentValues v=new ContentValues();
+                String image="",photos="";JSONArray received=snapshot.optJSONArray("photos");
+                if(received!=null)for(int n=0;n<Math.min(10,received.length());n++){
+                    String photo=BrowserCapturePolicy.photo(received.optString(n));if(photo.isEmpty())continue;
+                    if(image.isEmpty())image=photo;photos+=(photos.isEmpty()?"":",")+photo;
+                }
+                if(TextUtils.isEmpty(c.getString(2))&&!image.isEmpty())v.put("image_url",image);
+                if(TextUtils.isEmpty(c.getString(3))&&!photos.isEmpty())v.put("listing_photos_csv",photos);
+                String sellerId=snapshot.optString("sellerId").trim();
+                if(TextUtils.isEmpty(c.getString(4))&&sellerId.matches("[1-9][0-9]{0,18}"))v.put("seller_id",sellerId);
+                String sellerName=snapshot.optString("sellerName").trim();
+                if(TextUtils.isEmpty(c.getString(5))&&!sellerName.isEmpty())v.put("seller_name",safe(sellerName));
+                JSONObject publication=snapshot.optJSONObject("publication");
+                String published=publication==null?"":publication.optString("raw").trim();
+                if(TextUtils.isEmpty(c.getString(6))&&!published.isEmpty())v.put("published_label",safe(published));
+                String language=ListingLanguageDetector.detect(snapshot.optString("language"));
+                if(TextUtils.isEmpty(c.getString(7))&&!language.isEmpty())v.put("language_code",language);
+                if(v.size()==0)continue;
+                v.put("enriched_at",now);
+                if(db.update("market_listings",v,"id=? AND lifecycle='ACTIVE'",new String[]{String.valueOf(listingId)})>0){
+                    syncEmptyBrowserMetadataDeal(db,listingId);changed++;
+                }
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(inspected>0)setDiagnosticState("browser_snapshot_metadata_replay",changed,
+                "state=DONE;inspected="+inspected+";changed="+changed+";limit="+bounded+";network=0;ai=0");
+        return changed;
+    }
+
+    private static void syncEmptyBrowserMetadataDeal(SQLiteDatabase db,long listingId){
+        db.execSQL("UPDATE deals SET "+
+                "image_url=CASE WHEN COALESCE(TRIM(image_url),'')='' THEN NULLIF((SELECT image_url FROM market_listings WHERE id=?),'') ELSE image_url END,"+
+                "listing_photos_csv=CASE WHEN COALESCE(TRIM(listing_photos_csv),'')='' THEN NULLIF((SELECT listing_photos_csv FROM market_listings WHERE id=?),'') ELSE listing_photos_csv END,"+
+                "seller_id=CASE WHEN COALESCE(TRIM(seller_id),'')='' THEN NULLIF((SELECT seller_id FROM market_listings WHERE id=?),'') ELSE seller_id END,"+
+                "seller_name=CASE WHEN COALESCE(TRIM(seller_name),'')='' THEN NULLIF((SELECT seller_name FROM market_listings WHERE id=?),'') ELSE seller_name END,"+
+                "published_label=CASE WHEN COALESCE(TRIM(published_label),'')='' THEN NULLIF((SELECT published_label FROM market_listings WHERE id=?),'') ELSE published_label END,"+
+                "language_code=CASE WHEN COALESCE(TRIM(language_code),'')='' THEN NULLIF((SELECT language_code FROM market_listings WHERE id=?),'') ELSE language_code END "+
+                "WHERE signature=(SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) FROM market_listings WHERE id=?)",
+                new Object[]{listingId,listingId,listingId,listingId,listingId,listingId,listingId});
+    }
+
     /** Persist validated public captures by exact ID. Missing-price snapshots remain durable,
      * but cannot become zero-price observations. Called exclusively on the browser IO lane. */
     public long captureBrowserItem(JSONObject item,long now) throws org.json.JSONException {
