@@ -725,7 +725,7 @@ public final class MarketStore {
                     StringBuilder set=new StringBuilder();ArrayList<Object> args=new ArrayList<>();
                     for(String key:v.keySet()){
                         if(set.length()>0)set.append(',');
-                        set.append(key).append("=COALESCE(NULLIF(?,''),").append(key).append(')');
+                        set.append(key).append("=COALESCE(NULLIF(").append(key).append(",''),NULLIF(?,''))");
                         args.add(v.get(key));
                     }
                     args.add(id);
