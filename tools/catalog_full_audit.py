@@ -120,6 +120,7 @@ def report(db):
     snapshot_recoverable={"seller":0,"published":0,"photos":0,"language":0,"any":0}
     snapshot_recoverable_rows=[]
     missing_rows=[]
+    active_missing_game=[]
     intruders=[]
     contradictions=[]
     ai_positive=0
@@ -161,6 +162,21 @@ def report(db):
                 missing_rows.append({
                     "id":rid,"title":row["vinted_title"] or "","missing":missing,
                     "match_state":row["match_state"],"enrichment_state":row["enrichment_state"],
+                })
+            if row["game_id"] is None:
+                signature=(row["legacy_signature"] or row["temp_fingerprint"] or "")
+                obs=latest_observation(db,signature)
+                jobs=[]
+                if table_exists(db,"processing_jobs"):
+                    jobs=[dict(j) for j in db.execute("""SELECT job_type,state,source,last_error,next_attempt_at
+                        FROM processing_jobs WHERE listing_id=? ORDER BY updated_at DESC,id DESC LIMIT 4""",(rid,))]
+                active_missing_game.append({
+                    "id":rid,"title":row["vinted_title"] or "",
+                    "enrichment_state":row["enrichment_state"],"match_state":row["match_state"],
+                    "manual_review_required":row["manual_review_required"],
+                    "last_error":row["last_error"],
+                    "latest_observation":obs,
+                    "jobs":jobs,
                 })
 
             if has_queue and row["vinted_item_id"] is not None and str(row["vinted_item_id"]).strip():
@@ -344,6 +360,15 @@ def report(db):
             "percent":round((count*100.0/active),1) if active else 0.0,
         } for name,count in completeness.items()
     }
+    active_missing_game_summary={}
+    for r in active_missing_game:
+        obs=r.get("latest_observation") or {}
+        jobs=r.get("jobs") or []
+        active_jobs=sum(1 for j in jobs if j.get("state") in ("PENDING","PROCESSING","FAILED_RETRYABLE"))
+        key=(r.get("enrichment_state") or "(none)",r.get("match_state") or "(none)",
+             obs.get("listing_type") or "(none)",obs.get("verification_state") or "(none)",
+             "work" if active_jobs else "no-work")
+        active_missing_game_summary[key]=active_missing_game_summary.get(key,0)+1
 
     return {
         "captured_at":int(time.time()*1000),
@@ -367,6 +392,11 @@ def report(db):
         "potential_intruders":intruders,
         "state_contradictions":contradictions,
         "missing_active_fields":missing_rows,
+        "active_missing_game":{
+            "rows":active_missing_game,
+            "summary":[{"enrichment_state":k[0],"match_state":k[1],"obs_type":k[2],"obs_verify":k[3],"work":k[4],"count":v}
+                       for k,v in sorted(active_missing_game_summary.items(),key=lambda kv:(-kv[1],kv[0]))],
+        },
         "browser_snapshot_recoverable":{
             "counts":snapshot_recoverable,
             "rows":snapshot_recoverable_rows,
@@ -437,6 +467,12 @@ def main():
     print("Snapshot locali recuperabili: "+
           f"seller={local.get('seller',0)} published={local.get('published',0)} "+
           f"photos={local.get('photos',0)} language={local.get('language',0)} any={local.get('any',0)}")
+    missing_game=result.get("active_missing_game",{})
+    print(f"ACTIVE senza game link: {len(missing_game.get('rows',[]))}")
+    for x in missing_game.get("summary",[]):
+        print("  GAMELESS "+
+              f"{x.get('count')}x | {x.get('enrichment_state')}/{x.get('match_state')} | "+
+              f"obs={x.get('obs_type')}/{x.get('obs_verify')} | {x.get('work')}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
