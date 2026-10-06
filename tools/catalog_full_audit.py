@@ -473,6 +473,14 @@ def main():
         print("  GAMELESS "+
               f"{x.get('count')}x | {x.get('enrichment_state')}/{x.get('match_state')} | "+
               f"obs={x.get('obs_type')}/{x.get('obs_verify')} | {x.get('work')}")
+    for r in missing_game.get("rows",[]):
+        obs=r.get("latest_observation") or {}
+        jobs=r.get("jobs") or []
+        active_jobs=[j for j in jobs if j.get("state") in ("PENDING","PROCESSING","FAILED_RETRYABLE")]
+        if r.get("enrichment_state")=="PENDING_ANALYSIS" and r.get("match_state")=="PENDING_ANALYSIS" and not active_jobs:
+            print(f"  GAMELESS-PENDING #{r.get('id')} {r.get('title','')} | "+
+                  f"obs={obs.get('listing_type')}/{obs.get('verification_state')} "+
+                  f"review={r.get('manual_review_required')} error={r.get('last_error') or '(none)'}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
