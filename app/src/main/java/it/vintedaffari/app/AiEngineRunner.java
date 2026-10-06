@@ -56,7 +56,7 @@ final class AiEngineRunner {
        }
       };
       AiEngineSession.Result result=AiEngineSession.run(config,store,source,transport,System.currentTimeMillis());
-      int recovered=listings.recoveredCount();
+      int recovered=listings.recoveredCount(),refreshed=listings.refreshedCount();
       more=result.more;
       JSONObject progress=privateJournal.load();
       long completedAt=System.currentTimeMillis();
@@ -65,10 +65,10 @@ final class AiEngineRunner {
       nextAttempt=retryAt;
       android.content.ContentValues diagnostic=new android.content.ContentValues();
       diagnostic.put("name","diag:ai_engine");diagnostic.put("value",result.checked);diagnostic.put("updated_at",System.currentTimeMillis());
-      diagnostic.put("text_value","build=ai-engine-v3;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more+";retryAt="+retryAt);
+      diagnostic.put("text_value","build=ai-engine-v3;state="+result.state+";checked="+result.checked+";held="+result.held+";recovered="+recovered+";refreshed="+refreshed+";checksTotal="+progress.optLong("checked_total")+";holdsTotal="+progress.optLong("held_total")+";failedBatches="+progress.optInt("failed_batches")+";more="+result.more+";retryAt="+retryAt);
       db.insertWithOnConflict("queue_controls",null,diagnostic,SQLiteDatabase.CONFLICT_REPLACE);
-      if(result.held>0||recovered>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
-      if(recovered>0){
+      if(result.held>0||recovered>0||refreshed>0)app.sendBroadcast(new android.content.Intent(OperationCenter.CHANGED).setPackage(app.getPackageName()));
+      if(recovered>0||refreshed>0){
        app.sendBroadcast(new android.content.Intent(RECOVERY_READY).setPackage(app.getPackageName()));
        // The queue owner performs the zero-network AI -> provisional BGG handoff even when
        // Accessibility/JS analysis is not running.
