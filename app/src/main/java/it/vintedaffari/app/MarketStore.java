@@ -689,6 +689,7 @@ public final class MarketStore {
     public int materializeBrowserSnapshotMetadataBatch(int limit) {
         SQLiteDatabase db=helper.getWritableDatabase();
         int changed=0,scanned=0,parsed=0,usable=0,max=Math.max(1,Math.min(500,limit));
+        RuntimeException failure=null;
         db.beginTransaction();
         try(Cursor c=db.rawQuery(
                 "SELECT l.id,l.vinted_item_id,COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),q.text_value,"+
@@ -746,10 +747,22 @@ public final class MarketStore {
                 if(changed>=max)break;
             }
             db.setTransactionSuccessful();
-        }finally{db.endTransaction();}
+        }catch(RuntimeException ex){
+            failure=ex;
+        }finally{
+            try{db.endTransaction();}catch(RuntimeException endFailure){if(failure==null)failure=endFailure;}
+        }
+        if(failure!=null){
+            String message=failure.getMessage()==null?"":failure.getMessage();
+            try{setDiagnosticState("browser_snapshot_metadata",-1,
+                    "build=browser-snapshot-metadata-v3;scanned="+scanned+";parsed="+parsed+
+                    ";usable="+usable+";changed="+changed+";failure="+failure.getClass().getSimpleName()+":"+safe(message)+
+                    ";zeroNetwork=true");}catch(Throwable ignored){}
+            throw failure;
+        }
         setDiagnosticState("browser_snapshot_metadata",changed,
-                "build=browser-snapshot-metadata-v2;scanned="+scanned+";parsed="+parsed+
-                ";usable="+usable+";changed="+changed+";zeroNetwork=true");
+                "build=browser-snapshot-metadata-v3;scanned="+scanned+";parsed="+parsed+
+                ";usable="+usable+";changed="+changed+";failure=none;zeroNetwork=true");
         return changed;
     }
 
