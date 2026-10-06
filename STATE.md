@@ -8,7 +8,7 @@ The audit proved all 507 missing publication labels already exist in durable bro
 
 ## Operating constraint — cloud quota unavailable; local workstation is authoritative, 2026-10-06
 
-GitHub Actions and Cloudflare are currently exhausted/unavailable (quota zero). When either cloud path is unavailable, do not wait for, depend on, or interpret missing cloud runs as product/runtime evidence. Build, regression, audit, USB bridge/Qwen inference, and runtime validation must run from the owner workstation/local Android setup instead. GitHub remains the code/PR source of truth; Cloudflare and hosted Actions are not required for this backend flow.
+GitHub Actions and Cloudflare are currently exhausted/unavailable (quota zero). When either cloud path is unavailable, do not wait for, depend on, or interpret missing cloud runs as product/runtime evidence. Build, regression, audit, USB bridge/Qwen inference, and runtime validation must run from the owner workstation/local Android setup instead. GitHub remains the code/PR source of truth; Cloudflare and hosted Actions are not required for this backend flow. Local Android builds use a monotonic fallback versionCode (currently 1002033) when LUDO_VERSION_CODE is absent, so adb install -r can upgrade the installed beta without -d or data loss.
 
 ## Backend — local Qwen photo requests exceeded Ollama context; fix verified locally, 2026-10-05
 
