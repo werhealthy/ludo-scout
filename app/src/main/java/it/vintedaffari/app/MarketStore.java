@@ -2002,12 +2002,40 @@ public final class MarketStore {
         return changed;
     }
 
+    /** Keep legacy deal mirrors aligned with the already-authoritative BGG quality gate.
+     * This changes no product rule: it only normalizes stale automatic reasons left by older filter order. */
+    public int reconcileBggQualityDealMirrors(){
+        SQLiteDatabase db=helper.getWritableDatabase();int changed=0;
+        db.beginTransaction();try{
+            ContentValues child=new ContentValues();child.put("lifecycle","REMOVED");
+            child.put("verification_state","BGG_CHILDRENS_GAME");
+            child.put("verification_reason","Escluso: categoria BGG Children's Game");
+            changed+=db.update("deals",child,
+                    "COALESCE(confirmed,0)=0 AND COALESCE(verification_state,'')<>'USER_CONFIRMED' "+
+                    "AND bgg_id IN (SELECT bgg_id FROM games WHERE bgg_id IS NOT NULL AND bgg_id<>'' AND database_visible=0 AND filter_reason='BGG_CHILDRENS_GAME') "+
+                    "AND (lifecycle<>'REMOVED' OR COALESCE(verification_state,'')<>'BGG_CHILDRENS_GAME' OR COALESCE(verification_reason,'')<>?)",
+                    new String[]{"Escluso: categoria BGG Children's Game"});
+            ContentValues low=new ContentValues();low.put("lifecycle","REMOVED");
+            low.put("verification_state","BGG_RATING_BELOW_6");
+            low.put("verification_reason","Escluso: voto BGG sotto 6");
+            changed+=db.update("deals",low,
+                    "COALESCE(confirmed,0)=0 AND COALESCE(verification_state,'')<>'USER_CONFIRMED' "+
+                    "AND bgg_id IN (SELECT bgg_id FROM games WHERE bgg_id IS NOT NULL AND bgg_id<>'' AND database_visible=0 AND filter_reason='BGG_RATING_BELOW_6') "+
+                    "AND (lifecycle<>'REMOVED' OR COALESCE(verification_state,'')<>'BGG_RATING_BELOW_6' OR COALESCE(verification_reason,'')<>?)",
+                    new String[]{"Escluso: voto BGG sotto 6"});
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0)setDiagnosticState("bgg_quality_deal_mirror",changed,
+                "build=bgg-quality-deal-mirror-v1;changed="+changed+";zeroNetwork=true");
+        return changed;
+    }
+
     public int reconcileQueue() {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.reconcileQueue");
         try{
         trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         long now=System.currentTimeMillis();
-        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=enforceGlobalCatalogRatingGate(now)+reconcileBggQualityDealMirrors()+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
