@@ -165,7 +165,7 @@ def report(db):
 
             if has_queue and row["vinted_item_id"] is not None and str(row["vinted_item_id"]).strip():
                 snapshot_key="browser_snapshot:"+str(row["vinted_item_id"]).strip()
-                snapshot_row=db.execute("SELECT text_value,updated_at FROM queue_controls WHERE name=?",(snapshot_key,)).fetchone()
+                snapshot_row=db.execute("SELECT text_value FROM queue_controls WHERE name=?",(snapshot_key,)).fetchone()
                 snap=snapshot_row[0] if snapshot_row else None
                 if snap:
                     try:
