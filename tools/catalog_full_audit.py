@@ -353,6 +353,66 @@ def report(db):
         key=f"{r.get('match_state') or '(none)'} | {deal.get('verification_state') or '(none)'} | {reason}"
         filtered_historical_bgg_reasons[key]=filtered_historical_bgg_reasons.get(key,0)+1
 
+    catalog_visibility=None
+    if table_exists(db,"deals") and table_exists(db,"processing_jobs") and has_games:
+        row=db.execute("""
+        WITH core AS (
+          SELECT l.id AS listing_id FROM market_listings l JOIN games g ON g.id=l.game_id WHERE
+          l.lifecycle='ACTIVE' AND g.bgg_id IS NOT NULL AND g.bgg_id<>'' AND g.match_state='MATCHED'
+          AND g.database_visible=1 AND g.rating IS NOT NULL AND g.rating>=6.0
+          AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' AND l.vinted_url IS NOT NULL AND l.vinted_url<>''
+          AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND COALESCE(l.manual_review_required,0)=0
+        ), core_bridged AS (
+          SELECT DISTINCT d.id AS deal_id FROM core c JOIN market_listings l ON l.id=c.listing_id
+          JOIN deals d ON (l.legacy_signature=d.signature OR (d.vinted_item_id IS NOT NULL AND l.vinted_item_id=d.vinted_item_id))
+        ), catalog_base AS (
+          SELECT d.id AS deal_id FROM deals d WHERE d.lifecycle='ACTIVE'
+          AND d.tier IN ('hot','good','offer','fair','insufficient','hunt') AND d.rating IS NOT NULL AND d.rating>=6.0
+        ), deal_identity AS (
+          SELECT b.deal_id FROM catalog_base b JOIN deals d ON d.id=b.deal_id
+          WHERE d.bgg_id IS NOT NULL AND d.bgg_id<>'' AND d.vinted_item_id IS NOT NULL AND d.vinted_item_id<>''
+          AND d.vinted_url IS NOT NULL AND d.vinted_url<>''
+        ), review_clear AS (
+          SELECT b.deal_id FROM deal_identity b JOIN deals d ON d.id=b.deal_id
+          WHERE COALESCE(d.verification_state,'') IN ('OK','USER_CONFIRMED')
+          AND COALESCE(d.listing_type,'') IN ('BASE_GAME','EXPANSION','GAME')
+        ), listing_matched AS (
+          SELECT DISTINCT b.deal_id,l.id AS listing_id FROM review_clear b JOIN deals d ON d.id=b.deal_id
+          JOIN market_listings l ON (l.legacy_signature=d.signature OR (d.vinted_item_id IS NOT NULL AND l.vinted_item_id=d.vinted_item_id))
+          WHERE l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED'
+          AND COALESCE(l.manual_review_required,0)=0
+        ), bgg_agreement AS (
+          SELECT b.deal_id,b.listing_id FROM listing_matched b JOIN market_listings l ON l.id=b.listing_id
+          JOIN games g ON g.id=l.game_id JOIN deals d ON d.id=b.deal_id
+          WHERE g.match_state='MATCHED' AND g.bgg_id=d.bgg_id AND g.database_visible=1
+          AND g.rating IS NOT NULL AND g.rating>=6.0
+        ), job_clear AS (
+          SELECT b.deal_id,b.listing_id FROM bgg_agreement b
+          WHERE NOT EXISTS(
+            SELECT 1 FROM processing_jobs j WHERE j.listing_id=b.listing_id
+            AND (j.job_type<>'VINTED_DEEP_ENRICHMENT' OR j.source='MANUAL_RECOVERY')
+            AND j.state IN ('PENDING','PROCESSING','FAILED_RETRYABLE')
+          )
+        ), catalog_rows AS (
+          SELECT d.id AS deal_id FROM deals d JOIN (SELECT DISTINCT deal_id FROM job_clear) j ON j.deal_id=d.id
+          ORDER BY d.last_seen DESC LIMIT 800
+        )
+        SELECT
+          (SELECT COUNT(*) FROM core) core,
+          (SELECT COUNT(*) FROM core_bridged) core_bridged,
+          (SELECT COUNT(*) FROM core_bridged c WHERE EXISTS(SELECT 1 FROM catalog_rows r WHERE r.deal_id=c.deal_id)) core_in_catalog,
+          (SELECT COUNT(*) FROM core_bridged c WHERE NOT EXISTS(SELECT 1 FROM catalog_rows r WHERE r.deal_id=c.deal_id)) core_not_catalog,
+          (SELECT COUNT(*) FROM catalog_rows r WHERE NOT EXISTS(SELECT 1 FROM core_bridged c WHERE c.deal_id=r.deal_id)) catalog_outside_core,
+          (SELECT COUNT(*) FROM catalog_base) catalog_base,
+          (SELECT COUNT(*) FROM deal_identity) deal_identity,
+          (SELECT COUNT(*) FROM review_clear) review_clear,
+          (SELECT COUNT(DISTINCT deal_id) FROM listing_matched) listing_matched,
+          (SELECT COUNT(DISTINCT deal_id) FROM bgg_agreement) bgg_agreement,
+          (SELECT COUNT(DISTINCT deal_id) FROM job_clear) job_clear,
+          (SELECT COUNT(*) FROM catalog_rows) catalog_rows
+        """).fetchone()
+        catalog_visibility=dict(row) if row else None
+
     completeness_summary={
         name:{
             "present":count,
@@ -379,6 +439,7 @@ def report(db):
         "listing_match_state":distribution(db,"match_state"),
         "game_match_state":bgg_states,
         "active_completeness":completeness_summary,
+        "catalog_visibility":catalog_visibility,
         "ai_category_evidence":{
             "total":ai_positive,
             "still_filtered":ai_positive_filtered,
@@ -481,6 +542,15 @@ def main():
             print(f"  GAMELESS-PENDING #{r.get('id')} {r.get('title','')} | "+
                   f"obs={obs.get('listing_type')}/{obs.get('verification_state')} "+
                   f"review={r.get('manual_review_required')} error={r.get('last_error') or '(none)'}")
+    visibility=result.get("catalog_visibility")
+    if visibility:
+        print("Catalog trusted funnel: "+
+              f"core={visibility.get('core')} bridged={visibility.get('core_bridged')} "+
+              f"inCatalog={visibility.get('core_in_catalog')} coreNotCatalog={visibility.get('core_not_catalog')} "+
+              f"outsideCore={visibility.get('catalog_outside_core')} | "+
+              f"base={visibility.get('catalog_base')} identity={visibility.get('deal_identity')} "+
+              f"reviewClear={visibility.get('review_clear')} listingMatched={visibility.get('listing_matched')} "+
+              f"bggAgreement={visibility.get('bgg_agreement')} jobClear={visibility.get('job_clear')} rows={visibility.get('catalog_rows')}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
