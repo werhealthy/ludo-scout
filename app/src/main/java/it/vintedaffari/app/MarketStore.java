@@ -922,6 +922,9 @@ public final class MarketStore {
             if(!card.capturedSignature.isEmpty())syncBrowserDeal(db,listingId);
             db.setTransactionSuccessful();
         } finally { trace.phase("COMMIT");try{db.endTransaction();}finally{trace.phase("POST_TRANSACTION");} }
+        // BGG compatibility is authoritative for product type; clear only stale automatic holds
+        // that also satisfy the strict matched/core-complete/base-game repair predicate.
+        resolveMatchedAiCategoryHolds();
     
         }catch(RuntimeException|Error failure){trace.failed(failure);throw failure;}finally{trace.close();}
     }
@@ -1693,11 +1696,6 @@ public final class MarketStore {
                 db.update("deals",hiddenDeal,"bgg_id=? AND lifecycle='ACTIVE'",new String[]{m.bggId});
             }
             restoreCategoryConfirmedListings(db,id,m.rating,m.bggId);
-            if(typeVerdict==BggProductCompatibility.Verdict.COMPATIBLE && listingType==ListingClassifier.Type.BASE_GAME){
-                // The local repair also runs from maintenance for historical rows; this direct path
-                // prevents new AI_CATEGORY_REVIEW holds from surviving an authoritative BGG match.
-                // Run after this transaction commits through the maintenance path to avoid nesting.
-            }
             if(typeVerdict==BggProductCompatibility.Verdict.COMPATIBLE && listingType==ListingClassifier.Type.EXPANSION){
                 ContentValues verified=new ContentValues();verified.put("verification_state","OK");verified.putNull("verification_reason");
                 db.update("deals",verified,"bgg_id=? AND lifecycle='ACTIVE' AND verification_state='EXPANSION_CHECK'",new String[]{m.bggId});
