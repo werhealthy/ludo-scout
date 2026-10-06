@@ -1388,7 +1388,15 @@ public final class MarketStore {
                 ? helper.getWritableDatabase().update("processing_jobs",v,"id=? AND state=? AND processing_started_at=?",new String[]{String.valueOf(job.id),PROCESSING,String.valueOf(job.processingStartedAt)})
                 : helper.getWritableDatabase().update("processing_jobs",v,"id=?",new String[]{String.valueOf(job.id)});
         if(changed==0)return;
-        updateListingState(job.listingId, FAILED_RETRYABLE, error);
+        boolean optionalDeep=JOB_VINTED_DEEP.equals(job.type)&&!MANUAL_RECOVERY_SOURCE.equals(job.source);
+        if(optionalDeep){
+            // Seller/date/photo enrichment is optional once exact Vinted + BGG identity is already core.
+            // Keep the retry on the job only; degrading the listing would wrongly remove it from Catalog.
+            ContentValues note=new ContentValues();note.put("last_error","");
+            helper.getWritableDatabase().update("market_listings",note,
+                    "id=? AND lifecycle='ACTIVE' AND enrichment_state IN ('COMPLETE','CORE_COMPLETE')",
+                    new String[]{String.valueOf(job.listingId)});
+        }else updateListingState(job.listingId, FAILED_RETRYABLE, error);
         Log.w(TAG, "job=" + job.id + " state=FAILED_RETRYABLE attempt=" + job.attempt + " next=" + nextAt + " error=" + safe(error));
         notifyQueueChanged();
     }
@@ -2002,12 +2010,43 @@ public final class MarketStore {
         return changed;
     }
 
+    /** Ordinary deep metadata is optional after exact Vinted + authoritative BGG identity.
+     * Repair rows demoted by older retryJob() behavior without touching manual recovery. */
+    public int repairOptionalDeepMetadataListingState(){
+        SQLiteDatabase db=helper.getWritableDatabase();ContentValues v=new ContentValues();
+        v.put("enrichment_state","CORE_COMPLETE");v.put("last_error","");
+        int changed=db.update("market_listings",v,
+                "lifecycle='ACTIVE' AND enrichment_state='FAILED_RETRYABLE' AND match_state='MATCHED' "+
+                "AND TRIM(COALESCE(vinted_item_id,''))<>'' AND TRIM(COALESCE(vinted_url,''))<>'' "+
+                "AND game_id IN (SELECT id FROM games WHERE match_state='MATCHED' AND database_visible=1 AND TRIM(COALESCE(bgg_id,''))<>'') "+
+                "AND EXISTS(SELECT 1 FROM processing_jobs j WHERE j.listing_id=market_listings.id AND j.job_type=? "+
+                "AND COALESCE(j.source,'AUTO')<>? AND j.state IN (?,?,?))",
+                new String[]{JOB_VINTED_DEEP,MANUAL_RECOVERY_SOURCE,PENDING,PROCESSING,FAILED_RETRYABLE});
+        if(changed>0)setDiagnosticState("optional_deep_core_repair",changed,
+                "build=optional-deep-core-repair-v1;repaired="+changed+";zeroNetwork=true");
+        return changed;
+    }
+
+    /** PRICE_FILTERED is an automatic terminal visibility state unless the row was explicitly
+     * user-confirmed. Keep lifecycle/tier aligned with that decision. */
+    public int normalizeAutomaticPriceFilteredDeals(){
+        SQLiteDatabase db=helper.getWritableDatabase();ContentValues v=new ContentValues();
+        v.put("lifecycle","REMOVED");v.put("tier","filtered");v.put("tier_label","");
+        int changed=db.update("deals",v,
+                "lifecycle='ACTIVE' AND verification_state='PRICE_FILTERED' AND COALESCE(confirmed,0)=0 "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=deals.signature AND u.payload IS NOT NULL AND COALESCE(u.excluded,0)=0)",
+                null);
+        if(changed>0)setDiagnosticState("price_filtered_state_repair",changed,
+                "build=price-filtered-state-repair-v1;normalized="+changed+";zeroNetwork=true");
+        return changed;
+    }
+
     public int reconcileQueue() {
         DbContentionTrace.Scope trace=DbContentionTrace.start("MarketStore.reconcileQueue");
         try{
         trace.phase("OPEN_DATABASE");SQLiteDatabase db=helper.getWritableDatabase();trace.phase("PRE_TRANSACTION");
         long now=System.currentTimeMillis();
-        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
+        int changed=enforceGlobalCatalogRatingGate(now)+clearHistoricalManualReviewDebt(now)+repairOptionalDeepMetadataListingState()+normalizeAutomaticPriceFilteredDeals()+reopenTechnicalBggReviewsForExactIndex(now)+yieldOverBudgetEngineRun(now)+observeEngineTiming(now)+parkIdleOrdinaryVintedJobs(now);
         trace.phase("ACQUIRE_WRITER");db.beginTransaction();trace.phase("TRANSACTION");
         try {
             ContentValues done=new ContentValues();done.put("state",COMPLETE);done.put("next_attempt_at",0);done.put("updated_at",now);
