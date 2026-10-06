@@ -116,6 +116,7 @@ def report(db):
     completeness={name:0 for name in completeness_fields}
     snapshot_recoverable={"seller":0,"published":0,"photos":0,"language":0,"any":0}
     snapshot_recoverable_rows=[]
+    snapshot_recoverable_updated_at=[]
     missing_rows=[]
     intruders=[]
     contradictions=[]
@@ -161,8 +162,10 @@ def report(db):
                 })
 
             if has_queue and row["vinted_item_id"] is not None and str(row["vinted_item_id"]).strip():
-                snap=one(db,"SELECT text_value FROM queue_controls WHERE name=?",
-                         ("browser_snapshot:"+str(row["vinted_item_id"]).strip(),))
+                snapshot_key="browser_snapshot:"+str(row["vinted_item_id"]).strip()
+                snapshot_row=db.execute("SELECT text_value,updated_at FROM queue_controls WHERE name=?",(snapshot_key,)).fetchone()
+                snap=snapshot_row[0] if snapshot_row else None
+                snapshot_updated_at=int(snapshot_row[1] or 0) if snapshot_row else 0
                 if snap:
                     try:
                         payload=json.loads(snap)
@@ -188,8 +191,10 @@ def report(db):
                         snapshot_recoverable["language"]+=1;available.append("language")
                     if available:
                         snapshot_recoverable["any"]+=1
+                        snapshot_recoverable_updated_at.append(snapshot_updated_at)
                         snapshot_recoverable_rows.append({
                             "id":rid,"title":row["vinted_title"] or "","available":available,
+                            "snapshot_updated_at":snapshot_updated_at,
                         })
 
         signature=(row["legacy_signature"] or row["temp_fingerprint"] or "")
@@ -269,6 +274,15 @@ def report(db):
     if has_queue:
         diagnostics=[dict(r) for r in db.execute("""SELECT name,value,updated_at,text_value FROM queue_controls
             WHERE name LIKE 'diag:%' ORDER BY updated_at DESC""")]
+    replay_diag=next((d for d in diagnostics if d.get("name")=="diag:browser_snapshot_metadata"),None)
+    replay_at=int((replay_diag or {}).get("updated_at") or 0)
+    snapshot_timing={
+        "replay_at":replay_at,
+        "recoverable_min_updated_at":min(snapshot_recoverable_updated_at) if snapshot_recoverable_updated_at else 0,
+        "recoverable_max_updated_at":max(snapshot_recoverable_updated_at) if snapshot_recoverable_updated_at else 0,
+        "recoverable_after_replay":sum(1 for t in snapshot_recoverable_updated_at if replay_at and t>replay_at),
+        "recoverable_total_with_time":sum(1 for t in snapshot_recoverable_updated_at if t>0),
+    }
 
     ai_holds=[]
     if table_exists(db,"deals"):
@@ -333,6 +347,7 @@ def report(db):
         "browser_snapshot_recoverable":{
             "counts":snapshot_recoverable,
             "rows":snapshot_recoverable_rows,
+            "timing":snapshot_timing,
         },
         "duplicate_vinted_items":duplicate_items,
         "auto_filtered_reasons":filtered_reasons,
@@ -385,6 +400,11 @@ def main():
     print("Snapshot locali recuperabili: "+
           f"seller={local.get('seller',0)} published={local.get('published',0)} "+
           f"photos={local.get('photos',0)} language={local.get('language',0)} any={local.get('any',0)}")
+    timing=result.get("browser_snapshot_recoverable",{}).get("timing",{})
+    print("Timing snapshot: "+
+          f"replay_at={timing.get('replay_at',0)} min={timing.get('recoverable_min_updated_at',0)} "+
+          f"max={timing.get('recoverable_max_updated_at',0)} afterReplay={timing.get('recoverable_after_replay',0)}/"+
+          f"{timing.get('recoverable_total_with_time',0)}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
