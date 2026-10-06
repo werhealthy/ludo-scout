@@ -412,6 +412,13 @@ def main():
     print(f"AI holds={len(ai.get('holds',[]))}; live-ma-esclusi={len(result['excluded_live_listings'])}; filtered-con-BGG-storico={len(result['filtered_with_historical_bgg'])}")
     for reason,count in sorted(result.get("filtered_with_historical_bgg_reasons",{}).items(),key=lambda x:(-x[1],x[0])):
         print(f"  FILTERED-BGG {count}x | {reason}")
+    for row in result.get("filtered_with_historical_bgg",[]):
+        deal=row.get("deal") or {}
+        canonical_state="BGG_CHILDRENS_GAME" if row.get("game_filter_reason")=="BGG_CHILDRENS_GAME" else ("BGG_RATING_BELOW_6" if row.get("game_filter_reason")=="BGG_RATING_BELOW_6" else None)
+        if canonical_state and deal.get("verification_state")!=canonical_state:
+            print(f"  FILTERED-BGG-MISMATCH #{row.get('id')} {row.get('title','')} | "+
+                  f"listingBgg={row.get('bgg_id')} gameFilter={row.get('game_filter_reason')} "+
+                  f"dealBgg={deal.get('bgg_id')} dealState={deal.get('verification_state')} dealLife={deal.get('lifecycle')}")
     for row in ai.get("holds",[]):
         listing=row.get("listing") or {}
         obs=listing.get("latest_observation") or {}
