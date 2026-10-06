@@ -431,7 +431,14 @@ def report(db):
           )
           ORDER BY c.listing_id
         """):
-            catalog_visibility_reasons["unbridged_core"].append(dict(r))
+            x=dict(r)
+            sigrow=db.execute("SELECT COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) sig FROM market_listings WHERE id=?",(r["listing_id"],)).fetchone()
+            sig=sigrow["sig"] if sigrow else ""
+            x["latest_observation"]=latest_observation(db,sig)
+            retry=db.execute("SELECT value,text_value,updated_at FROM queue_controls WHERE name=?",
+                             ("catalog_bridge_retry:"+str(r["listing_id"]),)).fetchone()
+            x["bridge_retry"]=dict(retry) if retry else None
+            catalog_visibility_reasons["unbridged_core"].append(x)
 
         for r in db.execute("""
           WITH core AS (
@@ -482,7 +489,13 @@ def report(db):
               AND d.vinted_item_id IS NOT NULL AND d.vinted_item_id<>''
               AND d.vinted_url IS NOT NULL AND d.vinted_url<>''
           )
-          SELECT * FROM base
+          SELECT base.*,
+                 (SELECT l.game_id FROM market_listings l
+                  WHERE l.id=base.listing_id LIMIT 1) game_id,
+                 (SELECT q.value FROM queue_controls q
+                  WHERE q.name='bgg_revalidation_v1:'||(SELECT l.game_id FROM market_listings l WHERE l.id=base.listing_id LIMIT 1)
+                  LIMIT 1) historical_revalidation_value
+          FROM base
           WHERE COALESCE(verification_state,'') NOT IN ('OK','USER_CONFIRMED')
              OR COALESCE(listing_type,'') NOT IN ('BASE_GAME','EXPANSION','GAME')
           ORDER BY deal_id
@@ -502,15 +515,20 @@ def report(db):
             AND COALESCE(d.verification_state,'') IN ('OK','USER_CONFIRMED')
             AND COALESCE(d.listing_type,'') IN ('BASE_GAME','EXPANSION','GAME')
           )
-          SELECT b.deal_id,b.signature,b.vinted_item_id
+          SELECT b.deal_id,b.signature,b.vinted_item_id,
+                 l.id listing_id,l.lifecycle listing_lifecycle,l.enrichment_state listing_enrichment,
+                 l.match_state listing_match,l.manual_review_required listing_review,l.last_error listing_error,
+                 g.bgg_id listing_bgg,g.match_state game_match,g.database_visible game_visible,g.filter_reason game_filter
           FROM base b
+          LEFT JOIN market_listings l ON (l.legacy_signature=b.signature OR (b.vinted_item_id IS NOT NULL AND l.vinted_item_id=b.vinted_item_id))
+          LEFT JOIN games g ON g.id=l.game_id
           WHERE NOT EXISTS(
-            SELECT 1 FROM market_listings l
-            WHERE (l.legacy_signature=b.signature OR (b.vinted_item_id IS NOT NULL AND l.vinted_item_id=b.vinted_item_id))
-              AND l.lifecycle='ACTIVE' AND l.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND l.match_state='MATCHED'
-              AND COALESCE(l.manual_review_required,0)=0
+            SELECT 1 FROM market_listings x
+            WHERE (x.legacy_signature=b.signature OR (b.vinted_item_id IS NOT NULL AND x.vinted_item_id=b.vinted_item_id))
+              AND x.lifecycle='ACTIVE' AND x.enrichment_state IN ('COMPLETE','CORE_COMPLETE') AND x.match_state='MATCHED'
+              AND COALESCE(x.manual_review_required,0)=0
           )
-          ORDER BY b.deal_id
+          ORDER BY b.deal_id,l.last_seen DESC
         """):
             catalog_visibility_reasons["listing_drop"].append(dict(r))
     else:
@@ -664,10 +682,29 @@ def main():
             counts=Counter(reason for row in vr.get(key,[]) for reason in row.get("reasons",[]))
             for reason,count in counts.most_common():
                 print(f"  CATALOG-{label} {count}x | {reason}")
+        review_reason_counts=Counter((row.get("verification_state") or "(empty)",
+                                      row.get("verification_reason") or "(none)",
+                                      "historical-held" if row.get("historical_revalidation_value")==2 else
+                                      ("historical-verified" if row.get("historical_revalidation_value")==1 else "no-marker"))
+                                     for row in vr.get("review_drop",[]))
+        for (state,why,marker),count in review_reason_counts.most_common():
+            print(f"  CATALOG-REVIEW-DETAIL {count}x | {state} | {marker} | {why}")
         for row in vr.get("unbridged_core",[]):
-            print(f"  CATALOG-UNBRIDGED #{row.get('listing_id')} {row.get('vinted_title','')} | item={row.get('vinted_item_id')}")
+            obs=row.get("latest_observation") or {}
+            retry=row.get("bridge_retry") or {}
+            print(f"  CATALOG-UNBRIDGED #{row.get('listing_id')} {row.get('vinted_title','')} | item={row.get('vinted_item_id')} "+
+                  f"obs={obs.get('listing_type')}/{obs.get('verification_state')} obsReason={obs.get('verification_reason') or '(none)'} "+
+                  f"bridgeRetry={retry.get('text_value') or '(none)'}")
         for row in vr.get("listing_drop",[]):
-            print(f"  CATALOG-LISTING-DROP deal={row.get('deal_id')} | item={row.get('vinted_item_id')} signature={row.get('signature')}")
+            print(f"  CATALOG-LISTING-DROP deal={row.get('deal_id')} | item={row.get('vinted_item_id')} signature={row.get('signature')} | "+
+                  f"listing=#{row.get('listing_id')} {row.get('listing_lifecycle')}/{row.get('listing_enrichment')}/{row.get('listing_match')} "+
+                  f"review={row.get('listing_review')} bgg={row.get('listing_bgg')} game={row.get('game_match')}/visible={row.get('game_visible')} "+
+                  f"error={row.get('listing_error') or '(none)'} filter={row.get('game_filter') or '(none)'}")
+        for row in vr.get("review_drop",[]):
+            if row.get("verification_state")=="PRICE_FILTERED":
+                print(f"  CATALOG-PRICE-STATE deal={row.get('deal_id')} listing=#{row.get('listing_id')} "+
+                      f"tier={row.get('tier')} rating={row.get('rating')} type={row.get('listing_type')} "+
+                      f"reason={row.get('verification_reason') or '(none)'}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
