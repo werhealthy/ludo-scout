@@ -698,6 +698,8 @@ public final class MarketStore {
                 "WHERE l.lifecycle='ACTIVE' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' "+
                 "AND (COALESCE(l.seller_id,'')='' OR COALESCE(l.published_label,'')='' OR "+
                 "COALESCE(l.image_url,'')='' OR COALESCE(l.listing_photos_csv,'')='' OR COALESCE(l.language_code,'')='') "+
+                "AND (q.text_value LIKE '%\"sellerId\"%' OR q.text_value LIKE '%\"sellerName\"%' OR "+
+                "q.text_value LIKE '%\"publication\"%' OR q.text_value LIKE '%\"photos\"%' OR q.text_value LIKE '%\"language\"%') "+
                 "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?",
                 new String[]{String.valueOf(max)})){
             while(c.moveToNext()){
