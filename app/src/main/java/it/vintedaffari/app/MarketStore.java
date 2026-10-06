@@ -688,8 +688,22 @@ public final class MarketStore {
      * Exact Vinted item identity is the only join key; existing non-empty values always win. */
     public int materializeBrowserSnapshotMetadataBatch(int limit) {
         SQLiteDatabase db=helper.getWritableDatabase();
-        int changed=0,scanned=0,parsed=0,publicationObjects=0,publicationRaw=0,publishedBlank=0,usable=0,max=Math.max(1,Math.min(500,limit));
+        int changed=0,scanned=0,parsed=0,preTxScanned=0,preTxPublicationRaw=0,publicationObjects=0,publicationRaw=0,publishedBlank=0,usable=0,max=Math.max(1,Math.min(500,limit));
         RuntimeException failure=null;
+        try(Cursor pre=db.rawQuery(
+                "SELECT q.text_value FROM market_listings l JOIN queue_controls q ON q.name='browser_snapshot:'||l.vinted_item_id "+
+                "WHERE l.lifecycle='ACTIVE' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' "+
+                "AND TRIM(COALESCE(l.published_label,''))=''",
+                null)){
+            while(pre.moveToNext()){
+                preTxScanned++;
+                String raw=pre.isNull(0)?"":pre.getString(0);
+                if(TextUtils.isEmpty(raw))continue;
+                try{JSONObject snap=new JSONObject(raw);JSONObject publication=snap.optJSONObject("publication");
+                    if(publication!=null&&!publication.optString("raw").trim().isEmpty())preTxPublicationRaw++;
+                }catch(org.json.JSONException ignored){}
+            }
+        }
         db.beginTransaction();
         try(Cursor c=db.rawQuery(
                 "SELECT l.id,l.vinted_item_id,COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),q.text_value,"+
@@ -758,14 +772,16 @@ public final class MarketStore {
         if(failure!=null){
             String message=failure.getMessage()==null?"":failure.getMessage();
             try{setDiagnosticState("browser_snapshot_metadata",-1,
-                    "build=browser-snapshot-metadata-v5;scanned="+scanned+";parsed="+parsed+
-                    ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
+                    "build=browser-snapshot-metadata-v6;scanned="+scanned+";parsed="+parsed+
+                    ";preTxScanned="+preTxScanned+";preTxPublicationRaw="+preTxPublicationRaw+
+                    ";preTxScanned="+preTxScanned+";preTxPublicationRaw="+preTxPublicationRaw+
+                ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
                     ";usable="+usable+";changed="+changed+";failure="+failure.getClass().getSimpleName()+":"+safe(message)+
                     ";zeroNetwork=true");}catch(Throwable ignored){}
             throw failure;
         }
         setDiagnosticState("browser_snapshot_metadata",changed,
-                "build=browser-snapshot-metadata-v5;scanned="+scanned+";parsed="+parsed+
+                "build=browser-snapshot-metadata-v6;scanned="+scanned+";parsed="+parsed+
                 ";publicationObjects="+publicationObjects+";publicationRaw="+publicationRaw+";publishedBlank="+publishedBlank+
                 ";usable="+usable+";changed="+changed+";failure=none;zeroNetwork=true");
         return changed;
