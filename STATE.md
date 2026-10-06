@@ -1,5 +1,11 @@
 # Ludo Scout — Current state
 
+## Catalog full-audit follow-up — 2026-10-06
+
+Read-only full-catalog audit on the Pixel: 1598 listings, 532 ACTIVE, 1061 AUTO_FILTERED; 337 AI category evidence rows, 333 progressed to BGG, 4 later re-filtered only by the intentional BGG Children's Game product rule; 5 active deals are held as AI_CATEGORY_REVIEW. No state contradictions or duplicate Vinted item IDs were found. ACTIVE completeness before the local metadata fix: title/item ID/URL/observed text 100%, photos 81.4%, seller 4.7%, published 4.7%, language 45.9%, game link 95.7%.
+
+The audit proved all 507 missing publication labels already exist in durable browser_snapshot:<itemId> records; missing seller/photo/language values do not. Branch now replays browser snapshot metadata locally via MarketStore.materializeBrowserSnapshotMetadataBatch() during QueueJobRunner.sweepMissing(), filling only empty canonical/deal metadata and performing zero Vinted/AI/network calls. Regression: regression/browser_snapshot_metadata_replay.py. Runtime verification still requires local build + adb install -r, then re-run tools/catalog_full_audit.py; expected publication coverage is approximately 532/532. Seller backfill remains deliberately parked while an observation/Motore session is active and retains the existing 55 s / 60 h public-request limits.
+
 ## Operating constraint — cloud quota unavailable; local workstation is authoritative, 2026-10-06
 
 GitHub Actions and Cloudflare are currently exhausted/unavailable (quota zero). When either cloud path is unavailable, do not wait for, depend on, or interpret missing cloud runs as product/runtime evidence. Build, regression, audit, USB bridge/Qwen inference, and runtime validation must run from the owner workstation/local Android setup instead. GitHub remains the code/PR source of truth; Cloudflare and hosted Actions are not required for this backend flow.
