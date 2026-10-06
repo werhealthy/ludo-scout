@@ -33,6 +33,9 @@ checks={
  "AI recovery handoff is zero network": all(token not in handoff for token in ["HttpURLConnection","VintedPublicSession","AiBetaClient","BggSearchClient"]),
  "queue maintenance materializes AI recoveries": "market.materializeAiRecoveredBggCandidates(40)" in runner,
  "AI recovery wakes queue owner": "QueueKeepAliveService.ensureRunning(app)" in ai_runner and "QueueWorkScheduler.schedule(app)" in ai_runner,
+ "AI recovery persists product type not identity": 'observation.put("listing_type","BASE_GAME")' in ai_listings and 'observation.put("verification_state","MATCH_UNCERTAIN")' in ai_listings and 'put("bgg_id"' not in ai_listings[ai_listings.index("if(AiEnginePolicy.recover"):ai_listings.index("continue;",ai_listings.index("if(AiEnginePolicy.recover"))+9],
+ "historical AI recovery type repair exists": "public int repairAiRecoveredObservationType" in market and "identityOwner=BGG" in market,
+ "historical AI recovery type repair is zero network": all(token not in market[market.index("public int repairAiRecoveredObservationType"):market.index("/** Bridge AI product recovery",market.index("public int repairAiRecoveredObservationType"))] for token in ["HttpURLConnection","VintedPublicSession","AiBetaClient","BggSearchClient"]),
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)
@@ -69,7 +72,9 @@ AND COALESCE(l.last_error,'') LIKE 'AI_CATEGORY_RECOVERED:%'
 AND EXISTS(SELECT 1 FROM observations o WHERE o.id=(SELECT x.id FROM observations x
  WHERE x.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)
  ORDER BY x.observed_at DESC,x.id DESC LIMIT 1)
- AND o.verification_state='PENDING_ANALYSIS' AND o.listing_type IN ('UNCERTAIN','BASE_GAME'))
+ AND ((o.verification_state='PENDING_ANALYSIS' AND o.listing_type IN ('UNCERTAIN','BASE_GAME'))
+ OR (o.verification_state='MATCH_UNCERTAIN' AND o.listing_type='BASE_GAME'
+ AND o.verification_reason='AI category recovery: base game visually recognized; BGG pending')))
 AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE
  u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)
  OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id))
