@@ -217,11 +217,21 @@ def report(db):
         if lifecycle=="AUTO_FILTERED" and bgg:
             reasons.append("filtered_with_bgg_id")
         if reasons:
+            deal_detail=None
+            if table_exists(db,"deals"):
+                signature=(row["legacy_signature"] or row["temp_fingerprint"] or "")
+                if signature:
+                    deal_row=db.execute("""SELECT lifecycle,verification_state,verification_reason,listing_type,bgg_id
+                        FROM deals WHERE signature=? LIMIT 1""",(signature,)).fetchone()
+                    deal_detail=dict(deal_row) if deal_row else None
             intruders.append({
                 "id":rid,"title":row["vinted_title"] or "","lifecycle":lifecycle,
                 "enrichment_state":row["enrichment_state"],"match_state":row["match_state"],
                 "category":row["category_normalized"],"game_id":row["game_id"],
                 "bgg_id":bgg,"game_match_state":game_state,
+                "game_filter_reason":(game or {}).get("filter_reason") if game else None,
+                "last_error":row["last_error"],
+                "deal":deal_detail,
                 "latest_observation":obs,"reasons":reasons,
             })
 
@@ -321,8 +331,11 @@ def report(db):
     ]
     filtered_historical_bgg_reasons={}
     for r in filtered_historical_bgg:
-        reason=(r.get("last_error") or "(none)").strip() or "(none)"
-        filtered_historical_bgg_reasons[reason]=filtered_historical_bgg_reasons.get(reason,0)+1
+        deal=r.get("deal") or {}
+        reason=(r.get("last_error") or r.get("game_filter_reason") or deal.get("verification_reason") or "(none)")
+        reason=str(reason).strip() or "(none)"
+        key=f"{r.get('match_state') or '(none)'} | {deal.get('verification_state') or '(none)'} | {reason}"
+        filtered_historical_bgg_reasons[key]=filtered_historical_bgg_reasons.get(key,0)+1
 
     completeness_summary={
         name:{
