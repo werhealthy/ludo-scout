@@ -1,5 +1,15 @@
 # Ludo Scout — Current state
 
+## Backend AI recovery closure — 2026-10-06
+
+The real-device recovery cohort is now accepted. After the transient-service wake fix, the owner built the current branch successfully with `:app:assembleDebug`, installed it with `adb install -r`, kept the USB-local bridge active, and ran `tools/ai_recovery_runtime_audit.py --ids '1605,1610'`. Runtime result: AI evidence=2, filtered=0, BGG progressed=2, cohort_pass=True. Panic Lab (#1605) and Escape room puzzel (#1610) therefore both advanced through the intended AI-category-to-BGG handoff without AI assigning BGG identity.
+
+The final bug was a scheduling gap for transient AI service states: `STATUS_UNAVAILABLE` and `PENDING_*` could persist a retry deadline without guaranteeing a durable queue wake. `AiEngineRunner` now reschedules transient service states while preserving the existing backoff and request reservation. No Vinted pacing/rate-limit behavior, schema, pricing, trust or BGG-identity ownership changed.
+
+Verification actually performed: `regression/ai_recovery_bgg_handoff.py` PASS 27/27; Android `:app:assembleDebug` BUILD SUCCESSFUL; `adb install -r` Success; final real-device cohort PASS as above. GitHub comparison immediately before merge preparation: backend/ai-category-state is 0 behind beta and PR #310 is mergeable. Hosted Actions/Cloudflare remain non-authoritative for this local backend flow.
+
+Open groups for this workstream: frontend 7 / backend 0. The AI recovery backend objective is complete; any new backend objective should start as a separate workstream.
+
 ## Catalog full-audit follow-up — 2026-10-06
 
 Read-only full-catalog audit on the Pixel: 1598 listings, 532 ACTIVE, 1061 AUTO_FILTERED; 337 AI category evidence rows, 333 progressed to BGG, 4 later re-filtered only by the intentional BGG Children's Game product rule; 5 active deals are held as AI_CATEGORY_REVIEW. No state contradictions or duplicate Vinted item IDs were found. ACTIVE completeness before the local metadata fix: title/item ID/URL/observed text 100%, photos 81.4%, seller 4.7%, published 4.7%, language 45.9%, game link 95.7%.
