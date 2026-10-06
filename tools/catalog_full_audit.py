@@ -236,6 +236,37 @@ def report(db):
         diagnostics=[dict(r) for r in db.execute("""SELECT name,value,updated_at,text_value FROM queue_controls
             WHERE name LIKE 'diag:%' ORDER BY updated_at DESC""")]
 
+    ai_holds=[]
+    if table_exists(db,"deals"):
+        dc=columns(db,"deals")
+        needed={"signature","lifecycle","verification_state","verification_reason"}
+        if needed.issubset(dc):
+            title_expr="COALESCE(vinted_title,'')" if "vinted_title" in dc else "''"
+            for d in db.execute(f"""SELECT signature,{title_expr} AS title,verification_state,verification_reason
+                FROM deals
+                WHERE lifecycle='ACTIVE'
+                  AND verification_state='MATCH_UNCERTAIN'
+                  AND verification_reason LIKE 'AI_CATEGORY_REVIEW:%'
+                ORDER BY signature"""):
+                lid=one(db,"""SELECT id FROM market_listings
+                    WHERE COALESCE(NULLIF(legacy_signature,''),temp_fingerprint)=?
+                    ORDER BY last_seen DESC,id DESC LIMIT 1""",(d["signature"],))
+                ai_holds.append({
+                    "listing_id":lid,
+                    "title":d["title"],
+                    "verification_state":d["verification_state"],
+                    "verification_reason":d["verification_reason"],
+                })
+
+    blocked_live=[
+        r for r in intruders
+        if r["lifecycle"]=="ACTIVE" and r["match_state"]=="BLOCKED_CLASSIFIER"
+    ]
+    filtered_historical_bgg=[
+        r for r in intruders
+        if r["lifecycle"]=="AUTO_FILTERED" and r.get("bgg_id")
+    ]
+
     completeness_summary={
         name:{
             "present":count,
@@ -258,7 +289,10 @@ def report(db):
             "still_filtered":ai_positive_filtered,
             "progressed_to_bgg":ai_positive_progressed,
             "still_filtered_rows":ai_positive_filtered_rows,
+            "holds":ai_holds,
         },
+        "excluded_live_listings":blocked_live,
+        "filtered_with_historical_bgg":filtered_historical_bgg,
         "potential_intruders":intruders,
         "state_contradictions":contradictions,
         "missing_active_fields":missing_rows,
@@ -300,7 +334,8 @@ def main():
     print(f"AI evidence: total={ai['total']} filtered={ai['still_filtered']} BGG-progressed={ai['progressed_to_bgg']}")
     for row in ai.get("still_filtered_rows",[]):
         print(f"  AI-FILTERED #{row['id']} {row['title']} | match={row['match_state']} | error={row['last_error']}")
-    print(f"Potenziali intrusi={len(result['potential_intruders'])}; contraddizioni={len(result['state_contradictions'])}; duplicati item={len(result['duplicate_vinted_items'])}")
+    print(f"AI holds={len(ai.get('holds',[]))}; live-ma-esclusi={len(result['excluded_live_listings'])}; filtered-con-BGG-storico={len(result['filtered_with_historical_bgg'])}")
+    print(f"Contraddizioni={len(result['state_contradictions'])}; duplicati item={len(result['duplicate_vinted_items'])}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
