@@ -54,6 +54,26 @@ def field_present(row,name):
         return value is not None
     return value is not None and str(value).strip()!=""
 
+def snapshot_publication_count(db):
+    if not table_exists(db,"queue_controls") or not table_exists(db,"market_listings"):
+        return 0
+    total=0
+    for row in db.execute("""SELECT q.text_value
+        FROM market_listings l
+        JOIN queue_controls q ON q.name='browser_snapshot:'||l.vinted_item_id
+        WHERE l.lifecycle='ACTIVE'
+          AND TRIM(COALESCE(l.vinted_item_id,''))<>''
+          AND TRIM(COALESCE(l.published_label,''))=''"""):
+        try:
+            payload=json.loads(row[0] or "{}")
+        except Exception:
+            continue
+        publication=payload.get("publication") or {}
+        raw=publication.get("raw") if isinstance(publication,dict) else ""
+        if str(raw or "").strip():
+            total+=1
+    return total
+
 def latest_observation(db,signature):
     if not signature or not table_exists(db,"observations"):
         return None
@@ -370,13 +390,30 @@ def main():
             path=Path(tmp)/DB
             if not dump(adb,"databases/"+DB,path):
                 raise SystemExit("Database non leggibile via run-as. Nessun dato modificato.")
+            main_only_path=Path(tmp)/("main-only-"+DB)
+            main_only_path.write_bytes(path.read_bytes())
+            try:
+                with closing(sqlite3.connect(main_only_path.resolve().as_uri()+"?mode=ro&immutable=1",uri=True)) as main_db:
+                    main_only_publication=snapshot_publication_count(main_db)
+                    main_only_journal=one(main_db,"PRAGMA journal_mode") or ""
+            except sqlite3.DatabaseError:
+                main_only_publication=-1
+                main_only_journal="unreadable"
             dump(adb,"databases/"+DB+"-wal",str(path)+"-wal")
             dump(adb,"databases/"+DB+"-shm",str(path)+"-shm")
             try:
                 with closing(sqlite3.connect(path.resolve().as_uri()+"?mode=ro",uri=True)) as db:
                     result=report(db)
+                    wal_publication=snapshot_publication_count(db)
+                    wal_journal=one(db,"PRAGMA journal_mode") or ""
             except sqlite3.DatabaseError as error:
                 raise SystemExit("Snapshot live SQLite non coerente; riesegui il comando. Nessun dato è stato modificato. "+str(error))
+            result["storage_views"]={
+                "main_only_publication":main_only_publication,
+                "main_only_journal":str(main_only_journal),
+                "with_wal_publication":wal_publication,
+                "with_wal_journal":str(wal_journal),
+            }
         result["version"]=[line.strip() for line in version.splitlines() if "versionName=" in line or "versionCode=" in line]
 
     args.output.parent.mkdir(parents=True,exist_ok=True)
@@ -408,6 +445,11 @@ def main():
           f"replay_at={timing.get('replay_at',0)} min={timing.get('recoverable_min_updated_at',0)} "+
           f"max={timing.get('recoverable_max_updated_at',0)} afterReplay={timing.get('recoverable_after_replay',0)}/"+
           f"{timing.get('recoverable_total_with_time',0)}")
+    storage=result.get("storage_views")
+    if storage:
+        print("Storage view: "+
+              f"mainOnlyPublication={storage.get('main_only_publication')} journal={storage.get('main_only_journal')} | "+
+              f"withWalPublication={storage.get('with_wal_publication')} journal={storage.get('with_wal_journal')}")
     print("Completezza ACTIVE:")
     for name,data in result["active_completeness"].items():
         print(f"  {name}: {data['present']}/{data['active_total']} ({data['percent']}%)")
