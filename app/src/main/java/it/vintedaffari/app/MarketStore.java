@@ -1693,6 +1693,11 @@ public final class MarketStore {
                 db.update("deals",hiddenDeal,"bgg_id=? AND lifecycle='ACTIVE'",new String[]{m.bggId});
             }
             restoreCategoryConfirmedListings(db,id,m.rating,m.bggId);
+            if(typeVerdict==BggProductCompatibility.Verdict.COMPATIBLE && listingType==ListingClassifier.Type.BASE_GAME){
+                // The local repair also runs from maintenance for historical rows; this direct path
+                // prevents new AI_CATEGORY_REVIEW holds from surviving an authoritative BGG match.
+                // Run after this transaction commits through the maintenance path to avoid nesting.
+            }
             if(typeVerdict==BggProductCompatibility.Verdict.COMPATIBLE && listingType==ListingClassifier.Type.EXPANSION){
                 ContentValues verified=new ContentValues();verified.put("verification_state","OK");verified.putNull("verification_reason");
                 db.update("deals",verified,"bgg_id=? AND lifecycle='ACTIVE' AND verification_state='EXPANSION_CHECK'",new String[]{m.bggId});
@@ -2332,6 +2337,45 @@ public final class MarketStore {
             ContentValues j=new ContentValues();j.put("state",COMPLETE);j.put("next_attempt_at",0);j.put("updated_at",now);j.put("progress",100);j.put("processing_started_at",0);j.put("last_error","deferred: "+safe(reason));db.update("processing_jobs",j,"id=?",new String[]{String.valueOf(job.id)});
             ContentValues l=new ContentValues();l.put("enrichment_state","DEFERRED_LINK");l.put("deferred_retry_at",Math.max(now+60_000L,retryAt));l.put("last_error",safe(reason));db.update("market_listings",l,"id=?",new String[]{String.valueOf(job.listingId)});db.setTransactionSuccessful();
         }finally{db.endTransaction();}notifyQueueChanged();
+    }
+
+    /** Clear only stale automatic AI type holds after canonical BGG has independently confirmed
+     * both identity and BASE_GAME product compatibility. Human/manual decisions are excluded. */
+    public int resolveMatchedAiCategoryHolds(){
+        SQLiteDatabase db=helper.getWritableDatabase();
+        String eligible="d.lifecycle='ACTIVE' AND d.verification_state='MATCH_UNCERTAIN' "+
+                "AND d.verification_reason LIKE 'AI_CATEGORY_REVIEW:%' AND COALESCE(d.confirmed,0)=0 "+
+                "AND d.listing_type='BASE_GAME' "+
+                "AND EXISTS(SELECT 1 FROM market_listings l JOIN games g ON g.id=l.game_id "+
+                "WHERE COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint)=d.signature "+
+                "AND l.lifecycle='ACTIVE' AND l.enrichment_state='CORE_COMPLETE' AND l.match_state='MATCHED' "+
+                "AND COALESCE(l.manual_review_required,0)=0 AND g.match_state='MATCHED' "+
+                "AND g.database_visible=1 AND g.bgg_id=d.bgg_id "+
+                "AND EXISTS(SELECT 1 FROM observations o WHERE o.signature=d.signature "+
+                "AND o.id=(SELECT id FROM observations x WHERE x.signature=d.signature ORDER BY x.observed_at DESC,x.id DESC LIMIT 1) "+
+                "AND o.listing_type='BASE_GAME')) "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE u.signature=d.signature OR (u.item_id IS NOT NULL AND u.item_id=d.vinted_item_id))";
+        ArrayList<String> signatures=new ArrayList<>();
+        try(Cursor c=db.rawQuery("SELECT d.signature FROM deals d WHERE "+eligible,null)){
+            while(c.moveToNext())signatures.add(c.getString(0));
+        }
+        if(signatures.isEmpty())return 0;
+        int changed=0;db.beginTransaction();try{
+            for(String signature:signatures){
+                ContentValues listing=new ContentValues();listing.put("last_error","");
+                db.update("market_listings",listing,
+                        "lifecycle='ACTIVE' AND last_error LIKE 'AI_CATEGORY_REVIEW:%' AND COALESCE(NULLIF(legacy_signature,''),temp_fingerprint)=?",
+                        new String[]{signature});
+                ContentValues deal=new ContentValues();deal.put("verification_state","OK");deal.putNull("verification_reason");
+                changed+=db.update("deals",deal,
+                        "signature=? AND lifecycle='ACTIVE' AND verification_state='MATCH_UNCERTAIN' AND verification_reason LIKE 'AI_CATEGORY_REVIEW:%' AND COALESCE(confirmed,0)=0",
+                        new String[]{signature});
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0){setDiagnosticState("ai_hold_bgg_resolution",changed,
+                "build=ai-hold-bgg-resolution-v1;resolved="+changed+";requires=matched+core_complete+base_game+visible;zeroNetwork=true");notifyQueueChanged();}
+        return changed;
     }
 
     /** Zero-network maintenance keeps useful work moving even while Vinted is in cooldown. */
