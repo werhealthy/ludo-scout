@@ -415,10 +415,15 @@ def main():
     for row in result.get("filtered_with_historical_bgg",[]):
         deal=row.get("deal") or {}
         canonical_state="BGG_CHILDRENS_GAME" if row.get("game_filter_reason")=="BGG_CHILDRENS_GAME" else ("BGG_RATING_BELOW_6" if row.get("game_filter_reason")=="BGG_RATING_BELOW_6" else None)
-        if canonical_state and deal.get("verification_state")!=canonical_state:
+        if canonical_state and deal.get("verification_state") not in (None,canonical_state):
             print(f"  FILTERED-BGG-MISMATCH #{row.get('id')} {row.get('title','')} | "+
                   f"listingBgg={row.get('bgg_id')} gameFilter={row.get('game_filter_reason')} "+
                   f"dealBgg={deal.get('bgg_id')} dealState={deal.get('verification_state')} dealLife={deal.get('lifecycle')}")
+        if deal.get("verification_state")=="PRICE_FILTERED":
+            print(f"  FILTERED-BGG-PRICE #{row.get('id')} {row.get('title','')} | "+
+                  f"listingBgg={row.get('bgg_id')} gameFilter={row.get('game_filter_reason')} "+
+                  f"lastError={row.get('last_error')} dealBgg={deal.get('bgg_id')} "+
+                  f"dealReason={deal.get('verification_reason')}")
     for row in ai.get("holds",[]):
         listing=row.get("listing") or {}
         obs=listing.get("latest_observation") or {}
