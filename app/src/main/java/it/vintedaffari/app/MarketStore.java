@@ -697,8 +697,8 @@ public final class MarketStore {
                 "COALESCE(l.image_url,''),COALESCE(l.listing_photos_csv,''),COALESCE(l.language_code,'') "+
                 "FROM market_listings l JOIN queue_controls q ON q.name='browser_snapshot:'||l.vinted_item_id "+
                 "WHERE l.lifecycle='ACTIVE' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' "+
-                "AND (COALESCE(l.seller_id,'')='' OR COALESCE(l.published_label,'')='' OR "+
-                "COALESCE(l.image_url,'')='' OR COALESCE(l.listing_photos_csv,'')='' OR COALESCE(l.language_code,'')='') "+
+                "AND (TRIM(COALESCE(l.seller_id,''))='' OR TRIM(COALESCE(l.published_label,''))='' OR "+
+                "TRIM(COALESCE(l.image_url,''))='' OR TRIM(COALESCE(l.listing_photos_csv,''))='' OR TRIM(COALESCE(l.language_code,''))='') "+
                 "ORDER BY l.last_seen DESC,l.id DESC",
                 null)){
             while(c.moveToNext()){
@@ -709,30 +709,30 @@ public final class MarketStore {
                 if(TextUtils.isEmpty(raw))continue;
                 JSONObject snap;try{snap=new JSONObject(raw);parsed++;}catch(org.json.JSONException malformed){continue;}
                 ContentValues v=new ContentValues();
-                String sellerId=snap.optString("sellerId");
-                if(TextUtils.isEmpty(currentSellerId)&&sellerId.matches("[1-9][0-9]{0,18}"))v.put("seller_id",sellerId);
-                String sellerName=snap.optString("sellerName");
-                if(TextUtils.isEmpty(currentSellerName)&&!TextUtils.isEmpty(sellerName))v.put("seller_name",sellerName);
+                String sellerId=snap.optString("sellerId").trim();
+                if(currentSellerId.trim().isEmpty()&&sellerId.matches("[1-9][0-9]{0,18}"))v.put("seller_id",sellerId);
+                String sellerName=snap.optString("sellerName").trim();
+                if(currentSellerName.trim().isEmpty()&&!sellerName.isEmpty())v.put("seller_name",sellerName);
                 JSONObject publication=snap.optJSONObject("publication");
-                String published=publication==null?"":publication.optString("raw");
-                boolean fillPublished=TextUtils.isEmpty(currentPublished)&&!TextUtils.isEmpty(published);
+                String published=(publication==null?"":publication.optString("raw")).trim();
+                boolean fillPublished=currentPublished.trim().isEmpty()&&!published.isEmpty();
                 if(fillPublished)v.put("published_label",published);
                 JSONArray photos=snap.optJSONArray("photos");String image="",photoCsv="";
-                if((TextUtils.isEmpty(currentImage)||TextUtils.isEmpty(currentPhotos))&&photos!=null)
+                if((currentImage.trim().isEmpty()||currentPhotos.trim().isEmpty())&&photos!=null)
                     for(int n=0;n<Math.min(10,photos.length());n++){
                         String photo=BrowserCapturePolicy.photo(photos.optString(n));if(TextUtils.isEmpty(photo))continue;
                         if(TextUtils.isEmpty(image))image=photo;photoCsv+=(photoCsv.isEmpty()?"":",")+photo;
                     }
-                if(TextUtils.isEmpty(currentImage)&&!TextUtils.isEmpty(image))v.put("image_url",image);
-                if(TextUtils.isEmpty(currentPhotos)&&!TextUtils.isEmpty(photoCsv))v.put("listing_photos_csv",photoCsv);
-                String language=snap.optString("language");
-                if(TextUtils.isEmpty(currentLanguage)&&!TextUtils.isEmpty(language))v.put("language_code",language);
+                if(currentImage.trim().isEmpty()&&!image.isEmpty())v.put("image_url",image);
+                if(currentPhotos.trim().isEmpty()&&!photoCsv.isEmpty())v.put("listing_photos_csv",photoCsv);
+                String language=snap.optString("language").trim();
+                if(currentLanguage.trim().isEmpty()&&!language.isEmpty())v.put("language_code",language);
                 if(v.size()==0)continue;
                 usable++;
                 StringBuilder set=new StringBuilder();ArrayList<Object> args=new ArrayList<>();
                 for(String key:v.keySet()){
                     if(set.length()>0)set.append(',');
-                    set.append(key).append("=COALESCE(NULLIF(").append(key).append(",''),NULLIF(?,''))");
+                    set.append(key).append("=CASE WHEN TRIM(COALESCE(").append(key).append(",''))='' THEN NULLIF(?, '') ELSE ").append(key).append(" END");
                     args.add(v.get(key));
                 }
                 args.add(id);
@@ -740,7 +740,7 @@ public final class MarketStore {
                 if(fillPublished){
                     ContentValues deal=new ContentValues();deal.put("published_label",published);
                     db.update("deals",deal,
-                            "lifecycle='ACTIVE' AND COALESCE(published_label,'')='' AND (signature=? OR (vinted_item_id IS NOT NULL AND vinted_item_id=?))",
+                            "lifecycle='ACTIVE' AND TRIM(COALESCE(published_label,''))='' AND (signature=? OR (vinted_item_id IS NOT NULL AND vinted_item_id=?))",
                             new String[]{signature,itemId});
                 }
                 changed++;
@@ -755,13 +755,13 @@ public final class MarketStore {
         if(failure!=null){
             String message=failure.getMessage()==null?"":failure.getMessage();
             try{setDiagnosticState("browser_snapshot_metadata",-1,
-                    "build=browser-snapshot-metadata-v3;scanned="+scanned+";parsed="+parsed+
+                    "build=browser-snapshot-metadata-v4;scanned="+scanned+";parsed="+parsed+
                     ";usable="+usable+";changed="+changed+";failure="+failure.getClass().getSimpleName()+":"+safe(message)+
                     ";zeroNetwork=true");}catch(Throwable ignored){}
             throw failure;
         }
         setDiagnosticState("browser_snapshot_metadata",changed,
-                "build=browser-snapshot-metadata-v3;scanned="+scanned+";parsed="+parsed+
+                "build=browser-snapshot-metadata-v4;scanned="+scanned+";parsed="+parsed+
                 ";usable="+usable+";changed="+changed+";failure=none;zeroNetwork=true");
         return changed;
     }
