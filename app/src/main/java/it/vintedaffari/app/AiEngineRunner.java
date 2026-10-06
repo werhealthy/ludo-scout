@@ -76,7 +76,8 @@ final class AiEngineRunner {
        QueueWorkScheduler.schedule(app);
       }
       if(result.more)QueueWorkScheduler.scheduleAfter(app,10000);
-      else if("WAIT".equals(result.state))QueueWorkScheduler.scheduleAfter(app,Math.max(10000L,retryAt-System.currentTimeMillis()));
+      else if("WAIT".equals(result.state)||"PENDING_RECOVERY".equals(result.state))
+       QueueWorkScheduler.scheduleAfter(app,Math.max(10000L,retryAt-System.currentTimeMillis()));
      }
     }
    }catch(Exception unavailable){
