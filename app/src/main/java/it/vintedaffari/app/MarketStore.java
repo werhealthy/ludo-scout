@@ -2405,6 +2405,35 @@ public final class MarketStore {
                 long listingId=ids.get(i);String title=titles.get(i);
                 if(TextUtils.isEmpty(title)||!AiCategoryEvidence.has(db,listingId))continue;
                 long gameId=upsertProvisionalGame(db,title,"BGG_MATCH_REQUIRED",null,now);
+                String gameState="",gameBgg="",gameReason="";
+                try(Cursor game=db.rawQuery(
+                        "SELECT COALESCE(match_state,''),COALESCE(bgg_id,''),COALESCE(filter_reason,'') FROM games WHERE id=?",
+                        new String[]{String.valueOf(gameId)})){
+                    if(game.moveToFirst()){gameState=game.getString(0);gameBgg=game.getString(1);gameReason=game.getString(2);}
+                }
+                // A previous automatic product quarantine is exactly what fresh AI product evidence
+                // may reopen. A real BGG ambiguity/human-review state remains monotonic.
+                if(TextUtils.isEmpty(gameBgg)&&"AUTO_QUARANTINED".equals(gameState)){
+                    ContentValues reopen=new ContentValues();reopen.put("match_state","BGG_MATCH_REQUIRED");
+                    reopen.put("database_visible",1);reopen.putNull("filter_reason");
+                    db.update("games",reopen,"id=? AND (bgg_id IS NULL OR bgg_id='') AND match_state='AUTO_QUARANTINED'",
+                            new String[]{String.valueOf(gameId)});
+                    gameState="BGG_MATCH_REQUIRED";
+                }
+                if("BGG_MATCH_REVIEW".equals(gameState)){
+                    ContentValues review=new ContentValues();review.put("game_id",gameId);
+                    review.put("match_state","BGG_MATCH_REVIEW");review.put("enrichment_state","NEEDS_REVIEW");
+                    review.put("manual_review_required",1);
+                    review.put("manual_review_reason",TextUtils.isEmpty(gameReason)?"Match BGG ambiguo":gameReason);
+                    review.put("last_error",TextUtils.isEmpty(gameReason)?"Match BGG ambiguo":gameReason);
+                    int updated=db.update("market_listings",review,
+                            "id=? AND lifecycle='ACTIVE' AND game_id IS NULL AND match_state='PENDING_ANALYSIS'",
+                            new String[]{String.valueOf(listingId)});
+                    changed+=updated;continue;
+                }
+                // Never infer identity from a terminal/matched game row reached only through a title key.
+                if(!TextUtils.isEmpty(gameBgg)||(!TextUtils.isEmpty(gameState)&&!"BGG_MATCH_REQUIRED".equals(gameState)
+                        &&!"PENDING_ANALYSIS".equals(gameState)&&!"EPOCH_ARCHIVED_REVIEW".equals(gameState)))continue;
                 boolean exactIdentity=false;
                 try(Cursor identity=db.rawQuery(
                         "SELECT 1 FROM market_listings WHERE id=? AND TRIM(COALESCE(vinted_item_id,''))<>'' "+
