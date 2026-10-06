@@ -48,9 +48,8 @@ final class AiEnginePolicy {
   return photos!=null&&photos.length()>0;
  }
 
- static boolean recover(JSONObject row,JSONObject answer){
-  if(!recoveryCandidate(row)||answer==null)return false;
-  if(!"BASE_GAME".equals(answer.optString("proposed_type")))return false;
+ static boolean strongBaseGameProposal(JSONObject answer){
+  if(answer==null||!"BASE_GAME".equals(answer.optString("proposed_type")))return false;
   String title=answer.optString("product_title","").trim();
   if(title.length()<3)return false;
   String evidence=answer.optString("evidence","").trim();
@@ -58,6 +57,21 @@ final class AiEnginePolicy {
   int strong=0;
   for(String part:evidence.split("[;\\n]"))if(part.trim().length()>=8)strong++;
   return strong>=2;
+ }
+
+ static boolean recover(JSONObject row,JSONObject answer){
+  return recoveryCandidate(row)&&strongBaseGameProposal(answer);
+ }
+
+ static boolean refreshRecoveredProductEvidence(JSONObject row,JSONObject answer){
+  if(row==null||!"ACTIVE".equals(row.optString("lifecycle"))||!row.optBoolean("engine_latest_ai_recovered",false))return false;
+  if(!java.util.Arrays.asList("UNCERTAIN","BASE_GAME").contains(row.optString("local_type")))return false;
+  if(BoardGameIntakeGate.isStrongNonGameText(row.optString("title"),row.optString("source_text")))return false;
+  if(row.optInt("engine_manual_review",0)!=0||row.optInt("engine_confirmed",0)!=0)return false;
+  String category=row.optString("engine_category","");
+  if(!category.isEmpty()&&ListingClassifier.isExplicitNonGameCategory(category))return false;
+  JSONArray photos=row.optJSONArray("photos");
+  return photos!=null&&photos.length()>0&&strongBaseGameProposal(answer);
  }
 
  static boolean fresh(long at,long now){return at>0&&at<=now&&now-at<TTL;}
