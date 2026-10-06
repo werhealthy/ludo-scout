@@ -1,5 +1,9 @@
 # Ludo Scout — Current state
 
+## Operating constraint — cloud quota unavailable; local workstation is authoritative, 2026-10-06
+
+GitHub Actions and Cloudflare are currently exhausted/unavailable (quota zero). When either cloud path is unavailable, do not wait for, depend on, or interpret missing cloud runs as product/runtime evidence. Build, regression, audit, USB bridge/Qwen inference, and runtime validation must run from the owner workstation/local Android setup instead. GitHub remains the code/PR source of truth; Cloudflare and hosted Actions are not required for this backend flow.
+
 ## Backend — local Qwen photo requests exceeded Ollama context; fix verified locally, 2026-10-05
 
 The prior “underlying exception unknown” checkpoint is superseded by the owner’s next runtime evidence. Audit `ai-recovery-current.json` was captured at 1791236118196 (23:35:18 Europe/Rome): listings 1572, 1577 and 1581 still had zero AI evidence, all remained AUTO_FILTERED/AUTO_FILTERED_NON_GAME, and cohort_pass=false. `diag:ai_engine` updated at 1791235986104 (23:33:06) to PENDING_FAILED, checked=0, held=0, recovered=0, failedBatches=0, retryAt=1791236886104 (23:48:06). This is the phone state at capture only.
