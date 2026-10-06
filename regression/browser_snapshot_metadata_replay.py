@@ -15,7 +15,7 @@ checks=[
  ("exact item snapshot join","q.name='browser_snapshot:'||l.vinted_item_id" in section),
  ("active listings only","l.lifecycle='ACTIVE'" in section),
  ("bounded local batch","Math.min(500,limit)" in section and "if(changed>=max)break;" in section and "LIMIT ?" not in section),
- ("stage diagnostics exposed",all(token in section for token in ["scanned=", "parsed=", "usable=", "changed=", "failure=", "browser-snapshot-metadata-v4"])),
+ ("stage diagnostics exposed",all(token in section for token in ["scanned=", "parsed=", "publicationObjects=", "publicationRaw=", "publishedBlank=", "usable=", "changed=", "failure=", "browser-snapshot-metadata-v5"])),
  ("existing values win","CASE WHEN TRIM(COALESCE(" in section and "ELSE " in section),
  ("publication bridges to deals","published_label" in section and 'db.update("deals"' in section),
  ("no network or queue work",all(token not in section for token in [
