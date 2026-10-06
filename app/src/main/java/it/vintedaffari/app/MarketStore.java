@@ -2376,6 +2376,60 @@ public final class MarketStore {
         return changed;
     }
 
+    /** Bridge AI product recovery into the existing zero-network BGG identity matcher.
+     * AI proves only "board-game product"; BGG remains the sole owner of game identity. */
+    public int materializeAiRecoveredBggCandidates(int limit){
+        SQLiteDatabase db=helper.getWritableDatabase();long now=System.currentTimeMillis();
+        int bounded=Math.max(1,Math.min(100,limit)),changed=0;
+        ArrayList<Long> ids=new ArrayList<>();ArrayList<String> titles=new ArrayList<>();
+        try(Cursor c=db.rawQuery(
+                "SELECT l.id,COALESCE(l.vinted_title,'') FROM market_listings l "+
+                "WHERE l.lifecycle='ACTIVE' AND l.game_id IS NULL "+
+                "AND l.enrichment_state='PENDING_ANALYSIS' AND l.match_state='PENDING_ANALYSIS' "+
+                "AND COALESCE(l.manual_review_required,0)=0 "+
+                "AND COALESCE(l.last_error,'') LIKE 'AI_CATEGORY_RECOVERED:%' "+
+                "AND EXISTS(SELECT 1 FROM observations o WHERE o.id=(SELECT x.id FROM observations x "+
+                "WHERE x.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "ORDER BY x.observed_at DESC,x.id DESC LIMIT 1) "+
+                "AND o.verification_state='PENDING_ANALYSIS' AND o.listing_type IN ('UNCERTAIN','BASE_GAME')) "+
+                "AND NOT EXISTS(SELECT 1 FROM listing_overrides u WHERE "+
+                "u.signature=COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint) "+
+                "OR (u.item_id IS NOT NULL AND u.item_id=l.vinted_item_id)) "+
+                "ORDER BY l.last_seen DESC,l.id DESC LIMIT ?",
+                new String[]{String.valueOf(bounded)})){
+            while(c.moveToNext()){ids.add(c.getLong(0));titles.add(c.getString(1));}
+        }
+        if(ids.isEmpty())return 0;
+        db.beginTransaction();try{
+            for(int i=0;i<ids.size();i++){
+                long listingId=ids.get(i);String title=titles.get(i);
+                if(TextUtils.isEmpty(title)||!AiCategoryEvidence.has(db,listingId))continue;
+                long gameId=upsertProvisionalGame(db,title,"BGG_MATCH_REQUIRED",null,now);
+                boolean exactIdentity=false;
+                try(Cursor identity=db.rawQuery(
+                        "SELECT 1 FROM market_listings WHERE id=? AND TRIM(COALESCE(vinted_item_id,''))<>'' "+
+                        "AND TRIM(COALESCE(vinted_url,''))<>'' LIMIT 1",
+                        new String[]{String.valueOf(listingId)})){exactIdentity=identity.moveToFirst();}
+                ContentValues listing=new ContentValues();listing.put("game_id",gameId);
+                listing.put("match_state","BGG_MATCH_REQUIRED");
+                listing.put("enrichment_state",exactIdentity?"CORE_COMPLETE":"PENDING_ANALYSIS");
+                listing.putNull("match_confidence");listing.put("last_error","");
+                int updated=db.update("market_listings",listing,
+                        "id=? AND lifecycle='ACTIVE' AND game_id IS NULL AND match_state='PENDING_ANALYSIS'",
+                        new String[]{String.valueOf(listingId)});
+                if(updated>0){addAlias(db,gameId,title,"VINTED");changed+=updated;}
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
+        if(changed>0){
+            helper.invalidateActiveObservationSessionCache();
+            setDiagnosticState("ai_recovery_bgg_handoff",changed,
+                    "build=ai-recovery-bgg-handoff-v1;materialized="+changed+";identityOwner=BGG;zeroNetwork=true");
+            notifyQueueChanged();
+        }
+        return changed;
+    }
+
     /** Zero-network maintenance keeps useful work moving even while Vinted is in cooldown. */
     public int inferDeferredLanguages(int limit){
         int changed=0;SQLiteDatabase db=helper.getWritableDatabase();List<long[]> ids=new ArrayList<>();List<String[]> vals=new ArrayList<>();
