@@ -31,13 +31,13 @@ CREATE TABLE deals(signature TEXT PRIMARY KEY,lifecycle TEXT,verification_state 
 db.executemany("INSERT INTO games VALUES(?,?,?)",[
  ("c",0,"BGG_CHILDRENS_GAME"),
  ("l",0,"BGG_RATING_BELOW_6"),
- ("v",1,NULL)
+ ("v",1,None)
 ])
 db.executemany("INSERT INTO deals VALUES(?,?,?,?,?,?)",[
  ("stale-child","REMOVED","PRICE_FILTERED","old",0,"c"),
- ("stale-low","ACTIVE","OK",NULL,0,"l"),
+ ("stale-low","ACTIVE","OK",None,0,"l"),
  ("human","ACTIVE","USER_CONFIRMED","human",1,"c"),
- ("visible","ACTIVE","OK",NULL,0,"v"),
+ ("visible","ACTIVE","OK",None,0,"v"),
 ])
 child_reason="Escluso: categoria BGG Children's Game"
 db.execute("""UPDATE deals SET lifecycle='REMOVED',verification_state='BGG_CHILDRENS_GAME',verification_reason=?
