@@ -290,11 +290,25 @@ def report(db):
                 lid=one(db,"""SELECT id FROM market_listings
                     WHERE COALESCE(NULLIF(legacy_signature,''),temp_fingerprint)=?
                     ORDER BY last_seen DESC,id DESC LIMIT 1""",(d["signature"],))
+                listing_detail=None
+                if lid is not None:
+                    listing_row=db.execute("""SELECT id,COALESCE(NULLIF(legacy_signature,''),temp_fingerprint) signature,
+                        lifecycle,enrichment_state,match_state,game_id,category_normalized,last_error
+                        FROM market_listings WHERE id=?""",(lid,)).fetchone()
+                    if listing_row:
+                        listing_detail=dict(listing_row)
+                        game_id=listing_detail.get("game_id")
+                        game=games.get(game_id) if game_id is not None else None
+                        listing_detail["bgg_id"]=(game or {}).get("bgg_id") if game else None
+                        listing_detail["game_match_state"]=(game or {}).get("match_state") if game else None
+                        obs=latest_observation(db,listing_detail.get("signature"))
+                        listing_detail["latest_observation"]=obs
                 ai_holds.append({
                     "listing_id":lid,
                     "title":d["title"],
                     "verification_state":d["verification_state"],
                     "verification_reason":d["verification_reason"],
+                    "listing":listing_detail,
                 })
 
     blocked_live=[
@@ -379,7 +393,13 @@ def main():
         print(f"  AI-FILTERED #{row['id']} {row['title']} | match={row['match_state']} | error={row['last_error']}")
     print(f"AI holds={len(ai.get('holds',[]))}; live-ma-esclusi={len(result['excluded_live_listings'])}; filtered-con-BGG-storico={len(result['filtered_with_historical_bgg'])}")
     for row in ai.get("holds",[]):
-        print(f"  AI-HOLD #{row.get('listing_id')} {row.get('title','')} | {row.get('verification_reason','')}")
+        listing=row.get("listing") or {}
+        obs=listing.get("latest_observation") or {}
+        print(f"  AI-HOLD #{row.get('listing_id')} {row.get('title','')} | "+
+              f"listing={listing.get('lifecycle')}/{listing.get('enrichment_state')}/{listing.get('match_state')} "+
+              f"game={listing.get('game_id')} bgg={listing.get('bgg_id')} gameMatch={listing.get('game_match_state')} "+
+              f"obsType={obs.get('listing_type')} obsVerify={obs.get('verification_state')} | "+
+              f"{row.get('verification_reason','')}")
     print(f"Contraddizioni={len(result['state_contradictions'])}; duplicati item={len(result['duplicate_vinted_items'])}")
     local=result.get("browser_snapshot_recoverable",{}).get("counts",{})
     print("Snapshot locali recuperabili: "+
