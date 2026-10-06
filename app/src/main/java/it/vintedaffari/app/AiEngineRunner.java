@@ -76,7 +76,7 @@ final class AiEngineRunner {
        QueueWorkScheduler.schedule(app);
       }
       if(result.more)QueueWorkScheduler.scheduleAfter(app,10000);
-      else if("WAIT".equals(result.state)||"PENDING_RECOVERY".equals(result.state))
+      else if("WAIT".equals(result.state)||retryableServiceState(result.state))
        QueueWorkScheduler.scheduleAfter(app,Math.max(10000L,retryAt-System.currentTimeMillis()));
      }
     }
@@ -86,6 +86,10 @@ final class AiEngineRunner {
     android.util.Log.w("LudoAI","Automatic AI pass unavailable; reserved request retained");
    }finally{if(nextAttempt<=System.currentTimeMillis())nextAttempt=System.currentTimeMillis()+10000;BUSY.set(false);}
   });
+ }
+ private static boolean retryableServiceState(String state){
+  return "STATUS_UNAVAILABLE".equals(state)||"SERVICE_OFF".equals(state)||"BUDGET_BLOCKED".equals(state)
+   ||"INVALID_BUDGET".equals(state)||"INVALID_RESPONSE".equals(state)||(state!=null&&state.startsWith("PENDING_"));
  }
  private static boolean sameConfiguration(JSONObject expected,JSONObject current){
   return current.optBoolean("enabled")&&expected.optString("endpoint").equals(current.optString("endpoint"))&&expected.optString("token").equals(current.optString("token"));
