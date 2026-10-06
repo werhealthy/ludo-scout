@@ -27,7 +27,8 @@ final class AiEngineListings implements AiEngineSession.Source {
  private static final String ELIGIBLE=COMMON+" AND (l.lifecycle='ACTIVE' OR ("+RECOVERABLE+"))";
 
  AiEngineListings(SQLiteDatabase db){this.db=db;}
- int recoveredCount(){return recovered;}\n int refreshedCount(){return refreshed;}
+ int recoveredCount(){return recovered;}
+ int refreshedCount(){return refreshed;}
 
  /** Called by legacy upsert inside its writer transaction; user overrides are applied afterward. */
  static void preserveHold(SQLiteDatabase db,String signature,ContentValues incoming){
