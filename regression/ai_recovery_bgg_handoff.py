@@ -36,6 +36,9 @@ checks={
  "AI recovery persists product type not identity": 'observation.put("listing_type","BASE_GAME")' in listings and 'observation.put("verification_state","MATCH_UNCERTAIN")' in listings and 'put("bgg_id"' not in listings[listings.index("if(AiEnginePolicy.recover"):listings.index("continue;",listings.index("if(AiEnginePolicy.recover"))+9],
  "historical AI recovery type repair exists": "public int repairAiRecoveredObservationType" in market and "identityOwner=BGG" in market,
  "historical AI recovery type repair is zero network": all(token not in market[market.index("public int repairAiRecoveredObservationType"):market.index("/** Bridge AI product recovery",market.index("public int repairAiRecoveredObservationType"))] for token in ["HttpURLConnection","VintedPublicSession","AiBetaClient","BggSearchClient"]),
+ "changed AI recovery evidence can refresh": "refreshRecoveredProductEvidence" in policy and "engine_latest_ai_recovered" in listings and "AiCategoryEvidence.remember" in listings and "refreshedCount()" in listings,
+ "AI refresh still writes no BGG identity": 'put("bgg_id"' not in listings[listings.index("if(AiEnginePolicy.refreshRecoveredProductEvidence"):listings.index("if(!AiEnginePolicy.hold",listings.index("if(AiEnginePolicy.refreshRecoveredProductEvidence"))],
+ "AI refresh wakes local bridge": "refreshed=listings.refreshedCount()" in ai_runner and "recovered>0||refreshed>0" in ai_runner,
 }
 for name,ok in checks.items():
  print(("PASS " if ok else "FAIL ")+name)
