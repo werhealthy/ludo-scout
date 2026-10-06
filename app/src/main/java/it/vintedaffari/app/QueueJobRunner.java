@@ -208,6 +208,10 @@ public final class QueueJobRunner {
             android.content.SharedPreferences auto=context.getSharedPreferences("ludo_queue_maintenance",Context.MODE_PRIVATE);
             long last=auto.getLong("last_missing_sweep",0L),now=System.currentTimeMillis();
             if(market.claimCatalogBridgeSweep(now,60_000L)){int bridged=market.materializeCanonicalCatalogBatch(24);auto.edit().putInt("last_catalog_bridge_materialized",bridged).apply();}
+            // AI recovery proves only product type. Materialize a provisional game locally so the
+            // existing BGG identity matcher can take ownership without depending on the JS radar.
+            int aiBgg=market.materializeAiRecoveredBggCandidates(40);
+            auto.edit().putInt("last_ai_recovery_bgg_handoff",aiBgg).apply();
             // Purely local repair: authoritative BGG + canonical BASE_GAME evidence can close stale
             // automatic AI disagreement holds without any Vinted or AI request.
             market.resolveMatchedAiCategoryHolds();
