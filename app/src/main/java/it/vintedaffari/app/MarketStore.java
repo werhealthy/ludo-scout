@@ -691,7 +691,9 @@ public final class MarketStore {
         int changed=0,scanned=0,max=Math.max(1,Math.min(500,limit));
         db.beginTransaction();
         try(Cursor c=db.rawQuery(
-                "SELECT l.id,l.vinted_item_id,COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),q.text_value "+
+                "SELECT l.id,l.vinted_item_id,COALESCE(NULLIF(l.legacy_signature,''),l.temp_fingerprint),q.text_value,"+
+                "COALESCE(l.seller_id,''),COALESCE(l.seller_name,''),COALESCE(l.published_label,''),"+
+                "COALESCE(l.image_url,''),COALESCE(l.listing_photos_csv,''),COALESCE(l.language_code,'') "+
                 "FROM market_listings l JOIN queue_controls q ON q.name='browser_snapshot:'||l.vinted_item_id "+
                 "WHERE l.lifecycle='ACTIVE' AND l.vinted_item_id IS NOT NULL AND l.vinted_item_id<>'' "+
                 "AND (COALESCE(l.seller_id,'')='' OR COALESCE(l.published_label,'')='' OR "+
@@ -701,25 +703,29 @@ public final class MarketStore {
             while(c.moveToNext()){
                 scanned++;
                 long id=c.getLong(0);String itemId=c.getString(1),signature=c.getString(2),raw=c.getString(3);
+                String currentSellerId=c.getString(4),currentSellerName=c.getString(5),currentPublished=c.getString(6);
+                String currentImage=c.getString(7),currentPhotos=c.getString(8),currentLanguage=c.getString(9);
                 if(TextUtils.isEmpty(raw))continue;
                 JSONObject snap;try{snap=new JSONObject(raw);}catch(org.json.JSONException malformed){continue;}
                 ContentValues v=new ContentValues();
                 String sellerId=snap.optString("sellerId");
-                if(sellerId.matches("[1-9][0-9]{0,18}"))v.put("seller_id",sellerId);
+                if(TextUtils.isEmpty(currentSellerId)&&sellerId.matches("[1-9][0-9]{0,18}"))v.put("seller_id",sellerId);
                 String sellerName=snap.optString("sellerName");
-                if(!TextUtils.isEmpty(sellerName))v.put("seller_name",sellerName);
+                if(TextUtils.isEmpty(currentSellerName)&&!TextUtils.isEmpty(sellerName))v.put("seller_name",sellerName);
                 JSONObject publication=snap.optJSONObject("publication");
                 String published=publication==null?"":publication.optString("raw");
-                if(!TextUtils.isEmpty(published))v.put("published_label",published);
+                boolean fillPublished=TextUtils.isEmpty(currentPublished)&&!TextUtils.isEmpty(published);
+                if(fillPublished)v.put("published_label",published);
                 JSONArray photos=snap.optJSONArray("photos");String image="",photoCsv="";
-                if(photos!=null)for(int n=0;n<Math.min(10,photos.length());n++){
-                    String photo=BrowserCapturePolicy.photo(photos.optString(n));if(TextUtils.isEmpty(photo))continue;
-                    if(TextUtils.isEmpty(image))image=photo;photoCsv+=(photoCsv.isEmpty()?"":",")+photo;
-                }
-                if(!TextUtils.isEmpty(image))v.put("image_url",image);
-                if(!TextUtils.isEmpty(photoCsv))v.put("listing_photos_csv",photoCsv);
+                if((TextUtils.isEmpty(currentImage)||TextUtils.isEmpty(currentPhotos))&&photos!=null)
+                    for(int n=0;n<Math.min(10,photos.length());n++){
+                        String photo=BrowserCapturePolicy.photo(photos.optString(n));if(TextUtils.isEmpty(photo))continue;
+                        if(TextUtils.isEmpty(image))image=photo;photoCsv+=(photoCsv.isEmpty()?"":",")+photo;
+                    }
+                if(TextUtils.isEmpty(currentImage)&&!TextUtils.isEmpty(image))v.put("image_url",image);
+                if(TextUtils.isEmpty(currentPhotos)&&!TextUtils.isEmpty(photoCsv))v.put("listing_photos_csv",photoCsv);
                 String language=snap.optString("language");
-                if(!TextUtils.isEmpty(language))v.put("language_code",language);
+                if(TextUtils.isEmpty(currentLanguage)&&!TextUtils.isEmpty(language))v.put("language_code",language);
                 if(v.size()==0)continue;
                 StringBuilder set=new StringBuilder();ArrayList<Object> args=new ArrayList<>();
                 for(String key:v.keySet()){
@@ -729,7 +735,7 @@ public final class MarketStore {
                 }
                 args.add(id);
                 db.execSQL("UPDATE market_listings SET "+set+" WHERE id=? AND lifecycle='ACTIVE'",args.toArray());
-                if(!TextUtils.isEmpty(published)){
+                if(fillPublished){
                     ContentValues deal=new ContentValues();deal.put("published_label",published);
                     db.update("deals",deal,
                             "lifecycle='ACTIVE' AND COALESCE(published_label,'')='' AND (signature=? OR (vinted_item_id IS NOT NULL AND vinted_item_id=?))",
