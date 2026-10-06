@@ -208,10 +208,6 @@ public final class QueueJobRunner {
             android.content.SharedPreferences auto=context.getSharedPreferences("ludo_queue_maintenance",Context.MODE_PRIVATE);
             long last=auto.getLong("last_missing_sweep",0L),now=System.currentTimeMillis();
             if(market.claimCatalogBridgeSweep(now,60_000L)){int bridged=market.materializeCanonicalCatalogBatch(24);auto.edit().putInt("last_catalog_bridge_materialized",bridged).apply();}
-            // Local metadata replay is independent from the Vinted HTTP gate: reuse already-captured
-            // browser snapshots before considering any seller/catalog maintenance request.
-            int snapshotMetadata=market.materializeBrowserSnapshotMetadataBatch(200);
-            auto.edit().putInt("last_browser_snapshot_metadata",snapshotMetadata).apply();
             // Local inference is intentionally independent from the Vinted HTTP gate.
             market.inferDeferredLanguages(120);
             if(now-last>=30*60_000L){
