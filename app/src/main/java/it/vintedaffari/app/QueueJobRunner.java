@@ -219,6 +219,10 @@ public final class QueueJobRunner {
             // Purely local repair: authoritative BGG + canonical BASE_GAME evidence can close stale
             // automatic AI disagreement holds without any Vinted or AI request.
             market.resolveMatchedAiCategoryHolds();
+            // Reuse metadata already captured in browser snapshots before any network-backed
+            // enrichment. This pass is local-only and never overwrites an existing value.
+            int replayed=market.materializeBrowserSnapshotMetadataBatch(750);
+            auto.edit().putInt("last_browser_snapshot_metadata_replay",replayed).apply();
             // Local inference is intentionally independent from the Vinted HTTP gate.
             market.inferDeferredLanguages(750);
             if(now-last>=30*60_000L){

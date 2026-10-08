@@ -17,8 +17,8 @@ android {
         // CI supplies a monotonic build number. Local workstation builds must also stay
         // upgrade-compatible with the installed beta because cloud Actions may be unavailable.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
-        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 1002033
-        versionName '5.12.202-ai-wait-deadline'
+        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 1002034
+        versionName '5.12.203-catalog-metadata-replay'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')
