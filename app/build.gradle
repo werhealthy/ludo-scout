@@ -18,7 +18,13 @@ android {
         // upgrade-compatible with the installed beta because cloud Actions may be unavailable.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
         versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 1002033
-        versionName '5.12.202-ai-wait-deadline'
+        // Only the owner-approved Telegram release builder supplies a beta version name.
+        // Normal local builds retain the existing version unchanged.
+        def releaseVersionName = System.getenv('LUDO_VERSION_NAME')
+        if (releaseVersionName && !(releaseVersionName ==~ /5\.12\.\d{1,4}-beta/)) {
+            throw new GradleException('Invalid LUDO_VERSION_NAME for local beta release')
+        }
+        versionName releaseVersionName ?: '5.12.202-ai-wait-deadline'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')
