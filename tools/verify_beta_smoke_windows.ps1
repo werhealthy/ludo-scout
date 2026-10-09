@@ -32,7 +32,8 @@ try {
     $gradleContent = (& git -C $repo show $object | Out-String)
     if ($LASTEXITCODE -ne 0 -or
         -not $gradleContent.Contains("versionName '5.12.203-beta-smoke'") -or
-        -not $gradleContent.Contains('1002034 + ciVersionCode.toInteger()')) {
+        -not $gradleContent.Contains('1000000 + ciVersionCode.toInteger()') -or
+        -not $gradleContent.Contains('versionCode ciVersionCode ? (ciBaseVersionCode + 2034) : 1002034')) {
         throw 'Unexpected source versioning.'
     }
 
