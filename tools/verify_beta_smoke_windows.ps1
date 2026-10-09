@@ -85,7 +85,8 @@ try {
     }
 
     $dir = Join-Path $env:TEMP ('ludo-beta-smoke-' + [guid]::NewGuid().ToString('N'))
-    & git -C $repo worktree add --detach $dir $Commit
+    # Per-invocation only: Windows Git otherwise refuses long nested build paths.
+    & git -c core.longpaths=true -C $repo worktree add --detach $dir $Commit
     if ($LASTEXITCODE -ne 0) { throw 'Isolated worktree creation failed.' }
     $worktreeAdded = $true
     Remove-Item Env:\LUDO_VERSION_CODE -ErrorAction SilentlyContinue
@@ -162,8 +163,21 @@ try {
     [Environment]::SetEnvironmentVariable('ANDROID_HOME', $originalAndroidHome, 'Process')
     [Environment]::SetEnvironmentVariable('BGG_TOKEN', $originalBggToken, 'Process')
     if ($worktreeAdded) {
-        & git -C $repo worktree remove --force $dir 2>$null
-        if ($LASTEXITCODE -ne 0) { Write-Warning ('Temporary worktree remains: ' + $dir) }
+        # Git for Windows defaults to legacy MAX_PATH; a built Android tree
+        # can contain deeper files than a plain source checkout. The -c
+        # override applies to this command only, not global Git settings.
+        # A failed cleanup must never obscure build/signature status or skip
+        # the invariant check for the owner's active Git checkout.
+        try {
+            & git -c core.longpaths=true -C $repo worktree remove --force $dir 2>$null
+            if ($LASTEXITCODE -eq 0 -and -not (Test-Path -LiteralPath $dir)) {
+                Write-Host 'TEMP_WORKTREE_CLEANUP=PASS'
+            } else {
+                Write-Warning ('Temporary worktree cleanup incomplete (no phone changes): ' + $dir)
+            }
+        } catch {
+            Write-Warning ('Temporary worktree cleanup failed (no phone changes): ' + $dir)
+        }
     }
     if ($beforeHead) {
         $afterHead = (& git -C $repo rev-parse HEAD).Trim()
