@@ -14,11 +14,15 @@ android {
         targetSdk 35
         testInstrumentationRunner project.findProperty('LUDO_AI_TEST') ? 'it.vintedaffari.app.AiBetaInstrumentation' : project.findProperty('LUDO_AUDIT_TEST') ? 'it.vintedaffari.app.AuditExportInstrumentation' : 'it.vintedaffari.app.BrowserVisualInstrumentation'
 
-        // CI supplies a monotonic build number. Local workstation builds must also stay
-        // upgrade-compatible with the installed beta because cloud Actions may be unavailable.
+        // The first offline smoke candidate is newer than the accepted 1002033 build.
+        // CI run numbers stay increasing and always build above the local baseline:
+        // no downgrade when switching from local to Firebase-distributed betas.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
-        versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 1002033
-        versionName '5.12.202-ai-wait-deadline'
+        // Preserve the established 1000000 + run-number base expected by
+        // legacy release guards, then add 2034 to keep upgrades monotonic.
+        def ciBaseVersionCode = ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 1000000
+        versionCode ciVersionCode ? (ciBaseVersionCode + 2034) : 1002034
+        versionName '5.12.203-beta-smoke'
 
         def secrets = new Properties()
         def secretsFile = rootProject.file('secrets.properties')

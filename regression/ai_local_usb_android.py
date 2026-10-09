@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 root=Path(__file__).resolve().parents[1]
 protocol=(root/"app/src/main/java/it/vintedaffari/app/AiBetaProtocol.java").read_text(encoding="utf-8")
@@ -20,7 +21,7 @@ checks={
  "engine uses endpoint-aware auth": 'AiBetaProtocol.validToken(config.optString("endpoint"),config.optString("token"))' in engine,
  "main manifest stays cleartext-default": 'usesCleartextTraffic' not in main_manifest,
  "debug manifest owns cleartext": 'android:usesCleartextTraffic="true"' in debug_manifest,
- "version": "5.12.202-ai-wait-deadline" in gradle,
+ "valid Android beta version declaration": re.search(r"versionName '5\.12\.\d+-[^']+'", gradle) is not None and "versionCode ciVersionCode" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS" if ok else "FAIL"),name)

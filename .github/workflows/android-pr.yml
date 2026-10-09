@@ -81,9 +81,8 @@ jobs:
 
       - name: Run automatic AI trust policy
         run: |
-          mkdir -p /tmp/ai-policy
-          javac -d /tmp/ai-policy regression/AiEnginePolicyProbe.java app/src/main/java/it/vintedaffari/app/AiEnginePolicy.java
-          java -cp /tmp/ai-policy it.vintedaffari.app.AiEnginePolicyProbe
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:testDebugUnitTest --tests it.vintedaffari.app.AiEnginePolicyTest
 
       - name: Verify Vinted browser redesign states
         run: python3 regression/vinted_browser_redesign.py

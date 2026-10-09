@@ -29,7 +29,8 @@ checks=[
      "j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'" in market),
     ("beta build identity advances for App Tester validation",
      "versionName '5.12." in build and
-     "versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger())" in build),
+     "versionCode ciVersionCode ?" in build and
+     "ciVersionCode.toInteger()" in build),
 ]
 for name,ok in checks:
     print(("PASS " if ok else "FAIL ")+name)
