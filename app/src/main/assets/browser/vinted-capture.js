@@ -16,7 +16,9 @@
  function url(value){try{const u=new URL(value,window.location.href);return u.protocol==='https:'&&['www.vinted.it','vinted.it'].includes(u.hostname)&&(!u.port||u.port==='443')&&!u.username&&!u.password?u:null;}catch(_){return null;}}
  // Capture only public catalog and item JSON. Other API paths include private
  // conversations and account data, even while the visible page is a catalog.
- function endpoint(value){const u=url(value);return u&&/^\/api\/v\d+\/(?:catalog|items)(?:\/|$)/.test(u.pathname);}
+ function endpoint(value){const u=url(value);return u&&(
+     /^\/api\/v\d+\/catalog(?:\/|$)/.test(u.pathname) ||
+     /^\/api\/v\d+\/items(?:\/[1-9]\d{0,18})?\/?$/.test(u.pathname));}
  function photo(value){if(typeof value!=="string"||value.length>2048)return null;try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:null;}catch(_){return null;}}
  function domImage(image){
   if(!image)return null;
