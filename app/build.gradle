@@ -18,7 +18,10 @@ android {
         // CI run numbers stay increasing and always build above the local baseline:
         // no downgrade when switching from local to Firebase-distributed betas.
         def ciVersionCode = System.getenv('LUDO_VERSION_CODE')
-        versionCode ciVersionCode ? (1002034 + ciVersionCode.toInteger()) : 1002034
+        // Preserve the established 1000000 + run-number base expected by
+        // legacy release guards, then add 2034 to keep upgrades monotonic.
+        def ciBaseVersionCode = ciVersionCode ? (1000000 + ciVersionCode.toInteger()) : 1000000
+        versionCode ciVersionCode ? (ciBaseVersionCode + 2034) : 1002034
         versionName '5.12.203-beta-smoke'
 
         def secrets = new Properties()
