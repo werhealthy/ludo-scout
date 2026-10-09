@@ -21,7 +21,7 @@ checks={
  "engine uses endpoint-aware auth": 'AiBetaProtocol.validToken(config.optString("endpoint"),config.optString("token"))' in engine,
  "main manifest stays cleartext-default": 'usesCleartextTraffic' not in main_manifest,
  "debug manifest owns cleartext": 'android:usesCleartextTraffic="true"' in debug_manifest,
- "valid Android beta version declaration": re.search(r"versionName '5\\.12\\.\\d+-[^']+'", gradle) is not None and "versionCode ciVersionCode" in gradle,
+ "valid Android beta version declaration": re.search(r"versionName '5\.12\.\d+-[^']+'", gradle) is not None and "versionCode ciVersionCode" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS" if ok else "FAIL"),name)
