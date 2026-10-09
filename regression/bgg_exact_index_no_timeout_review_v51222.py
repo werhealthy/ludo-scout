@@ -65,7 +65,7 @@ checks=[
  ("classifier block diagnostics are timestamped by build",
   "lastClassifierBlockAt" in radar and "lastClassifierBlockBuild" in radar),
  ("version lineage preserved",
-  "versionName '5.12." in build and "versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger())" in build),
+  "versionName '5.12." in build and "1000000 + ciVersionCode.toInteger()" in build and "versionCode ciVersionCode ? (ciBaseVersionCode + 2034) : 1002034" in build),
 ]
 for name,ok in checks:
     print(("PASS " if ok else "FAIL ")+name)
