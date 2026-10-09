@@ -14,6 +14,7 @@ $worktreeAdded = $false
 $beforeHead = $null
 $originalVersionOverride = [Environment]::GetEnvironmentVariable('LUDO_VERSION_CODE', 'Process')
 $originalAndroidHome = [Environment]::GetEnvironmentVariable('ANDROID_HOME', 'Process')
+$originalBggToken = [Environment]::GetEnvironmentVariable('BGG_TOKEN', 'Process')
 try {
     if ($PSVersionTable.PSVersion.Major -ne 5) { throw 'Windows PowerShell 5.1 required.' }
     if ($Commit -notmatch '^[0-9a-f]{40}$') { throw 'Pinned commit SHA required.' }
@@ -53,7 +54,33 @@ try {
         $tokenConfigured = [bool](Select-String -LiteralPath $userProps -Pattern '^\s*BGG_TOKEN\s*=\s*\S+' -Quiet)
     }
     if (-not $tokenConfigured -and -not $env:BGG_TOKEN) {
-        throw 'BGG_TOKEN missing from user Gradle configuration or environment.'
+        # The original checkout may use the legacy secrets.properties source
+        # supported by app/build.gradle. Detached worktrees intentionally do
+        # not copy untracked secrets. Read this exact local file once and pass
+        # the existing value only to the build child-process environment.
+        $legacySecrets = Join-Path $repo 'secrets.properties'
+        if (Test-Path -LiteralPath $legacySecrets -PathType Leaf) {
+            foreach ($entry in [IO.File]::ReadAllLines($legacySecrets)) {
+                $match = [regex]::Match($entry, '^\s*BGG_TOKEN\s*=\s*(\S.*)$')
+                if ($match.Success) {
+                    $env:BGG_TOKEN = $match.Groups[1].Value.Trim()
+                    break
+                }
+            }
+        }
+    }
+    if (-not $tokenConfigured -and -not $env:BGG_TOKEN) {
+        throw 'BGG_TOKEN unavailable to this Windows user. Configure it in the current user .gradle/gradle.properties or process environment; do not send the value in chat.'
+    }
+
+    # The debug signing key must ALREADY exist. The Android build must never
+    # silently create a different certificate that cannot upgrade phone data.
+    $signingKey = $env:ANDROID_DEBUG_KEYSTORE
+    if (-not $signingKey) {
+        $signingKey = Join-Path $env:USERPROFILE '.android\debug.keystore'
+    }
+    if (-not (Test-Path -LiteralPath $signingKey -PathType Leaf)) {
+        throw 'Existing Android debug signing key unavailable; refusing build with a new key.'
     }
 
     $dir = Join-Path $env:TEMP ('ludo-beta-smoke-' + [guid]::NewGuid().ToString('N'))
@@ -132,6 +159,7 @@ try {
 } finally {
     [Environment]::SetEnvironmentVariable('LUDO_VERSION_CODE', $originalVersionOverride, 'Process')
     [Environment]::SetEnvironmentVariable('ANDROID_HOME', $originalAndroidHome, 'Process')
+    [Environment]::SetEnvironmentVariable('BGG_TOKEN', $originalBggToken, 'Process')
     if ($worktreeAdded) {
         & git -C $repo worktree remove --force $dir 2>$null
         if ($LASTEXITCODE -ne 0) { Write-Warning ('Temporary worktree remains: ' + $dir) }
