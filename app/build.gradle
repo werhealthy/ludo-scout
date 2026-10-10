@@ -1,4 +1,5 @@
 import java.util.Properties
+import groovy.json.JsonSlurper
 
 plugins {
     id 'com.android.application'
@@ -37,11 +38,47 @@ android {
         def rawToken = globalToken ? globalToken : (envToken ? envToken : fileToken)
         def bggToken = rawToken.replace('\\', '\\\\').replace('"', '\\"')
         buildConfigField 'String', 'BGG_TOKEN', '"' + bggToken + '"'
-        // Optional phone-first Firestore connection; missing values keep all sync traffic OFF.
-        // Client identifiers are not service-account secrets. The project must register this
-        // Android applicationId before the owner can sign in.
+        // Optional Firestore client configuration. The Firebase console download is
+        // app/google-services.json, excluded from Git by .gitignore. Never commit it.
+        // A malformed/mismatched local file is an error rather than silent cross-project use.
+        def firebaseClient = [:]
+        def firebaseFile = project.file('google-services.json')
+        if (firebaseFile.isFile()) {
+            def firebaseJson
+            try {
+                firebaseJson = new JsonSlurper().parseText(firebaseFile.getText('UTF-8'))
+            } catch (Exception failure) {
+                throw new GradleException('Invalid app/google-services.json; download it again from Firebase.', failure)
+            }
+            def projectId = firebaseJson?.project_info?.project_id?.toString()
+            def projectNumber = firebaseJson?.project_info?.project_number?.toString()
+            def clients = firebaseJson?.client instanceof List ? firebaseJson.client : []
+            def matchingClients = clients.findAll {
+                it?.client_info?.android_client_info?.package_name == applicationId
+            }
+            if (projectId != 'ludo-scout' || !projectNumber || matchingClients.size() != 1) {
+                throw new GradleException('Firebase project or Android package does not match Ludo Scout.')
+            }
+            def client = matchingClients[0]
+            def firebaseAppId = client?.client_info?.mobilesdk_app_id?.toString()
+            def keys = client?.api_key instanceof List ? client.api_key : []
+            def apiKey = keys.find { it?.current_key instanceof String && it.current_key.trim() }?.current_key?.trim()
+            if (!firebaseAppId?.startsWith("1:${projectNumber}:android:") || !apiKey) {
+                throw new GradleException('Firebase Android app ID or API key is missing.')
+            }
+            firebaseClient = [
+                LUDO_FIREBASE_APP_ID: firebaseAppId,
+                LUDO_FIREBASE_API_KEY: apiKey,
+                LUDO_FIREBASE_PROJECT_ID: projectId
+            ]
+        }
+
+        // Build overrides still work for unattended Hermes builds. The authorized UID is
+        // an account identifier (not a credential); Firestore rules enforce it server-side.
+        def firebaseOwnerUid = 'FxAKNm8aK6amBPoHZcXNOtSLv3t2'
         ['LUDO_FIREBASE_APP_ID','LUDO_FIREBASE_API_KEY','LUDO_FIREBASE_PROJECT_ID','LUDO_SYNC_OWNER_UID'].each { key ->
-            def raw = (project.findProperty(key) ?: System.getenv(key) ?: '').toString()
+            def fallback = key == 'LUDO_SYNC_OWNER_UID' ? firebaseOwnerUid : (firebaseClient[key] ?: '')
+            def raw = (project.findProperty(key) ?: System.getenv(key) ?: fallback).toString()
             def escaped = raw.replace('\\', '\\\\').replace('"', '\\"')
             buildConfigField 'String', key, '"' + escaped + '"'
         }
