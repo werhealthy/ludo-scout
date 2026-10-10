@@ -47,6 +47,21 @@ jobs:
         run: python3 regression/classification_audit_export.py
       - name: Verify Firestore sync projection and deny-by-default rules
         run: python3 regression/firestore_sync_contract.py
+      - name: Validate local Firebase installer syntax and non-tracking
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("tools/install_local_firebase_config.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) {
+            foreach ($issue in $errors) { Write-Error $issue.Message }
+            exit 1
+          }
+          $tracked = @(git ls-files -- app/google-services.json)
+          if ($tracked.Count -gt 0) { throw "Firebase JSON must never be committed" }
+          git check-ignore -q -- app/google-services.json
+          if ($LASTEXITCODE -ne 0) { throw "Firebase JSON must remain ignored" }
+
       - name: Verify supplied Ludo visual universe
         run: python3 regression/ludo_visual_universe.py
       - name: Run featured pedestal regression
