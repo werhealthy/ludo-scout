@@ -18,7 +18,6 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +70,9 @@ public final class FirestoreSyncWorker extends Worker {
             FirebaseFirestore firestore = FirestoreSync.store(context);
             if (firestore == null || !FirestoreSync.enabled(context)) return Result.success();
             String owner = BuildConfig.LUDO_SYNC_OWNER_UID;
+            // Flush pending offline commits before queuing more; prevent repeated paid writes.
+            Tasks.await(firestore.waitForPendingWrites(), 20, TimeUnit.SECONDS);
+            if (!FirestoreSync.enabled(context) || isStopped()) return Result.success();
             WriteBatch batch = firestore.batch();
             for (Row row : pending) {
                 DocumentReference doc = firestore.collection("sync_v1").document(owner)
@@ -110,8 +112,8 @@ public final class FirestoreSyncWorker extends Worker {
         values.put("title", string(c, 2, 400));
         values.put("brand", string(c, 3, 120));
         values.put("condition", string(c, 4, 80));
-        values.put("price_cents", c.isNull(5) ? null : c.getLong(5));
-        values.put("protected_price_cents", c.isNull(6) ? null : c.getLong(6));
+        values.put("price_cents", nonnegative(c, 5));
+        values.put("protected_price_cents", nonnegative(c, 6));
         values.put("item_url", string(c, 7, 1200));
         values.put("photo_urls", photos(string(c, 9, 6000), string(c, 8, 1200)));
         values.put("observed_text", string(c, 10, 2000));
@@ -132,6 +134,10 @@ public final class FirestoreSyncWorker extends Worker {
         values.put("source_hash", hash);
         values.put("synced_at", FieldValue.serverTimestamp());
         return new Row(id, hash, values);
+    }
+
+    private static Long nonnegative(Cursor c, int index) {
+        return c.isNull(index) || c.getLong(index) < 0 ? null : c.getLong(index);
     }
 
     private static String string(Cursor c, int index, int max) {
