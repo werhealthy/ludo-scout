@@ -75,6 +75,31 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Validate Firebase JSON loading with disposable client fixture
+        run: |
+          test ! -e app/google-services.json
+          trap 'rm -f app/google-services.json' EXIT
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          cfg = {
+              "project_info": {"project_number": "123456789", "project_id": "ludo-scout"},
+              "client": [
+                  {"client_info": {
+                      "mobilesdk_app_id": "1:123456789:android:syntheticclient",
+                      "android_client_info": {"package_name": "it.vintedaffari.app"}
+                  }, "api_key": [{"current_key": "test-only-not-a-real-firebase-key"}]}
+              ]
+          }
+          Path("app/google-services.json").write_text(json.dumps(cfg), encoding="utf-8")
+          PY
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:generateDebugBuildConfig
+          grep -R -q "1:123456789:android:syntheticclient" app/build/generated/source/buildConfig/debug
+          grep -R -q "test-only-not-a-real-firebase-key" app/build/generated/source/buildConfig/debug
+          grep -R -q "FxAKNm8aK6amBPoHZcXNOtSLv3t2" app/build/generated/source/buildConfig/debug
+          rm app/google-services.json
+
       - name: Build Firestore sync debug APK with ephemeral CI-only certificate
         run: |
           chmod +x ./gradlew
