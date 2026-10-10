@@ -75,10 +75,11 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Build Firestore sync debug APK before unrelated legacy regressions
+      - name: Build Firestore sync debug APK with ephemeral CI-only certificate
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon :app:assembleDebug
+          keytool -genkeypair -keystore "$RUNNER_TEMP/ludo-ci-debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname "CN=Temporary CI Build, OU=Validation, O=Ludo" -keyalg RSA -keysize 2048 -validity 2 -noprompt
+          ANDROID_DEBUG_KEYSTORE="$RUNNER_TEMP/ludo-ci-debug.keystore" ./gradlew --no-daemon :app:assembleDebug
 
       - name: Run passive Vinted browser capture behavior
         run: node --test regression/vinted_browser_capture.test.js
