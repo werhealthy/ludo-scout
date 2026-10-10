@@ -78,6 +78,11 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Compile Firestore sync Android before unrelated browser regressions
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+
       - name: Verify Android API28 compatibility
         run: python3 regression/android_api28_compat.py
 
