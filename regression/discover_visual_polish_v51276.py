@@ -25,7 +25,9 @@ nav = between(ui, "private void renderNav()", "private void addMarketHeader")
 
 checks = [
     ("build identity is current beta line",
-     "versionName '5.12." in build),
+     "versionName '5.12." in build or
+     ("versionName releaseVersionName ?: '5.12." in build and
+      "LUDO_VERSION_NAME" in build)),
     ("Home gradient scales with its content bounds",
      "RadialGradient" in chrome and "b.height()/(float)b.width()" in chrome),
     ("Home uses a Helvetica-compatible bundled typeface",
