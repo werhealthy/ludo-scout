@@ -41,6 +41,36 @@ Come fallback per release autonome senza JSON locale, Gradle accetta
 valore predefinito (sovrascrivibile per test controllati). Il suo valore
 non è una password e viene anche vincolato nelle regole remote.
 
+### Installazione locale dal codice GitHub (senza ZIP in repository)
+
+La repository GitHub `werhealthy/ludo-scout` è **pubblica**. Per questo
+`google-services.json` originale NON va aggiunto ai commit né agli
+allegati di PR: il client Firebase Android può essere incorporato nell'APK,
+ma il file non serve al lettore Hermes e non è necessario pubblicarlo.
+
+I soli installer sono versionati su questo branch:
+`tools/install_local_firebase_config.cmd` e
+`tools/install_local_firebase_config.ps1`. Dopo aver scaricato
+`google-services.json` sul PC Windows nella cartella *Download*,
+eseguire con doppio clic il file `.cmd` dalla checkout locale del
+branch contenente la PR; in alternativa lo script apre un selettore
+file. L'installer:
+- verifica remote Git `werhealthy/ludo-scout`, project ID, project number,
+  Android package, Firebase Android App ID e presenza di una API key;
+- si rifiuta di sovrascrivere un JSON locale diverso o un file tracciato;
+- richiede che `app/google-services.json` sia ignorato da Git e ne
+  controlla hash e stato Git dopo la copia;
+- non compila, non cambia branch, non invia dati, non fa login Firebase,
+  non attiva Firestore e non modifica Hermes.
+
+**Nota operativa:** mettere l'installer su GitHub non trasferisce da solo
+il JSON su Windows e non abilita automaticamente il trasferimento
+Android→Firestore→Hermes. Se il proprietario vuole evitare anche l'unica
+installazione locale, serve una capacità Hermes autenticata già
+autorizzata oppure un'ulteriore decisione esplicita sulla gestione della
+configurazione: nessun accesso remoto viene inventato o abilitato
+implicitamente.
+
 **Se mancano app ID, API key o project ID, la sincronizzazione è OFF.**
 Identificativi e API key del client Android sono incorporati nell'APK
 Firebase, ma **non autenticano l'utente**: l'accesso al database richiede
