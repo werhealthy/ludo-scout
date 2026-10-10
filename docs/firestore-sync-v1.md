@@ -19,18 +19,35 @@ non abilitare la sincronizzazione senza questa consapevolezza. Il catalogo remot
 contiene dati e quindi il database Firestore NON è un archivio pubblicabile.
 
 ## Configurazione Android
-Serve registrare l'app Android `it.vintedaffari.app` nel progetto Firebase.
-La build riceve da proprietà Gradle oppure ambiente (mai tramite codice):
-`LUDO_FIREBASE_APP_ID`, `LUDO_FIREBASE_API_KEY`,
-`LUDO_FIREBASE_PROJECT_ID`, `LUDO_SYNC_OWNER_UID` (UID dell'account
-Firebase Authentication dedicato, distinto dalla password).
-Si utilizzano `FirebaseOptions` e una FirebaseApp *nominata*, senza
-plugin google-services e senza includere `google-services.json` in Git.
-Questi valori identificano il client, **non sono segreti** e da soli non
-concedono accesso ai dati. Non mettere la password utente, refresh token,
-o credenziali di service account in file/versionamento o variabili di build.
+La configurazione **ufficiale del client Android** fornita dal proprietario è
+stata verificata (2026-10-10): progetto Firebase `ludo-scout`,
+applicationId Android `it.vintedaffari.app` e ID app Firebase congruente
+con il project number. Il file fornito NON è stato committato su GitHub.
 
-Se uno dei quattro valori manca, sincronizzazione completamente disabilitata.
+Per le build Hermes/locali, salvare l'originale scaricato dalla console come
+`app/google-services.json` (esatto percorso locale in working repo).
+Il file è ignorato da `.gitignore` e va conservato solo sulla macchina
+di build autorizzata. Il Gradle Android legge automaticamente il file,
+seleziona il client per `applicationId`, e blocca una build con progetto,
+package, Firebase App ID o API key mancanti o incongruenti.
+**Non occorre** aggiungere il plugin Gradle google-services.
+`FirebaseOptions` inizializza una FirebaseApp nominata senza cambiare
+l'eventuale app Firebase predefinita.
+
+Come fallback per release autonome senza JSON locale, Gradle accetta
+`LUDO_FIREBASE_APP_ID`, `LUDO_FIREBASE_API_KEY`,
+`LUDO_FIREBASE_PROJECT_ID` da proprietà Gradle o variabili d'ambiente.
+`LUDO_SYNC_OWNER_UID` mantiene l'UID già autorizzato del progetto come
+valore predefinito (sovrascrivibile per test controllati). Il suo valore
+non è una password e viene anche vincolato nelle regole remote.
+
+**Se mancano app ID, API key o project ID, la sincronizzazione è OFF.**
+Identificativi e API key del client Android sono incorporati nell'APK
+Firebase, ma **non autenticano l'utente**: l'accesso al database richiede
+Firebase Authentication + security rules. Non committare JSON originale,
+password utente, refresh token, credenziali Admin SDK o chiavi private.
+Non condividere la password dell'account con Hermes.
+
 In Impostazioni > Avanzate > Sincronizzazione archivio, l'utente effettua
 **una sola volta** l'accesso Email/Password; la sessione è gestita da
 Firebase Auth. Se l'UID non corrisponde a quello configurato, accesso
