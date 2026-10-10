@@ -75,10 +75,10 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Compile Firestore sync Android before unrelated browser regressions
+      - name: Build Firestore sync debug APK before unrelated legacy regressions
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+          ./gradlew --no-daemon :app:assembleDebug
 
       - name: Run passive Vinted browser capture behavior
         run: node --test regression/vinted_browser_capture.test.js
