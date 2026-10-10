@@ -37,6 +37,14 @@ android {
         def rawToken = globalToken ? globalToken : (envToken ? envToken : fileToken)
         def bggToken = rawToken.replace('\\', '\\\\').replace('"', '\\"')
         buildConfigField 'String', 'BGG_TOKEN', '"' + bggToken + '"'
+        // Optional phone-first Firestore connection; missing values keep all sync traffic OFF.
+        // Client identifiers are not service-account secrets. The project must register this
+        // Android applicationId before the owner can sign in.
+        ['LUDO_FIREBASE_APP_ID','LUDO_FIREBASE_API_KEY','LUDO_FIREBASE_PROJECT_ID','LUDO_SYNC_OWNER_UID'].each { key ->
+            def raw = (project.findProperty(key) ?: System.getenv(key) ?: '').toString()
+            def escaped = raw.replace('\\', '\\\\').replace('"', '\\"')
+            buildConfigField 'String', key, '"' + escaped + '"'
+        }
     }
 
     signingConfigs {
@@ -88,3 +96,9 @@ dependencies { implementation 'androidx.webkit:webkit:1.12.1' }
 
 
 
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:34.19.0')
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+}
