@@ -45,6 +45,8 @@ jobs:
           python3 regression/ai_local_usb_android.py
       - name: Execute read-only classification audit SQL
         run: python3 regression/classification_audit_export.py
+      - name: Verify Firestore sync projection and deny-by-default rules
+        run: python3 regression/firestore_sync_contract.py
       - name: Verify supplied Ludo visual universe
         run: python3 regression/ludo_visual_universe.py
       - name: Run featured pedestal regression
