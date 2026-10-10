@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// Owner-only sync v1. All other collections remain inaccessible.
+// Deploy only after the Android build has been checked; do NOT replace with auth != null.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null
+        && request.auth.uid == uid
+        && uid == 'FxAKNm8aK6amBPoHZcXNOtSLv3t2';
+    }
+
+    function validListing() {
+      let data = request.resource.data;
+      return data.keys().hasAll([
+          'schema_version', 'source_id', 'item_id', 'title', 'brand',
+          'condition', 'price_cents', 'protected_price_cents', 'item_url',
+          'photo_urls', 'observed_text', 'category', 'category_source',
+          'lifecycle', 'enrichment_state', 'match_state', 'bgg_id',
+          'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
+        ])
+        && data.keys().hasOnly([
+          'schema_version', 'source_id', 'item_id', 'title', 'brand',
+          'condition', 'price_cents', 'protected_price_cents', 'item_url',
+          'photo_urls', 'observed_text', 'category', 'category_source',
+          'lifecycle', 'enrichment_state', 'match_state', 'bgg_id',
+          'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
+        ])
+        && data.schema_version == 1
+        && data.source_id is int && data.source_id > 0
+        && data.item_id is string && data.item_id.size() <= 80
+        && data.title is string && data.title.size() <= 400
+        && data.brand is string && data.brand.size() <= 120
+        && data.condition is string && data.condition.size() <= 80
+        && (data.price_cents == null || (data.price_cents is int && data.price_cents >= 0))
+        && (data.protected_price_cents == null || (data.protected_price_cents is int && data.protected_price_cents >= 0))
+        && data.item_url is string && data.item_url.size() <= 1200
+        && data.photo_urls is list && data.photo_urls.size() <= 3
+        && data.observed_text is string && data.observed_text.size() <= 2000
+        && data.category is string && data.category.size() <= 80
+        && data.category_source is string && data.category_source.size() <= 80
+        && data.lifecycle is string && data.lifecycle.size() <= 60
+        && data.enrichment_state is string && data.enrichment_state.size() <= 60
+        && data.match_state is string && data.match_state.size() <= 60
+        && data.bgg_id is string && data.bgg_id.size() <= 80
+        && data.language is string && data.language.size() <= 40
+        && data.last_seen is int && data.last_seen >= 0
+        && data.manual_review is bool
+        && data.source_hash is string
+        && data.source_hash.matches('[0-9a-f]{64}')
+        && data.synced_at == request.time;
+    }
+
+    match /sync_v1/{uid}/devices/{deviceId}/listings/{listingId} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid)
+        && deviceId.matches('[a-z0-9-]{36}')
+        && listingId.matches('[0-9]{1,20}')
+        && validListing();
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
