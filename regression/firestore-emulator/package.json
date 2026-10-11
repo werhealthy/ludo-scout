@@ -1,0 +1,11 @@
+{
+  "name": "ludo-firestore-rule-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Emulator-only regression; never touches production Firebase",
+  "dependencies": {
+    "@firebase/rules-unit-testing": "5.0.0",
+    "firebase": "11.10.0",
+    "firebase-tools": "14.7.0"
+  }
+}
