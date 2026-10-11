@@ -111,6 +111,24 @@ l'Admin SDK bypassa le Security Rules. Non condividere la password
 dell'account Ludo con Hermes. Il collegamento Hermes e i test end-to-end
 restano fuori dal perimetro verificato della prima PR.
 
+## Verifica permessi Firebase senza accessi al cloud
+
+`regression/firestore-emulator/rules.test.cjs` è una suite isolata nel
+progetto fittizio `demo-ludo-firestore-rules`, lanciata nel workflow
+Android tramite Firebase Local Emulator Suite. Non richiede
+`google-services.json`, password o account reali; non contatta la
+istanza di produzione. Controlla creazione, lettura e update validi da
+UID owner, blocco di utenti non autenticati/altri UID, blocco di
+altre collection, cancellazioni, documenti con path invalidi e
+schema non consentito. L'esecuzione sul commit di introduzione della
+suite è **PASS** (run GitHub Actions 38097481496).
+
+Questa prova valida il file **proposto** `firestore.rules`, non le
+regole effettivamente pubblicate nella console Firebase. Non abilita
+trasferimenti reali né l'accesso read-only Hermes. Prima della
+pubblicazione servono un confronto con le regole console correnti,
+verifica login Firebase reale/consenso e conferma dei costi Spark.
+
 ## Verifiche mancanti
 Compilazione Android e lint con SDK/dependenze Firebase, test unitari/strumentati
 Android con database realistico, test security rules, login Firebase reale,
