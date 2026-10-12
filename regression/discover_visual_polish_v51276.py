@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from beta_version_contract import has_valid_beta_version_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 app = ROOT / "app/src/main"
@@ -25,9 +26,7 @@ nav = between(ui, "private void renderNav()", "private void addMarketHeader")
 
 checks = [
     ("build identity is current beta line",
-     "versionName '5.12." in build or
-     ("versionName releaseVersionName ?: '5.12." in build and
-      "LUDO_VERSION_NAME" in build)),
+     has_valid_beta_version_contract(build)),
     ("Home gradient scales with its content bounds",
      "RadialGradient" in chrome and "b.height()/(float)b.width()" in chrome),
     ("Home uses a Helvetica-compatible bundled typeface",
