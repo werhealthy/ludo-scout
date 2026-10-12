@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from beta_version_contract import has_valid_beta_version_contract
 
 ROOT=Path(__file__).resolve().parents[1]
 ui=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
@@ -24,7 +25,7 @@ indicator_loader=ui[ui.index("private void requestActivityIndicatorSnapshot()"):
 
 checks=[
     ("release identity",
-     "versionName '5.12." in build and "applicationId 'it.vintedaffari.app'" in build),
+     has_valid_beta_version_contract(build) and "applicationId 'it.vintedaffari.app'" in build),
     ("invisible interaction contract exists",
      "The interface should explain itself by shape, placement and behavior" in system and
      "Never place all chips, checkboxes and inputs on the same filter screen" in system),
