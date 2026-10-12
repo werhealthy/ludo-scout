@@ -129,11 +129,13 @@ public class RecoveryPolicyProbe {
         }
         for name in ['AiEnginePolicy.java','ListingClassifier.java','BoardGameIntakeGate.java','VintedCard.java']:
             files['it/vintedaffari/app/'+name] = (SRC/name).read_text(encoding='utf-8')
+        files['it/vintedaffari/app/AiEnginePolicyProbe.java'] = (ROOT/'regression/AiEnginePolicyProbe.java').read_text(encoding='utf-8')
         for path, content in files.items():
             target=base/path
             target.parent.mkdir(parents=True,exist_ok=True)
             target.write_text(content,encoding='utf-8')
         subprocess.run(['java','--module','jdk.compiler/com.sun.tools.javac.Main','-encoding','UTF-8','-d',str(base/'classes'),*[str(base/p) for p in files]],check=True)
+        subprocess.run(['java','-cp',str(base/'classes'),'it.vintedaffari.app.AiEnginePolicyProbe'],check=True)
         subprocess.run(['java','-cp',str(base/'classes'),'it.vintedaffari.app.RecoveryPolicyProbe'],check=True)
 
 if __name__ == '__main__':
