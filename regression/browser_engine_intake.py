@@ -13,7 +13,7 @@ source=p.read_text()
 capture=(root/'app/src/main/assets/browser/vinted-capture.js').read_text(encoding='utf-8')
 policy=(root/'app/src/main/java/it/vintedaffari/app/BrowserCapturePolicy.java').read_text(encoding='utf-8')
 activity=(root/'app/src/main/java/it/vintedaffari/app/VintedBrowserActivity.java').read_text(encoding='utf-8')
-assert "return u&&/^\\/api\\/v\\d+\\//.test(u.pathname);" in capture, 'passive JSON capture is still tied to obsolete endpoint paths'
+assert "return u&&/^\\/api\\/v\\d+\\/catalog\\/items\\/?$/.test(u.pathname);" in capture, 'passive JSON capture must allow only catalog items and exclude private API paths'
 assert "function cardImage(anchor)" in capture and "image.closest&&image.closest('a[href*=\"/items/\"]')" in capture, 'DOM capture cannot recover sibling card images'
 assert "picture.querySelectorAll('source')" in capture, 'picture/srcset sources are ignored'
 assert 'h.equals("vinted.com")||h.endsWith(".vinted.com")' in policy, 'trusted vinted.com photo CDN is rejected'

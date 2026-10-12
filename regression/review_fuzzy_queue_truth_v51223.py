@@ -15,23 +15,26 @@ hist=market[market.index("public void flagHistoricalBggReview"):market.index("pu
 runnable=market[market.index("public int runnableVintedDueCount"):market.index("public int runnableBggDueCount")]
 next_due=market[market.index("public long nextRunnableVintedDueAt"):market.index("public long nextRunnableBggDueAt")]
 
-# Executable queue truth model: while Motore is idle, only explicit/manual/live work is claimable.
+# Executable queue truth model: when Motore is idle, explicit/manual/live work and serial
+# catalog-maintenance jobs are claimable; automatic backlog and history stay parked.
 db=sqlite3.connect(":memory:")
 db.executescript("""
 CREATE TABLE jobs(source TEXT,state TEXT);
 INSERT INTO jobs VALUES('AUTO','PENDING');
 INSERT INTO jobs VALUES('DEFERRED_LINK','PENDING');
 INSERT INTO jobs VALUES('LIVE_DEAL','PENDING');
+INSERT INTO jobs VALUES('CATALOG_HEALTH','PENDING');
+INSERT INTO jobs VALUES('SELLER_BACKFILL','PENDING');
 INSERT INTO jobs VALUES('HUNT_PRIORITY','PENDING');
 INSERT INTO jobs VALUES('MANUAL_PRIORITY','PENDING');
 INSERT INTO jobs VALUES('HISTORICAL_REVALIDATION','PENDING');
 """)
 claimable=[r[0] for r in db.execute("""
 SELECT source FROM jobs WHERE state='PENDING'
-AND source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL')
+AND source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH','SELLER_BACKFILL')
 ORDER BY source
 """)]
-assert claimable==['HUNT_PRIORITY','LIVE_DEAL','MANUAL_PRIORITY'], claimable
+assert claimable==['CATALOG_HEALTH','HUNT_PRIORITY','LIVE_DEAL','MANUAL_PRIORITY','SELLER_BACKFILL'], claimable
 
 # Executable historical cleanup model: historical uncertainty remains trust-gated, but not user review.
 db2=sqlite3.connect(":memory:")
@@ -63,8 +66,8 @@ checks=[
     ("historical revalidation is described as held, not human review",
      "heldGames" in reval and "persistent review instead of being guessed" not in reval),
     ("idle runnable count matches claimable source policy",
-     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')" in runnable and
-     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH')" in next_due and
+     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH','SELLER_BACKFILL')" in runnable and
+     "j.source IN ('HUNT_PRIORITY','MANUAL_PRIORITY','LIVE_DEAL','CATALOG_HEALTH','SELLER_BACKFILL')" in next_due and
      "if(helper.activeObservationSession()!=null)return 0" in market),
     ("idle ordinary jobs are parked instead of spinning",
      "parkIdleOrdinaryVintedJobs" in market and "parked: nessuno scroll attivo" in market and

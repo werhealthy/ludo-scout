@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from beta_version_contract import has_valid_beta_version_contract
 
 ROOT=Path(__file__).resolve().parents[1]
 evaluator=(ROOT/"app/src/main/java/it/vintedaffari/app/DealEvaluator.java").read_text(encoding="utf-8")
@@ -14,7 +15,7 @@ bgg=(ROOT/"app/src/main/java/it/vintedaffari/app/BggSearchClient.java").read_tex
 
 checks=[
     ("release identity",
-     "versionName '5.12." in build and
+     has_valid_beta_version_contract(build) and
      "applicationId 'it.vintedaffari.app'" in build and
      "1000000 + ciVersionCode.toInteger()" in build),
     ("no user-visible expensive category",'"Troppo caro"' not in evaluator and 'Decision.REJECT,""' in evaluator and '"Prezzo alto"' not in ui),

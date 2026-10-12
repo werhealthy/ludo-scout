@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Guards for copyable queue liveness diagnostics added in v5.12.77."""
 from pathlib import Path
+from beta_version_contract import has_valid_beta_version_contract
 
 ROOT=Path(__file__).resolve().parents[1]
 market=(ROOT/"app/src/main/java/it/vintedaffari/app/MarketStore.java").read_text(encoding="utf-8")
@@ -28,7 +29,7 @@ checks=[
      "oldestRunnableVintedAgeMs(long now)" in market and
      "j.state IN (?,?) AND j.next_attempt_at<=? AND l.lifecycle='ACTIVE'" in market),
     ("beta build identity advances for App Tester validation",
-     "versionName '5.12." in build and
+     has_valid_beta_version_contract(build) and
      "versionCode ciVersionCode ? (1000000 + ciVersionCode.toInteger())" in build),
 ]
 for name,ok in checks:

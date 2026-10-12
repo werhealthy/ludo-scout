@@ -80,10 +80,7 @@ jobs:
         run: python3 regression/android_api28_compat.py
 
       - name: Run automatic AI trust policy
-        run: |
-          mkdir -p /tmp/ai-policy
-          javac -d /tmp/ai-policy regression/AiEnginePolicyProbe.java app/src/main/java/it/vintedaffari/app/AiEnginePolicy.java
-          java -cp /tmp/ai-policy it.vintedaffari.app.AiEnginePolicyProbe
+        run: python3 regression/ai_recovery_state_machine.py
 
       - name: Verify Vinted browser redesign states
         run: python3 regression/vinted_browser_redesign.py
