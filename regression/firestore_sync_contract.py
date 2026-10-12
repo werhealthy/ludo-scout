@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "app/src/main/java/it/vintedaffari/app"
 WORKER = (SRC / "FirestoreSyncWorker.java").read_text(encoding="utf-8")
+SNAPSHOT_WORKER = (SRC / "FirestoreSnapshotWorker.java").read_text(encoding="utf-8")
+SNAPSHOT_STORE = (SRC / "FirestoreSnapshotStore.java").read_text(encoding="utf-8")
 SYNC = (SRC / "FirestoreSync.java").read_text(encoding="utf-8")
 RULES = (ROOT / "firestore.rules").read_text(encoding="utf-8")
 MAIN = (SRC / "MainActivity.java").read_text(encoding="utf-8")
@@ -86,10 +88,37 @@ class FirestoreSyncContractTest(unittest.TestCase):
                     "LUDO_FIREBASE_PROJECT_ID", "LUDO_SYNC_OWNER_UID"):
             self.assertIn("BuildConfig." + key, SYNC)
         self.assertIn('prefs(context).getBoolean("enabled", false) && authorized(context)', SYNC)
-        self.assertIn("MAX_PER_PASS = 80", WORKER)
-        self.assertIn("MAX_PER_DAY = 2400", WORKER)
-        self.assertIn("SQLiteDatabase.OPEN_READONLY", WORKER)
-        self.assertIn("waitForPendingWrites()", WORKER)
+        self.assertIn("MAX_PER_PASS = 80", SNAPSHOT_WORKER)
+        self.assertIn("MAX_PER_DAY = 2400", SNAPSHOT_WORKER)
+        self.assertIn("SQLiteDatabase.OPEN_READONLY", SNAPSHOT_WORKER)
+        self.assertIn("waitForPendingWrites()", SNAPSHOT_WORKER)
+
+    def test_sync_device_identity_is_shared_across_worker_passes(self):
+        sync_source = (SRC / "FirestoreSync.java").read_text(encoding="utf-8")
+        self.assertIn("FirestoreSync.deviceId(context)", SNAPSHOT_WORKER)
+        self.assertIn("static String deviceId(Context context)", sync_source)
+        self.assertNotIn("private static String deviceId(Context context)", WORKER)
+
+    def test_firestore_projection_is_not_misrepresented_as_complete_snapshot(self):
+        docs = (ROOT / "docs/firestore-sync-v1.md").read_text(encoding="utf-8").lower()
+        self.assertIn("non viene effettuata la rimozione automatica", docs)
+        self.assertIn("implementata la riconciliazione/tombstone", docs)
+        self.assertNotIn("author", WORKER.lower())
+
+    def test_v2_snapshot_worker_is_isolated_bounded_and_owner_scoped(self):
+        self.assertIn("SQLiteDatabase.OPEN_READONLY", SNAPSHOT_WORKER)
+        self.assertIn("getNoBackupFilesDir()", SNAPSHOT_STORE)
+        self.assertIn("MAX_BYTES = 32L * 1024L * 1024L", SNAPSHOT_STORE)
+        self.assertIn("MAX_ROWS = 100_000", SNAPSHOT_STORE)
+        self.assertIn("MAX_PER_PASS = 80", SNAPSHOT_WORKER)
+        self.assertIn("MAX_PER_DAY = 2400", SNAPSHOT_WORKER)
+        self.assertIn("sync_v2", SNAPSHOT_WORKER)
+        self.assertIn('store.state("MANIFEST")', SNAPSHOT_WORKER)
+        self.assertIn('store.state("PUBLISH")', SNAPSHOT_WORKER)
+        self.assertIn('manifest.put("schema_version",2)', SNAPSHOT_WORKER)
+        self.assertIn("state.contentHash.equals(sourceHash(catalog))", SNAPSHOT_WORKER)
+        self.assertIn('snapshotId != currentSnapshotId(uid, deviceId)', RULES)
+        self.assertIn('FirestoreSnapshotWorker.class', SYNC)
 
 
 if __name__ == "__main__":

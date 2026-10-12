@@ -129,8 +129,18 @@ trasferimenti reali né l'accesso read-only Hermes. Prima della
 pubblicazione servono un confronto con le regole console correnti,
 verifica login Firebase reale/consenso e conferma dei costi Spark.
 
-## Verifiche mancanti
-Compilazione Android e lint con SDK/dependenze Firebase, test unitari/strumentati
-Android con database realistico, test security rules, login Firebase reale,
-trasferimento su Firestore, test su Pixel, test Hermes. Non dichiarare
-alcuno di questi PASS fino alla loro esecuzione.
+## Snapshot versionato v2 — preparazione locale
+
+Il worktree isolato introduce un protocollo v2 separato da `sync_v1`:
+
+- Il catalogo autorevole `vinted_affari.db` è aperto `OPEN_READONLY` dentro una transazione SQLite differita `BEGIN`/`ROLLBACK`; query e materializzazione condividono così la stessa read view. La copia vive solo nella sidecar app-private `noBackupFilesDir/ludo_firestore_snapshot.db`, mai in tabelle del catalogo.
+- La sidecar conserva al massimo uno snapshot di staging, con proiezione minima, ID ordinato, hash per riga, progresso di upload e stato riprendibile. La dimensione del file è limitata a 32 MiB e le righe a 100.000; il superamento interrompe la preparazione senza pubblicare un puntatore.
+- Ogni snapshot usa un ID UUID e percorsi `sync_v2/{uid}/devices/{device}/snapshots/{snapshotId}`. Il worker continua a limitare ogni passaggio a 80 operazioni e 2.400 scritture giornaliere, includendo manifest, puntatore e pulizia. Il budget è prenotato localmente prima della richiesta per non superarlo dopo crash/timeout.
+- Il manifest completo e poi il puntatore `meta/current` vengono scritti solo dopo l'upload di tutti i documenti e una verifica che la proiezione corrente SQLite abbia ancora lo stesso hash. Se il catalogo cambia durante l'upload, la generazione viene abortita e pulita in batch; non diventa corrente. Dopo lo switch, la versione precedente è rimossa a pagine, mantenendo al massimo corrente + staging/vecchia generazione.
+- Le regole v2 in questo repository sono **solo proposta locale**: lettura owner-scoped, staging/versioni, puntatore legato a manifest completo e delete consentito solo a versioni non correnti. Nessuna regola live è stata letta o pubblicata.
+- Hermes ha un core separato in `firestore_reader_v2.py` che legge solo il puntatore corrente e verifica schema, scope, hash riga, conteggio e hash snapshot. Il core è offline/iniettato: non include adapter Firebase, credenziali, registrazione `ludo_dev` o Telegram runtime.
+
+Le verifiche automatiche locali coprono il modello di cambio catalogo/interruzione/non-pubblicazione, i controlli adversariali reader e le regole nell'emulatore demo. Non dimostrano il comportamento end-to-end dell'Android Worker su Firestore live né il recapito Telegram. Una modifica SQLite concorrente dopo l'ultima verifica e prima dell'update del puntatore può lasciare corrente una versione coerente ma momentaneamente non più latest; il passaggio periodico successivo rileva il nuovo hash e avvia la generazione seguente. Non è introdotto un contatore di mutazione nello schema autorevole.
+
+## Verifiche ancora mancanti
+Compilazione Java/unit Gradle locali PASS; modello snapshot 4/4 e contratto sync 6/6 PASS; reader v2 + suite Stack 193/193 PASS; Firebase Emulator Rules v2 7/7 PASS nel progetto demo locale. Queste prove verificano il codice proposto, non il Worker su device/emulatore Android, Firestore live, regole pubblicate, Telegram/Hermes runtime o catalogo reale. Review indipendente in corso prima del push. Non dichiarare end-to-end o accettazione telefono completati.

@@ -7,16 +7,22 @@ import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
+import android.util.AtomicFile;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /** Opt-in, owner-scoped transport. Never contacts Firebase if build configuration is absent. */
 public final class FirestoreSync {
     private static final String APP = "ludo-catalog-sync";
-    private static final String WORK = "ludo-catalog-sync-v1";
+    private static final String WORK = "ludo-catalog-sync-v2";
+    private static final String LEGACY_WORK = "ludo-catalog-sync-v1";
     private static final String PREFS = "ludo_firestore_sync";
     private FirestoreSync() {}
 
@@ -66,24 +72,49 @@ public final class FirestoreSync {
 
     public static void start(Context context) {
         if (!authorized(context)) return;
-        prefs(context).edit().putBoolean("enabled", true).apply();
+        // Stop a persisted v1 worker before enabling the immutable snapshot protocol.
+        prefs(context).edit().putBoolean("enabled", false).commit();
+        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(LEGACY_WORK);
+        prefs(context).edit().putBoolean("enabled", true).commit();
         Constraints network = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED).build();
         PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
-                FirestoreSyncWorker.class, 15, TimeUnit.MINUTES)
+                FirestoreSnapshotWorker.class, 15, TimeUnit.MINUTES)
                 .setConstraints(network).build();
         WorkManager.getInstance(context.getApplicationContext()).enqueueUniquePeriodicWork(
-                WORK, ExistingPeriodicWorkPolicy.KEEP, request);
+                WORK, ExistingPeriodicWorkPolicy.REPLACE, request);
     }
 
     public static void stop(Context context) {
         prefs(context).edit().putBoolean("enabled", false).apply();
         WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(WORK);
+        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(LEGACY_WORK);
         FirebaseAuth auth = auth(context);
         if (auth != null) auth.signOut();
     }
 
     static SharedPreferences progress(Context context) {
         return prefs(context);
+    }
+
+    /** Stable per-install identity; stored in no-backup storage to avoid restore collisions. */
+    public static String deviceId(Context context) throws Exception {
+        AtomicFile file = new AtomicFile(new File(context.getNoBackupFilesDir(), "firestore-sync-device"));
+        if (file.getBaseFile().exists()) {
+            String value = new String(file.readFully(), StandardCharsets.UTF_8).trim();
+            if (value.matches("[a-z0-9-]{36}")) return value;
+            throw new IllegalStateException("invalid device identity");
+        }
+        String value = UUID.randomUUID().toString();
+        FileOutputStream out = null;
+        try {
+            out = file.startWrite();
+            out.write(value.getBytes(StandardCharsets.UTF_8));
+            file.finishWrite(out);
+        } catch (Exception failure) {
+            if (out != null) file.failWrite(out);
+            throw failure;
+        }
+        return value;
     }
 }

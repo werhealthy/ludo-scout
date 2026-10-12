@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Owner-only sync v1. All other collections remain inaccessible.
+// Owner-only sync v1/v2. All other collections remain inaccessible.
 // Deploy only after the Android build has been checked; do NOT replace with auth != null.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -58,6 +58,97 @@ service cloud.firestore {
         && listingId.matches('[0-9]{1,20}')
         && validListing();
       allow delete: if false;
+    }
+
+    function currentSnapshotId(uid, deviceId) {
+      let currentPath = /databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/meta/current;
+      return exists(currentPath) ? get(currentPath).data.snapshot_id : '';
+    }
+
+    function validSnapshotListing(snapshotId) {
+      let data = request.resource.data;
+      return data.keys().hasAll([
+          'schema_version', 'snapshot_id', 'source_id', 'item_id', 'title', 'brand',
+          'condition', 'price_cents', 'protected_price_cents', 'item_url', 'photo_urls',
+          'observed_text', 'category', 'category_source', 'lifecycle', 'enrichment_state',
+          'match_state', 'bgg_id', 'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
+        ])
+        && data.keys().hasOnly([
+          'schema_version', 'snapshot_id', 'source_id', 'item_id', 'title', 'brand',
+          'condition', 'price_cents', 'protected_price_cents', 'item_url', 'photo_urls',
+          'observed_text', 'category', 'category_source', 'lifecycle', 'enrichment_state',
+          'match_state', 'bgg_id', 'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
+        ])
+        && data.schema_version is int && data.schema_version == 2
+        && data.snapshot_id == snapshotId
+        && data.source_id is int && data.source_id > 0
+        && data.item_id is string && data.item_id.size() <= 80
+        && data.title is string && data.title.size() <= 400
+        && data.brand is string && data.brand.size() <= 120
+        && data.condition is string && data.condition.size() <= 80
+        && (data.price_cents == null || (data.price_cents is int && data.price_cents >= 0))
+        && (data.protected_price_cents == null || (data.protected_price_cents is int && data.protected_price_cents >= 0))
+        && data.item_url is string && data.item_url.size() <= 1200
+        && data.photo_urls is list && data.photo_urls.size() <= 3
+        && data.observed_text is string && data.observed_text.size() <= 2000
+        && data.category is string && data.category.size() <= 80
+        && data.category_source is string && data.category_source.size() <= 80
+        && data.lifecycle is string && data.lifecycle.size() <= 60
+        && data.enrichment_state is string && data.enrichment_state.size() <= 60
+        && data.match_state is string && data.match_state.size() <= 60
+        && data.bgg_id is string && data.bgg_id.size() <= 80
+        && data.language is string && data.language.size() <= 40
+        && data.last_seen is int && data.last_seen >= 0
+        && data.manual_review is bool
+        && data.source_hash is string && data.source_hash.matches('[0-9a-f]{64}')
+        && data.synced_at == request.time;
+    }
+
+    match /sync_v2/{uid}/devices/{deviceId}/meta/current {
+      allow get: if owner(uid) && deviceId.matches('[a-z0-9-]{36}');
+      allow list: if false;
+      allow create, update: if owner(uid)
+        && deviceId.matches('[a-z0-9-]{36}')
+        && request.resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'updated_at'])
+        && request.resource.data.keys().hasAll(['schema_version', 'snapshot_id', 'updated_at'])
+        && request.resource.data.schema_version is int && request.resource.data.schema_version == 2
+        && request.resource.data.snapshot_id is string
+        && request.resource.data.snapshot_id.matches('[a-z0-9-]{36}')
+        && request.resource.data.updated_at == request.time
+        && getAfter(/databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.complete == true
+        && getAfter(/databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.content_hash is string
+        && getAfter(/databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.document_count is int;
+      allow delete: if false;
+    }
+
+    match /sync_v2/{uid}/devices/{deviceId}/snapshots/{snapshotId} {
+      allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+        && snapshotId.matches('[a-z0-9-]{36}');
+      allow create, update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+        && snapshotId.matches('[a-z0-9-]{36}')
+        && request.resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
+        && request.resource.data.keys().hasAll(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
+        && request.resource.data.schema_version is int && request.resource.data.schema_version == 2
+        && request.resource.data.snapshot_id == snapshotId
+        && request.resource.data.document_count is int && request.resource.data.document_count >= 0
+        && request.resource.data.content_hash is string && request.resource.data.content_hash.matches('[0-9a-f]{64}')
+        && request.resource.data.complete == true
+        && request.resource.data.created_at == request.time;
+      allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+        && snapshotId != currentSnapshotId(uid, deviceId);
+
+      match /listings/{listingId} {
+        allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+          && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}');
+        allow create, update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+          && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}')
+          && request.resource.data.source_id == int(listingId)
+          && validSnapshotListing(snapshotId);
+        allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+          && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}')
+          && resource.data.snapshot_id == snapshotId
+          && snapshotId != currentSnapshotId(uid, deviceId);
+      }
     }
 
     match /{document=**} {

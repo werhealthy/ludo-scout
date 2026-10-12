@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.util.AtomicFile;
+
 import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
@@ -14,20 +14,20 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.WriteBatch;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+
 import java.util.concurrent.TimeUnit;
 
 /** Read-only SQLite projection; capped uploads happen separately from Motore/queue writers. */
 public final class FirestoreSyncWorker extends Worker {
     private static final int MAX_PER_PASS = 80;
     private static final int MAX_PER_DAY = 2400;
+    private final WorkerParameters workerParameters;
     // All columns are already present in the canonical market_listings and games tables.
     static final String QUERY = "SELECT l.id,l.vinted_item_id,l.vinted_title,l.brand,l.item_condition,"
             + "l.current_price_cents,l.protected_price_cents,l.vinted_url,l.image_url,"
@@ -38,59 +38,12 @@ public final class FirestoreSyncWorker extends Worker {
 
     public FirestoreSyncWorker(@NonNull Context context, @NonNull WorkerParameters parameters) {
         super(context, parameters);
+        workerParameters = parameters;
     }
 
     @NonNull @Override public Result doWork() {
-        Context context = getApplicationContext();
-        if (!FirestoreSync.enabled(context)) return Result.success();
-        File database = context.getDatabasePath("vinted_affari.db");
-        if (!database.isFile()) return Result.success();
-        try {
-            SharedPreferences prefs = FirestoreSync.progress(context);
-            String device = deviceId(context);
-            // An Android restore may bring old sent hashes but never the no-backup device identity.
-            if (!device.equals(prefs.getString("device_id", ""))) {
-                prefs.edit().clear().putBoolean("enabled", true).putString("device_id", device).commit();
-            }
-            int day = (int) (System.currentTimeMillis() / 86_400_000L);
-            int spent = prefs.getInt("budget_day", -1) == day ? prefs.getInt("budget_writes", 0) : 0;
-            if (spent >= MAX_PER_DAY) return Result.success();
-
-            List<Row> pending = new ArrayList<>();
-            try (SQLiteDatabase db = SQLiteDatabase.openDatabase(
-                    database.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
-                 Cursor cursor = db.rawQuery(QUERY, null)) {
-                while (cursor.moveToNext() && !isStopped()
-                        && pending.size() < Math.min(MAX_PER_PASS, MAX_PER_DAY - spent)) {
-                    Row row = project(cursor);
-                    if (!row.hash.equals(prefs.getString("sent_" + row.id, ""))) pending.add(row);
-                }
-            }
-            if (pending.isEmpty() || isStopped()) return Result.success();
-            FirebaseFirestore firestore = FirestoreSync.store(context);
-            if (firestore == null || !FirestoreSync.enabled(context)) return Result.success();
-            String owner = BuildConfig.LUDO_SYNC_OWNER_UID;
-            // Flush pending offline commits before queuing more; prevent repeated paid writes.
-            Tasks.await(firestore.waitForPendingWrites(), 20, TimeUnit.SECONDS);
-            if (!FirestoreSync.enabled(context) || isStopped()) return Result.success();
-            WriteBatch batch = firestore.batch();
-            for (Row row : pending) {
-                DocumentReference doc = firestore.collection("sync_v1").document(owner)
-                        .collection("devices").document(device)
-                        .collection("listings").document(Long.toString(row.id));
-                batch.set(doc, row.fields);
-            }
-            // A timeout never marks local progress. A later pass may safely repeat the same set.
-            Tasks.await(batch.commit(), 35, TimeUnit.SECONDS);
-            SharedPreferences.Editor saved = prefs.edit().putInt("budget_day", day)
-                    .putInt("budget_writes", spent + pending.size());
-            for (Row row : pending) saved.putString("sent_" + row.id, row.hash);
-            if (!saved.commit()) return Result.retry();
-            return Result.success();
-        } catch (Exception failure) {
-            // Do not log records, tokens, credentials or seller text.
-            return Result.retry();
-        }
+        if (isStopped() || !FirestoreSync.enabled(getApplicationContext())) return Result.success();
+        return new FirestoreSnapshotWorker(getApplicationContext(), workerParameters).doWork();
     }
 
     private static final class Row {
@@ -160,23 +113,4 @@ public final class FirestoreSyncWorker extends Worker {
         return urls;
     }
 
-    private static String deviceId(Context context) throws Exception {
-        AtomicFile file = new AtomicFile(new File(context.getNoBackupFilesDir(), "firestore-sync-device"));
-        if (file.getBaseFile().exists()) {
-            String saved = new String(file.readFully(), StandardCharsets.UTF_8).trim();
-            if (saved.matches("[a-z0-9-]{36}")) return saved;
-            throw new IllegalStateException("invalid device identity");
-        }
-        String created = UUID.randomUUID().toString();
-        FileOutputStream out = null;
-        try {
-            out = file.startWrite();
-            out.write(created.getBytes(StandardCharsets.UTF_8));
-            file.finishWrite(out);
-        } catch (Exception error) {
-            if (out != null) file.failWrite(out);
-            throw error;
-        }
-        return created;
-    }
 }

@@ -46,7 +46,9 @@ jobs:
       - name: Execute read-only classification audit SQL
         run: python3 regression/classification_audit_export.py
       - name: Verify Firestore sync projection and deny-by-default rules
-        run: python3 regression/firestore_sync_contract.py
+        run: |
+          python3 regression/firestore_sync_contract.py
+          python3 regression/firestore_snapshot_protocol.py
       - name: Validate local Firebase installer syntax and non-tracking
         shell: pwsh
         run: |

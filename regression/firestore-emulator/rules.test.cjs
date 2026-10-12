@@ -18,6 +18,10 @@ const deviceId = '12345678-1234-1234-1234-123456789abc';
 const listingsPath = 'sync_v1/' + ownerUid + '/devices/' + deviceId + '/listings';
 const listingPath = listingsPath + '/42';
 const otherPath = 'sync_v1/' + otherUid + '/devices/' + deviceId + '/listings/42';
+const snapshotId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const nextSnapshotId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const snapshotRoot = 'sync_v2/' + ownerUid + '/devices/' + deviceId + '/snapshots/';
+const currentPath = 'sync_v2/' + ownerUid + '/devices/' + deviceId + '/meta/current';
 
 function listing() {
   return {
@@ -44,6 +48,19 @@ function listing() {
     source_hash: 'a'.repeat(64),
     synced_at: serverTimestamp(),
   };
+}
+
+function snapshotListing(id = 42, version = snapshotId) {
+  return {...listing(), schema_version: 2, snapshot_id: version, source_id: id};
+}
+
+function manifest(id = snapshotId, complete = true, count = 1) {
+  return {schema_version: 2, snapshot_id: id, document_count: count,
+    content_hash: 'b'.repeat(64), complete, created_at: serverTimestamp()};
+}
+
+function current(id = snapshotId) {
+  return {schema_version: 2, snapshot_id: id, updated_at: serverTimestamp()};
 }
 
 let env, owner, other, anonymous;
@@ -104,4 +121,42 @@ test('invalid schema, extra data, missing fields and spoofed timestamp are rejec
   await assertFails(setDoc(document, {...listing(), source_hash: 'invalid'}));
   await assertFails(setDoc(document, {...listing(), price_cents: -10}));
   await assertFails(setDoc(document, {...listing(), synced_at: new Date('2020-01-01T00:00:00Z')}));
+});
+
+test('snapshot pointer cannot publish an incomplete or missing manifest', async () => {
+  await env.clearFirestore();
+  await assertFails(setDoc(doc(owner, currentPath), current()));
+  await assertFails(setDoc(doc(owner, snapshotRoot + snapshotId), manifest(snapshotId, false)));
+  const missingSchema = manifest(snapshotId, true);
+  delete missingSchema.schema_version;
+  await assertFails(setDoc(doc(owner, snapshotRoot + snapshotId), missingSchema));
+  await assertFails(setDoc(doc(owner, currentPath), current()));
+  await assertSucceeds(setDoc(doc(owner, snapshotRoot + nextSnapshotId + '/listings/42'), snapshotListing(42, nextSnapshotId)));
+  await assertSucceeds(setDoc(doc(owner, snapshotRoot + nextSnapshotId), manifest(nextSnapshotId, true, 1)));
+  await assertSucceeds(setDoc(doc(owner, currentPath), current(nextSnapshotId)));
+  await assertSucceeds(getDoc(doc(owner, currentPath)));
+});
+
+test('snapshot listings are schema scoped; active docs protected, stale version cleanup allowed', async () => {
+  await env.clearFirestore();
+  const active=doc(owner,snapshotRoot+snapshotId+'/listings/42');
+  const old=doc(owner,snapshotRoot+nextSnapshotId+'/listings/42');
+  await assertSucceeds(setDoc(active,snapshotListing(42,snapshotId)));
+  await assertFails(setDoc(doc(owner,snapshotRoot+snapshotId+'/listings/43'),snapshotListing(42,snapshotId)));
+  await assertFails(setDoc(doc(other,snapshotRoot+snapshotId+'/listings/42'),snapshotListing(42,snapshotId)));
+  await assertSucceeds(setDoc(doc(owner,snapshotRoot+snapshotId),manifest(snapshotId)));
+  await assertSucceeds(setDoc(doc(owner,currentPath),current(snapshotId)));
+  await assertFails(deleteDoc(active));
+  await assertSucceeds(setDoc(old,snapshotListing(42,nextSnapshotId)));
+  await assertSucceeds(setDoc(doc(owner,snapshotRoot+nextSnapshotId),manifest(nextSnapshotId)));
+  await assertSucceeds(setDoc(doc(owner,currentPath),current(nextSnapshotId)));
+  await assertSucceeds(deleteDoc(active));
+});
+
+test('snapshot foreign scopes and extra listing fields are denied', async () => {
+  await env.clearFirestore();
+  const bad=snapshotListing();bad.seller_name='not allowed';
+  await assertFails(setDoc(doc(owner,snapshotRoot+snapshotId+'/listings/42'),bad));
+  await assertFails(getDoc(doc(other,currentPath)));
+  await assertFails(setDoc(doc(owner,'sync_v2/'+otherUid+'/devices/'+deviceId+'/snapshots/'+snapshotId),manifest()));
 });
