@@ -1,4 +1,6 @@
-name: Android beta
+name: Android beta (build only)
+
+# Release is a separate owner-approved operation outside GitHub Actions.
 
 on:
   workflow_dispatch:
@@ -18,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Verify beta release boundary
+        run: python3 regression/beta_distribution_gate.py
       - name: Verify supplied Ludo visual universe
         run: python3 regression/ludo_visual_universe.py
       - name: Run featured pedestal regression
@@ -155,15 +159,9 @@ jobs:
         env:
           BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
           ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
         run: |
           test -n "$BGG_TOKEN" || (echo "Missing GitHub secret: BGG_TOKEN" && exit 1)
           test -n "$ANDROID_DEBUG_KEYSTORE_BASE64" || (echo "Missing GitHub secret: ANDROID_DEBUG_KEYSTORE_BASE64" && exit 1)
-          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON" || (echo "Missing GitHub secret: FIREBASE_SERVICE_ACCOUNT_JSON" && exit 1)
-          test -n "$FIREBASE_APP_ID" || (echo "Missing GitHub secret: FIREBASE_APP_ID" && exit 1)
-          test -n "$FIREBASE_TESTERS" || (echo "Missing GitHub secret: FIREBASE_TESTERS" && exit 1)
 
       - name: Restore existing Android debug signing key
         env:
@@ -320,42 +318,9 @@ jobs:
 
       - name: Upload APK
         if: github.event_name == 'workflow_dispatch'
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ludo-scout-beta-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-
-      - name: Prepare Firebase credentials
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
-          chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
-
-      - name: Distribute beta to Firebase App Distribution
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          FIREBASE_TESTERS: ${{ secrets.FIREBASE_TESTERS }}
-        run: |
-          npx --yes firebase-tools@latest appdistribution:distribute app/build/outputs/apk/debug/app-debug.apk \
-            --app "$FIREBASE_APP_ID" \
-            --testers "$FIREBASE_TESTERS" \
-            --release-notes "Ludo Scout beta - GitHub run #${{ github.run_number }} (${{ github.sha }})"
-
-
-
-
-
-
-
-
-
-
-
-
