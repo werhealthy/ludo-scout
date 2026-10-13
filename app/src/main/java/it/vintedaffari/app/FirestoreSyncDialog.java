@@ -22,11 +22,20 @@ public final class FirestoreSyncDialog {
             return;
         }
         if (FirestoreSync.authorized(activity)) {
-            new AlertDialog.Builder(activity).setTitle("Sincronizzazione Ludo")
-                    .setMessage(FirestoreSync.enabled(activity)
+            String status = FirestoreSync.enabled(activity)
                             ? "Account collegato. Invio automatico delle sole schede annuncio selezionate; "
                                     + "non vengono condivisi preferiti o credenziali."
-                            : "Account collegato, sincronizzazione in pausa.")
+                            : "Account collegato, sincronizzazione in pausa.";
+            String deviceId = "non disponibile";
+            try { deviceId = FirestoreSync.deviceId(activity); }
+            catch (Exception ignored) { }
+            int padding = (int) (20 * activity.getResources().getDisplayMetrics().density);
+            TextView details = new TextView(activity);
+            details.setText(status + "\n\nID dispositivo per i comandi Telegram:\n" + deviceId);
+            details.setTextIsSelectable(true);
+            details.setPadding(padding, padding / 2, padding, 0);
+            new AlertDialog.Builder(activity).setTitle("Sincronizzazione Ludo")
+                    .setView(details)
                     .setPositiveButton("Attiva", (d, w) -> {
                         FirestoreSync.start(activity);
                         Toast.makeText(activity, "Sincronizzazione pianificata", Toast.LENGTH_LONG).show();
