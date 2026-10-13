@@ -21,8 +21,10 @@ import java.util.concurrent.TimeUnit;
 /** Opt-in, owner-scoped transport. Never contacts Firebase if build configuration is absent. */
 public final class FirestoreSync {
     private static final String APP = "ludo-catalog-sync";
-    private static final String WORK = "ludo-catalog-sync-v2";
+    private static final String WORK = "ludo-catalog-sync-v3";
     private static final String LEGACY_WORK = "ludo-catalog-sync-v1";
+    private static final String V2_WORK = "ludo-catalog-sync-v2";
+    private static final String OPT_IN_VERSION = "minimal-v3";
     private static final String PREFS = "ludo_firestore_sync";
     private FirestoreSync() {}
 
@@ -67,28 +69,36 @@ public final class FirestoreSync {
     }
 
     public static boolean enabled(Context context) {
-        return prefs(context).getBoolean("enabled", false) && authorized(context);
+        SharedPreferences p = prefs(context);
+        return "minimal-v3".equals(p.getString("opt_in_version", ""))
+                && p.getBoolean("enabled", false) && authorized(context);
     }
 
     public static void start(Context context) {
         if (!authorized(context)) return;
-        // Stop a persisted v1 worker before enabling the immutable snapshot protocol.
-        prefs(context).edit().putBoolean("enabled", false).commit();
-        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(LEGACY_WORK);
-        prefs(context).edit().putBoolean("enabled", true).commit();
+        Context appContext = context.getApplicationContext();
+        SharedPreferences p = prefs(context);
+        // Stop all old publishers before recording a fresh, version-specific user tap.
+        p.edit().putBoolean("enabled", false).commit();
+        WorkManager manager = WorkManager.getInstance(appContext);
+        manager.cancelUniqueWork(LEGACY_WORK);
+        manager.cancelUniqueWork(V2_WORK);
+        manager.cancelUniqueWork(WORK);
+        p.edit().putString("opt_in_version", OPT_IN_VERSION).putBoolean("enabled", true).commit();
         Constraints network = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED).build();
         PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
                 FirestoreSnapshotWorker.class, 15, TimeUnit.MINUTES)
                 .setConstraints(network).build();
-        WorkManager.getInstance(context.getApplicationContext()).enqueueUniquePeriodicWork(
-                WORK, ExistingPeriodicWorkPolicy.REPLACE, request);
+        manager.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.REPLACE, request);
     }
 
     public static void stop(Context context) {
-        prefs(context).edit().putBoolean("enabled", false).apply();
-        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(WORK);
-        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(LEGACY_WORK);
+        prefs(context).edit().putBoolean("enabled", false).remove("opt_in_version").apply();
+        WorkManager manager = WorkManager.getInstance(context.getApplicationContext());
+        manager.cancelUniqueWork(WORK);
+        manager.cancelUniqueWork(V2_WORK);
+        manager.cancelUniqueWork(LEGACY_WORK);
         FirebaseAuth auth = auth(context);
         if (auth != null) auth.signOut();
     }
