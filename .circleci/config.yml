@@ -1,0 +1,20 @@
+version: 2.1
+
+jobs:
+  validate_android_sync_pr:
+    machine:
+      image: android:2026.05.1
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Compile and run Android unit tests
+          command: |
+            chmod +x ./gradlew
+            ./gradlew --no-daemon :app:compileDebugJavaWithJavac :app:testDebugUnitTest
+
+workflows:
+  android_sync_pr:
+    jobs:
+      - validate_android_sync_pr:
+          filters: pipeline.git.branch == "backend/firestore-sync-v1"
