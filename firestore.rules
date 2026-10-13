@@ -65,7 +65,12 @@ service cloud.firestore {
       return exists(currentPath) ? get(currentPath).data.snapshot_id : '';
     }
 
-    function validSnapshotListing(snapshotId) {
+    function stagingSnapshot(uid, deviceId, snapshotId) {
+      let manifestPath = /databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(snapshotId);
+      return exists(manifestPath) && get(manifestPath).data.complete == false;
+    }
+
+    function validSnapshotListing(uid, deviceId, snapshotId) {
       let data = request.resource.data;
       return data.keys().hasAll([
           'schema_version', 'snapshot_id', 'source_id', 'item_id', 'title', 'brand',
@@ -79,6 +84,7 @@ service cloud.firestore {
           'observed_text', 'category', 'category_source', 'lifecycle', 'enrichment_state',
           'match_state', 'bgg_id', 'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
         ])
+        && stagingSnapshot(uid, deviceId, snapshotId)
         && data.schema_version is int && data.schema_version == 2
         && data.snapshot_id == snapshotId
         && data.source_id is int && data.source_id > 0
@@ -122,18 +128,33 @@ service cloud.firestore {
     }
 
     match /sync_v2/{uid}/devices/{deviceId}/snapshots/{snapshotId} {
+      function validSnapshotManifest() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
+          && data.keys().hasAll(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
+          && data.schema_version is int && data.schema_version == 2
+          && data.snapshot_id == snapshotId
+          && data.document_count is int && data.document_count >= 0
+          && data.content_hash is string && data.content_hash.matches('[0-9a-f]{64}')
+          && data.created_at is timestamp;
+      }
       allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
         && snapshotId.matches('[a-z0-9-]{36}');
-      allow create, update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+      allow create: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
         && snapshotId.matches('[a-z0-9-]{36}')
-        && request.resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
-        && request.resource.data.keys().hasAll(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
-        && request.resource.data.schema_version is int && request.resource.data.schema_version == 2
-        && request.resource.data.snapshot_id == snapshotId
-        && request.resource.data.document_count is int && request.resource.data.document_count >= 0
-        && request.resource.data.content_hash is string && request.resource.data.content_hash.matches('[0-9a-f]{64}')
-        && request.resource.data.complete == true
+        && validSnapshotManifest()
+        && request.resource.data.complete == false
         && request.resource.data.created_at == request.time;
+      allow update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+        && snapshotId.matches('[a-z0-9-]{36}')
+        && validSnapshotManifest()
+        && resource.data.complete == false
+        && request.resource.data.complete == true
+        && request.resource.data.schema_version == resource.data.schema_version
+        && request.resource.data.snapshot_id == resource.data.snapshot_id
+        && request.resource.data.document_count == resource.data.document_count
+        && request.resource.data.content_hash == resource.data.content_hash
+        && request.resource.data.created_at == resource.data.created_at;
       allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
         && snapshotId != currentSnapshotId(uid, deviceId);
 
@@ -143,10 +164,9 @@ service cloud.firestore {
         allow create, update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
           && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}')
           && request.resource.data.source_id == int(listingId)
-          && validSnapshotListing(snapshotId);
+          && validSnapshotListing(uid, deviceId, snapshotId);
         allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
           && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}')
-          && resource.data.snapshot_id == snapshotId
           && snapshotId != currentSnapshotId(uid, deviceId);
       }
     }

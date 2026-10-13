@@ -54,7 +54,7 @@ function snapshotListing(id = 42, version = snapshotId) {
   return {...listing(), schema_version: 2, snapshot_id: version, source_id: id};
 }
 
-function manifest(id = snapshotId, complete = true, count = 1) {
+function manifest(id = snapshotId, complete = false, count = 1) {
   return {schema_version: 2, snapshot_id: id, document_count: count,
     content_hash: 'b'.repeat(64), complete, created_at: serverTimestamp()};
 }
@@ -65,11 +65,16 @@ function current(id = snapshotId) {
 
 let env, owner, other, anonymous;
 
+function emulatorFirestoreAddress() {
+  const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8081').split(':');
+  return {host, port: Number(port)};
+}
+
 test.before(async () => {
   const rules = fs.readFileSync(path.resolve(__dirname, '..', '..', 'firestore.rules'), 'utf8');
   env = await initializeTestEnvironment({
     projectId: 'demo-ludo-firestore-rules',
-    firestore: {host: '127.0.0.1', port: 8081, rules},
+    firestore: {...emulatorFirestoreAddress(), rules},
   });
   owner = env.authenticatedContext(ownerUid).firestore();
   other = env.authenticatedContext(otherUid).firestore();
@@ -126,31 +131,45 @@ test('invalid schema, extra data, missing fields and spoofed timestamp are rejec
 test('snapshot pointer cannot publish an incomplete or missing manifest', async () => {
   await env.clearFirestore();
   await assertFails(setDoc(doc(owner, currentPath), current()));
-  await assertFails(setDoc(doc(owner, snapshotRoot + snapshotId), manifest(snapshotId, false)));
-  const missingSchema = manifest(snapshotId, true);
+  const staged = doc(owner, snapshotRoot + snapshotId);
+  await assertSucceeds(setDoc(staged, manifest(snapshotId, false)));
+  await assertFails(setDoc(doc(owner, currentPath), current()));
+  await assertSucceeds(updateDoc(staged, {complete: true}));
+  const missingSchema = manifest(snapshotId, false);
   delete missingSchema.schema_version;
   await assertFails(setDoc(doc(owner, snapshotRoot + snapshotId), missingSchema));
-  await assertFails(setDoc(doc(owner, currentPath), current()));
+  const nextManifest = doc(owner, snapshotRoot + nextSnapshotId);
+  await assertFails(setDoc(doc(owner, currentPath), current(nextSnapshotId)));
+  await assertFails(setDoc(doc(owner, snapshotRoot + nextSnapshotId + '/listings/42'), snapshotListing(42, nextSnapshotId)));
+  await assertSucceeds(setDoc(nextManifest, manifest(nextSnapshotId, false, 1)));
   await assertSucceeds(setDoc(doc(owner, snapshotRoot + nextSnapshotId + '/listings/42'), snapshotListing(42, nextSnapshotId)));
-  await assertSucceeds(setDoc(doc(owner, snapshotRoot + nextSnapshotId), manifest(nextSnapshotId, true, 1)));
+  await assertSucceeds(updateDoc(nextManifest, {complete: true}));
   await assertSucceeds(setDoc(doc(owner, currentPath), current(nextSnapshotId)));
   await assertSucceeds(getDoc(doc(owner, currentPath)));
 });
 
 test('snapshot listings are schema scoped; active docs protected, stale version cleanup allowed', async () => {
   await env.clearFirestore();
+  const activeManifest = doc(owner, snapshotRoot + snapshotId);
+  await assertSucceeds(setDoc(activeManifest, manifest(snapshotId, false, 1)));
   const active=doc(owner,snapshotRoot+snapshotId+'/listings/42');
   const old=doc(owner,snapshotRoot+nextSnapshotId+'/listings/42');
   await assertSucceeds(setDoc(active,snapshotListing(42,snapshotId)));
   await assertFails(setDoc(doc(owner,snapshotRoot+snapshotId+'/listings/43'),snapshotListing(42,snapshotId)));
   await assertFails(setDoc(doc(other,snapshotRoot+snapshotId+'/listings/42'),snapshotListing(42,snapshotId)));
-  await assertSucceeds(setDoc(doc(owner,snapshotRoot+snapshotId),manifest(snapshotId)));
+  await assertSucceeds(updateDoc(activeManifest, {complete: true}));
   await assertSucceeds(setDoc(doc(owner,currentPath),current(snapshotId)));
   await assertFails(deleteDoc(active));
+  await assertFails(setDoc(doc(owner,snapshotRoot+snapshotId+'/listings/43'),snapshotListing(43,snapshotId)));
+  const nextManifest = doc(owner,snapshotRoot+nextSnapshotId);
+  await assertSucceeds(setDoc(nextManifest,manifest(nextSnapshotId,false,1)));
   await assertSucceeds(setDoc(old,snapshotListing(42,nextSnapshotId)));
-  await assertSucceeds(setDoc(doc(owner,snapshotRoot+nextSnapshotId),manifest(nextSnapshotId)));
+  await assertSucceeds(updateDoc(nextManifest,{complete:true}));
   await assertSucceeds(setDoc(doc(owner,currentPath),current(nextSnapshotId)));
   await assertSucceeds(deleteDoc(active));
+  await assertSucceeds(deleteDoc(doc(owner,snapshotRoot+snapshotId+'/listings/99')));
+  await assertSucceeds(deleteDoc(activeManifest));
+  await assertFails(setDoc(doc(owner,snapshotRoot+snapshotId+'/listings/43'),snapshotListing(43,snapshotId)));
 });
 
 test('snapshot foreign scopes and extra listing fields are denied', async () => {

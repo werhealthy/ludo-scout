@@ -10,6 +10,7 @@ import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldPath;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -58,12 +59,30 @@ public final class FirestoreSnapshotWorker extends Worker {
             store=FirestoreSnapshotStore.open(context);FirestoreSnapshotStore.Snapshot state=store.snapshot();
             String owner=BuildConfig.LUDO_SYNC_OWNER_UID;DocumentReference current=currentRef(cloud,owner,device);
             if(state!=null&&"CLEAN_OLD".equals(state.state))return cleanupOld(cloud,store,state,owner,device,prefs,day,spent);
-            if(state!=null&&"ABORTING".equals(state.state))return cleanupAborted(cloud,store,state,owner,device,prefs,day,spent);
+            if(state!=null&&("ABORTING".equals(state.state)||"ABORTING_SEALED".equals(state.state)))return cleanupAborted(cloud,store,state,owner,device,prefs,day,spent);
             if(state==null||"PUBLISHED".equals(state.state)){
                 String hash=sourceHash(catalog);if(state!=null&&hash.equals(state.contentHash))return Result.success();
                 store.begin(FirestoreSnapshotStore.newId(),readCurrentId(current));materialize(catalog,store);state=store.snapshot();
             }else if("MATERIALIZING".equals(state.state)){
                 String id=state.id,previous=state.previousId;store.begin(id,previous);materialize(catalog,store);state=store.snapshot();
+            }
+            if("STAGE_MANIFEST".equals(state.state)){
+                if(!state.contentHash.equals(sourceHash(catalog))){store.markAborted();return Result.success();}
+                DocumentReference manifestRef=snapshot(cloud,owner,device,state.id);
+                DocumentSnapshot existing=Tasks.await(manifestRef.get(),20,TimeUnit.SECONDS);
+                if(existing.exists()){
+                    if(matchesManifest(existing,state.id,state.count,state.contentHash,false)){
+                        store.state("UPLOADING");return Result.success();
+                    }
+                    store.markAborted();return Result.success();
+                }
+                if(!reserve(prefs,day,spent,1))return Result.success();
+                Map<String,Object> manifest=new LinkedHashMap<>();manifest.put("schema_version",2);
+                manifest.put("snapshot_id",state.id);manifest.put("document_count",state.count);
+                manifest.put("content_hash",state.contentHash);manifest.put("complete",false);
+                manifest.put("created_at",FieldValue.serverTimestamp());
+                if(!FirestoreSync.enabled(context)||isStopped())return Result.success();
+                Tasks.await(manifestRef.set(manifest),35,TimeUnit.SECONDS);store.state("UPLOADING");return Result.success();
             }
             if("UPLOADING".equals(state.state)){
                 if(state.uploaded>=state.count){if(!state.contentHash.equals(sourceHash(catalog))){store.markAborted();return Result.success();}store.state("MANIFEST");return Result.success();}
@@ -73,18 +92,23 @@ public final class FirestoreSnapshotWorker extends Worker {
                     long id=rows.getLong(0);ids.add(id);Map<String,Object> fields=decode(rows.getString(1),state.id);
                     batch.set(listings(cloud,owner,device,state.id).document(Long.toString(id)),fields);
                 }}
-                if(ids.isEmpty()){store.markAborted();return Result.success();}if(!reserve(prefs,day,spent,ids.size()))return Result.success();
+                if(ids.isEmpty()){store.markAborted();return Result.success();}
+                long[] done=new long[ids.size()];for(int i=0;i<ids.size();i++)done[i]=ids.get(i);
+                store.markUploadAttempted(done);
+                if(!reserve(prefs,day,spent,ids.size()))return Result.success();
                 if(!FirestoreSync.enabled(context)||isStopped())return Result.success();
-                Tasks.await(batch.commit(),35,TimeUnit.SECONDS);long[] done=new long[ids.size()];for(int i=0;i<ids.size();i++)done[i]=ids.get(i);store.markUploaded(done);return Result.success();
+                Tasks.await(batch.commit(),35,TimeUnit.SECONDS);store.markUploaded(done);return Result.success();
             }
             if("MANIFEST".equals(state.state)){
                 if(!state.contentHash.equals(sourceHash(catalog))){store.markAborted();return Result.success();}
-                if(!reserve(prefs,day,spent,1))return Result.success();Map<String,Object> manifest=new LinkedHashMap<>();
-                manifest.put("schema_version",2);
-                manifest.put("snapshot_id",state.id);manifest.put("document_count",state.count);
-                manifest.put("content_hash",state.contentHash);manifest.put("complete",true);manifest.put("created_at",FieldValue.serverTimestamp());
+                DocumentReference manifestRef=snapshot(cloud,owner,device,state.id);
+                DocumentSnapshot existing=Tasks.await(manifestRef.get(),20,TimeUnit.SECONDS);
+                if(!existing.exists()||!matchesManifest(existing,state.id,state.count,state.contentHash,
+                        Boolean.TRUE.equals(existing.getBoolean("complete")))){store.markAborted();return Result.success();}
+                if(Boolean.TRUE.equals(existing.getBoolean("complete"))){store.state("PUBLISH");return Result.success();}
+                if(!reserve(prefs,day,spent,1))return Result.success();
                 if(!FirestoreSync.enabled(context)||isStopped())return Result.success();
-                Tasks.await(snapshot(cloud,owner,device,state.id).set(manifest),35,TimeUnit.SECONDS);store.state("PUBLISH");return Result.success();
+                Tasks.await(manifestRef.update("complete",true),35,TimeUnit.SECONDS);store.state("PUBLISH");return Result.success();
             }
             if("PUBLISH".equals(state.state)){
                 String active=readCurrentId(current);if(state.id.equals(active)){store.markCleanupPending(state.previousId);return Result.success();}
@@ -95,8 +119,14 @@ public final class FirestoreSnapshotWorker extends Worker {
                 Tasks.await(current.set(pointer),35,TimeUnit.SECONDS);store.markCleanupPending(state.previousId);return Result.success();
             }
             return Result.retry();
-        }catch(SQLiteException full){if(store!=null)store.resetIdle();FirestoreSync.progress(context).edit().putString("snapshot_error","local_snapshot_limit").commit();return Result.success();}
-        catch(IllegalStateException bounded){if(store!=null)store.resetIdle();FirestoreSync.progress(context).edit().putString("snapshot_error",bounded.getMessage()==null?"snapshot_invalid":bounded.getMessage()).commit();return Result.success();}
+        }catch(SQLiteException full){
+            // Keep the durable generation state: a remote batch may have committed
+            // immediately before its local acknowledgement hit SQLite's size cap.
+            FirestoreSync.progress(context).edit().putString("snapshot_error","local_snapshot_limit").commit();return Result.success();}
+        catch(IllegalStateException bounded){
+            // Retain resumable state; MATERIALIZING restarts locally, while an
+            // UPLOADING generation can safely replay idempotent document sets.
+            FirestoreSync.progress(context).edit().putString("snapshot_error",bounded.getMessage()==null?"snapshot_invalid":bounded.getMessage()).commit();return Result.success();}
         catch(Exception failure){return Result.retry();}finally{
             if(store!=null)store.close();
             try{if(lease!=null)lease.release();}catch(Exception ignored){}
@@ -106,14 +136,21 @@ public final class FirestoreSnapshotWorker extends Worker {
 
     private Result cleanupAborted(FirebaseFirestore db,FirestoreSnapshotStore store,FirestoreSnapshotStore.Snapshot s,
             String owner,String device,SharedPreferences prefs,int day,int spent)throws Exception{
+        if("ABORTING".equals(s.state)){
+            if(!reserve(prefs,day,spent,1))return Result.success();
+            if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
+            // Remove the incomplete manifest first; Firestore rules then reject
+            // any delayed listing upload for this abandoned generation.
+            Tasks.await(snapshot(db,owner,device,s.id).delete(),35,TimeUnit.SECONDS);
+            store.state("ABORTING_SEALED");return Result.success();
+        }
         int cap=Math.min(MAX_PER_PASS,MAX_PER_DAY-spent);if(cap<=0)return Result.success();List<Long> ids=new ArrayList<>();WriteBatch batch=db.batch();
         try(Cursor rows=store.cleanupRows(s.id,cap)){while(rows.moveToNext()){long id=rows.getLong(0);ids.add(id);batch.delete(listings(db,owner,device,s.id).document(Long.toString(id)));}}
         if(!ids.isEmpty()){if(!reserve(prefs,day,spent,ids.size()))return Result.success();
             if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
             Tasks.await(batch.commit(),35,TimeUnit.SECONDS);
             long[] done=new long[ids.size()];for(int i=0;i<ids.size();i++)done[i]=ids.get(i);store.markCleaned(done);return Result.success();}
-        if(!reserve(prefs,day,spent,1))return Result.success();if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
-        Tasks.await(snapshot(db,owner,device,s.id).delete(),35,TimeUnit.SECONDS);store.resetIdle();return Result.success();
+        store.resetIdle();return Result.success();
     }
     private Result cleanupOld(FirebaseFirestore db,FirestoreSnapshotStore store,FirestoreSnapshotStore.Snapshot s,
             String owner,String device,SharedPreferences prefs,int day,int spent)throws Exception{
@@ -129,8 +166,16 @@ public final class FirestoreSnapshotWorker extends Worker {
             Tasks.await(batch.commit(),35,TimeUnit.SECONDS);
             return Result.success();
         }
+        // Recheck before deleting the parent: the rules only permit listing writes
+        // while this generation's staging manifest is incomplete.
+        QuerySnapshot beforeDelete=Tasks.await(listings(db,owner,device,s.previousId).limit(1).get(),20,TimeUnit.SECONDS);
+        if(!beforeDelete.isEmpty())return Result.success();
         if(!reserve(prefs,day,spent,1))return Result.success();if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
         Tasks.await(snapshot(db,owner,device,s.previousId).delete(),35,TimeUnit.SECONDS);
+        // Completed manifests reject later listing writes; this final read keeps
+        // cleanup resumable if a previously queued write raced the first query.
+        QuerySnapshot finalCheck=Tasks.await(listings(db,owner,device,s.previousId).limit(1).get(),20,TimeUnit.SECONDS);
+        if(!finalCheck.isEmpty())return Result.success();
         store.clearAfterPublish(s.id,s.contentHash);return Result.success();
     }
 
@@ -193,6 +238,12 @@ public final class FirestoreSnapshotWorker extends Worker {
     private static DocumentReference snapshot(FirebaseFirestore d,String o,String dev,String id){return d.collection("sync_v2").document(o).collection("devices").document(dev).collection("snapshots").document(id);}
     private static com.google.firebase.firestore.CollectionReference listings(FirebaseFirestore d,String o,String dev,String id){return snapshot(d,o,dev,id).collection("listings");}
     private static String readCurrentId(DocumentReference r)throws Exception{com.google.firebase.firestore.DocumentSnapshot d=Tasks.await(r.get(),20,TimeUnit.SECONDS);String id=d.getString("snapshot_id");return id==null?"":id;}
+    private static boolean matchesManifest(DocumentSnapshot document,String id,long count,String hash,boolean complete){
+        Long schema=document.getLong("schema_version"),rows=document.getLong("document_count");
+        return document.exists()&&Long.valueOf(2L).equals(schema)&&Long.valueOf(count).equals(rows)
+                &&id.equals(document.getString("snapshot_id"))&&hash.equals(document.getString("content_hash"))
+                &&Boolean.valueOf(complete).equals(document.getBoolean("complete"));
+    }
     private static boolean same(String a,String b){return(a==null?"":a).equals(b==null?"":b);}
     private static final class Row{final long id;final String hash;final Map<String,Object> fields;Row(long i,String h,Map<String,Object> f){id=i;hash=h;fields=f;}}
     private static Long nonnegative(Cursor c,int i){return c.isNull(i)||c.getLong(i)<0?null:c.getLong(i);}

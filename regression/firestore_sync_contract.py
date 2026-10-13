@@ -109,6 +109,8 @@ class FirestoreSyncContractTest(unittest.TestCase):
         self.assertIn("SQLiteDatabase.OPEN_READONLY", SNAPSHOT_WORKER)
         self.assertIn("getNoBackupFilesDir()", SNAPSHOT_STORE)
         self.assertIn("MAX_BYTES = 32L * 1024L * 1024L", SNAPSHOT_STORE)
+        self.assertIn("MAX_DATABASE_BYTES = MAX_BYTES - AUXILIARY_RESERVE_BYTES", SNAPSHOT_STORE)
+        self.assertIn("sidecarBytes(databaseFile)", SNAPSHOT_STORE)
         self.assertIn("MAX_ROWS = 100_000", SNAPSHOT_STORE)
         self.assertIn("MAX_PER_PASS = 80", SNAPSHOT_WORKER)
         self.assertIn("MAX_PER_DAY = 2400", SNAPSHOT_WORKER)
