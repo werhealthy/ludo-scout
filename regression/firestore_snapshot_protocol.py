@@ -51,28 +51,31 @@ class SnapshotModel:
         self.staging["state"] = "UPLOADING"
         return True
 
-    def upload(self, limit, interrupted=False):
+    def upload(self, limit, interrupted=False, rejected=False):
         s = self.staging
         todo = [r for r in s["rows"] if r["id"] not in s["uploaded"]][:limit]
         # Remote set() is idempotent; interruption after server commit but before
         # local cursor persistence simply repeats the same IDs on retry.
         s["attempted"].update(r["id"] for r in todo)
+        if rejected:  # Firestore WriteBatch is atomic: no accepted subset to acknowledge.
+            return
         for row in todo:
             self.remote[(s["id"], row["id"])] = row["hash"]
         if interrupted:
             return
         s["uploaded"].update(r["id"] for r in todo)
 
-    def cleanup_aborted(self, limit=80):
+    def cleanup_aborted(self, limit=80, state_write_fails=False):
         s = self.staging
         if s["state"] == "ABORTING":
             self.manifests.pop(s["id"], None)  # seal first: no later row creates
-            s["state"] = "ABORTING_SEALED"
-            return
-        todo = sorted(s["attempted"] - s["cleaned"])[:limit]
+            if not state_write_fails:
+                s["state"] = "ABORTING_SEALED"
+        # Mirror the worker's remote listing query; local SQLite acknowledgements
+        # are deliberately not required to discover committed staging rows.
+        todo = sorted(item_id for snapshot_id, item_id in self.remote if snapshot_id == s["id"])[:limit]
         for item_id in todo:
             self.remote.pop((s["id"], item_id), None)  # absent deletes are idempotent
-        s["cleaned"].update(todo)
         if not todo:
             self.staging = {}
 
@@ -158,14 +161,17 @@ class SnapshotProtocolTests(unittest.TestCase):
         self.assertFalse(m.manifests["partial"]["complete"])
 
     def test_aborted_generation_seals_before_cleaning_ambiguous_uploads(self):
-        m = SnapshotModel([{"id": 1, "hash": "a"}], current="old")
+        m = SnapshotModel([{"id": 1, "hash": "a"}, {"id": 2, "hash": "b"}], current="old")
         m.capture("aborted")
-        m.upload(1, interrupted=True)  # remote commit without local uploaded acknowledgement
+        m.upload(2, interrupted=True)  # remote commit without local uploaded acknowledgement
+        # A failed local cleanup acknowledgement must not hide the remote row.
+        m.staging["attempted"].clear()
         m.staging["state"] = "ABORTING"
-        m.cleanup_aborted()
+        m.cleanup_aborted(limit=1, state_write_fails=True)
         self.assertNotIn("aborted", m.manifests)
-        self.assertEqual("ABORTING_SEALED", m.staging["state"])
-        m.cleanup_aborted()
+        self.assertEqual("ABORTING", m.staging["state"])
+        self.assertEqual(1, len([key for key in m.remote if key[0] == "aborted"]))
+        m.cleanup_aborted(limit=1, state_write_fails=False)
         self.assertFalse(any(key[0] == "aborted" for key in m.remote))
         m.cleanup_aborted()
         self.assertEqual({}, m.staging)
@@ -182,9 +188,8 @@ class SnapshotProtocolTests(unittest.TestCase):
         self.assertIn('manifest.put("complete",false)', WORKER)
         self.assertIn('manifestRef.update("complete",true)', WORKER)
         self.assertIn('"ABORTING_SEALED".equals(state.state)', WORKER)
-        self.assertIn('store.markUploadAttempted(done)', WORKER)
+        self.assertIn("store.markUploadAttempted(done)", WORKER)
         self.assertIn('upload_attempted=1', STORE)
-        self.assertIn('upload_attempted=1 AND cleaned=0', STORE)
         self.assertIn("state.contentHash.equals(sourceHash(catalog))", WORKER)
         self.assertIn("MAX_PER_PASS = 80", WORKER)
         self.assertIn("MAX_PER_DAY = 2400", WORKER)
@@ -207,6 +212,12 @@ class SnapshotProtocolTests(unittest.TestCase):
         self.assertNotIn("previousCursor(", cleanup)
         self.assertIn("if(!finalCheck.isEmpty())return Result.success()", cleanup)
         self.assertLess(cleanup.index("beforeDelete="), cleanup.index("snapshot(db,owner,device,s.previousId).delete()"))
+        aborted = WORKER.split("private Result cleanupAborted", 1)[1].split("private Result cleanupOld", 1)[0]
+        self.assertIn("listings(db,owner,device,s.id).orderBy(FieldPath.documentId()).limit(cap)", aborted)
+        self.assertNotIn("store.cleanupRows", aborted)
+        self.assertIn('catch(SQLiteException localStateFailure)', aborted)
+        self.assertIn('putString("snapshot_error","aborted_snapshot_state_write_failed")', aborted)
+        self.assertIn("writesSpent++", aborted)
 
         sqlite_catches = WORKER.split("catch(SQLiteException full)", 1)[1].split("catch(Exception failure)", 1)[0]
         self.assertNotIn("resetIdle()", sqlite_catches)
@@ -214,6 +225,8 @@ class SnapshotProtocolTests(unittest.TestCase):
     def test_sqlite_full_after_remote_commit_preserves_idempotent_retry_state(self):
         self.assertIn("store.markUploadAttempted(done)", WORKER)
         self.assertIn("Tasks.await(batch.commit(),35,TimeUnit.SECONDS);store.markUploaded(done)", WORKER)
+        upload = WORKER.split('if("UPLOADING".equals(state.state))', 1)[1].split('if("MANIFEST".equals(state.state))', 1)[0]
+        self.assertLess(upload.index("Tasks.await(batch.commit()"), upload.index("store.markUploaded(done)"))
         m = SnapshotModel([{"id": 1, "hash": "a"}, {"id": 2, "hash": "b"}], current="old")
         m.capture("same-generation")
         m.upload(1, interrupted=True)  # remote commit succeeded; SQLite acknowledgement failed
@@ -226,6 +239,15 @@ class SnapshotProtocolTests(unittest.TestCase):
         self.assertTrue(m.finish_and_publish())
         self.assertEqual("same-generation", m.current)
         self.assertEqual(2, len([key for key in m.remote if key[0] == "same-generation"]))
+
+    def test_rejected_batch_cannot_advance_to_manifest_sealing(self):
+        m = SnapshotModel([{"id": 1, "hash": "a"}, {"id": 2, "hash": "b"}], current="old")
+        m.capture("rejected-batch")
+        m.upload(2, rejected=True)
+        self.assertEqual({}, m.remote)
+        self.assertEqual(set(), m.staging["uploaded"])
+        self.assertFalse(m.finish_and_publish())
+        self.assertFalse(m.manifests["rejected-batch"]["complete"])
 
     def test_old_snapshot_cleanup_restart_catches_late_row_behind_previous_page(self):
         m = SnapshotModel([], current="new")

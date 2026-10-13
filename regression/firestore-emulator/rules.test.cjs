@@ -166,6 +166,7 @@ test('snapshot listings are schema scoped; active docs protected, stale version 
   await assertSucceeds(setDoc(old,snapshotListing(42,nextSnapshotId)));
   await assertSucceeds(updateDoc(nextManifest,{complete:true}));
   await assertSucceeds(setDoc(doc(owner,currentPath),current(nextSnapshotId)));
+  await assertFails(updateDoc(old, {title: 'completed snapshots are immutable'}));
   await assertSucceeds(deleteDoc(active));
   await assertSucceeds(deleteDoc(doc(owner,snapshotRoot+snapshotId+'/listings/99')));
   await assertSucceeds(deleteDoc(activeManifest));

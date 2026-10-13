@@ -136,20 +136,32 @@ public final class FirestoreSnapshotWorker extends Worker {
 
     private Result cleanupAborted(FirebaseFirestore db,FirestoreSnapshotStore store,FirestoreSnapshotStore.Snapshot s,
             String owner,String device,SharedPreferences prefs,int day,int spent)throws Exception{
+        int writesSpent=spent;
+        int remaining=MAX_PER_DAY-writesSpent;
         if("ABORTING".equals(s.state)){
-            if(!reserve(prefs,day,spent,1))return Result.success();
+            if(remaining<=0)return Result.success();
+            if(!reserve(prefs,day,writesSpent,1))return Result.success();
+            writesSpent++;
+            remaining--;
             if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
             // Remove the incomplete manifest first; Firestore rules then reject
             // any delayed listing upload for this abandoned generation.
             Tasks.await(snapshot(db,owner,device,s.id).delete(),35,TimeUnit.SECONDS);
-            store.state("ABORTING_SEALED");return Result.success();
+            // If SQLite cannot persist the sealed state, continue from Firestore's
+            // listing query anyway. The next pass can repeat the idempotent delete.
+            try{store.state("ABORTING_SEALED");}catch(SQLiteException localStateFailure){
+                FirestoreSync.progress(getApplicationContext()).edit()
+                        .putString("snapshot_error","aborted_snapshot_state_write_failed").commit();
+            }
         }
-        int cap=Math.min(MAX_PER_PASS,MAX_PER_DAY-spent);if(cap<=0)return Result.success();List<Long> ids=new ArrayList<>();WriteBatch batch=db.batch();
-        try(Cursor rows=store.cleanupRows(s.id,cap)){while(rows.moveToNext()){long id=rows.getLong(0);ids.add(id);batch.delete(listings(db,owner,device,s.id).document(Long.toString(id)));}}
-        if(!ids.isEmpty()){if(!reserve(prefs,day,spent,ids.size()))return Result.success();
+        int cap=Math.min(MAX_PER_PASS,remaining);if(cap<=0)return Result.success();
+        // Enumerate remote staging rows directly. Local upload/cleanup acknowledgements
+        // can fail under SQLite pressure, so they must not be the only delete manifest.
+        QuerySnapshot page=Tasks.await(listings(db,owner,device,s.id).orderBy(FieldPath.documentId()).limit(cap).get(),20,TimeUnit.SECONDS);
+        if(!page.isEmpty()){if(!reserve(prefs,day,writesSpent,page.size()))return Result.success();
             if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
-            Tasks.await(batch.commit(),35,TimeUnit.SECONDS);
-            long[] done=new long[ids.size()];for(int i=0;i<ids.size();i++)done[i]=ids.get(i);store.markCleaned(done);return Result.success();}
+            WriteBatch batch=db.batch();for(QueryDocumentSnapshot document:page)batch.delete(document.getReference());
+            Tasks.await(batch.commit(),35,TimeUnit.SECONDS);return Result.success();}
         store.resetIdle();return Result.success();
     }
     private Result cleanupOld(FirebaseFirestore db,FirestoreSnapshotStore store,FirestoreSnapshotStore.Snapshot s,
