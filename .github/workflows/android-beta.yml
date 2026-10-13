@@ -319,6 +319,7 @@ jobs:
           test "$ACTUAL_SHA256" = "$EXPECTED_SHA256" || (echo "Unexpected APK signing certificate" && exit 1)
 
       - name: Upload APK
+        if: github.event_name == 'workflow_dispatch'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -328,6 +329,7 @@ jobs:
           retention-days: 14
 
       - name: Prepare Firebase credentials
+        if: github.event_name == 'workflow_dispatch'
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
@@ -335,6 +337,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
 
       - name: Distribute beta to Firebase App Distribution
+        if: github.event_name == 'workflow_dispatch'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
