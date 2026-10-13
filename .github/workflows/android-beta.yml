@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version_code_suffix:
-        description: "Integer suffix; Gradle adds 1,000,000. Use >2033 and above every currently installed/Firebase beta version."
+        description: "Integer suffix; Gradle adds 1,000,000. Use >2301 and above every currently installed/Firebase beta version."
         required: true
         type: string
   push:
