@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from beta_version_contract import has_valid_beta_version_contract
 
 ROOT=Path(__file__).resolve().parents[1]
 main=(ROOT/"app/src/main/java/it/vintedaffari/app/MainActivity.java").read_text(encoding="utf-8")
@@ -34,7 +35,7 @@ checks=[
     ("cross-process busy timeout remains available to background writers",
      "PRAGMA busy_timeout=8000" in database),
     ("release identity preserves the ANR fix in later builds",
-     "versionName '5.12." in build and "applicationId 'it.vintedaffari.app'" in build),
+     has_valid_beta_version_contract(build) and "applicationId 'it.vintedaffari.app'" in build),
 ]
 
 for name,ok in checks:

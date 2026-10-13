@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sqlite3
 from pathlib import Path
+from beta_version_contract import has_valid_beta_version_contract
 
 ROOT=Path(__file__).resolve().parents[1]
 deal=(ROOT/"app/src/main/java/it/vintedaffari/app/DealDatabase.java").read_text(encoding="utf-8")
@@ -110,7 +111,7 @@ checks=[
      "targetMs=" in radar and "targetRemainingMs=" in radar and "timingNonDestructive=true" in radar and "reviewPct=" in radar and "engineSla={" in radar),
     ("build invariants preserved",
      "applicationId 'it.vintedaffari.app'" in build and "1000000 + ciVersionCode.toInteger()" in build and
-     "versionName '5.12." in build),
+     has_valid_beta_version_contract(build)),
 ]
 for name,ok in checks:
     print(("PASS " if ok else "FAIL ")+name)

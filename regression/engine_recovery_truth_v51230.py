@@ -32,7 +32,8 @@ checks=[
      "next = Math.max(VintedPublicSession.nextAllowedAt(context), resolver.nextAllowedAt(candidate))" in transient_branch),
     ("historical catalog repair is serial and self-cleaning",
      'CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY"' in market and
-     'source IN (?,?)' in market[market.index("public int enqueueCatalogHealthCheckIfIdle"):market.index("5.12.22 cut-over")] and
+     'source IN (?,?,?)' in market[market.index("public int enqueueCatalogHealthCheckIfIdle"):market.index("5.12.22 cut-over")] and
+     "SELLER_BACKFILL_SOURCE" in market[market.index("public int enqueueCatalogHealthCheckIfIdle"):market.index("5.12.22 cut-over")] and
      "ARCHIVED_UNRESOLVED" in runner and
      "Catalogo storico: annuncio non identificabile dopo 3 tentativi" in runner),
     ("manual recovery deep work blocks publication until completion",

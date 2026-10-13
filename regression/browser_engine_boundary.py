@@ -3,7 +3,7 @@ Android JSON/Rect/SQLite APIs are controlled test adapters. JSON parsing and And
 lifecycle themselves are not verified here. No HTTP and no extra product dependency.
 """
 from pathlib import Path
-import re, subprocess, tempfile, sqlite3
+import re, subprocess, tempfile, sqlite3, sys
 ROOT=Path(__file__).resolve().parents[1]; SRC=ROOT/'app/src/main/java/it/vintedaffari/app'
 def method(file,signature):
  s=(SRC/file).read_text();a=s.index(signature);b=s.index('{',a);level=1;i=b+1
@@ -40,7 +40,7 @@ stubs={
 'android/database/sqlite/SQLiteDatabase.java':r'''package android.database.sqlite;
 import android.database.Cursor;import android.content.ContentValues;import java.util.*;import java.text.Normalizer;import java.io.*;import java.nio.charset.StandardCharsets;
 public class SQLiteDatabase{final Process process;final BufferedReader in;final PrintWriter out;int depth;boolean success;
- public SQLiteDatabase(String server,String file)throws Exception{process=new ProcessBuilder("python3","-u",server,file).start();in=new BufferedReader(new InputStreamReader(process.getInputStream()));out=new PrintWriter(process.getOutputStream(),true);}
+ public SQLiteDatabase(String server,String file)throws Exception{process=new ProcessBuilder(System.getProperty("python.executable","python3"),"-u",server,file).start();in=new BufferedReader(new InputStreamReader(process.getInputStream()));out=new PrintWriter(process.getOutputStream(),true);}
  String encode(Object x){if(x==null)return "N";if(x instanceof Number)return "I"+((Number)x).longValue();return "S"+Base64.getEncoder().encodeToString(x.toString().getBytes(StandardCharsets.UTF_8));}
  Object decode(String s){if(s.equals("N"))return null;if(s.startsWith("I"))return Long.parseLong(s.substring(1));if(s.startsWith("D"))return Double.parseDouble(s.substring(1));return new String(Base64.getDecoder().decode(s.substring(1)),StandardCharsets.UTF_8);}
  synchronized List<Object[]> request(String sql,Object[] args){try{String line=Base64.getEncoder().encodeToString(sql.getBytes(StandardCharsets.UTF_8));if(args!=null)for(Object x:args)line+="\t"+encode(x);out.println(line);String head=in.readLine();if(head==null||!head.startsWith("OK\t"))throw new IllegalStateException(head+" SQL="+sql);int count=Integer.parseInt(head.substring(3));List<Object[]> rows=new ArrayList<>();for(int n=0;n<count;n++){String[] cols=in.readLine().split("\t",-1);Object[] row=new Object[cols.length];for(int k=0;k<cols.length;k++)row[k]=decode(cols[k]);rows.add(row);}return rows;}catch(IOException e){throw new RuntimeException(e);}}
@@ -84,4 +84,4 @@ with tempfile.TemporaryDirectory() as tmp:
   p=b/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(content)
  files=[str(p) for p in b.rglob('*.java')]+[str(SRC/(name+'.java')) for name in ['VintedCard','VintedBrowserPolicy','BrowserCapturePolicy','BrowserIntakeSql','ListingClassifier','BoardGameIntakeGate']]
  subprocess.run(['javac','-d',tmp,*files],check=True)
- subprocess.run(['java','-cp',tmp,'it.vintedaffari.app.BrowserEngineBoundary',str(serverfile),str(dbfile)],check=True)
+ subprocess.run(['java','-Dpython.executable='+sys.executable,'-cp',tmp,'it.vintedaffari.app.BrowserEngineBoundary',str(serverfile),str(dbfile)],check=True)

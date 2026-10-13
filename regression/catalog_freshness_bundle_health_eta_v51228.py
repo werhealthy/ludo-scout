@@ -46,9 +46,9 @@ checks=[
     ("catalog health is idle-only, serial, and can repair both exact and missing-link history",
      'CATALOG_HEALTH_SOURCE = "CATALOG_HEALTH"' in market and
      'CATALOG_RECOVERY_SOURCE = "CATALOG_RECOVERY"' in market and
-     "if(helper.activeObservationSession()!=null)return 0" in health and
+     'if(helper.activeObservationSession()!=null){setDiagnosticState("seller_backfill_schedule",0,"reason=ACTIVE_OBSERVATION");return 0;}' in health and
      "l.vinted_item_id IS NOT NULL" in health and "l.vinted_url IS NOT NULL" in health and
-     "source IN (?,?)" in health and
+     "source IN (?,?,?)" in health and "SELLER_BACKFILL_SOURCE" in health and
      "enqueueListingJob(db,listingId,JOB_VINTED_DEEP,now,5,CATALOG_HEALTH_SOURCE)" in health and
      "enqueueListingJob(db,recovery,JOB_VINTED,now,4,CATALOG_RECOVERY_SOURCE)" in health),
     ("catalog health uses existing paced resolver rather than new networking",
