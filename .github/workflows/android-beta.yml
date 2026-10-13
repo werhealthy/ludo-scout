@@ -4,6 +4,11 @@ name: Android beta (build only)
 
 on:
   workflow_dispatch:
+    inputs:
+      version_code_suffix:
+        description: "Integer suffix; Gradle adds 1,000,000. Use >2033 and above every currently installed/Firebase beta version."
+        required: true
+        type: string
   push:
     branches:
       - beta
@@ -22,6 +27,11 @@ jobs:
         uses: actions/checkout@v4
       - name: Verify beta release boundary
         run: python3 regression/beta_distribution_gate.py
+      - name: Validate manual beta version code
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION_CODE_SUFFIX: ${{ inputs.version_code_suffix }}
+        run: python3 regression/manual_beta_version_code.py
       - name: Verify supplied Ludo visual universe
         run: python3 regression/ludo_visual_universe.py
       - name: Run featured pedestal regression
@@ -301,12 +311,11 @@ jobs:
         env:
           BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
           ANDROID_DEBUG_KEYSTORE: ${{ runner.temp }}/ludo-debug.keystore
-          # 1,000,000 + GitHub's monotonically increasing run number.
-          # This stays safely above the historical local versionCode 118.
-          LUDO_VERSION_CODE: ${{ github.run_number }}
+          # Manual builds use the required validated suffix; push builds remain build-only.
+          LUDO_VERSION_CODE: ${{ github.event_name == 'workflow_dispatch' && inputs.version_code_suffix || github.run_number }}
         run: |
           cp "$HOME/.android/debug.keystore" "$ANDROID_DEBUG_KEYSTORE"
-          echo "Building beta run number=$LUDO_VERSION_CODE"
+          echo "Building beta versionCode=$((1000000 + LUDO_VERSION_CODE)) (suffix=$LUDO_VERSION_CODE)"
           ./gradlew --no-daemon clean assembleDebug
 
       - name: Verify built APK signing certificate
