@@ -119,13 +119,15 @@ public final class FirestoreSnapshotWorker extends Worker {
             String owner,String device,SharedPreferences prefs,int day,int spent)throws Exception{
         if(s.previousId.isEmpty()){store.clearAfterPublish(s.id,s.contentHash);return Result.success();}
         int cap=Math.min(MAX_PER_PASS,MAX_PER_DAY-spent);if(cap<=0)return Result.success();
+        // Deleted rows disappear from the query, so always resume from the first
+        // remaining ID. A persisted cursor could skip a row recreated behind it.
         com.google.firebase.firestore.Query q=listings(db,owner,device,s.previousId).orderBy(FieldPath.documentId()).limit(cap);
-        if(!s.previousCursor.isEmpty())q=q.startAfter(s.previousCursor);QuerySnapshot page=Tasks.await(q.get(),20,TimeUnit.SECONDS);
+        QuerySnapshot page=Tasks.await(q.get(),20,TimeUnit.SECONDS);
         if(!page.isEmpty()){
             WriteBatch batch=db.batch();for(QueryDocumentSnapshot d:page)batch.delete(d.getReference());
             if(!reserve(prefs,day,spent,page.size()))return Result.success();if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
             Tasks.await(batch.commit(),35,TimeUnit.SECONDS);
-            store.previousCursor(page.getDocuments().get(page.size()-1).getId());return Result.success();
+            return Result.success();
         }
         if(!reserve(prefs,day,spent,1))return Result.success();if(!FirestoreSync.enabled(getApplicationContext())||isStopped())return Result.success();
         Tasks.await(snapshot(db,owner,device,s.previousId).delete(),35,TimeUnit.SECONDS);

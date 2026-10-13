@@ -72,6 +72,16 @@ class SnapshotModel:
         self.current = s["id"]
         return True
 
+    def cleanup_old_page(self, snapshot_id, limit):
+        # Mirrors cleanupOld(): deleted IDs vanish, so every pass starts at the
+        # first remaining ID rather than trusting a durable cursor.
+        ids = sorted(key[1] for key in self.remote if key[0] == snapshot_id)[:limit]
+        for item_id in ids:
+            del self.remote[(snapshot_id, item_id)]
+        if not ids:
+            self.manifests.pop(snapshot_id, None)
+        return ids
+
 
 class SnapshotProtocolTests(unittest.TestCase):
     def test_catalog_change_while_uploading_never_mixes_or_publishes_stale_snapshot(self):
@@ -136,6 +146,36 @@ class SnapshotProtocolTests(unittest.TestCase):
         self.assertIn('db.delete("snapshot_rows", null, null)', STORE)
         self.assertIn('"MATERIALIZING".equals(state.state)', WORKER)
         self.assertIn("store.begin(id,previous)", WORKER)
+        cleanup = WORKER.split("private Result cleanupOld", 1)[1].split("private static void materialize", 1)[0]
+        self.assertIn("orderBy(FieldPath.documentId()).limit(cap)", cleanup)
+        self.assertNotIn("startAfter", cleanup)
+        self.assertNotIn("previousCursor(", cleanup)
+
+    def test_old_snapshot_cleanup_restart_catches_late_row_behind_previous_page(self):
+        m = SnapshotModel([], current="new")
+        m.manifests["old"] = {"complete": True}
+        m.remote.update({("old", "2"): "a", ("old", "4"): "b", ("old", "8"): "c"})
+        self.assertEqual(["2"], m.cleanup_old_page("old", 1))
+        # Simulate an unexpected late write whose ID sorts before the old cursor.
+        m.remote[("old", "1")] = "late"
+        while m.cleanup_old_page("old", 1):
+            pass
+        self.assertFalse(any(snapshot_id == "old" for snapshot_id, _ in m.remote))
+        self.assertNotIn("old", m.manifests)
+
+    def test_android_sidecar_bound_and_full_failure_leave_current_snapshot_untouched(self):
+        # The sidecar is capped by SQLite itself; deleting rows in the error path
+        # makes a later materialization retry start from a clean logical state.
+        self.assertIn("db.setMaximumSize(MAX_BYTES)", STORE)
+        self.assertIn("MAX_BYTES = 32L * 1024L * 1024L", STORE)
+        self.assertIn('catch(SQLiteException full){if(store!=null)store.resetIdle()', WORKER)
+        self.assertIn('putString("snapshot_error","local_snapshot_limit")', WORKER)
+        m = SnapshotModel([{"id": 1, "hash": "a"}], current="published")
+        self.assertFalse(m.materialize("retryable", interrupt_after=1))
+        m.staging = {}  # resetIdle() after the bounded local-storage failure
+        self.assertEqual("published", m.current)
+        self.assertNotIn("retryable", m.manifests)
+        self.assertTrue(m.materialize("retryable"))
 
 
 if __name__ == "__main__":
