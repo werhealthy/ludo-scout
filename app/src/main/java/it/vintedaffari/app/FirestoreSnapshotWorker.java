@@ -34,17 +34,14 @@ import org.json.JSONObject;
 public final class FirestoreSnapshotWorker extends Worker {
     private static final int MAX_PER_PASS = 80;
     private static final int MAX_PER_DAY = 2400;
-    static final String QUERY = "SELECT l.id,l.vinted_item_id,l.vinted_title,l.brand,l.item_condition,"
-            + "l.current_price_cents,l.protected_price_cents,l.vinted_url,l.image_url,"
-            + "l.listing_photos_csv,l.observed_text,l.category_normalized,l.category_source,"
-            + "l.lifecycle,l.enrichment_state,l.match_state,g.bgg_id,l.language_code,"
-            + "l.last_seen,l.manual_review_required FROM market_listings l "
-            + "LEFT JOIN games g ON g.id=l.game_id ORDER BY l.id";
+    static final String QUERY = "SELECT l.id,l.language_code,l.vinted_title,l.category_normalized,g.bgg_id "
+            + "FROM market_listings l LEFT JOIN games g ON g.id=l.game_id ORDER BY l.id";
 
     public FirestoreSnapshotWorker(@NonNull Context context,@NonNull WorkerParameters parameters){super(context,parameters);}
 
     @NonNull @Override public Result doWork(){
-        Context context=getApplicationContext();if(!FirestoreSync.enabled(context))return Result.success();
+        Context context=getApplicationContext();
+        if (!FirestoreSync.enabled(context)) return Result.success();
         File catalog=context.getDatabasePath("vinted_affari.db");if(!catalog.isFile())return Result.success();
         FirestoreSnapshotStore store=null;FileChannel leaseChannel=null;FileLock lease=null;
         try{
@@ -52,11 +49,17 @@ public final class FirestoreSnapshotWorker extends Worker {
             leaseChannel=FileChannel.open(lockFile.toPath(),StandardOpenOption.CREATE,StandardOpenOption.WRITE);
             lease=leaseChannel.tryLock();if(lease==null)return Result.retry();
             SharedPreferences prefs=FirestoreSync.progress(context);String device=FirestoreSync.deviceId(context);
-            if(!device.equals(prefs.getString("device_id","")))prefs.edit().clear().putBoolean("enabled",true).putString("device_id",device).commit();
+            if(!device.equals(prefs.getString("device_id",""))){
+                prefs.edit().clear().putString("device_id",device).commit();
+                return Result.success();
+            }
             int day=(int)(System.currentTimeMillis()/86_400_000L);int spent=prefs.getInt("budget_day",-1)==day?prefs.getInt("budget_writes",0):0;
             if(spent>=MAX_PER_DAY)return Result.success();FirebaseFirestore cloud=FirestoreSync.store(context);
             if(cloud==null||!FirestoreSync.enabled(context))return Result.success();Tasks.await(cloud.waitForPendingWrites(),20,TimeUnit.SECONDS);
             store=FirestoreSnapshotStore.open(context);FirestoreSnapshotStore.Snapshot state=store.snapshot();
+            if(state!=null&&state.protocolVersion!=3){
+                store.resetIdle();state=null;
+            }
             String owner=BuildConfig.LUDO_SYNC_OWNER_UID;DocumentReference current=currentRef(cloud,owner,device);
             if(state!=null&&"CLEAN_OLD".equals(state.state))return cleanupOld(cloud,store,state,owner,device,prefs,day,spent);
             if(state!=null&&("ABORTING".equals(state.state)||"ABORTING_SEALED".equals(state.state)))return cleanupAborted(cloud,store,state,owner,device,prefs,day,spent);
@@ -77,7 +80,8 @@ public final class FirestoreSnapshotWorker extends Worker {
                     store.markAborted();return Result.success();
                 }
                 if(!reserve(prefs,day,spent,1))return Result.success();
-                Map<String,Object> manifest=new LinkedHashMap<>();manifest.put("schema_version",2);
+                Map<String,Object> manifest=new LinkedHashMap<>();manifest.put("schema_version",3);
+                manifest.put("author_coverage_available",false);
                 manifest.put("snapshot_id",state.id);manifest.put("document_count",state.count);
                 manifest.put("content_hash",state.contentHash);manifest.put("complete",false);
                 manifest.put("created_at",FieldValue.serverTimestamp());
@@ -114,7 +118,7 @@ public final class FirestoreSnapshotWorker extends Worker {
                 String active=readCurrentId(current);if(state.id.equals(active)){store.markCleanupPending(state.previousId);return Result.success();}
                 if(!state.contentHash.equals(sourceHash(catalog))||!same(state.previousId,active)){store.markAborted();return Result.success();}
                 if(!reserve(prefs,day,spent,1))return Result.success();Map<String,Object> pointer=new LinkedHashMap<>();
-                pointer.put("schema_version",2);pointer.put("snapshot_id",state.id);pointer.put("updated_at",FieldValue.serverTimestamp());
+                pointer.put("schema_version",3);pointer.put("snapshot_id",state.id);pointer.put("updated_at",FieldValue.serverTimestamp());
                 if(!FirestoreSync.enabled(context)||isStopped())return Result.success();
                 Tasks.await(current.set(pointer),35,TimeUnit.SECONDS);store.markCleanupPending(state.previousId);return Result.success();
             }
@@ -215,12 +219,14 @@ public final class FirestoreSnapshotWorker extends Worker {
     }
     private static Row project(Cursor c)throws Exception{
         long id=c.getLong(0);if(id<=0)throw new IllegalArgumentException("invalid local ID");Map<String,Object> v=new LinkedHashMap<>();
-        v.put("schema_version",2);v.put("source_id",id);v.put("item_id",str(c,1,80));v.put("title",str(c,2,400));v.put("brand",str(c,3,120));
-        v.put("condition",str(c,4,80));v.put("price_cents",nonnegative(c,5));v.put("protected_price_cents",nonnegative(c,6));v.put("item_url",str(c,7,1200));
-        v.put("photo_urls",photos(str(c,9,6000),str(c,8,1200)));v.put("observed_text",str(c,10,2000));v.put("category",str(c,11,80));
-        v.put("category_source",str(c,12,80));v.put("lifecycle",str(c,13,60));v.put("enrichment_state",str(c,14,60));v.put("match_state",str(c,15,60));
-        v.put("bgg_id",str(c,16,80));v.put("language",str(c,17,40));v.put("last_seen",c.isNull(18)?0L:c.getLong(18));v.put("manual_review",!c.isNull(19)&&c.getInt(19)!=0);
-        String hash=FirestoreSnapshotStore.hex(FirestoreSnapshotStore.sha256().digest(canonicalJson(v).getBytes(StandardCharsets.UTF_8)));v.put("source_hash",hash);return new Row(id,hash,v);
+        v.put("schema_version",3);v.put("source_id",id);v.put("language",normalizedLanguage(str(c,1,40)));
+        v.put("has_title",!str(c,2,400).isEmpty());v.put("has_category",!str(c,3,80).isEmpty());
+        v.put("has_bgg_id",!str(c,4,80).isEmpty());
+        String hash=FirestoreSnapshotStore.hex(FirestoreSnapshotStore.sha256().digest(canonicalJson(v).getBytes(StandardCharsets.UTF_8)));return new Row(id,hash,v);
+    }
+    static String normalizedLanguage(String value){
+        String code=value==null?"":value.trim().toUpperCase(java.util.Locale.ROOT);
+        return java.util.Arrays.asList("IT","EN","DE","FR","ES","PT","NL","MULTI","OTHER").contains(code)?code:"UNKNOWN";
     }
     static String canonicalJson(Map<String,Object> values){
         List<String> keys=new ArrayList<>(values.keySet());java.util.Collections.sort(keys);StringBuilder out=new StringBuilder("{");
@@ -242,17 +248,17 @@ public final class FirestoreSnapshotWorker extends Worker {
     }
     private static Map<String,Object> decode(String text,String snapshotId)throws Exception{
         JSONObject j=new JSONObject(text);Map<String,Object> out=new LinkedHashMap<>();java.util.Iterator<String> it=j.keys();
-        while(it.hasNext()){String k=it.next();Object v=j.get(k);out.put(k,v==JSONObject.NULL?null:v);}out.put("snapshot_id",snapshotId);out.put("synced_at",FieldValue.serverTimestamp());return out;
+        while(it.hasNext()){String k=it.next();Object v=j.get(k);out.put(k,v==JSONObject.NULL?null:v);}out.put("snapshot_id",snapshotId);return out;
     }
     private static boolean reserve(SharedPreferences p,int day,int spent,int count){if(count<1||count>MAX_PER_PASS||spent+count>MAX_PER_DAY)return false;
         return p.edit().putInt("budget_day",day).putInt("budget_writes",spent+count).commit();}
-    private static DocumentReference currentRef(FirebaseFirestore d,String o,String dev){return d.collection("sync_v2").document(o).collection("devices").document(dev).collection("meta").document("current");}
-    private static DocumentReference snapshot(FirebaseFirestore d,String o,String dev,String id){return d.collection("sync_v2").document(o).collection("devices").document(dev).collection("snapshots").document(id);}
+    private static DocumentReference currentRef(FirebaseFirestore d,String o,String dev){return d.collection("sync_v3").document(o).collection("devices").document(dev).collection("meta").document("current");}
+    private static DocumentReference snapshot(FirebaseFirestore d,String o,String dev,String id){return d.collection("sync_v3").document(o).collection("devices").document(dev).collection("snapshots").document(id);}
     private static com.google.firebase.firestore.CollectionReference listings(FirebaseFirestore d,String o,String dev,String id){return snapshot(d,o,dev,id).collection("listings");}
     private static String readCurrentId(DocumentReference r)throws Exception{com.google.firebase.firestore.DocumentSnapshot d=Tasks.await(r.get(),20,TimeUnit.SECONDS);String id=d.getString("snapshot_id");return id==null?"":id;}
     private static boolean matchesManifest(DocumentSnapshot document,String id,long count,String hash,boolean complete){
         Long schema=document.getLong("schema_version"),rows=document.getLong("document_count");
-        return document.exists()&&Long.valueOf(2L).equals(schema)&&Long.valueOf(count).equals(rows)
+        return document.exists()&&Long.valueOf(3L).equals(schema)&&Long.valueOf(count).equals(rows)
                 &&id.equals(document.getString("snapshot_id"))&&hash.equals(document.getString("content_hash"))
                 &&Boolean.valueOf(complete).equals(document.getBoolean("complete"));
     }

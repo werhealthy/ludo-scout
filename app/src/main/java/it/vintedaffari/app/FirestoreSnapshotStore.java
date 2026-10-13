@@ -3,6 +3,7 @@ package it.vintedaffari.app;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+
 import android.database.sqlite.SQLiteStatement;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -29,10 +30,12 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         final long uploaded;
         final String previousId;
         final String previousCursor;
+        final int protocolVersion;
         Snapshot(String id, String state, long count, String contentHash,
-                 long uploaded, String previousId, String previousCursor) {
+                 long uploaded, String previousId, String previousCursor, int protocolVersion) {
             this.id=id; this.state=state; this.count=count; this.contentHash=contentHash;
             this.uploaded=uploaded; this.previousId=previousId; this.previousCursor=previousCursor;
+            this.protocolVersion=protocolVersion;
         }
     }
 
@@ -42,6 +45,12 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         long configuredMaximum = db.setMaximumSize(MAX_DATABASE_BYTES);
         if (configuredMaximum > MAX_DATABASE_BYTES) throw new IllegalStateException("snapshot_database_limit_unavailable");
         db.execSQL("CREATE TABLE IF NOT EXISTS snapshot_meta (singleton INTEGER PRIMARY KEY CHECK(singleton=1), snapshot_id TEXT NOT NULL, state TEXT NOT NULL, row_count INTEGER NOT NULL, content_hash TEXT NOT NULL, uploaded_count INTEGER NOT NULL, previous_id TEXT NOT NULL, previous_cursor TEXT NOT NULL)");
+        boolean hasProtocolVersion = false;
+        try (Cursor columns = db.rawQuery("PRAGMA table_info(snapshot_meta)", null)) {
+            int nameColumn = columns.getColumnIndex("name");
+            while (columns.moveToNext()) if ("protocol_version".equals(columns.getString(nameColumn))) hasProtocolVersion = true;
+        }
+        if (!hasProtocolVersion) db.execSQL("ALTER TABLE snapshot_meta ADD COLUMN protocol_version INTEGER NOT NULL DEFAULT 2");
         db.execSQL("CREATE TABLE IF NOT EXISTS snapshot_rows (local_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, source_hash TEXT NOT NULL, uploaded INTEGER NOT NULL DEFAULT 0, upload_attempted INTEGER NOT NULL DEFAULT 0, cleaned INTEGER NOT NULL DEFAULT 0)");
         verifySidecarBounds();
     }
@@ -51,10 +60,10 @@ final class FirestoreSnapshotStore implements AutoCloseable {
     }
 
     Snapshot snapshot() {
-        try (Cursor c = db.rawQuery("SELECT snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor FROM snapshot_meta WHERE singleton=1", null)) {
+        try (Cursor c = db.rawQuery("SELECT snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version FROM snapshot_meta WHERE singleton=1", null)) {
             if (!c.moveToFirst()) return null;
             return new Snapshot(c.getString(0), c.getString(1), c.getLong(2), c.getString(3),
-                    c.getLong(4), c.getString(5), c.getString(6));
+                    c.getLong(4), c.getString(5), c.getString(6), c.getInt(7));
         }
     }
 
@@ -63,7 +72,7 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         db.beginTransaction();
         try {
             db.delete("snapshot_meta", null, null);
-            db.execSQL("INSERT INTO snapshot_meta VALUES(1,?,'MATERIALIZING',0,'',0,?,'')",
+            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version) VALUES(1,?,'MATERIALIZING',0,'',0,?,'',3)",
                     new Object[]{id, previousId == null ? "" : previousId});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
@@ -147,7 +156,7 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         db.beginTransaction();
         try {
             db.delete("snapshot_meta",null,null);
-            db.execSQL("INSERT INTO snapshot_meta VALUES(1,?,'PUBLISHED',0,?,0,'','')",
+            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version) VALUES(1,?,'PUBLISHED',0,?,0,'','',3)",
                     new Object[]{publishedId, contentHash});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }

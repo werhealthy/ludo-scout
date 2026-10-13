@@ -1,178 +1,99 @@
 rules_version = '2';
 
-// Owner-only sync v1/v2. All other collections remain inaccessible.
-// Deploy only after the Android build has been checked; do NOT replace with auth != null.
+// Owner-only sync v1/v2/v3. All other collections remain inaccessible.
 service cloud.firestore {
   match /databases/{database}/documents {
     function owner(uid) {
-      return request.auth != null
-        && request.auth.uid == uid
+      return request.auth != null && request.auth.uid == uid
         && uid == 'FxAKNm8aK6amBPoHZcXNOtSLv3t2';
     }
-
-    function validListing() {
-      let data = request.resource.data;
-      return data.keys().hasAll([
-          'schema_version', 'source_id', 'item_id', 'title', 'brand',
-          'condition', 'price_cents', 'protected_price_cents', 'item_url',
-          'photo_urls', 'observed_text', 'category', 'category_source',
-          'lifecycle', 'enrichment_state', 'match_state', 'bgg_id',
-          'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
-        ])
-        && data.keys().hasOnly([
-          'schema_version', 'source_id', 'item_id', 'title', 'brand',
-          'condition', 'price_cents', 'protected_price_cents', 'item_url',
-          'photo_urls', 'observed_text', 'category', 'category_source',
-          'lifecycle', 'enrichment_state', 'match_state', 'bgg_id',
-          'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
-        ])
-        && data.schema_version == 1
-        && data.source_id is int && data.source_id > 0
-        && data.item_id is string && data.item_id.size() <= 80
-        && data.title is string && data.title.size() <= 400
-        && data.brand is string && data.brand.size() <= 120
-        && data.condition is string && data.condition.size() <= 80
-        && (data.price_cents == null || (data.price_cents is int && data.price_cents >= 0))
-        && (data.protected_price_cents == null || (data.protected_price_cents is int && data.protected_price_cents >= 0))
-        && data.item_url is string && data.item_url.size() <= 1200
-        && data.photo_urls is list && data.photo_urls.size() <= 3
-        && data.observed_text is string && data.observed_text.size() <= 2000
-        && data.category is string && data.category.size() <= 80
-        && data.category_source is string && data.category_source.size() <= 80
-        && data.lifecycle is string && data.lifecycle.size() <= 60
-        && data.enrichment_state is string && data.enrichment_state.size() <= 60
-        && data.match_state is string && data.match_state.size() <= 60
-        && data.bgg_id is string && data.bgg_id.size() <= 80
-        && data.language is string && data.language.size() <= 40
-        && data.last_seen is int && data.last_seen >= 0
-        && data.manual_review is bool
-        && data.source_hash is string
-        && data.source_hash.matches('[0-9a-f]{64}')
-        && data.synced_at == request.time;
-    }
-
-    match /sync_v1/{uid}/devices/{deviceId}/listings/{listingId} {
-      allow get, list: if owner(uid);
-      allow create, update: if owner(uid)
-        && deviceId.matches('[a-z0-9-]{36}')
-        && listingId.matches('[0-9]{1,20}')
-        && validListing();
-      allow delete: if false;
-    }
-
     function currentSnapshotId(uid, deviceId) {
-      let currentPath = /databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/meta/current;
-      return exists(currentPath) ? get(currentPath).data.snapshot_id : '';
+      let p = /databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/meta/current;
+      return exists(p) ? get(p).data.snapshot_id : '';
     }
-
     function stagingSnapshot(uid, deviceId, snapshotId) {
-      let manifestPath = /databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(snapshotId);
-      return exists(manifestPath) && get(manifestPath).data.complete == false;
+      let p = /databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(snapshotId);
+      return exists(p) && get(p).data.complete == false;
     }
-
     function validSnapshotListing(uid, deviceId, snapshotId) {
-      let data = request.resource.data;
-      return data.keys().hasAll([
-          'schema_version', 'snapshot_id', 'source_id', 'item_id', 'title', 'brand',
-          'condition', 'price_cents', 'protected_price_cents', 'item_url', 'photo_urls',
-          'observed_text', 'category', 'category_source', 'lifecycle', 'enrichment_state',
-          'match_state', 'bgg_id', 'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
-        ])
-        && data.keys().hasOnly([
-          'schema_version', 'snapshot_id', 'source_id', 'item_id', 'title', 'brand',
-          'condition', 'price_cents', 'protected_price_cents', 'item_url', 'photo_urls',
-          'observed_text', 'category', 'category_source', 'lifecycle', 'enrichment_state',
-          'match_state', 'bgg_id', 'language', 'last_seen', 'manual_review', 'source_hash', 'synced_at'
-        ])
-        && stagingSnapshot(uid, deviceId, snapshotId)
-        && data.schema_version is int && data.schema_version == 2
-        && data.snapshot_id == snapshotId
-        && data.source_id is int && data.source_id > 0
-        && data.item_id is string && data.item_id.size() <= 80
-        && data.title is string && data.title.size() <= 400
-        && data.brand is string && data.brand.size() <= 120
-        && data.condition is string && data.condition.size() <= 80
-        && (data.price_cents == null || (data.price_cents is int && data.price_cents >= 0))
-        && (data.protected_price_cents == null || (data.protected_price_cents is int && data.protected_price_cents >= 0))
-        && data.item_url is string && data.item_url.size() <= 1200
-        && data.photo_urls is list && data.photo_urls.size() <= 3
-        && data.observed_text is string && data.observed_text.size() <= 2000
-        && data.category is string && data.category.size() <= 80
-        && data.category_source is string && data.category_source.size() <= 80
-        && data.lifecycle is string && data.lifecycle.size() <= 60
-        && data.enrichment_state is string && data.enrichment_state.size() <= 60
-        && data.match_state is string && data.match_state.size() <= 60
-        && data.bgg_id is string && data.bgg_id.size() <= 80
-        && data.language is string && data.language.size() <= 40
-        && data.last_seen is int && data.last_seen >= 0
-        && data.manual_review is bool
-        && data.source_hash is string && data.source_hash.matches('[0-9a-f]{64}')
-        && data.synced_at == request.time;
+      let d=request.resource.data;
+      return d.keys().hasAll(['schema_version','snapshot_id','source_id','item_id','title','brand','condition','price_cents','protected_price_cents','item_url','photo_urls','observed_text','category','category_source','lifecycle','enrichment_state','match_state','bgg_id','language','last_seen','manual_review','source_hash','synced_at'])
+        && d.keys().hasOnly(['schema_version','snapshot_id','source_id','item_id','title','brand','condition','price_cents','protected_price_cents','item_url','photo_urls','observed_text','category','category_source','lifecycle','enrichment_state','match_state','bgg_id','language','last_seen','manual_review','source_hash','synced_at'])
+        && stagingSnapshot(uid,deviceId,snapshotId) && d.schema_version==2 && d.snapshot_id==snapshotId
+        && d.source_id is int && d.source_id>0 && d.source_hash is string && d.source_hash.matches('[0-9a-f]{64}') && d.synced_at==request.time;
     }
-
+    match /sync_v1/{uid}/devices/{deviceId}/listings/{listingId} {
+      allow read: if owner(uid);
+      allow write: if false;
+    }
     match /sync_v2/{uid}/devices/{deviceId}/meta/current {
       allow get: if owner(uid) && deviceId.matches('[a-z0-9-]{36}');
+      allow list, write: if false;
+    }
+    match /sync_v2/{uid}/devices/{deviceId}/snapshots/{snapshotId} {
+      allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}');
+      allow create, update, delete: if false;
+      match /listings/{listingId} {
+        allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}');
+        allow write: if false;
+      }
+    }
+    function v3CurrentSnapshotId(uid, deviceId) {
+      let p = /databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/meta/current;
+      return exists(p) ? get(p).data.snapshot_id : '';
+    }
+    function v3Staging(uid, deviceId, snapshotId) {
+      let p = /databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(snapshotId);
+      return exists(p) && get(p).data.complete == false;
+    }
+    function validV3Listing(uid, deviceId, snapshotId) {
+      let d=request.resource.data;
+      return v3Staging(uid,deviceId,snapshotId)
+        && d.keys().hasAll(['schema_version','snapshot_id','source_id','language','has_title','has_category','has_bgg_id'])
+        && d.keys().hasOnly(['schema_version','snapshot_id','source_id','language','has_title','has_category','has_bgg_id'])
+        && d.schema_version is int && d.schema_version==3 && d.snapshot_id==snapshotId
+        && d.source_id is int && d.source_id>0
+        && d.language is string && d.language in ['IT','EN','DE','FR','ES','PT','NL','MULTI','OTHER','UNKNOWN']
+        && d.has_title is bool && d.has_category is bool && d.has_bgg_id is bool;
+    }
+    match /sync_v3/{uid}/devices/{deviceId}/meta/current {
+      allow get: if owner(uid) && deviceId.matches('[a-z0-9-]{36}');
       allow list: if false;
-      allow create, update: if owner(uid)
-        && deviceId.matches('[a-z0-9-]{36}')
-        && request.resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'updated_at'])
-        && request.resource.data.keys().hasAll(['schema_version', 'snapshot_id', 'updated_at'])
-        && request.resource.data.schema_version is int && request.resource.data.schema_version == 2
-        && request.resource.data.snapshot_id is string
-        && request.resource.data.snapshot_id.matches('[a-z0-9-]{36}')
-        && request.resource.data.updated_at == request.time
-        && getAfter(/databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.complete == true
-        && getAfter(/databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.content_hash is string
-        && getAfter(/databases/$(database)/documents/sync_v2/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.document_count is int;
+      allow create, update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
+        && request.resource.data.keys().hasOnly(['schema_version','snapshot_id','updated_at'])
+        && request.resource.data.keys().hasAll(['schema_version','snapshot_id','updated_at'])
+        && request.resource.data.schema_version==3 && request.resource.data.snapshot_id is string
+        && request.resource.data.snapshot_id.matches('[a-z0-9-]{36}') && request.resource.data.updated_at==request.time
+        && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.complete==true
+        && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.content_hash is string;
       allow delete: if false;
     }
-
-    match /sync_v2/{uid}/devices/{deviceId}/snapshots/{snapshotId} {
-      function validSnapshotManifest() {
-        let data = request.resource.data;
-        return data.keys().hasOnly(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
-          && data.keys().hasAll(['schema_version', 'snapshot_id', 'document_count', 'content_hash', 'complete', 'created_at'])
-          && data.schema_version is int && data.schema_version == 2
-          && data.snapshot_id == snapshotId
-          && data.document_count is int && data.document_count >= 0
-          && data.content_hash is string && data.content_hash.matches('[0-9a-f]{64}')
-          && data.created_at is timestamp;
+    match /sync_v3/{uid}/devices/{deviceId}/snapshots/{snapshotId} {
+      function validManifest() {
+        let d=request.resource.data;
+        return d.keys().hasAll(['schema_version','snapshot_id','document_count','content_hash','complete','author_coverage_available','created_at'])
+          && d.keys().hasOnly(['schema_version','snapshot_id','document_count','content_hash','complete','author_coverage_available','created_at'])
+          && d.schema_version==3 && d.snapshot_id==snapshotId && d.document_count is int && d.document_count>=0
+          && d.content_hash is string && d.content_hash.matches('[0-9a-f]{64}') && d.complete is bool
+          && d.author_coverage_available is bool && d.author_coverage_available==false && d.created_at is timestamp;
       }
-      allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-        && snapshotId.matches('[a-z0-9-]{36}');
-      allow create: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-        && snapshotId.matches('[a-z0-9-]{36}')
-        && validSnapshotManifest()
-        && request.resource.data.complete == false
-        && request.resource.data.created_at == request.time;
-      allow update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-        && snapshotId.matches('[a-z0-9-]{36}')
-        && validSnapshotManifest()
-        && resource.data.complete == false
-        && request.resource.data.complete == true
-        && request.resource.data.schema_version == resource.data.schema_version
-        && request.resource.data.snapshot_id == resource.data.snapshot_id
-        && request.resource.data.document_count == resource.data.document_count
-        && request.resource.data.content_hash == resource.data.content_hash
-        && request.resource.data.created_at == resource.data.created_at;
-      allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-        && snapshotId != currentSnapshotId(uid, deviceId);
-
+      allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId.matches('[a-z0-9-]{36}');
+      allow create: if owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId.matches('[a-z0-9-]{36}')
+        && validManifest() && request.resource.data.complete==false && request.resource.data.created_at==request.time;
+      allow update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId.matches('[a-z0-9-]{36}')
+        && validManifest() && resource.data.complete==false && request.resource.data.complete==true
+        && request.resource.data.schema_version==resource.data.schema_version && request.resource.data.snapshot_id==resource.data.snapshot_id
+        && request.resource.data.document_count==resource.data.document_count && request.resource.data.content_hash==resource.data.content_hash
+        && request.resource.data.author_coverage_available==resource.data.author_coverage_available && request.resource.data.created_at==resource.data.created_at;
+      allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId!=v3CurrentSnapshotId(uid,deviceId);
       match /listings/{listingId} {
-        allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-          && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}');
-        allow create, update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-          && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}')
-          && request.resource.data.source_id == int(listingId)
-          && validSnapshotListing(uid, deviceId, snapshotId);
-        allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-          && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}')
-          && snapshotId != currentSnapshotId(uid, deviceId);
+        allow get, list: if owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,20}');
+        allow create, update: if owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId.matches('[a-z0-9-]{36}')
+          && listingId.matches('[0-9]{1,20}') && request.resource.data.source_id==int(listingId) && validV3Listing(uid,deviceId,snapshotId);
+        allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId.matches('[a-z0-9-]{36}')
+          && listingId.matches('[0-9]{1,20}') && snapshotId!=v3CurrentSnapshotId(uid,deviceId);
       }
     }
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }
