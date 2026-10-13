@@ -30,3 +30,6 @@ Thumbs.db
 
 # Keep the Gradle wrapper committed
 !gradle/wrapper/gradle-wrapper.jar
+
+# Local Firebase project configuration (use build properties for the sync module)
+app/google-services.json

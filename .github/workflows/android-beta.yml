@@ -317,6 +317,7 @@ jobs:
           test "$ACTUAL_SHA256" = "$EXPECTED_SHA256" || (echo "Unexpected APK signing certificate" && exit 1)
 
       - name: Upload APK
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: ludo-scout-beta-apk
