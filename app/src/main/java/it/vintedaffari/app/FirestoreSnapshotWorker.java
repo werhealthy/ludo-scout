@@ -50,14 +50,14 @@ public final class FirestoreSnapshotWorker extends Worker {
             leaseChannel=FileChannel.open(lockFile.toPath(),StandardOpenOption.CREATE,StandardOpenOption.WRITE);
             lease=leaseChannel.tryLock();if(lease==null)return Result.retry();
             SharedPreferences prefs=FirestoreSync.progress(context);String device=FirestoreSync.deviceId(context);
-            if(!device.equals(prefs.getString("device_id",""))){
-                prefs.edit().clear().putString("device_id",device).commit();
-                return Result.success();
-            }
+            boolean identityChanged=!device.equals(prefs.getString("device_id",""));
+            if(identityChanged&&!prefs.edit().putString("device_id",device).putInt("budget_day",-1)
+                    .putInt("budget_writes",0).remove("snapshot_error").commit())return Result.retry();
             int day=(int)(System.currentTimeMillis()/86_400_000L);int spent=prefs.getInt("budget_day",-1)==day?prefs.getInt("budget_writes",0):0;
             if(spent>=MAX_PER_DAY)return Result.success();FirebaseFirestore cloud=FirestoreSync.store(context);
             if(cloud==null||!FirestoreSync.enabled(context))return Result.success();Tasks.await(cloud.waitForPendingWrites(),20,TimeUnit.SECONDS);
-            store=FirestoreSnapshotStore.open(context);FirestoreSnapshotStore.Snapshot state=store.snapshot();
+            store=FirestoreSnapshotStore.open(context);if(identityChanged)store.resetIdle();
+            FirestoreSnapshotStore.Snapshot state=store.snapshot();
             if(state!=null&&state.protocolVersion!=3){
                 store.resetIdle();state=null;
             }

@@ -86,6 +86,16 @@ class FirestoreSyncContractTest(unittest.TestCase):
         self.assertIn("SQLiteDatabase.OPEN_READONLY", SNAPSHOT_WORKER)
         self.assertIn("waitForPendingWrites()", SNAPSHOT_WORKER)
 
+    def test_first_device_identity_initialization_preserves_opt_in_and_continues(self):
+        identity = SNAPSHOT_WORKER.split("boolean identityChanged=", 1)[1].split("int day=", 1)[0]
+        self.assertNotIn(".clear()", identity)
+        self.assertNotIn("return Result.success()", identity)
+        self.assertIn('putString("device_id",device)', identity)
+        self.assertIn('putInt("budget_day",-1)', identity)
+        self.assertIn('putInt("budget_writes",0)', identity)
+        self.assertIn("store=FirestoreSnapshotStore.open(context);if(identityChanged)store.resetIdle()", SNAPSHOT_WORKER)
+        self.assertIn('"minimal-v3".equals(p.getString("opt_in_version", ""))', SYNC)
+
     def test_sync_device_identity_is_shared_across_worker_passes(self):
         sync_source = (SRC / "FirestoreSync.java").read_text(encoding="utf-8")
         self.assertIn("FirestoreSync.deviceId(context)", SNAPSHOT_WORKER)
