@@ -27,23 +27,24 @@ class FirestoreSyncContractTest(unittest.TestCase):
             db.executescript("""
                 CREATE TABLE games(id INTEGER PRIMARY KEY, bgg_id TEXT);
                 CREATE TABLE market_listings(
-                    id INTEGER PRIMARY KEY, game_id INTEGER, vinted_title TEXT,
-                    category_normalized TEXT, language_code TEXT
+                    id INTEGER PRIMARY KEY, game_id INTEGER, vinted_title TEXT, brand TEXT,
+                    category_normalized TEXT, category_source TEXT, language_code TEXT,
+                    lifecycle TEXT, enrichment_state TEXT, match_state TEXT
                 );
                 INSERT INTO games VALUES(1,'12345');
-                INSERT INTO market_listings(id,game_id,vinted_title,category_normalized,language_code)
-                    VALUES(21,1,'Gioco','board_game','it');
-                INSERT INTO market_listings(id,vinted_title,category_normalized,language_code)
-                    VALUES(22,'Incerto',NULL,'xx');
+                INSERT INTO market_listings(id,game_id,vinted_title,brand,category_normalized,category_source,language_code,lifecycle,enrichment_state,match_state)
+                    VALUES(21,1,'Gioco','Hasbro','board_game','manual','it','ACTIVE','ENRICHED','BGG_MATCHED');
+                INSERT INTO market_listings(id,vinted_title,brand,category_normalized,category_source,language_code,lifecycle,enrichment_state,match_state)
+                    VALUES(22,'Incerto','',NULL,'','xx','ACTIVE','PENDING_ANALYSIS','BGG_MATCH_REQUIRED');
             """)
             before = db.total_changes
             query = sql_projection()
             self.assertTrue(query.strip().startswith("SELECT "))
             self.assertEqual(2, len(db.execute(query).fetchall()))
             rows = db.execute(query).fetchall()
-            self.assertEqual(5, len(rows[0]))
-            self.assertEqual((21, "it", "Gioco", "board_game", "12345"), rows[0])
-            self.assertEqual((22, "xx", "Incerto", None, None), rows[1])
+            self.assertEqual(10, len(rows[0]))
+            self.assertEqual((21, "it", "Gioco", "Hasbro", "board_game", "manual", "12345", "ACTIVE", "ENRICHED", "BGG_MATCHED"), rows[0])
+            self.assertEqual((22, "xx", "Incerto", "", None, "", None, "ACTIVE", "PENDING_ANALYSIS", "BGG_MATCH_REQUIRED"), rows[1])
             self.assertEqual(before, db.total_changes)
         finally:
             db.close()
@@ -62,7 +63,8 @@ class FirestoreSyncContractTest(unittest.TestCase):
         self.assertEqual(produced, expected[0])
         self.assertEqual(produced, expected[1])
         for forbidden in ("seller_name", "seller_id", "favorites", "password",
-                          "token", "listing_overrides"):
+                          "token", "listing_overrides", "condition", "price_cents",
+                          "protected_price_cents", "item_url", "photo_urls", "observed_text", "author"):
             self.assertNotIn(forbidden, produced)
 
     def test_owner_scope_deny_all_and_off_by_default(self):

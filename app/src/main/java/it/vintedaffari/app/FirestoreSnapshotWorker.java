@@ -34,7 +34,8 @@ import org.json.JSONObject;
 public final class FirestoreSnapshotWorker extends Worker {
     private static final int MAX_PER_PASS = 80;
     private static final int MAX_PER_DAY = 2400;
-    static final String QUERY = "SELECT l.id,l.language_code,l.vinted_title,l.category_normalized,g.bgg_id "
+    static final String QUERY = "SELECT l.id,l.language_code,l.vinted_title,l.brand,l.category_normalized,"
+            + "l.category_source,g.bgg_id,l.lifecycle,l.enrichment_state,l.match_state "
             + "FROM market_listings l LEFT JOIN games g ON g.id=l.game_id ORDER BY l.id";
 
     public FirestoreSnapshotWorker(@NonNull Context context,@NonNull WorkerParameters parameters){super(context,parameters);}
@@ -219,10 +220,14 @@ public final class FirestoreSnapshotWorker extends Worker {
     }
     private static Row project(Cursor c)throws Exception{
         long id=c.getLong(0);if(id<=0)throw new IllegalArgumentException("invalid local ID");Map<String,Object> v=new LinkedHashMap<>();
-        v.put("schema_version",3);v.put("source_id",id);v.put("language",normalizedLanguage(str(c,1,40)));
-        v.put("has_title",!str(c,2,400).isEmpty());v.put("has_category",!str(c,3,80).isEmpty());
-        v.put("has_bgg_id",!str(c,4,80).isEmpty());
-        String hash=FirestoreSnapshotStore.hex(FirestoreSnapshotStore.sha256().digest(canonicalJson(v).getBytes(StandardCharsets.UTF_8)));return new Row(id,hash,v);
+        String title=str(c,2,400),brand=str(c,3,120),category=str(c,4,80),categorySource=str(c,5,80);
+        v.put("schema_version",3);v.put("source_id",id);v.put("title",title);v.put("title_source","VINTED_LISTING");
+        v.put("brand",brand);v.put("brand_source","VINTED_LISTING");v.put("category",category);
+        v.put("category_source",categorySource);v.put("category_provenance_available",!categorySource.isEmpty());
+        v.put("language",normalizedLanguage(str(c,1,40)));v.put("bgg_id",str(c,6,80));
+        v.put("lifecycle",str(c,7,40));v.put("enrichment_state",str(c,8,60));v.put("match_state",str(c,9,60));
+        String hash=FirestoreSnapshotStore.hex(FirestoreSnapshotStore.sha256().digest(canonicalJson(v).getBytes(StandardCharsets.UTF_8)));
+        v.put("source_hash",hash);return new Row(id,hash,v);
     }
     static String normalizedLanguage(String value){
         String code=value==null?"":value.trim().toUpperCase(java.util.Locale.ROOT);
