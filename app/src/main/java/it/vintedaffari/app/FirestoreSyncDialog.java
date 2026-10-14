@@ -31,20 +31,37 @@ public final class FirestoreSyncDialog {
             catch (Exception ignored) { }
             int padding = (int) (20 * activity.getResources().getDisplayMetrics().density);
             TextView details = new TextView(activity);
-            details.setText(status + "\n\nID dispositivo per i comandi Telegram:\n" + deviceId);
+            String activationDiagnostic = FirestoreSync.activationDiagnostic(activity);
+            String crashDiagnostic = ProcessCrashJournal.safeLatestCrashSummary(activity);
+            if (crashDiagnostic.isEmpty()) {
+                crashDiagnostic = ProcessCrashJournal.safeLatestSystemExitSummary(activity);
+            }
+            StringBuilder text = new StringBuilder(status);
+            if (!activationDiagnostic.isEmpty()) {
+                text.append("\n\nUltimo errore di attivazione (dati ridotti):\n")
+                        .append(activationDiagnostic);
+            }
+            if (!crashDiagnostic.isEmpty()) {
+                text.append("\n\nUltimo arresto registrato (senza messaggio né stack):\n")
+                        .append(crashDiagnostic);
+            }
+            text.append("\n\nRiepilogo dell’ultimo worker Firestore:\n")
+                    .append(FirestoreWorkerDiagnostics.summary(activity));
+            text.append("\n\nID dispositivo per i comandi Telegram:\n").append(deviceId);
+            details.setText(text.toString());
             details.setTextIsSelectable(true);
             details.setPadding(padding, padding / 2, padding, 0);
-            new AlertDialog.Builder(activity).setTitle("Sincronizzazione Ludo")
-                    .setView(details)
-                    .setPositiveButton("Attiva", (d, w) -> {
-                        FirestoreSync.start(activity);
-                        Toast.makeText(activity, "Sincronizzazione pianificata", Toast.LENGTH_LONG).show();
-                    })
-                    .setNeutralButton("Disconnetti", (d, w) -> {
-                        FirestoreSync.stop(activity);
-                        Toast.makeText(activity, "Sincronizzazione disattivata", Toast.LENGTH_LONG).show();
-                    })
-                    .setNegativeButton("Chiudi", null).show();
+            AlertDialog.Builder dialog = new AlertDialog.Builder(activity)
+                    .setTitle("Sincronizzazione Ludo")
+                    .setView(details);
+            if (!FirestoreSync.enabled(activity)) {
+                dialog.setPositiveButton("Attiva", (d, w) ->
+                        FirestoreSync.start(activity, active -> showActivationResult(activity, active)));
+            }
+            dialog.setNeutralButton("Disconnetti", (d, w) -> {
+                FirestoreSync.stop(activity);
+                Toast.makeText(activity, "Sincronizzazione disattivata", Toast.LENGTH_LONG).show();
+            }).setNegativeButton("Chiudi", null).show();
             return;
         }
         int space = (int) (20 * activity.getResources().getDisplayMetrics().density);
@@ -91,12 +108,17 @@ public final class FirestoreSyncDialog {
                                     Toast.LENGTH_LONG).show();
                             return;
                         }
-                        FirestoreSync.start(activity);
                         dialog.dismiss();
-                        Toast.makeText(activity, "Account collegato. Sincronizzazione pianificata.",
-                                Toast.LENGTH_LONG).show();
+                        FirestoreSync.start(activity, active -> showActivationResult(activity, active));
                     });
                 }));
         dialog.show();
+    }
+
+    private static void showActivationResult(Activity activity, boolean active) {
+        if (activity.isFinishing() || activity.isDestroyed()) return;
+        String message = active ? "Account collegato. Sincronizzazione pianificata."
+                : "Account collegato, sincronizzazione in pausa: pianificazione non riuscita.";
+        Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
     }
 }

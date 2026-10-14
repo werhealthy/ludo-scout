@@ -13,6 +13,9 @@ SNAPSHOT_STORE = (SRC / "FirestoreSnapshotStore.java").read_text(encoding="utf-8
 SYNC = (SRC / "FirestoreSync.java").read_text(encoding="utf-8")
 RULES = (ROOT / "firestore.rules").read_text(encoding="utf-8")
 MAIN = (SRC / "MainActivity.java").read_text(encoding="utf-8")
+APP = (SRC / "LudoScoutApp.java").read_text(encoding="utf-8")
+MANIFEST = (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+APP_GRADLE = (ROOT / "app/build.gradle").read_text(encoding="utf-8")
 
 
 def sql_projection():
@@ -85,6 +88,18 @@ class FirestoreSyncContractTest(unittest.TestCase):
         self.assertIn("MAX_PER_DAY = 2400", SNAPSHOT_WORKER)
         self.assertIn("SQLiteDatabase.OPEN_READONLY", SNAPSHOT_WORKER)
         self.assertIn("waitForPendingWrites()", SNAPSHOT_WORKER)
+
+    def test_sync_scheduling_uses_the_multi_process_workmanager_api(self):
+        self.assertIn('android:process=":ui"', MANIFEST)
+        self.assertIn("Configuration.Provider", APP)
+        self.assertIn("setDefaultProcessName(getPackageName())", APP)
+        self.assertIn("if(getPackageName().equals(Application.getProcessName()))", APP)
+        self.assertIn("WorkManager.initialize(this,getWorkManagerConfiguration())", APP)
+        self.assertIn('androidx.work.WorkManagerInitializer', MANIFEST)
+        self.assertIn('tools:node="remove"', MANIFEST)
+        self.assertIn("androidx.work:work-multiprocess:2.9.1", APP_GRADLE)
+        self.assertIn("RemoteWorkManager.getInstance(appContext)", SYNC)
+        self.assertNotRegex(SYNC, r"(?<!Remote)WorkManager\.getInstance")
 
     def test_first_device_identity_initialization_preserves_opt_in_and_continues(self):
         identity = SNAPSHOT_WORKER.split("boolean identityChanged=", 1)[1].split("int day=", 1)[0]
