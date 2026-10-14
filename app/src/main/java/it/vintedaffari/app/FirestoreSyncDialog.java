@@ -47,6 +47,9 @@ public final class FirestoreSyncDialog {
             }
             text.append("\n\nRiepilogo dell’ultimo worker Firestore:\n")
                     .append(FirestoreWorkerDiagnostics.summary(activity));
+            final String workManagerHeading = "\n\nStato del lavoro Firestore in WorkManager:\n";
+            final String workManagerPlaceholder = "lettura locale in corso…";
+            text.append(workManagerHeading).append(workManagerPlaceholder);
             text.append("\n\nID dispositivo per i comandi Telegram:\n").append(deviceId);
             details.setText(text.toString());
             details.setTextIsSelectable(true);
@@ -58,10 +61,18 @@ public final class FirestoreSyncDialog {
                 dialog.setPositiveButton("Attiva", (d, w) ->
                         FirestoreSync.start(activity, active -> showActivationResult(activity, active)));
             }
-            dialog.setNeutralButton("Disconnetti", (d, w) -> {
+            AlertDialog shown = dialog.setNeutralButton("Disconnetti", (d, w) -> {
                 FirestoreSync.stop(activity);
                 Toast.makeText(activity, "Sincronizzazione disattivata", Toast.LENGTH_LONG).show();
-            }).setNegativeButton("Chiudi", null).show();
+            }).setNegativeButton("Chiudi", null).create();
+            shown.show();
+            FirestoreSync.readWorkManagerDiagnostic(activity, summary -> {
+                if (activity.isFinishing() || activity.isDestroyed() || details.getWindowToken() == null) return;
+                String current = details.getText().toString();
+                if (current.contains(workManagerPlaceholder)) {
+                    details.setText(current.replace(workManagerPlaceholder, summary));
+                }
+            });
             return;
         }
         int space = (int) (20 * activity.getResources().getDisplayMetrics().density);

@@ -8,6 +8,8 @@ import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
 import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkInfo;
+import androidx.work.WorkQuery;
 import androidx.work.multiprocess.RemoteWorkManager;
 import android.util.AtomicFile;
 import com.google.firebase.FirebaseApp;
@@ -18,6 +20,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -151,6 +155,32 @@ public final class FirestoreSync {
             catch (RuntimeException ignored) { }
             recordActivationFailure(diagnosticPrefs, "executor_submit", rejected);
             deliver(callback, false);
+        }
+    }
+
+    public interface WorkManagerDiagnosticCallback { void onComplete(String summary); }
+
+    /** Reads WorkManager's local record only; this does not enqueue or run work. */
+    public static void readWorkManagerDiagnostic(Context context,
+                                                 WorkManagerDiagnosticCallback callback) {
+        if (callback == null) return;
+        Context appContext = context.getApplicationContext();
+        try {
+            RemoteWorkManager manager = RemoteWorkManager.getInstance(appContext);
+            ListenableFuture<List<WorkInfo>> query = manager.getWorkInfos(
+                    WorkQuery.fromUniqueWorkNames(Collections.singletonList(WORK)));
+            query.addListener(() -> {
+                String summary;
+                try {
+                    summary = FirestoreWorkManagerDiagnostics.summary(query.get());
+                } catch (Exception failure) {
+                    summary = FirestoreWorkManagerDiagnostics.unavailable();
+                }
+                String result = summary;
+                MAIN.post(() -> callback.onComplete(result));
+            }, ACTIVATION_EXECUTOR);
+        } catch (RuntimeException failure) {
+            MAIN.post(() -> callback.onComplete(FirestoreWorkManagerDiagnostics.unavailable()));
         }
     }
 
