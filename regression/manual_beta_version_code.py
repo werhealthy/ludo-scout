@@ -7,7 +7,7 @@ import re
 import sys
 
 BASE_VERSION_CODE = 1_000_000
-MIN_INSTALLED_VERSION_CODE = 1_002_301
+MIN_INSTALLED_VERSION_CODE = 1_002_305
 MAX_VERSION_CODE = 2_147_483_647
 
 
@@ -17,7 +17,7 @@ def derive_version_code(suffix: str) -> int:
     version_code = BASE_VERSION_CODE + int(suffix)
     if version_code <= MIN_INSTALLED_VERSION_CODE:
         raise ValueError(
-            "version_code_suffix must be >2301 to exceed installed versionCode 1002301"
+            "version_code_suffix must be >2305 to exceed installed versionCode 1002305"
         )
     if version_code > MAX_VERSION_CODE:
         raise ValueError("versionCode exceeds Android's signed 32-bit range")

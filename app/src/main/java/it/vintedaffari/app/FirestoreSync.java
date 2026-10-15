@@ -91,6 +91,73 @@ public final class FirestoreSync {
                 p.getString("opt_in_version", "")) && authorized(context);
     }
 
+    /** Transactionally bind sidecar invalidation to changes in explicit evidence consent. */
+    public static boolean evidenceUploadEnabled(Context context) {
+        SharedPreferences p = prefs(context);
+        String expected = evidenceConsented(context) ? FirestoreEvidenceConsentPolicy.CURRENT_VERSION : "none";
+        if ("description-photo-v1".equals(expected) && !authorized(context)) return false;
+        synchronized (FirestoreSync.class) {
+            String previous = p.getString("evidence_upload_mode", "");
+            if (!expected.equals(previous)) {
+                if ("none".equals(expected)) {
+                    if (!scrubEvidenceSidecar(context)) {
+                        p.edit().putString("snapshot_error", "evidence_revoke_local_scrub_failed").commit();
+                        return false;
+                    }
+                }
+                if (!p.edit().putString("evidence_upload_mode", expected).remove("snapshot_error").commit()) return false;
+            }
+            return enabled(context) && "description-photo-v1".equals(expected);
+        }
+    }
+
+    /** Existing metadata opt-in never grants consent to transmit descriptions or photo URLs. */
+    public static boolean evidenceConsented(Context context) {
+        SharedPreferences p = prefs(context);
+        return FirestoreEvidenceConsentPolicy.accepts(p.getBoolean("evidence_enabled", false),
+                p.getString("evidence_opt_in_version", ""));
+    }
+
+    public static boolean evidenceEnabled(Context context) {
+        return enabled(context) && evidenceConsented(context);
+    }
+
+    /** Persist only an explicit, separately versioned evidence choice. */
+    public static boolean setEvidenceConsent(Context context, boolean enabled) {
+        if (enabled && !authorized(context)) return false;
+        synchronized (FirestoreSync.class) {
+            SharedPreferences preferences = prefs(context);
+            boolean scrubbed = enabled || scrubEvidenceSidecar(context);
+            return commitEvidenceConsent(preferences, enabled, scrubbed);
+        }
+    }
+
+    /** Revocation remains fail-closed even when local evidence cleanup must be retried. */
+    static boolean commitEvidenceConsent(SharedPreferences preferences, boolean enabled, boolean scrubbed) {
+        SharedPreferences.Editor edit = preferences.edit();
+        if (enabled) {
+            edit.putBoolean("evidence_enabled", true)
+                    .putString("evidence_opt_in_version", FirestoreEvidenceConsentPolicy.CURRENT_VERSION)
+                    .remove("snapshot_error");
+        } else {
+            edit.putBoolean("evidence_enabled", false).remove("evidence_opt_in_version");
+            if (scrubbed) edit.putString("evidence_upload_mode", "none").remove("snapshot_error");
+            else edit.putString("snapshot_error", "evidence_revoke_local_scrub_failed");
+        }
+        return edit.commit();
+    }
+
+    public static boolean evidenceCleanupPending(Context context) {
+        return !"none".equals(prefs(context).getString("evidence_upload_mode", ""));
+    }
+
+    private static boolean scrubEvidenceSidecar(Context context) {
+        try (FirestoreSnapshotStore store = FirestoreSnapshotStore.open(context)) {
+            store.prepareEvidenceRevocation();
+            return true;
+        } catch (RuntimeException failure) { return false; }
+    }
+
     public static void start(Context context, ActivationCallback callback) {
         Context appContext = context.getApplicationContext();
         SharedPreferences diagnosticPrefs = prefs(appContext);
@@ -171,7 +238,9 @@ public final class FirestoreSync {
             query.addListener(() -> {
                 String summary;
                 try {
-                    summary = FirestoreWorkManagerDiagnostics.summary(query.get());
+                    String workManagerSummary = FirestoreWorkManagerDiagnostics.summary(query.get());
+                    summary = enabled(appContext) ? workManagerSummary
+                            : "Sospesa localmente. Le copie Firestore precedenti non vengono eliminate in remoto.";
                 } catch (Exception failure) {
                     summary = FirestoreWorkManagerDiagnostics.unavailable();
                 }
@@ -250,13 +319,20 @@ public final class FirestoreSync {
 
     public static void stop(Context context) {
         Context appContext = context.getApplicationContext();
-        prefs(appContext).edit().putBoolean("enabled", false).remove("opt_in_version").apply();
+        synchronized (FirestoreSync.class) {
+            prefs(appContext).edit().putBoolean("enabled", false).remove("opt_in_version")
+                    .putBoolean("evidence_enabled", false).remove("evidence_opt_in_version").apply();
+        }
         try {
             FirebaseAuth auth = auth(appContext);
             if (auth != null) auth.signOut();
         } catch (RuntimeException ignored) { }
         try {
             ACTIVATION_EXECUTOR.execute(() -> {
+                synchronized (FirestoreSync.class) {
+                    SharedPreferences preferences = prefs(appContext);
+                    commitEvidenceConsent(preferences, false, scrubEvidenceSidecar(appContext));
+                }
                 try {
                     RemoteWorkManager manager = RemoteWorkManager.getInstance(appContext);
                     WorkManagerActivationScheduler.await(manager.cancelUniqueWork(WORK));

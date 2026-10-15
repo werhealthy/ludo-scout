@@ -9,10 +9,11 @@ const {
   initializeTestEnvironment, assertFails, assertSucceeds
 } = require('@firebase/rules-unit-testing');
 const {
-  doc, collection, setDoc, updateDoc, deleteDoc, getDoc, getDocs, serverTimestamp
+  doc, collection, setDoc, updateDoc, deleteDoc, getDoc, getDocs, serverTimestamp, writeBatch
 } = require('firebase/firestore');
 
 const ownerUid = 'FxAKNm8aK6amBPoHZcXNOtSLv3t2';
+const readerUid = 'reader-identity-emulator-only';
 const otherUid = 'another-account-that-must-not-see-ludo';
 const deviceId = '12345678-1234-1234-1234-123456789abc';
 const v1ListingsPath = 'sync_v1/' + ownerUid + '/devices/' + deviceId + '/listings';
@@ -82,7 +83,7 @@ function v3Current(id = snapshotId) {
   return {schema_version: 3, snapshot_id: id, updated_at: serverTimestamp()};
 }
 
-let env, owner, other, anonymous;
+let env, owner, reader, other, anonymous;
 
 function emulatorFirestoreAddress() {
   const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8081').split(':');
@@ -96,12 +97,16 @@ async function seedLegacy(pathName, data) {
 }
 
 test.before(async () => {
-  const rules = fs.readFileSync(path.resolve(__dirname, '..', '..', 'firestore.rules'), 'utf8');
+  const sourceRules = fs.readFileSync(path.resolve(__dirname, '..', '..', 'firestore.rules'), 'utf8');
+  const readerBinding = sourceRules.match(/request\.auth\.uid == '([^']+)'/);
+  if (!readerBinding || readerBinding[1] === ownerUid) throw new Error('rules must bind a separate reader identity');
+  const rules = sourceRules.replace(readerBinding[1], readerUid);
   env = await initializeTestEnvironment({
     projectId: 'demo-ludo-firestore-rules',
     firestore: {...emulatorFirestoreAddress(), rules},
   });
   owner = env.authenticatedContext(ownerUid).firestore();
+  reader = env.authenticatedContext(readerUid).firestore();
   other = env.authenticatedContext(otherUid).firestore();
   anonymous = env.unauthenticatedContext().firestore();
 });
@@ -110,15 +115,11 @@ test.after(async () => {
   if (env) await env.cleanup();
 });
 
-test('owner retains the existing v1 sync write boundary during v3 rollout', async () => {
+test('legacy v1 paths remain denied; historical beta compatibility is not reopened', async () => {
   await env.clearFirestore();
-  await assertSucceeds(setDoc(doc(owner, v1ListingPath), legacyV1Listing()));
-  await assertSucceeds(getDoc(doc(owner, v1ListingPath)));
-  await assertSucceeds(getDocs(collection(owner, v1ListingsPath)));
-  await assertSucceeds(updateDoc(doc(owner, v1ListingPath), {
-    title: 'Synthetic updated title', synced_at: serverTimestamp(),
-  }));
-  await assertFails(deleteDoc(doc(owner, v1ListingPath)));
+  await assertFails(setDoc(doc(owner, v1ListingPath), legacyV1Listing()));
+  await assertFails(getDoc(doc(owner, v1ListingPath)));
+  await assertFails(getDocs(collection(owner, v1ListingsPath)));
 });
 
 test('anonymous and other Firebase accounts cannot read legacy v1 data or write it', async () => {
@@ -141,18 +142,15 @@ test('other collections and malformed legacy listing paths remain denied', async
   await assertFails(setDoc(doc(owner, 'sync_v1/' + otherUid + '/devices/' + deviceId + '/listings/42'), legacyV1Listing()));
 });
 
-test('owner retains v2 snapshot writes during v3 rollout; foreign accounts remain denied', async () => {
+test('legacy v2 snapshot paths remain denied; historical beta compatibility is not reopened', async () => {
   await env.clearFirestore();
   const manifestPath = v2SnapshotRoot + snapshotId;
   const listingPath = manifestPath + '/listings/42';
-  await assertSucceeds(setDoc(doc(owner, manifestPath), legacyV2Manifest()));
-  await assertSucceeds(setDoc(doc(owner, listingPath), legacyV2Listing()));
-  await assertSucceeds(updateDoc(doc(owner, manifestPath), {complete: true}));
-  await assertSucceeds(setDoc(doc(owner, v2CurrentPath), legacyV2Current()));
-  await assertSucceeds(getDoc(doc(owner, v2CurrentPath)));
-  await assertSucceeds(getDoc(doc(owner, manifestPath)));
-  await assertSucceeds(getDoc(doc(owner, listingPath)));
-  await assertFails(deleteDoc(doc(owner, listingPath)));
+  await assertFails(setDoc(doc(owner, manifestPath), legacyV2Manifest()));
+  await assertFails(setDoc(doc(owner, listingPath), legacyV2Listing()));
+  await assertFails(getDoc(doc(owner, v2CurrentPath)));
+  await assertFails(getDoc(doc(owner, manifestPath)));
+  await assertFails(getDoc(doc(owner, listingPath)));
   await assertFails(setDoc(doc(other, v2SnapshotRoot + nextSnapshotId), legacyV2Manifest(nextSnapshotId)));
   await assertFails(setDoc(doc(anonymous, v2SnapshotRoot + nextSnapshotId), legacyV2Manifest(nextSnapshotId)));
 });
@@ -201,6 +199,34 @@ test('completed v3 snapshots from the previous schema remain owner-readable and 
   await assertFails(updateDoc(doc(owner, snapshotRoot + snapshotId + '/listings/42'), {title: 'write denied'}));
 });
 
+test('existing reader can read only complete v3 snapshots and cannot write them', async () => {
+  await env.clearFirestore();
+  const completeRow = snapshotRoot + snapshotId + '/listings/42';
+  const stagingRow = snapshotRoot + nextSnapshotId + '/listings/43';
+  await seedLegacy(currentPath, v3Current(snapshotId));
+  await seedLegacy(snapshotRoot + snapshotId, v3Manifest(snapshotId, true, 1));
+  await seedLegacy(completeRow, v3Listing(42, snapshotId, {
+    observed_text: 'Synthetic evidence', photo_urls: ['https://images.vinted.net/test.jpg'],
+  }));
+  await seedLegacy(snapshotRoot + nextSnapshotId, v3Manifest(nextSnapshotId, false, 1));
+  await seedLegacy(stagingRow, v3Listing(43, nextSnapshotId));
+  await assertSucceeds(getDoc(doc(reader, currentPath)));
+  await assertSucceeds(getDoc(doc(reader, snapshotRoot + snapshotId)));
+  await assertSucceeds(getDoc(doc(reader, completeRow)));
+  await assertSucceeds(getDocs(collection(reader, snapshotRoot + snapshotId + '/listings')));
+  await assertFails(getDoc(doc(reader, snapshotRoot + nextSnapshotId)));
+  await assertFails(getDoc(doc(reader, stagingRow)));
+  await assertFails(setDoc(doc(reader, stagingRow), v3Listing(43, nextSnapshotId)));
+
+  await assertSucceeds(updateDoc(doc(owner, snapshotRoot + nextSnapshotId), {complete: true}));
+  await assertSucceeds(setDoc(doc(owner, currentPath), v3Current(nextSnapshotId)));
+  await assertSucceeds(getDoc(doc(reader, snapshotRoot + nextSnapshotId)));
+  await assertSucceeds(getDoc(doc(reader, stagingRow)));
+  await assertFails(getDoc(doc(reader, snapshotRoot + snapshotId)));
+  await assertFails(getDoc(doc(reader, completeRow)));
+  await assertFails(getDocs(collection(reader, snapshotRoot + snapshotId + '/listings')));
+});
+
  test('v3 current pointer cannot publish a missing or incomplete manifest', async () => {
   await env.clearFirestore();
   await assertFails(setDoc(doc(owner, currentPath), v3Current()));
@@ -211,6 +237,20 @@ test('completed v3 snapshots from the previous schema remain owner-readable and 
   await assertSucceeds(setDoc(doc(owner, currentPath), v3Current()));
   await assertSucceeds(getDoc(doc(owner, currentPath)));
   await assertFails(getDoc(doc(other, currentPath)));
+});
+
+test('a write already prepared before revocation is rejected after its staging manifest is sealed', async () => {
+  await env.clearFirestore();
+  const stagingManifest = doc(owner, snapshotRoot + nextSnapshotId);
+  const delayedRow = doc(owner, snapshotRoot + nextSnapshotId + '/listings/43');
+  const delayedUpload = writeBatch(owner);
+  delayedUpload.set(delayedRow, v3Listing(43, nextSnapshotId));
+
+  await assertSucceeds(setDoc(stagingManifest, v3Manifest(nextSnapshotId, false, 1)));
+  // Revocation/abort deletes the incomplete manifest before listing cleanup.
+  await assertSucceeds(deleteDoc(stagingManifest));
+  // A request prepared before revocation cannot land after that barrier.
+  await assertFails(delayedUpload.commit());
 });
 
 test('v3 owner can stage and publish immutable rows; stale snapshots alone can be deleted', async () => {

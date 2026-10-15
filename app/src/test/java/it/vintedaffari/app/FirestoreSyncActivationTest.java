@@ -11,12 +11,28 @@ import java.util.Map;
 import org.junit.Test;
 
 public final class FirestoreSyncActivationTest {
-    @Test public void activeLegacyOptInDoesNotRequireASecondConsentPrompt() {
+    @Test public void activeMetadataOptInRemainsIndependentOfEvidenceConsent() {
         assertTrue(FirestoreOptInPolicy.accepts(true, ""));
         assertTrue(FirestoreOptInPolicy.accepts(true, null));
         assertTrue(FirestoreOptInPolicy.accepts(true, "minimal-v3"));
         assertFalse(FirestoreOptInPolicy.accepts(false, ""));
         assertFalse(FirestoreOptInPolicy.accepts(true, "unknown-version"));
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(true, ""));
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(true, "minimal-v3"));
+    }
+
+    @Test public void evidenceConsentRequiresSeparateVersionedExplicitChoice() {
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(true, ""));
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(true, null));
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(true, "minimal-v3"));
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(false,
+                FirestoreEvidenceConsentPolicy.CURRENT_VERSION));
+        assertTrue(FirestoreEvidenceConsentPolicy.accepts(true,
+                FirestoreEvidenceConsentPolicy.CURRENT_VERSION));
+    }
+
+    @Test public void disconnectClearsBothConsents() {
+        assertTrue(FirestoreSyncSourceContract.sourceDisconnectClearsBothConsents());
     }
 
     @Test public void workManagerFailureAfterPauseDoesNotEscapeAndReopensPaused() {

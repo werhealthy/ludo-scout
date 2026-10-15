@@ -13,7 +13,74 @@ public final class FirestoreSnapshotEvidenceTest {
         assertEquals("", FirestoreSnapshotWorker.boundedCodePoints("  ", 2000));
     }
 
-    @Test public void photoProjectionKeepsOnlyFourUniqueHttpsVintedUrls() {
+    @Test public void evidenceProjectionIsBoundedAndFailClosedByConsentMode() throws Exception {
+        String source = readProjectSource("app/src/main/java/it/vintedaffari/app/FirestoreSnapshotWorker.java");
+        assertTrue(source.contains("private static Row project(Cursor c,boolean includeEvidence)"));
+        int consentBranch = source.indexOf("if(includeEvidence){");
+        assertTrue(consentBranch >= 0);
+        assertTrue(source.indexOf("v.put(\"observed_text\"", consentBranch) > consentBranch);
+        assertTrue(source.indexOf("v.put(\"photo_urls\"", consentBranch) > consentBranch);
+        assertTrue(source.contains("MAX_EVIDENCE_TEXT = 2_000"));
+        assertTrue(source.contains("MAX_PHOTO_URLS = 4"));
+    }
+
+    private static String readProjectSource(String relativePath) throws Exception {
+        java.io.File dir = new java.io.File(System.getProperty("user.dir"));
+        while (dir != null && !new java.io.File(dir, relativePath).isFile()) dir = dir.getParentFile();
+        if (dir == null) throw new java.io.IOException("project_source_not_found:" + relativePath);
+        return new String(java.nio.file.Files.readAllBytes(new java.io.File(dir, relativePath).toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    @Test public void evidenceProjectionChangesContentHash() throws Exception {
+        String source = readProjectSource("app/src/main/java/it/vintedaffari/app/FirestoreSnapshotWorker.java");
+        int evidenceBranch = source.indexOf("if(includeEvidence){");
+        int evidenceFields = source.indexOf("v.put(\"observed_text\"", evidenceBranch);
+        int hash = source.indexOf("String hash=", evidenceFields);
+        assertTrue(evidenceBranch >= 0 && evidenceFields > evidenceBranch && hash > evidenceFields);
+        assertTrue(source.contains("sourceHash(File file,boolean includeEvidence)"));
+    }
+
+    @Test public void legacySidecarIsCleanedBeforeProtocolMigration() {
+        assertTrue(FirestoreSyncSourceContract.legacySidecarIsCleanedBeforeMigration());
+    }
+
+    @Test public void evidenceOptOutScrubsDurableLocalRowsBeforeMetadataOnlyGeneration() {
+        assertTrue(FirestoreSyncSourceContract.sidecarRevocationIsFailClosed());
+    }
+
+    @Test public void revocationDuringUploadIsCheckedBeforeBatchCommit() throws Exception {
+        String worker = readProjectSource("app/src/main/java/it/vintedaffari/app/FirestoreSnapshotWorker.java");
+        int uploadStart = worker.indexOf("store.markUploadAttempted(done)");
+        int gate = worker.indexOf("commitIfEvidenceModeMatches(", uploadStart);
+        int submit = worker.indexOf("batch::commit", gate);
+        int await = worker.indexOf("Tasks.await(uploadTask", submit);
+        assertTrue(uploadStart >= 0);
+        assertTrue(gate > uploadStart);
+        assertTrue(submit > gate);
+        assertTrue(await > submit);
+        assertTrue(FirestoreSyncSourceContract.evidenceRevocationScrubsBeforeConsentCommit());
+        assertTrue(FirestoreSyncSourceContract.sidecarRevocationIsFailClosed());
+    }
+
+    @Test public void explicitEvidenceConsentRequiresItsOwnVersion() {
+        assertTrue(FirestoreEvidenceConsentPolicy.accepts(true, "description-photo-v1"));
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(true, ""));
+        assertFalse(FirestoreEvidenceConsentPolicy.accepts(false, "description-photo-v1"));
+        assertTrue(FirestoreSyncSourceContract.evidenceConsentDoesNotMigrateFromMetadata());
+        assertTrue(FirestoreSyncSourceContract.sourceDisconnectClearsBothConsents());
+    }
+
+    @Test public void fullEvidenceContract() throws Exception {
+        descriptionIsBoundedByUnicodeCodePointAndNullIsEmpty();
+        evidenceProjectionIsBoundedAndFailClosedByConsentMode();
+        evidenceProjectionChangesContentHash();
+        evidenceOptOutScrubsDurableLocalRowsBeforeMetadataOnlyGeneration();
+        revocationDuringUploadIsCheckedBeforeBatchCommit();
+        explicitEvidenceConsentRequiresItsOwnVersion();
+        photoProjectionKeepsOnlyFourUniqueHttpsVintedUrls();
+    }
+    private static void photoProjectionKeepsOnlyFourUniqueHttpsVintedUrls() {
         List<String> urls = FirestoreSnapshotWorker.photos(
                 "https://images1.vinted.net/a.jpg, https://vinted.com/b.jpg, https://evil.test/c.jpg, http://vinted.net/d.jpg, https://vinted.net:8443/port.jpg, https://vinted.net/e.jpg",
                 "https://images1.vinted.net/a.jpg");

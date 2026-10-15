@@ -3,6 +3,7 @@ package it.vintedaffari.app;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.text.InputType;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -18,6 +19,14 @@ public final class FirestoreSyncDialog {
             new AlertDialog.Builder(activity).setTitle("Sincronizzazione Ludo")
                     .setMessage("La configurazione Firebase non è presente in questa build. "
                             + "Il catalogo resta soltanto sul telefono.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        if (FirestoreSync.authorized(activity) && !FirestoreSync.enabled(activity)) {
+            new AlertDialog.Builder(activity).setTitle("Sincronizzazione Ludo")
+                    .setMessage("La sincronizzazione dei metadati è in pausa. Per preservare la tua scelta, "
+                            + "la condivisione delle descrizioni e degli URL foto resta disattivata e non può "
+                            + "essere riattivata da questa schermata mentre la sincronizzazione è in pausa.")
                     .setPositiveButton("OK", null).show();
             return;
         }
@@ -54,9 +63,47 @@ public final class FirestoreSyncDialog {
             details.setText(text.toString());
             details.setTextIsSelectable(true);
             details.setPadding(padding, padding / 2, padding, 0);
+            LinearLayout content = new LinearLayout(activity);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.addView(details);
+            TextView evidenceNotice = new TextView(activity);
+            evidenceNotice.setText("Consenso distinto da quello ai metadati. Se attivo, descrizione e URL foto "
+                    + "vengono trasferiti a Firestore per l'analisi sul PC tramite Ollama locale (mai AI cloud). "
+                    + "Revocando il solo consenso evidence, il worker si sospende. Le descrizioni e gli URL già "
+                    + "salvati sul dispositivo vengono rimossi preparando una generazione senza evidence. La copia "
+                    + "già su Firestore non viene cancellata automaticamente: per sostituirla con dati senza evidence, "
+                    + "la sync metadati deve restare attiva e completare un nuovo snapshot. Se sospendi o disconnetti "
+                    + "anche i metadati, i dati già caricati restano online.");
+            evidenceNotice.setPadding(padding, padding / 2, padding, 0);
+            content.addView(evidenceNotice);
+            CheckBox evidenceConsent = new CheckBox(activity);
+            evidenceConsent.setText("Consento il trasferimento di descrizioni e URL foto a Firestore");
+            evidenceConsent.setChecked(FirestoreSync.evidenceConsented(activity));
+            boolean[] persistingEvidenceChoice = {false};
+            evidenceConsent.setOnCheckedChangeListener((button, checked) -> {
+                if (persistingEvidenceChoice[0]) return;
+                persistingEvidenceChoice[0] = true;
+                button.setEnabled(false);
+                new Thread(() -> {
+                    boolean saved = FirestoreSync.setEvidenceConsent(activity, checked);
+                    activity.runOnUiThread(() -> {
+                        button.setEnabled(true);
+                        persistingEvidenceChoice[0] = false;
+                        if (!saved) {
+                            persistingEvidenceChoice[0] = true;
+                            button.setChecked(!checked);
+                            persistingEvidenceChoice[0] = false;
+                            Toast.makeText(activity, "Scelta evidence non salvata", Toast.LENGTH_LONG).show();
+                        } else if (!checked && FirestoreSync.evidenceCleanupPending(activity)) {
+                            Toast.makeText(activity, "Consenso revocato; pulizia locale in attesa di un nuovo tentativo", Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }, "ludo-evidence-consent").start();
+            });
+            content.addView(evidenceConsent);
             AlertDialog.Builder dialog = new AlertDialog.Builder(activity)
                     .setTitle("Sincronizzazione Ludo")
-                    .setView(details);
+                    .setView(content);
             if (!FirestoreSync.enabled(activity)) {
                 dialog.setPositiveButton("Attiva", (d, w) ->
                         FirestoreSync.start(activity, active -> showActivationResult(activity, active)));
