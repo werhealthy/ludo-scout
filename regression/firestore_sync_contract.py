@@ -32,7 +32,8 @@ class FirestoreSyncContractTest(unittest.TestCase):
                 CREATE TABLE market_listings(
                     id INTEGER PRIMARY KEY, game_id INTEGER, vinted_title TEXT, brand TEXT,
                     category_normalized TEXT, category_source TEXT, language_code TEXT,
-                    lifecycle TEXT, enrichment_state TEXT, match_state TEXT
+                    lifecycle TEXT, enrichment_state TEXT, match_state TEXT,
+                    observed_text TEXT, listing_photos_csv TEXT, image_url TEXT
                 );
                 INSERT INTO games VALUES(1,'12345');
                 INSERT INTO market_listings(id,game_id,vinted_title,brand,category_normalized,category_source,language_code,lifecycle,enrichment_state,match_state)
@@ -45,9 +46,9 @@ class FirestoreSyncContractTest(unittest.TestCase):
             self.assertTrue(query.strip().startswith("SELECT "))
             self.assertEqual(2, len(db.execute(query).fetchall()))
             rows = db.execute(query).fetchall()
-            self.assertEqual(10, len(rows[0]))
-            self.assertEqual((21, "it", "Gioco", "Hasbro", "board_game", "manual", "12345", "ACTIVE", "ENRICHED", "BGG_MATCHED"), rows[0])
-            self.assertEqual((22, "xx", "Incerto", "", None, "", None, "ACTIVE", "PENDING_ANALYSIS", "BGG_MATCH_REQUIRED"), rows[1])
+            self.assertEqual(13, len(rows[0]))
+            self.assertEqual((21, "it", "Gioco", "Hasbro", "board_game", "manual", "12345", "ACTIVE", "ENRICHED", "BGG_MATCHED", None, None, None), rows[0])
+            self.assertEqual((22, "xx", "Incerto", "", None, "", None, "ACTIVE", "PENDING_ANALYSIS", "BGG_MATCH_REQUIRED", None, None, None), rows[1])
             self.assertEqual(before, db.total_changes)
         finally:
             db.close()
@@ -62,13 +63,35 @@ class FirestoreSyncContractTest(unittest.TestCase):
             start = v3_rules.index("d.keys()." + action + "([")
             fragment = v3_rules[start:].split("])", 1)[0]
             fields = re.findall(r"'([^']+)'", fragment)
+            if action == "hasOnly":
+                fields = [field for field in fields if field not in {"observed_text", "photo_urls"}]
             expected.append(fields)
+        expected[0].extend(["observed_text", "photo_urls"])
+        expected[0].sort(key=produced.index)
+        expected[1].extend(["observed_text", "photo_urls"])
+        expected[1].sort(key=produced.index)
         self.assertEqual(produced, expected[0])
         self.assertEqual(produced, expected[1])
         for forbidden in ("seller_name", "seller_id", "favorites", "password",
                           "token", "listing_overrides", "condition", "price_cents",
-                          "protected_price_cents", "item_url", "photo_urls", "observed_text", "author"):
+                          "protected_price_cents", "item_url", "author"):
             self.assertNotIn(forbidden, produced)
+        self.assertIn("observed_text", produced)
+        self.assertIn("photo_urls", produced)
+
+    def test_evidence_projection_and_document_limit_are_gated_before_materialization_complete(self):
+        self.assertIn("MAX_EVIDENCE_TEXT = 2_000", WORKER)
+        self.assertIn("MAX_PHOTO_URLS = 4", WORKER)
+        self.assertIn("MAX_DOCUMENT_BYTES = 12_000", WORKER)
+        self.assertIn('v.put("observed_text",boundedCodePoints', WORKER)
+        self.assertIn('v.put("photo_urls",photos', WORKER)
+        materialize = WORKER.split("private static void materialize", 1)[1].split("private static String sourceHash", 1)[0]
+        self.assertLess(materialize.index("payload.getBytes"), materialize.index("store.insertRow"))
+        self.assertLess(materialize.index("store.insertRow"), materialize.index("store.finishMaterialization"))
+        self.assertIn('"snapshot_document_limit"', materialize)
+        migration = WORKER.split("if(state!=null&&state.protocolVersion!=4)", 1)[1].split('if(state!=null&&"CLEAN_OLD"', 1)[0]
+        self.assertIn("store.markAborted()", migration)
+        self.assertIn('"PUBLISH".equals(state.state)', migration)
 
     def test_owner_scope_deny_all_and_off_by_default(self):
         self.assertIn("request.auth.uid == uid", RULES)

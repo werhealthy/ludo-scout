@@ -46,11 +46,30 @@ service cloud.firestore {
       let p = /databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(snapshotId);
       return exists(p) && get(p).data.complete == false;
     }
+    function v3PhotoUrl(value) {
+      return value is string && value.size()<=1200
+        && value.matches('https://([A-Za-z0-9-]+[.])*vinted[.](net|com)/.*');
+    }
+    function v3PhotoUrls(values) {
+      return values is list && values.size()<=4
+        && (values.size()<1 || v3PhotoUrl(values[0]))
+        && (values.size()<2 || v3PhotoUrl(values[1]))
+        && (values.size()<3 || v3PhotoUrl(values[2]))
+        && (values.size()<4 || v3PhotoUrl(values[3]));
+    }
+    function v3EvidencePair(d) {
+      let hasText = d.keys().hasAny(['observed_text']);
+      let hasPhotos = d.keys().hasAny(['photo_urls']);
+      return (hasText && hasPhotos
+          && d.observed_text is string && d.observed_text.size()<=8000
+          && v3PhotoUrls(d.photo_urls))
+        || (!hasText && !hasPhotos);
+    }
     function validV3Listing(uid, deviceId, snapshotId) {
       let d=request.resource.data;
       return v3Staging(uid,deviceId,snapshotId)
         && d.keys().hasAll(['schema_version','snapshot_id','source_id','title','title_source','brand','brand_source','category','category_source','category_provenance_available','language','bgg_id','lifecycle','enrichment_state','match_state','source_hash'])
-        && d.keys().hasOnly(['schema_version','snapshot_id','source_id','title','title_source','brand','brand_source','category','category_source','category_provenance_available','language','bgg_id','lifecycle','enrichment_state','match_state','source_hash'])
+        && d.keys().hasOnly(['schema_version','snapshot_id','source_id','title','title_source','brand','brand_source','category','category_source','category_provenance_available','language','bgg_id','lifecycle','enrichment_state','match_state','observed_text','photo_urls','source_hash'])
         && d.schema_version is int && d.schema_version==3 && d.snapshot_id==snapshotId
         && d.source_id is int && d.source_id>0
         && d.title is string && d.title.size()<=400 && d.title_source=='VINTED_LISTING'
@@ -59,6 +78,7 @@ service cloud.firestore {
         && d.category_provenance_available is bool && d.category_provenance_available==(d.category_source.size()>0)
         && d.language is string && d.language in ['IT','EN','DE','FR','ES','PT','NL','MULTI','OTHER','UNKNOWN']
         && d.bgg_id is string && d.bgg_id.size()<=80
+        && v3EvidencePair(d)
         && d.lifecycle is string && d.lifecycle.size()<=40
         && d.enrichment_state is string && d.enrichment_state.size()<=60
         && d.match_state is string && d.match_state.size()<=60

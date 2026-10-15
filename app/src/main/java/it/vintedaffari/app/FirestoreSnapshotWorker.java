@@ -35,8 +35,12 @@ public final class FirestoreSnapshotWorker extends Worker {
     private static final int MAX_PER_PASS = 80;
     private static final int MAX_PER_DAY = 2400;
     static final String QUERY = "SELECT l.id,l.language_code,l.vinted_title,l.brand,l.category_normalized,"
-            + "l.category_source,g.bgg_id,l.lifecycle,l.enrichment_state,l.match_state "
+            + "l.category_source,g.bgg_id,l.lifecycle,l.enrichment_state,l.match_state,"
+            + "l.observed_text,l.listing_photos_csv,l.image_url "
             + "FROM market_listings l LEFT JOIN games g ON g.id=l.game_id ORDER BY l.id";
+    static final int MAX_EVIDENCE_TEXT = 2_000;
+    static final int MAX_PHOTO_URLS = 4;
+    static final int MAX_DOCUMENT_BYTES = 12_000;
 
     public FirestoreSnapshotWorker(@NonNull Context context,@NonNull WorkerParameters parameters){super(context,parameters);}
 
@@ -60,10 +64,20 @@ public final class FirestoreSnapshotWorker extends Worker {
             if(cloud==null||!FirestoreSync.enabled(context)){diagnostics.progress("NOT_ACTIVE");return diagnostics.success();}Tasks.await(cloud.waitForPendingWrites(),20,TimeUnit.SECONDS);
             store=FirestoreSnapshotStore.open(context);if(identityChanged)store.resetIdle();
             FirestoreSnapshotStore.Snapshot state=store.snapshot();diagnostics.snapshot("LOAD_SNAPSHOT",state);
-            if(state!=null&&state.protocolVersion!=3){
-                store.resetIdle();state=null;
-            }
             String owner=BuildConfig.LUDO_SYNC_OWNER_UID;DocumentReference current=currentRef(cloud,owner,device);
+            if(state!=null&&state.protocolVersion!=4){
+                if("CLEAN_OLD".equals(state.state)||"ABORTING".equals(state.state)||"ABORTING_SEALED".equals(state.state)){
+                    // Finish already-authorized cleanup before migrating the local sidecar format.
+                }else if("PUBLISH".equals(state.state)){
+                    // A completed legacy generation may still need its pointer acknowledgement.
+                }else if("PUBLISHED".equals(state.state)){
+                    store.resetIdle();state=null;
+                }else{
+                    // Never complete a pre-evidence partial generation under the new schema.
+                    store.markAborted();state=store.snapshot();
+                    return cleanupAborted(cloud,store,state,owner,device,prefs,day,spent,diagnostics);
+                }
+            }
             if(state!=null&&"CLEAN_OLD".equals(state.state))return cleanupOld(cloud,store,state,owner,device,prefs,day,spent,diagnostics);
             if(state!=null&&("ABORTING".equals(state.state)||"ABORTING_SEALED".equals(state.state)))return cleanupAborted(cloud,store,state,owner,device,prefs,day,spent,diagnostics);
             if(state==null||"PUBLISHED".equals(state.state)){
@@ -212,7 +226,7 @@ public final class FirestoreSnapshotWorker extends Worker {
             source.execSQL("BEGIN");
             try(Cursor c=source.rawQuery(QUERY,null)){while(c.moveToNext()){
                 if(count>=FirestoreSnapshotStore.MAX_ROWS)throw new IllegalStateException("snapshot_row_limit");Row row=project(c);
-                String payload=new JSONObject(row.fields).toString();if(payload.getBytes(StandardCharsets.UTF_8).length>12_000)throw new IllegalStateException("snapshot_document_limit");
+                String payload=new JSONObject(row.fields).toString();if(payload.getBytes(StandardCharsets.UTF_8).length>MAX_DOCUMENT_BYTES)throw new IllegalStateException("snapshot_document_limit");
                 store.insertRow(row.id,payload,row.hash);FirestoreSnapshotStore.updateRoot(root,row.id,row.hash);count++;}
                 store.finishMaterialization(count,FirestoreSnapshotStore.hex(root.digest()));
             }finally{source.execSQL("ROLLBACK");}
@@ -235,8 +249,29 @@ public final class FirestoreSnapshotWorker extends Worker {
         v.put("category_source",categorySource);v.put("category_provenance_available",!categorySource.isEmpty());
         v.put("language",normalizedLanguage(str(c,1,40)));v.put("bgg_id",str(c,6,80));
         v.put("lifecycle",str(c,7,40));v.put("enrichment_state",str(c,8,60));v.put("match_state",str(c,9,60));
+        v.put("observed_text",boundedCodePoints(c.isNull(10)?"":c.getString(10),MAX_EVIDENCE_TEXT));
+        v.put("photo_urls",photos(c.isNull(11)?"":c.getString(11),c.isNull(12)?"":c.getString(12)));
         String hash=FirestoreSnapshotStore.hex(FirestoreSnapshotStore.sha256().digest(canonicalJson(v).getBytes(StandardCharsets.UTF_8)));
         v.put("source_hash",hash);return new Row(id,hash,v);
+    }
+    static String boundedCodePoints(String value,int max){
+        if(value==null)return "";String trimmed=value.trim();int count=trimmed.codePointCount(0,trimmed.length());
+        return count<=max?trimmed:trimmed.substring(0,trimmed.offsetByCodePoints(0,max));
+    }
+    static List<String> photos(String csv,String primary){
+        List<String> out=new ArrayList<>();List<String> candidates=new ArrayList<>();
+        if(primary!=null&&!primary.trim().isEmpty())candidates.add(primary.trim());
+        if(csv!=null)for(String item:csv.split(","))if(!item.trim().isEmpty())candidates.add(item.trim());
+        for(String url:candidates){
+            try{java.net.URI u=new java.net.URI(url);String host=u.getHost();
+                if(!"https".equalsIgnoreCase(u.getScheme())||host==null||u.getUserInfo()!=null||u.getPort()!=-1
+                        ||!(host.equalsIgnoreCase("vinted.net")||host.toLowerCase(java.util.Locale.ROOT).endsWith(".vinted.net")
+                        ||host.equalsIgnoreCase("vinted.com")||host.toLowerCase(java.util.Locale.ROOT).endsWith(".vinted.com"))
+                        ||url.length()>1200||out.contains(url))continue;
+                out.add(url);if(out.size()==MAX_PHOTO_URLS)break;
+            }catch(Exception ignored){}
+        }
+        return out;
     }
     static String normalizedLanguage(String value){
         String code=value==null?"":value.trim().toUpperCase(java.util.Locale.ROOT);
@@ -280,6 +315,4 @@ public final class FirestoreSnapshotWorker extends Worker {
     private static final class Row{final long id;final String hash;final Map<String,Object> fields;Row(long i,String h,Map<String,Object> f){id=i;hash=h;fields=f;}}
     private static Long nonnegative(Cursor c,int i){return c.isNull(i)||c.getLong(i)<0?null:c.getLong(i);}
     private static String str(Cursor c,int i,int cap){if(c.isNull(i))return"";String s=c.getString(i);if(s==null)return"";s=s.trim();return s.length()<=cap?s:s.substring(0,cap);}
-    private static List<String> photos(String csv,String primary){List<String> out=new ArrayList<>();if(!primary.isEmpty()&&primary.startsWith("https://"))out.add(primary);
-        for(String x:csv.split(",")){String u=x.trim();if(u.startsWith("https://")&&u.length()<=1200&&!out.contains(u))out.add(u);if(out.size()==3)break;}return out;}
 }

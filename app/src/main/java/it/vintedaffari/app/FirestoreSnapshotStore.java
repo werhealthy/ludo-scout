@@ -72,7 +72,7 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         db.beginTransaction();
         try {
             db.delete("snapshot_meta", null, null);
-            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version) VALUES(1,?,'MATERIALIZING',0,'',0,?,'',3)",
+            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version) VALUES(1,?,'MATERIALIZING',0,'',0,?,'',4)",
                     new Object[]{id, previousId == null ? "" : previousId});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
@@ -156,7 +156,7 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         db.beginTransaction();
         try {
             db.delete("snapshot_meta",null,null);
-            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version) VALUES(1,?,'PUBLISHED',0,?,0,'','',3)",
+            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version) VALUES(1,?,'PUBLISHED',0,?,0,'','',4)",
                     new Object[]{publishedId, contentHash});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }

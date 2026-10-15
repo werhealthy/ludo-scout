@@ -65,6 +65,8 @@ function v3Listing(id = 42, version = snapshotId, overrides = {}) {
     lifecycle: 'ACTIVE',
     enrichment_state: 'ENRICHED',
     match_state: 'MATCHED',
+    observed_text: '',
+    photo_urls: [],
     source_hash: 'a'.repeat(64),
     ...overrides,
   };
@@ -162,13 +164,16 @@ test('v3 listing schema, provenance, language, and protected-field boundaries ar
     [11, {price: 100}],
     [12, {item_url: 'https://example.test/item'}],
     [13, {photos: ['https://example.test/photo.jpg']}],
-    [14, {observed_text: 'not exported'}],
     [15, {title_source: 'CATALOG'}],
     [16, {brand_source: 'CATALOG'}],
     [17, {category_provenance_available: false}],
     [18, {language: 'bad'}],
     [19, {source_hash: 'invalid'}],
     [20, {schema_version: 2}],
+    [22, {photo_urls: ['https://x.test/1', 'https://x.test/2', 'https://x.test/3', 'https://x.test/4', 'https://x.test/5']}],
+    [23, {photo_urls: 'not-a-list'}],
+    [24, {observed_text: 'x'.repeat(8001)}],
+    [26, {photo_urls: ['https://evil.test/private.jpg']}],
   ];
   for (const [id, overrides] of invalid) {
     await assertFails(setDoc(doc(owner, snapshotRoot + snapshotId + '/listings/' + id), v3Listing(id, snapshotId, overrides)));
@@ -176,9 +181,26 @@ test('v3 listing schema, provenance, language, and protected-field boundaries ar
   await assertSucceeds(setDoc(doc(owner, snapshotRoot + snapshotId + '/listings/21'), v3Listing(21, snapshotId, {
     category: '', category_source: '', category_provenance_available: false,
   })));
+  await assertSucceeds(setDoc(doc(owner, snapshotRoot + snapshotId + '/listings/25'), v3Listing(25, snapshotId, {
+    observed_text: 'Synthetic listing description',
+    photo_urls: ['https://images1.vinted.net/a.jpg', 'https://images1.vinted.net/b.jpg', 'https://images1.vinted.net/c.jpg', 'https://images1.vinted.net/d.jpg'],
+  })));
 });
 
-test('v3 current pointer cannot publish a missing or incomplete manifest', async () => {
+test('completed v3 snapshots from the previous schema remain owner-readable and immutable', async () => {
+  await env.clearFirestore();
+  const legacy = v3Listing(42, snapshotId);
+  delete legacy.observed_text;
+  delete legacy.photo_urls;
+  await seedLegacy(snapshotRoot + snapshotId, v3Manifest(snapshotId, true, 1));
+  await seedLegacy(snapshotRoot + snapshotId + '/listings/42', legacy);
+  await seedLegacy(currentPath, v3Current(snapshotId));
+  await assertSucceeds(getDoc(doc(owner, snapshotRoot + snapshotId + '/listings/42')));
+  await assertFails(getDoc(doc(other, snapshotRoot + snapshotId + '/listings/42')));
+  await assertFails(updateDoc(doc(owner, snapshotRoot + snapshotId + '/listings/42'), {title: 'write denied'}));
+});
+
+ test('v3 current pointer cannot publish a missing or incomplete manifest', async () => {
   await env.clearFirestore();
   await assertFails(setDoc(doc(owner, currentPath), v3Current()));
   const staged = doc(owner, snapshotRoot + snapshotId);
