@@ -20,7 +20,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -33,7 +32,7 @@ public final class FirestoreSync {
     private static final String WORK = FirestoreSyncActivation.V3_WORK;
     private static final String LEGACY_WORK = FirestoreSyncActivation.LEGACY_WORK;
     private static final String V2_WORK = FirestoreSyncActivation.V2_WORK;
-    private static final String OPT_IN_VERSION = "minimal-v3";
+    private static final String OPT_IN_VERSION = FirestoreOptInPolicy.CURRENT_VERSION;
     private static final String PREFS = "ludo_firestore_sync";
     private static final String ACTIVATION_DIAGNOSTIC = "activation_diagnostic";
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -88,8 +87,8 @@ public final class FirestoreSync {
 
     public static boolean enabled(Context context) {
         SharedPreferences p = prefs(context);
-        return "minimal-v3".equals(p.getString("opt_in_version", ""))
-                && p.getBoolean("enabled", false) && authorized(context);
+        return FirestoreOptInPolicy.accepts(p.getBoolean("enabled", false),
+                p.getString("opt_in_version", "")) && authorized(context);
     }
 
     public static void start(Context context, ActivationCallback callback) {
@@ -168,7 +167,7 @@ public final class FirestoreSync {
         try {
             RemoteWorkManager manager = RemoteWorkManager.getInstance(appContext);
             ListenableFuture<List<WorkInfo>> query = manager.getWorkInfos(
-                    WorkQuery.fromUniqueWorkNames(Collections.singletonList(WORK)));
+                    WorkQuery.fromUniqueWorkNames(java.util.Arrays.asList(WORK, V2_WORK, LEGACY_WORK)));
             query.addListener(() -> {
                 String summary;
                 try {

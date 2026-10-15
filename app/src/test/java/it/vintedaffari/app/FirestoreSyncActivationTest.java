@@ -11,6 +11,14 @@ import java.util.Map;
 import org.junit.Test;
 
 public final class FirestoreSyncActivationTest {
+    @Test public void activeLegacyOptInDoesNotRequireASecondConsentPrompt() {
+        assertTrue(FirestoreOptInPolicy.accepts(true, ""));
+        assertTrue(FirestoreOptInPolicy.accepts(true, null));
+        assertTrue(FirestoreOptInPolicy.accepts(true, "minimal-v3"));
+        assertFalse(FirestoreOptInPolicy.accepts(false, ""));
+        assertFalse(FirestoreOptInPolicy.accepts(true, "unknown-version"));
+    }
+
     @Test public void workManagerFailureAfterPauseDoesNotEscapeAndReopensPaused() {
         Map<String, Object> disk = new HashMap<>();
         FakeState before = new FakeState(disk);

@@ -11,6 +11,7 @@ WORKER = (SRC / "FirestoreSnapshotWorker.java").read_text(encoding="utf-8")
 SNAPSHOT_WORKER = WORKER
 SNAPSHOT_STORE = (SRC / "FirestoreSnapshotStore.java").read_text(encoding="utf-8")
 SYNC = (SRC / "FirestoreSync.java").read_text(encoding="utf-8")
+OPT_IN_POLICY = (SRC / "FirestoreOptInPolicy.java").read_text(encoding="utf-8")
 RULES = (ROOT / "firestore.rules").read_text(encoding="utf-8")
 MAIN = (SRC / "MainActivity.java").read_text(encoding="utf-8")
 APP = (SRC / "LudoScoutApp.java").read_text(encoding="utf-8")
@@ -98,15 +99,17 @@ class FirestoreSyncContractTest(unittest.TestCase):
         self.assertIn("FxAKNm8aK6amBPoHZcXNOtSLv3t2", RULES)
         self.assertIn("match /sync_v1/{uid}/devices/{deviceId}/listings/{listingId}", RULES)
         self.assertIn("allow delete: if false", RULES)
+        self.assertIn("allow list: if false", RULES)
         self.assertIn("allow read, write: if false", RULES)
         self.assertIn("function validV3Listing", RULES)
-        self.assertIn("allow write: if false", RULES)
         self.assertIn("FirestoreSyncDialog.show(this)", MAIN)
         for key in ("LUDO_FIREBASE_APP_ID", "LUDO_FIREBASE_API_KEY",
                     "LUDO_FIREBASE_PROJECT_ID", "LUDO_SYNC_OWNER_UID"):
             self.assertIn("BuildConfig." + key, SYNC)
-        self.assertIn('p.getBoolean("enabled", false) && authorized(context)', SYNC)
-        self.assertIn('"minimal-v3".equals(p.getString("opt_in_version", ""))', SYNC)
+        self.assertIn('FirestoreOptInPolicy.accepts(p.getBoolean("enabled", false),', SYNC)
+        self.assertIn('return enabled && (version == null || version.isEmpty() || CURRENT_VERSION.equals(version));', OPT_IN_POLICY)
+        self.assertIn('WorkQuery.fromUniqueWorkNames(java.util.Arrays.asList(WORK, V2_WORK, LEGACY_WORK))', SYNC)
+        self.assertIn('OPT_IN_VERSION.equals(preferences.getString("opt_in_version", ""))', SYNC)
         self.assertIn("MAX_PER_PASS = 80", SNAPSHOT_WORKER)
         self.assertIn("MAX_PER_DAY = 2400", SNAPSHOT_WORKER)
         self.assertIn("SQLiteDatabase.OPEN_READONLY", SNAPSHOT_WORKER)
@@ -132,7 +135,7 @@ class FirestoreSyncContractTest(unittest.TestCase):
         self.assertIn('putInt("budget_day",-1)', identity)
         self.assertIn('putInt("budget_writes",0)', identity)
         self.assertIn("store=FirestoreSnapshotStore.open(context);if(identityChanged)store.resetIdle()", SNAPSHOT_WORKER)
-        self.assertIn('"minimal-v3".equals(p.getString("opt_in_version", ""))', SYNC)
+        self.assertIn('FirestoreOptInPolicy.accepts(p.getBoolean("enabled", false),', SYNC)
 
     def test_sync_device_identity_is_shared_across_worker_passes(self):
         sync_source = (SRC / "FirestoreSync.java").read_text(encoding="utf-8")
@@ -161,11 +164,13 @@ class FirestoreSyncContractTest(unittest.TestCase):
         self.assertIn('store.state("PUBLISH")', SNAPSHOT_WORKER)
         self.assertIn('manifest.put("schema_version",3)', SNAPSHOT_WORKER)
         self.assertIn("state.contentHash.equals(sourceHash(catalog))", SNAPSHOT_WORKER)
-        self.assertIn('snapshotId!=v3CurrentSnapshotId(uid,deviceId)', RULES)
+        self.assertIn('snapshotId != v3CurrentSnapshotId(uid, deviceId)', RULES)
         self.assertIn('FirestoreSnapshotWorker.class', SYNC)
         self.assertIn('cancelUniqueWork(V2_WORK)', SYNC)
         self.assertIn('cancelUniqueWork(LEGACY_WORK)', SYNC)
-        self.assertNotIn('allow create, update: if owner(uid)', RULES.split('match /sync_v2/', 1)[1].split('function v3CurrentSnapshotId', 1)[0])
+        v2_rules = RULES.split('match /sync_v2/', 1)[1].split('function v3CurrentSnapshotId', 1)[0]
+        self.assertIn('allow create, update: if owner(uid)', v2_rules)
+        self.assertIn('allow create: if owner(uid)', v2_rules)
 
 
 if __name__ == "__main__":

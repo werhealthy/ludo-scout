@@ -110,13 +110,14 @@ test.after(async () => {
   if (env) await env.cleanup();
 });
 
-test('owner can read legacy v1 data but cannot create, update, or delete it', async () => {
+test('owner retains the existing v1 sync write boundary during v3 rollout', async () => {
   await env.clearFirestore();
-  await seedLegacy(v1ListingPath, legacyV1Listing());
+  await assertSucceeds(setDoc(doc(owner, v1ListingPath), legacyV1Listing()));
   await assertSucceeds(getDoc(doc(owner, v1ListingPath)));
   await assertSucceeds(getDocs(collection(owner, v1ListingsPath)));
-  await assertFails(setDoc(doc(owner, v1ListingPath + '-new'), legacyV1Listing()));
-  await assertFails(updateDoc(doc(owner, v1ListingPath), {title: 'must remain read-only'}));
+  await assertSucceeds(updateDoc(doc(owner, v1ListingPath), {
+    title: 'Synthetic updated title', synced_at: serverTimestamp(),
+  }));
   await assertFails(deleteDoc(doc(owner, v1ListingPath)));
 });
 
@@ -140,20 +141,20 @@ test('other collections and malformed legacy listing paths remain denied', async
   await assertFails(setDoc(doc(owner, 'sync_v1/' + otherUid + '/devices/' + deviceId + '/listings/42'), legacyV1Listing()));
 });
 
-test('legacy v2 snapshot data remains readable to owner but all v2 writes are denied', async () => {
+test('owner retains v2 snapshot writes during v3 rollout; foreign accounts remain denied', async () => {
   await env.clearFirestore();
-  await seedLegacy(v2SnapshotRoot + snapshotId, legacyV2Manifest());
-  await seedLegacy(v2SnapshotRoot + snapshotId + '/listings/42', legacyV2Listing());
-  await seedLegacy(v2CurrentPath, legacyV2Current());
+  const manifestPath = v2SnapshotRoot + snapshotId;
+  const listingPath = manifestPath + '/listings/42';
+  await assertSucceeds(setDoc(doc(owner, manifestPath), legacyV2Manifest()));
+  await assertSucceeds(setDoc(doc(owner, listingPath), legacyV2Listing()));
+  await assertSucceeds(updateDoc(doc(owner, manifestPath), {complete: true}));
+  await assertSucceeds(setDoc(doc(owner, v2CurrentPath), legacyV2Current()));
   await assertSucceeds(getDoc(doc(owner, v2CurrentPath)));
-  await assertSucceeds(getDoc(doc(owner, v2SnapshotRoot + snapshotId)));
-  await assertSucceeds(getDoc(doc(owner, v2SnapshotRoot + snapshotId + '/listings/42')));
-  await assertFails(setDoc(doc(owner, v2SnapshotRoot + nextSnapshotId), legacyV2Manifest(nextSnapshotId)));
-  await assertFails(updateDoc(doc(owner, v2SnapshotRoot + snapshotId), {complete: true}));
-  await assertFails(setDoc(doc(owner, v2SnapshotRoot + snapshotId + '/listings/43'), legacyV2Listing(43)));
-  await assertFails(updateDoc(doc(owner, v2SnapshotRoot + snapshotId + '/listings/42'), {title: 'write denied'}));
-  await assertFails(deleteDoc(doc(owner, v2SnapshotRoot + snapshotId + '/listings/42')));
-  await assertFails(updateDoc(doc(owner, v2CurrentPath), {snapshot_id: nextSnapshotId}));
+  await assertSucceeds(getDoc(doc(owner, manifestPath)));
+  await assertSucceeds(getDoc(doc(owner, listingPath)));
+  await assertFails(deleteDoc(doc(owner, listingPath)));
+  await assertFails(setDoc(doc(other, v2SnapshotRoot + nextSnapshotId), legacyV2Manifest(nextSnapshotId)));
+  await assertFails(setDoc(doc(anonymous, v2SnapshotRoot + nextSnapshotId), legacyV2Manifest(nextSnapshotId)));
 });
 
 test('v3 listing schema, provenance, language, and protected-field boundaries are enforced', async () => {
