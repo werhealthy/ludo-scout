@@ -21,6 +21,12 @@ service cloud.firestore {
       return exists(currentPath) ? get(currentPath).data.snapshot_id : '';
     }
 
+    function rollbackSnapshotId(uid, deviceId) {
+      let currentPath = /databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/meta/current;
+      return exists(currentPath) && get(currentPath).data.keys().hasAny(['rollback_snapshot_id'])
+        ? get(currentPath).data.rollback_snapshot_id : '';
+    }
+
     function stagingSnapshot(uid, deviceId, snapshotId) {
       let manifestPath = /databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(snapshotId);
       return exists(manifestPath) && get(manifestPath).data.complete == false;
@@ -120,19 +126,21 @@ service cloud.firestore {
       allow get: if (owner(uid) && deviceId.matches('[a-z0-9-]{36}'))
         || (deviceId.matches('[a-z0-9-]{36}')
         && resource.data.keys().hasAll(['schema_version', 'snapshot_id', 'updated_at'])
-        && resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'updated_at'])
+        && resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'rollback_snapshot_id', 'updated_at'])
         && resource.data.schema_version is int && resource.data.schema_version == 3
         && resource.data.snapshot_id is string && resource.data.snapshot_id.matches('[a-z0-9-]{36}')
         && resource.data.updated_at is timestamp
+        && (!resource.data.keys().hasAny(['rollback_snapshot_id']) || resource.data.rollback_snapshot_id == '' || resource.data.rollback_snapshot_id.matches('[a-z0-9-]{36}'))
         && (owner(uid) || (reader(uid) && completeSnapshot(uid, deviceId, resource.data.snapshot_id))));
       allow list: if false;
       allow create, update: if owner(uid)
         && deviceId.matches('[a-z0-9-]{36}')
         && request.resource.data.keys().hasAll(['schema_version', 'snapshot_id', 'updated_at'])
-        && request.resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'updated_at'])
+        && request.resource.data.keys().hasOnly(['schema_version', 'snapshot_id', 'rollback_snapshot_id', 'updated_at'])
         && request.resource.data.schema_version is int && request.resource.data.schema_version == 3
         && request.resource.data.snapshot_id is string
         && request.resource.data.snapshot_id.matches('[a-z0-9-]{36}')
+        && (!request.resource.data.keys().hasAny(['rollback_snapshot_id']) || (request.resource.data.rollback_snapshot_id is string && (request.resource.data.rollback_snapshot_id == '' || request.resource.data.rollback_snapshot_id.matches('[a-z0-9-]{36}'))))
         && request.resource.data.updated_at == request.time
         && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.complete == true
         && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.schema_version == 3
@@ -142,7 +150,11 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.document_count is int
         && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.document_count >= 0
         && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.author_coverage_available is bool
-        && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.author_coverage_available == false;
+        && getAfter(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.snapshot_id)).data.author_coverage_available == false
+        && (!request.resource.data.keys().hasAny(['rollback_snapshot_id'])
+          || request.resource.data.rollback_snapshot_id == ''
+          || (exists(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.rollback_snapshot_id))
+            && get(/databases/$(database)/documents/sync_v3/$(uid)/devices/$(deviceId)/snapshots/$(request.resource.data.rollback_snapshot_id)).data.complete == true));
       allow delete: if false;
     }
 
@@ -188,7 +200,8 @@ service cloud.firestore {
         && request.resource.data.author_coverage_available == resource.data.author_coverage_available
         && request.resource.data.created_at == resource.data.created_at;
       allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-        && snapshotId != currentSnapshotId(uid, deviceId);
+        && snapshotId != currentSnapshotId(uid, deviceId)
+        && snapshotId != rollbackSnapshotId(uid, deviceId);
 
       match /listings/{listingId} {
       allow get: if (owner(uid) && deviceId.matches('[a-z0-9-]{36}') && snapshotId.matches('[a-z0-9-]{36}') && listingId.matches('[0-9]{1,19}'))
@@ -202,7 +215,8 @@ service cloud.firestore {
           && request.resource.data.source_id == int(listingId)
           && validMinimalListing(snapshotId) && stagingSnapshot(uid, deviceId, snapshotId);
         allow delete: if owner(uid) && deviceId.matches('[a-z0-9-]{36}')
-          && snapshotId.matches('[a-z0-9-]{36}') && snapshotId != currentSnapshotId(uid, deviceId);
+          && snapshotId.matches('[a-z0-9-]{36}') && snapshotId != currentSnapshotId(uid, deviceId)
+          && snapshotId != rollbackSnapshotId(uid, deviceId);
       }
     }
 

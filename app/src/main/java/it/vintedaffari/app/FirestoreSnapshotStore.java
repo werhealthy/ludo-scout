@@ -95,6 +95,10 @@ final class FirestoreSnapshotStore implements AutoCloseable {
     }
 
     void begin(String id, String previousId, boolean includesEvidence) {
+        begin(id, previousId, includesEvidence, "");
+    }
+
+    void begin(String id, String previousId, boolean includesEvidence, String previousCursor) {
         Snapshot prior = snapshot();
         boolean resumingMaterialization = prior != null && "MATERIALIZING".equals(prior.state)
                 && prior.evidenceEnabled == includesEvidence && prior.id.equals(id)
@@ -108,11 +112,11 @@ final class FirestoreSnapshotStore implements AutoCloseable {
             try {
                 if (prior == null) {
                     db.execSQL("DELETE FROM snapshot_rows");
-                    db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled) VALUES(1,?,'MATERIALIZING',0,'',0,?,'',5,?)",
-                            new Object[]{id, previousId == null ? "" : previousId, includesEvidence ? 1 : 0});
+                    db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled) VALUES(1,?,'MATERIALIZING',0,'',0,?,?,6,?)",
+                            new Object[]{id, previousId == null ? "" : previousId, previousCursor == null ? "" : previousCursor, includesEvidence ? 1 : 0});
                 } else if (!resumingMaterialization) {
-                    db.execSQL("UPDATE snapshot_meta SET state='MATERIALIZING',row_count=0,content_hash='',uploaded_count=0,previous_id=?,previous_cursor='',protocol_version=5,evidence_enabled=? WHERE singleton=1",
-                            new Object[]{previousId == null ? "" : previousId, includesEvidence ? 1 : 0});
+                    db.execSQL("UPDATE snapshot_meta SET state='MATERIALIZING',row_count=0,content_hash='',uploaded_count=0,previous_id=?,previous_cursor=?,protocol_version=6,evidence_enabled=? WHERE singleton=1",
+                            new Object[]{previousId == null ? "" : previousId, previousCursor == null ? "" : previousCursor, includesEvidence ? 1 : 0});
                     db.execSQL("DELETE FROM snapshot_rows");
                 }
                 db.setTransactionSuccessful();
@@ -198,7 +202,7 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         db.beginTransaction();
         try {
             db.delete("snapshot_meta",null,null);
-            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled) VALUES(1,?,'PUBLISHED',0,?,0,'','',5,?)",
+            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled) VALUES(1,?,'PUBLISHED',0,?,0,'','',6,?)",
                     new Object[]{publishedId, contentHash, includesEvidence ? 1 : 0});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
@@ -206,7 +210,7 @@ final class FirestoreSnapshotStore implements AutoCloseable {
     }
 
     void markCleanupPending(String oldId) {
-        db.execSQL("UPDATE snapshot_meta SET state='CLEAN_OLD',previous_id=?,previous_cursor='' WHERE singleton=1",
+        db.execSQL("UPDATE snapshot_meta SET state='CLEAN_OLD',previous_id=? WHERE singleton=1",
                 new Object[]{oldId == null ? "" : oldId});
     }
 

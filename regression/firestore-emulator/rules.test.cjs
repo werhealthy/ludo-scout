@@ -278,3 +278,24 @@ test('v3 owner can stage and publish immutable rows; stale snapshots alone can b
   await assertFails(setDoc(doc(owner, snapshotRoot + snapshotId + '/listings/43'), v3Listing(43, snapshotId)));
   await assertFails(setDoc(doc(owner, 'sync_v3/' + otherUid + '/devices/' + deviceId + '/snapshots/' + snapshotId), v3Manifest()));
 });
+
+test('retained rollback generation is undeletable and can be repointed', async () => {
+  await env.clearFirestore();
+  const oldManifestPath = snapshotRoot + snapshotId;
+  const oldRowPath = oldManifestPath + '/listings/42';
+  const currentManifestPath = snapshotRoot + nextSnapshotId;
+  const currentRowPath = currentManifestPath + '/listings/42';
+  await seedLegacy(oldManifestPath, v3Manifest(snapshotId, true, 1));
+  await seedLegacy(oldRowPath, v3Listing(42, snapshotId));
+  await seedLegacy(currentManifestPath, v3Manifest(nextSnapshotId, true, 1));
+  await seedLegacy(currentRowPath, v3Listing(42, nextSnapshotId));
+  await seedLegacy(currentPath, {...v3Current(nextSnapshotId), rollback_snapshot_id: snapshotId});
+
+  await assertFails(deleteDoc(doc(owner, oldRowPath)));
+  await assertFails(deleteDoc(doc(owner, oldManifestPath)));
+  await assertSucceeds(setDoc(doc(owner, currentPath), {
+    schema_version: 3, snapshot_id: snapshotId, rollback_snapshot_id: nextSnapshotId,
+    updated_at: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(owner, oldRowPath)));
+});

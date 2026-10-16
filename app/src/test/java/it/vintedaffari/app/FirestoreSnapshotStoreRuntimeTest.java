@@ -61,8 +61,24 @@ public final class FirestoreSnapshotStoreRuntimeTest {
             assertNotNull(fresh);
             assertEquals("fresh-v5-snapshot", fresh.id);
             assertEquals("MATERIALIZING", fresh.state);
-            assertEquals(5, fresh.protocolVersion);
+            assertEquals(6, fresh.protocolVersion);
             assertFalse(fresh.includesEvidence);
+        }
+    }
+
+    @Test public void crashAfterPointerWriteResumesCleanupOfOnlyExpiredThirdGeneration() {
+        try (FirestoreSnapshotStore store = FirestoreSnapshotStore.open(context)) {
+            // Before publish: A is current, B is the older rollback; C is fully staged.
+            store.begin("generation-C", "generation-A", false, "generation-B");
+            store.state("PUBLISH");
+
+            // Simulate restart after Firestore accepted current=C, rollback=A,
+            // but before the worker persisted CLEAN_OLD locally.
+            store.markCleanupPending("generation-A");
+            FirestoreSnapshotStore.Snapshot recovered = store.snapshot();
+            assertEquals("CLEAN_OLD", recovered.state);
+            assertEquals("generation-A", recovered.previousId);
+            assertEquals("generation-B", FirestoreSnapshotWorker.expiredGenerationId(recovered));
         }
     }
 

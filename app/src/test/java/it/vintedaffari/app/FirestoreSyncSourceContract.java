@@ -100,7 +100,7 @@ final class FirestoreSyncSourceContract {
             if (root == null) return false;
             String store = new String(Files.readAllBytes(root.resolve("app/src/main/java/it/vintedaffari/app/FirestoreSnapshotStore.java")), StandardCharsets.UTF_8);
             String worker = new String(Files.readAllBytes(root.resolve("app/src/main/java/it/vintedaffari/app/FirestoreSnapshotWorker.java")), StandardCharsets.UTF_8);
-            String[] required = {"void resetIdle() {", "protocol_version INTEGER NOT NULL DEFAULT 2", "protocol_version=5", "evidence_revoke_local_scrub_failed"};
+            String[] required = {"void resetIdle() {", "protocol_version INTEGER NOT NULL DEFAULT 2", "protocol_version=6", "evidence_revoke_local_scrub_failed"};
             for (String token : required) if (!store.contains(token)) return false;
             if (store.indexOf("void resetIdle() {") != store.lastIndexOf("void resetIdle() {")) return false;
             int scrubStart = store.indexOf("private void clearExistingEvidenceRows()");
