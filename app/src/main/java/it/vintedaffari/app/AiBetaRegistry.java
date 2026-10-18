@@ -58,6 +58,8 @@ public final class AiBetaRegistry {
 
     public static final class Entry {
         public final long listingId;
+        /** Optional stable Vinted ID from the source snapshot; never the local SQLite primary key. */
+        public final String itemId;
         public final String originalType;
         public final String originalLanguage;
         public final String originalSource;
@@ -67,10 +69,11 @@ public final class AiBetaRegistry {
         public final String recordState;
         public final List<String> reviewFlags;
 
-        private Entry(long listingId, String originalType, String originalLanguage,
+        private Entry(long listingId, String itemId, String originalType, String originalLanguage,
                       String originalSource, String correctedType, String correctedLanguage,
                       String correctedSource, String recordState, List<String> reviewFlags) {
             this.listingId = listingId;
+            this.itemId = itemId;
             this.originalType = originalType;
             this.originalLanguage = originalLanguage;
             this.originalSource = originalSource;
@@ -135,10 +138,10 @@ public final class AiBetaRegistry {
         Set<Long> seen = new HashSet<>();
         for (Object rawRow : rows) {
             Map<String, Object> row = stringMap(rawRow);
-            requireKeys(row, "listing_id", "original_type", "original_language", "original_source",
-                    "corrected_type", "corrected_language", "corrected_source", "record_state", "review_flags");
+            requireEntryKeys(row);
             long id = requiredLong(row, "listing_id");
             if (id <= 0 || !seen.add(id)) throw new IllegalArgumentException("ID mancante o duplicato");
+            String itemId = row.containsKey("item_id") ? requiredString(row, "item_id", 80) : null;
             String originalType = nullableCode(row, "original_type", TYPES);
             String originalLanguage = nullableCode(row, "original_language", LANGUAGES);
             String originalSource = requiredString(row, "original_source", 80);
@@ -167,7 +170,7 @@ public final class AiBetaRegistry {
             if ("UNRESOLVED".equals(recordState) != flags.contains("RECORD_UNRESOLVED")) {
                 throw new IllegalArgumentException("Flag unresolved incoerente");
             }
-            entries.add(new Entry(id, originalType, originalLanguage, originalSource,
+            entries.add(new Entry(id, itemId, originalType, originalLanguage, originalSource,
                     correctedType, correctedLanguage, correctedSource, recordState, flags));
         }
         return new AiBetaRegistry(registryId, snapshotId, generatedAt, modelId, modelIdStatus,
@@ -265,6 +268,17 @@ public final class AiBetaRegistry {
         Set<String> actual = new HashSet<>(object.keySet());
         Set<String> wanted = new HashSet<>(Arrays.asList(expected));
         if (!wanted.equals(actual)) throw new IllegalArgumentException("Campi JSON mancanti o inattesi");
+    }
+
+    private static void requireEntryKeys(Map<String, Object> object) {
+        Set<String> required = new HashSet<>(Arrays.asList("listing_id", "original_type", "original_language",
+                "original_source", "corrected_type", "corrected_language", "corrected_source",
+                "record_state", "review_flags"));
+        Set<String> allowed = new HashSet<>(required);
+        allowed.add("item_id");
+        if (!object.keySet().containsAll(required) || !allowed.containsAll(object.keySet())) {
+            throw new IllegalArgumentException("Campi JSON mancanti o inattesi");
+        }
     }
 
     private static Set<String> immutableSet(String... values) {

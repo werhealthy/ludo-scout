@@ -18,7 +18,7 @@ checks={
  "language requires photo evidence": 'if not images: language="UNKNOWN"' in worker,
  "worker queue idle": "Coda Qwen vuota · tutti i job ricevuti finora sono completati." in worker,
  "idle only after work": "worked_since_idle and not idle_announced" in worker,
- "version": "5.12.180-ai-grounded-copy" in gradle,
+ "version": "5.12.202-ai-wait-deadline" in gradle and "LUDO_VERSION_CODE" in gradle,
 }
 for name,ok in checks.items():
  print(("PASS" if ok else "FAIL"),name)
