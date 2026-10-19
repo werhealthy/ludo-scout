@@ -187,6 +187,21 @@ final class AiBetaRegistryView {
         }
     }
 
+    static final class CurrentTargetRead {
+        final CatalogRead catalog;
+        final boolean uniqueCurrentItemId;
+        final boolean active;
+        final boolean manualReviewRequired;
+
+        CurrentTargetRead(CatalogRead catalog, boolean uniqueCurrentItemId,
+                          boolean active, boolean manualReviewRequired) {
+            this.catalog = catalog;
+            this.uniqueCurrentItemId = uniqueCurrentItemId;
+            this.active = active;
+            this.manualReviewRequired = manualReviewRequired;
+        }
+    }
+
     private AiBetaRegistryView() { }
 
     static CatalogRead readCurrentCatalog(Context context, AiBetaRegistry registry) {
@@ -234,6 +249,107 @@ final class AiBetaRegistryView {
         } finally {
             if (db != null) db.close();
         }
+    }
+
+    /** Reads one row only; no full catalog/root hash is recalculated for the controlled apply flow. */
+    static CurrentTargetRead readCurrentTarget(Context context, long localId) {
+        if (localId <= 0) return new CurrentTargetRead(CatalogRead.queryFailed(), false, false, true);
+        File file = context.getDatabasePath("vinted_affari.db");
+        if (!file.isFile()) return new CurrentTargetRead(CatalogRead.databaseMissing(), false, false, true);
+        SQLiteDatabase db = null;
+        try {
+            db = SQLiteDatabase.openDatabase(file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+            db.execSQL("BEGIN");
+            try {
+                List<LocalListing> rows = new ArrayList<>();
+                queryChunks(db, "id", Collections.singleton(localId), rows);
+                CatalogRead read = CatalogRead.available(rows);
+                if (rows.size() != 1) return new CurrentTargetRead(read, false, false, true);
+                LocalListing listing = rows.get(0);
+                boolean unique = false;
+                if (listing.itemId != null && !listing.itemId.trim().isEmpty()) {
+                    try (Cursor ids = db.rawQuery("SELECT id FROM market_listings WHERE vinted_item_id=? LIMIT 2",
+                            new String[]{listing.itemId})) {
+                        unique = ids.moveToFirst() && ids.getLong(0) == localId && !ids.moveToNext();
+                    }
+                }
+                boolean active;
+                boolean manualReview;
+                try (Cursor state = db.rawQuery("SELECT lifecycle,COALESCE(manual_review_required,0) FROM market_listings WHERE id=?",
+                        new String[]{String.valueOf(localId)})) {
+                    if (!state.moveToFirst()) return new CurrentTargetRead(read, false, false, true);
+                    active = "ACTIVE".equals(state.getString(0));
+                    manualReview = state.getInt(1) != 0;
+                }
+                return new CurrentTargetRead(read, unique, active, manualReview);
+            } finally {
+                db.execSQL("ROLLBACK");
+            }
+        } catch (Exception failure) {
+            return new CurrentTargetRead(CatalogRead.queryFailed(), false, false, true);
+        } finally {
+            if (db != null) db.close();
+        }
+    }
+
+    static boolean canPrepareCurrentTarget(AiBetaRegistry.Entry entry, Match match,
+                                           CurrentTargetRead target) {
+        return entry != null && target != null && target.catalog.state == CatalogState.AVAILABLE
+                && match != null && match.listing != null && match.contentMatched
+                && entry.sourceId != null && entry.sourceHash != null && entry.sourceHashVersion != null
+                && entry.sourceId == entry.listingId && entry.sourceId == match.listing.localId
+                && target.uniqueCurrentItemId && target.active && !target.manualReviewRequired
+                && match.listing.itemId != null && !match.listing.itemId.trim().isEmpty()
+                && "PROPOSED".equals(entry.recordState)
+                && !AiBetaRegistryDraft.choices(entry, match.listing).isEmpty();
+    }
+
+    static String reviewHeader(AiBetaRegistry registry) {
+        int proposed = 0;
+        int unresolved = 0;
+        for (AiBetaRegistry.Entry entry : registry.entries) {
+            if ("PROPOSED".equals(entry.recordState)) proposed++;
+            else unresolved++;
+        }
+        return "Registro AI · " + registry.registryId
+                + "\nRecord: " + registry.entries.size() + " · proposte: " + proposed
+                + " · irrisolti: " + unresolved
+                + "\nNessun confronto completo o AI viene eseguito in questa vista."
+                + "\nLa scheda corrente viene letta solo aprendo un singolo record; l’identità storica resta non verificata.";
+    }
+
+    static String[] reviewRows(AiBetaRegistry registry) {
+        String[] rows = new String[registry.entries.size()];
+        for (int i = 0; i < registry.entries.size(); i++) {
+            AiBetaRegistry.Entry entry = registry.entries.get(i);
+            StringBuilder row = new StringBuilder("ID registro ").append(entry.listingId)
+                    .append(" · ").append(entry.recordState);
+            row.append("\nOriginale (").append(sourceLabel(entry.originalSource)).append("): ")
+                    .append(proposal(entry.originalType, entry.originalLanguage));
+            if (entry.correctedSource == null) row.append("\nA/B corretto: non disponibile");
+            else row.append("\nA/B corretto (").append(entry.correctedSource).append("): ")
+                    .append(proposal(entry.correctedType, entry.correctedLanguage));
+            row.append("\nRevisione: ").append(reviewLabel(entry));
+            rows[i] = row.toString();
+        }
+        return rows;
+    }
+
+    static String registryOnlyDetails(AiBetaRegistry registry, AiBetaRegistry.Entry entry) {
+        StringBuilder text = new StringBuilder("ID registro: ").append(entry.listingId)
+                .append("\nSource ID storico: ").append(entry.sourceId == null ? "non conservato" : entry.sourceId)
+                .append("\nitem_id nel registro: ").append(valueLabel(entry.itemId))
+                .append(" (provenienza storica non verificata)")
+                .append("\nHash proiezione v3 nel registro: ").append(valueLabel(entry.sourceHash))
+                .append("\nTitolo/ID/metadati correnti: non letti; questa vista non esegue un confronto completo")
+                .append("\nProposta originale (").append(sourceLabel(entry.originalSource)).append("): ")
+                .append(proposal(entry.originalType, entry.originalLanguage));
+        if (entry.correctedSource == null) text.append("\nProposta A/B corretta: non disponibile");
+        else text.append("\nProposta A/B corretta (").append(entry.correctedSource).append("): ")
+                .append(proposal(entry.correctedType, entry.correctedLanguage));
+        return text.append("\nStato record: ").append(entry.recordState)
+                .append("\nRevisione: ").append(reviewLabel(entry))
+                .append("\nIdentità Vinted storica: non dimostrata").toString();
     }
 
     private static void queryChunks(SQLiteDatabase db, String column, Set<?> values, List<LocalListing> output) throws Exception {
@@ -481,10 +597,12 @@ final class AiBetaRegistryView {
     }
 
     static String acceptanceLabel(AiBetaRegistry.Entry entry, Match match) {
-        if (match == null || !match.isVerified()) return "bloccata: corrispondenza non verificata";
+        if (match == null || match.listing == null) return "bloccata: nessuna scheda corrente disponibile";
+        if (!match.contentMatched) return "bloccata: hash dei contenuti correnti diverso o non disponibile";
         if (!"PROPOSED".equals(entry.recordState)) return "bloccata: record irrisolto";
         if (AiBetaRegistryDraft.choices(entry, match.listing).isEmpty()) return "bloccata: nessuna proposta diversa e accettabile (mancante, UNKNOWN o già attuale)";
-        return "disponibile solo come bozza locale; nessuna modifica al catalogo";
+        if (match.listing.itemId == null || match.listing.itemId.trim().isEmpty()) return "bloccata: ID Vinted corrente mancante";
+        return "possibile solo per la scheda corrente dopo controllo di unicità; identità storica non dimostrata, nessuna scrittura finché non si conferma una correzione concreta";
     }
 
     private static String matchLabel(MatchState state) {

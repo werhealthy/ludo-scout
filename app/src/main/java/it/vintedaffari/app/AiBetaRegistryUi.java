@@ -48,7 +48,6 @@ final class AiBetaRegistryUi {
     static void open(Activity activity, AiBetaRegistry registry, AiBetaSettings settings) {
         if (registry == null || !AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
         AiBetaTestDialog.IO.execute(() -> {
-            AiBetaRegistryView.CatalogRead catalog = AiBetaRegistryView.readCurrentCatalog(activity, registry);
             DraftState draftState = new DraftState();
             try {
                 JSONObject saved = settings.load();
@@ -60,13 +59,12 @@ final class AiBetaRegistryUi {
             }
             activity.runOnUiThread(() -> {
                 if (activity.isFinishing() || activity.isDestroyed()) return;
-                showList(activity, registry, catalog, settings, draftState);
+                showList(activity, registry, settings, draftState);
             });
         });
     }
 
-    private static void showList(Activity activity, AiBetaRegistry registry,
-                                 AiBetaRegistryView.CatalogRead catalog, AiBetaSettings settings,
+    private static void showList(Activity activity, AiBetaRegistry registry, AiBetaSettings settings,
                                  DraftState draftState) {
         float density = activity.getResources().getDisplayMetrics().density;
         int pad = Math.round(14 * density);
@@ -75,7 +73,7 @@ final class AiBetaRegistryUi {
         content.setPadding(pad, pad, pad, pad);
 
         TextView heading = new TextView(activity);
-        heading.setText(AiBetaRegistryView.header(registry, catalog));
+        heading.setText(AiBetaRegistryView.reviewHeader(registry));
         heading.setTextSize(13);
         heading.setTextColor(Color.rgb(225, 223, 236));
         content.addView(heading);
@@ -83,7 +81,7 @@ final class AiBetaRegistryUi {
         Button draftButton = new Button(activity);
         updateDraftButton(draftButton, draftState);
         content.addView(draftButton);
-        draftButton.setOnClickListener(v -> showDraft(activity, settings, catalog, draftState, draftButton));
+        draftButton.setOnClickListener(v -> showDraft(activity, settings, draftState, draftButton));
 
         EditText filter = new EditText(activity);
         filter.setSingleLine(true);
@@ -91,10 +89,10 @@ final class AiBetaRegistryUi {
         content.addView(filter);
 
         List<RegistryRow> rows = new ArrayList<>();
-        String[] displayRows = AiBetaRegistryView.rows(registry, catalog);
+        String[] displayRows = AiBetaRegistryView.reviewRows(registry);
         for (int i = 0; i < registry.entries.size(); i++) {
             AiBetaRegistry.Entry entry = registry.entries.get(i);
-            rows.add(new RegistryRow(entry, AiBetaRegistryView.match(entry, catalog), displayRows[i]));
+            rows.add(new RegistryRow(entry, null, displayRows[i]));
         }
         ArrayAdapter<RegistryRow> adapter = new ArrayAdapter<RegistryRow>(activity,
                 android.R.layout.simple_list_item_1, rows) {
@@ -120,23 +118,60 @@ final class AiBetaRegistryUi {
         });
 
         AlertDialog listDialog = new AlertDialog.Builder(activity)
-                .setTitle("Registro AI · confronto locale")
+                .setTitle("Registro AI · proposta controllata")
                 .setView(content)
                 .setNegativeButton("Chiudi", null)
                 .create();
         list.setOnItemClickListener((parent, view, position, id) -> {
             RegistryRow selected = adapter.getItem(position);
-            if (selected != null) openEntry(activity, registry, catalog, settings, draftState,
+            if (selected != null) openEntry(activity, registry, settings, draftState,
                     draftButton, selected);
         });
         listDialog.show();
     }
 
-    private static void openEntry(Activity activity, AiBetaRegistry registry,
-                                  AiBetaRegistryView.CatalogRead catalog, AiBetaSettings settings,
+    private static void openEntry(Activity activity, AiBetaRegistry registry, AiBetaSettings settings,
                                   DraftState draftState, Button draftButton, RegistryRow row) {
+        if (!AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
+        AiBetaTestDialog.IO.execute(() -> {
+            AiBetaRegistryView.CurrentTargetRead target = null;
+            AiBetaRegistryView.Match match = null;
+            String details;
+            try {
+                if ("PROPOSED".equals(row.entry.recordState) && row.entry.sourceId != null) {
+                    target = AiBetaRegistryView.readCurrentTarget(activity, row.entry.sourceId);
+                    match = AiBetaRegistryView.match(row.entry, target.catalog);
+                    details = AiBetaRegistryView.details(registry, row.entry, target.catalog)
+                            + "\n\nVerifica mirata della scheda attuale: "
+                            + (AiBetaRegistryView.canPrepareCurrentTarget(row.entry, match, target)
+                            ? "ID corrente univoco, scheda attiva e hash contenuti uguale; identità storica comunque non dimostrata."
+                            : "non sufficiente per preparare una correzione; consultare i motivi riportati sopra.");
+                } else {
+                    details = AiBetaRegistryView.registryOnlyDetails(registry, row.entry);
+                }
+            } catch (Exception failure) {
+                details = AiBetaRegistryView.registryOnlyDetails(registry, row.entry)
+                        + "\n\nLettura mirata della scheda non riuscita; nessuna modifica effettuata.";
+            } finally {
+                AiBetaTestDialog.BUSY.set(false);
+            }
+            final AiBetaRegistryView.CurrentTargetRead selectedTarget = target;
+            final AiBetaRegistryView.Match selectedMatch = match;
+            final String selectedDetails = details;
+            activity.runOnUiThread(() -> {
+                if (activity.isFinishing() || activity.isDestroyed()) return;
+                showEntryDetails(activity, registry, settings, draftState, draftButton,
+                        row.entry, selectedTarget, selectedMatch, selectedDetails);
+            });
+        });
+    }
+
+    private static void showEntryDetails(Activity activity, AiBetaRegistry registry, AiBetaSettings settings,
+                                         DraftState draftState, Button draftButton, AiBetaRegistry.Entry entry,
+                                         AiBetaRegistryView.CurrentTargetRead target,
+                                         AiBetaRegistryView.Match match, String details) {
         TextView body = new TextView(activity);
-        body.setText(AiBetaRegistryView.details(registry, row.entry, catalog));
+        body.setText(details);
         body.setTextSize(16);
         body.setTextColor(Color.rgb(225, 223, 236));
         body.setTextIsSelectable(true);
@@ -144,33 +179,33 @@ final class AiBetaRegistryUi {
         body.setPadding(pad, pad, pad, pad);
         ScrollView scroll = new ScrollView(activity);
         scroll.addView(body);
-
+        boolean allowed = match != null && AiBetaRegistryView.canPrepareCurrentTarget(entry, match, target)
+                && draftState.error == null && draftState.draft == null;
         AlertDialog dialog = new AlertDialog.Builder(activity)
-                .setTitle("Scheda proposta · ID " + row.entry.listingId)
+                .setTitle("Scheda proposta · ID " + entry.listingId)
                 .setView(scroll)
                 .setNegativeButton("Chiudi", null)
                 .setPositiveButton("Scegli proposta", null)
                 .create();
         dialog.setOnShowListener(ignored -> {
             Button choose = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            boolean allowed = row.match.isVerified() && !"UNRESOLVED".equals(row.entry.recordState)
-                    && !AiBetaRegistryDraft.choices(row.entry, row.match.listing).isEmpty()
-                    && draftState.error == null && draftState.draft == null;
             choose.setEnabled(allowed);
             choose.setOnClickListener(v -> {
                 dialog.dismiss();
-                showChoices(activity, registry, row.entry, row.match, settings, draftState, draftButton);
+                showChoices(activity, registry, entry, match, target, settings, draftState, draftButton);
             });
         });
         dialog.show();
     }
 
     private static void showChoices(Activity activity, AiBetaRegistry registry, AiBetaRegistry.Entry entry,
-                                    AiBetaRegistryView.Match match, AiBetaSettings settings,
+                                    AiBetaRegistryView.Match match,
+                                    AiBetaRegistryView.CurrentTargetRead target, AiBetaSettings settings,
                                     DraftState draftState, Button draftButton) {
         List<AiBetaRegistryDraft.Choice> choices = AiBetaRegistryDraft.choices(entry, match.listing);
-        if (choices.isEmpty() || !match.isVerified() || draftState.draft != null || draftState.error != null) {
-            Toast.makeText(activity, "Accettazione bloccata: serve una corrispondenza verificata e una proposta valida.", Toast.LENGTH_LONG).show();
+        if (choices.isEmpty() || !AiBetaRegistryView.canPrepareCurrentTarget(entry, match, target)
+                || draftState.draft != null || draftState.error != null) {
+            Toast.makeText(activity, "Bozza bloccata: controlla ID corrente, hash, stato della scheda e revisione.", Toast.LENGTH_LONG).show();
             return;
         }
         String[] labels = new String[choices.size()];
@@ -178,44 +213,51 @@ final class AiBetaRegistryUi {
         new AlertDialog.Builder(activity)
                 .setTitle("Scegli un solo campo e una sola provenienza")
                 .setItems(labels, (dialog, which) -> showPreview(activity, registry, entry, match,
-                        choices.get(which), settings, draftState, draftButton))
+                        target, choices.get(which), settings, draftState, draftButton))
                 .setNegativeButton("Annulla", null)
                 .show();
     }
 
     private static void showPreview(Activity activity, AiBetaRegistry registry, AiBetaRegistry.Entry entry,
-                                    AiBetaRegistryView.Match match, AiBetaRegistryDraft.Choice choice,
+                                    AiBetaRegistryView.Match match,
+                                    AiBetaRegistryView.CurrentTargetRead target,
+                                    AiBetaRegistryDraft.Choice choice,
                                     AiBetaSettings settings, DraftState draftState, Button draftButton) {
         final AiBetaRegistryDraft.Draft preview;
         try {
-            preview = AiBetaRegistryDraft.create(registry, entry, match, choice);
+            preview = AiBetaRegistryDraft.createCurrentTarget(registry, entry, match, choice,
+                    target.uniqueCurrentItemId, target.active, target.manualReviewRequired,
+                    choice.reviewRequired);
         } catch (Exception failure) {
             Toast.makeText(activity, "Proposta non preparabile: " + failure.getMessage(), Toast.LENGTH_LONG).show();
             return;
         }
         String before = AiBetaRegistryView.valueLabel(preview.beforeValue);
         String after = preview.afterValue;
-        String message = "Scheda locale: " + AiBetaRegistryView.titleLabel(preview.title)
-                + "\nID item esterno verificato: " + preview.itemId
+        String message = "Scheda attuale: " + AiBetaRegistryView.titleLabel(preview.title)
+                + "\nID Vinted attuale: " + preview.itemId + " (non prova identità storica)"
                 + "\nCampo: " + (AiBetaRegistryDraft.FIELD_CATEGORY.equals(preview.field) ? "categoria" : "lingua")
                 + "\nPrima: " + before
                 + "\nDopo: " + after
                 + "\nProvenienza: " + preview.provenance + " · " + preview.source
-                + "\nHash dell’inserzione non conservato: contenuto attuale rispetto all’analisi storica non verificabile."
-                + "\nConfermare salva solo una bozza privata cifrata; il catalogo resta invariato.";
+                + "\nHash v3 corrente: " + preview.currentHash
+                + (preview.reviewRequired ? "\nFlag dubbio: revisione umana richiesta; confermando dichiari di aver esaminato la proposta." : "")
+                + "\nID e hash saranno ricontrollati nella transazione al momento dell’applicazione."
+                + "\nQuesto controllo non dimostra retroattivamente l’identità storica."
+                + "\nConfermare salva solo una bozza privata cifrata; nessuna scrittura al catalogo.";
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle("Anteprima prima/dopo")
                 .setMessage(message)
                 .setNegativeButton("Indietro", null)
-                .setPositiveButton("Salva bozza locale", null)
+                .setPositiveButton(preview.reviewRequired ? "Confermo la revisione · salva bozza" : "Salva bozza locale", null)
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(v -> saveDraft(activity, registry, entry, preview, settings,
+                .setOnClickListener(v -> saveDraft(activity, entry, preview, settings,
                         draftState, draftButton, dialog)));
         dialog.show();
     }
 
-    private static void saveDraft(Activity activity, AiBetaRegistry registry, AiBetaRegistry.Entry entry,
+    private static void saveDraft(Activity activity, AiBetaRegistry.Entry entry,
                                   AiBetaRegistryDraft.Draft preview, AiBetaSettings settings,
                                   DraftState draftState, Button draftButton, AlertDialog previewDialog) {
         if (!AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
@@ -228,13 +270,11 @@ final class AiBetaRegistryUi {
                 if (saved.has(AiBetaRegistryDraft.SETTINGS_KEY)) {
                     throw new IllegalStateException("Esiste già una bozza locale; annullala prima di crearne un’altra.");
                 }
-                AiBetaRegistryView.CatalogRead fresh = AiBetaRegistryView.readByItemId(activity, preview.itemId);
-                AiBetaRegistryView.Match current = AiBetaRegistryView.match(entry, fresh);
-                if (!current.isVerified()) {
-                    throw new IllegalStateException("Corrispondenza non più verificabile; bozza non salvata.");
-                }
-                if (!preview.stillMatches(current.listing)) {
-                    throw new IllegalStateException("I dati locali sono cambiati dopo l’anteprima; riapri la scheda e verifica i valori aggiornati.");
+                AiBetaRegistryView.CurrentTargetRead fresh = AiBetaRegistryView.readCurrentTarget(activity, preview.localId);
+                AiBetaRegistryView.Match current = AiBetaRegistryView.match(entry, fresh.catalog);
+                if (!AiBetaRegistryView.canPrepareCurrentTarget(entry, current, fresh)
+                        || !preview.stillMatches(current.listing)) {
+                    throw new IllegalStateException("ID corrente o hash cambiati dopo l’anteprima; bozza non salvata.");
                 }
                 AiBetaRegistryDraft.store(saved, preview);
                 settings.save(saved);
@@ -263,42 +303,222 @@ final class AiBetaRegistryUi {
         });
     }
 
-    private static void showDraft(Activity activity, AiBetaSettings settings,
-                                  AiBetaRegistryView.CatalogRead catalog, DraftState draftState,
+    private static void showDraft(Activity activity, AiBetaSettings settings, DraftState draftState,
                                   Button draftButton) {
         if (draftState.error != null) {
             Toast.makeText(activity, draftState.error, Toast.LENGTH_LONG).show();
             return;
         }
         AiBetaRegistryDraft.Draft draft = draftState.draft;
+        if (draft == null || !AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
+        AiBetaTestDialog.IO.execute(() -> {
+            AiBetaRegistryView.CurrentTargetRead target = AiBetaRegistryView.readCurrentTarget(activity, draft.localId);
+            AiBetaRegistryView.LocalListing listing = target.catalog.byLocalId.get(draft.localId);
+            AiBetaRegistryDraft.Draft reconciled = draft;
+            if (listing != null) reconciled = AiBetaRegistryApply.reconcile(draft,
+                    new AiBetaRegistryApply.Current(listing, target.active ? "ACTIVE" : "INACTIVE",
+                            target.manualReviewRequired));
+            String error = null;
+            if (!sameState(draft, reconciled)) {
+                try {
+                    JSONObject saved = settings.load();
+                    AiBetaRegistryDraft.Draft persisted = AiBetaRegistryDraft.load(saved);
+                    if (persisted == null || !persisted.sameProposal(draft))
+                        throw new IllegalStateException("Bozza cambiata durante la verifica");
+                    AiBetaRegistryDraft.replace(saved, reconciled);
+                    settings.save(saved);
+                } catch (Exception failure) {
+                    error = "Stato recuperato in memoria ma non salvato; nessuna nuova azione consentita.";
+                }
+            }
+            final AiBetaRegistryDraft.Draft currentDraft = reconciled;
+            final String recoveryError = error;
+            AiBetaTestDialog.BUSY.set(false);
+            activity.runOnUiThread(() -> {
+                if (activity.isFinishing() || activity.isDestroyed()) return;
+                draftState.draft = currentDraft;
+                if (recoveryError != null) draftState.error = recoveryError;
+                String currentStatus;
+                if (target.catalog.state != AiBetaRegistryView.CatalogState.AVAILABLE)
+                    currentStatus = target.catalog.state == AiBetaRegistryView.CatalogState.DATABASE_MISSING
+                            ? "database locale non presente" : "lettura mirata non riuscita";
+                else if (listing == null) currentStatus = "scheda locale non trovata";
+                else if (draftStillApplied(currentDraft, listing, target.uniqueCurrentItemId)) currentStatus = "applicata e hash post-correzione invariato";
+                else if (draftStillRestored(currentDraft, listing)) currentStatus = "ripristinata e hash invariato";
+                else if (currentDraft.stillMatches(listing) && target.uniqueCurrentItemId
+                        && target.active && !target.manualReviewRequired) currentStatus = "ID e hash invariati rispetto alla bozza";
+                else currentStatus = "dati o identità corrente cambiati; applicazione/ripristino bloccati";
+                showDraftDialog(activity, settings, draftState, draftButton, target, listing, currentStatus);
+            });
+        });
+    }
+
+    private static void showDraftDialog(Activity activity, AiBetaSettings settings, DraftState draftState,
+                                        Button draftButton, AiBetaRegistryView.CurrentTargetRead target,
+                                        AiBetaRegistryView.LocalListing listing, String currentStatus) {
+        AiBetaRegistryDraft.Draft draft = draftState.draft;
         if (draft == null) return;
-        String currentStatus = "non verificabili";
-        if (catalog.state == AiBetaRegistryView.CatalogState.AVAILABLE) {
-            List<AiBetaRegistryView.LocalListing> matches = catalog.byItemId.get(draft.itemId);
-            if (matches == null || matches.isEmpty()) currentStatus = "ID esterno non trovato";
-            else if (matches.size() > 1) currentStatus = "associazione ambigua";
-            else currentStatus = draft.stillMatches(matches.get(0)) ? "invariati rispetto alla bozza" : "cambiati; bozza da rivedere";
-        } else if (catalog.state == AiBetaRegistryView.CatalogState.QUERY_FAILED) {
-            currentStatus = "query non riuscita";
-        } else {
-            currentStatus = "database locale non presente";
-        }
-        String message = draft.details(currentStatus);
-        AlertDialog dialog = new AlertDialog.Builder(activity)
-                .setTitle("Bozza locale · valore precedente conservato")
-                .setMessage(message)
+        boolean canApply = draft.canApply() && listing != null && draft.stillMatches(listing)
+                && target.uniqueCurrentItemId && target.active && !target.manualReviewRequired
+                && draftState.error == null;
+        boolean canRestore = draftStillApplied(draft, listing, target.uniqueCurrentItemId)
+                && draftState.error == null;
+        boolean canDelete = AiBetaRegistryDraft.STAGED.equals(draft.state)
+                || AiBetaRegistryDraft.RESTORED.equals(draft.state);
+        boolean canDeleteNeutral = AiBetaRegistryDraft.STAGED.equals(draft.state);
+        String action = canApply ? "Applica correzione" : canRestore ? "Ripristina valore precedente"
+                : canDelete ? "Elimina bozza" : "Chiudi";
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity)
+                .setTitle("Bozza · prima/dopo conservati")
+                .setMessage(draft.details(currentStatus))
                 .setNegativeButton("Chiudi", null)
-                .setPositiveButton("Annulla bozza", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(v -> clearDraft(activity, settings, draftState, draftButton, dialog)));
+                .setPositiveButton(action, null);
+        if (canDeleteNeutral) builder.setNeutralButton("Elimina bozza", null);
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(ignored -> {
+            Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            if (canApply) positive.setOnClickListener(v -> showApplyConfirmation(activity, settings,
+                    draftState, draftButton, draft, dialog));
+            else if (canRestore) positive.setOnClickListener(v -> showRestoreConfirmation(activity, settings,
+                    draftState, draftButton, draft, dialog));
+            else if (canDelete && AiBetaRegistryDraft.RESTORED.equals(draft.state))
+                positive.setOnClickListener(v -> clearDraft(activity, settings, draftState, draftButton, dialog));
+            else if (!canDelete) positive.setEnabled(false);
+            if (canDeleteNeutral) dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+                    .setOnClickListener(v -> clearDraft(activity, settings, draftState, draftButton, dialog));
+        });
         dialog.show();
+    }
+
+    private static void showApplyConfirmation(Activity activity, AiBetaSettings settings,
+                                             DraftState draftState, Button draftButton,
+                                             AiBetaRegistryDraft.Draft draft, AlertDialog parent) {
+        String message = "Scheda: " + AiBetaRegistryView.titleLabel(draft.title)
+                + "\nID Vinted attuale: " + draft.itemId
+                + "\nCampo: " + draft.field + " · " + draft.beforeLabel() + " → " + draft.afterValue
+                + "\nProvenienza: " + draft.provenance + " · " + draft.source
+                + "\nHash v3 atteso: " + draft.currentHash
+                + "\nLa transazione rileggerà ID e hash e bloccherà la scrittura se differiscono."
+                + "\nIdentità storica: non dimostrata. Verrà modificato un solo campo di una sola scheda.";
+        new AlertDialog.Builder(activity).setTitle("Conferma questa correzione")
+                .setMessage(message).setNegativeButton("Non applicare", null)
+                .setPositiveButton("Applica questa sola correzione", (d, which) -> runApply(activity,
+                        settings, draftState, draftButton, draft, parent)).show();
+    }
+
+    private static void showRestoreConfirmation(Activity activity, AiBetaSettings settings,
+                                               DraftState draftState, Button draftButton,
+                                               AiBetaRegistryDraft.Draft draft, AlertDialog parent) {
+        new AlertDialog.Builder(activity).setTitle("Ripristina il valore precedente?")
+                .setMessage("La scheda verrà riletta nella transazione. Il ripristino procede solo se ID e hash post-correzione sono invariati.\n\n"
+                        + AiBetaRegistryView.titleLabel(draft.title) + " · " + draft.itemId
+                        + "\n" + draft.afterValue + " → " + draft.beforeLabel()
+                        + "\nHash post-correzione: " + draft.appliedHash)
+                .setNegativeButton("Mantieni correzione", null)
+                .setPositiveButton("Ripristina", (d, which) -> runRestore(activity,
+                        settings, draftState, draftButton, draft, parent)).show();
+    }
+
+    private static void runApply(Activity activity, AiBetaSettings settings, DraftState draftState,
+                                Button draftButton, AiBetaRegistryDraft.Draft draft, AlertDialog parent) {
+        runDatabaseChange(activity, settings, draftState, draftButton, draft, parent, true);
+    }
+
+    private static void runRestore(Activity activity, AiBetaSettings settings, DraftState draftState,
+                                  Button draftButton, AiBetaRegistryDraft.Draft draft, AlertDialog parent) {
+        runDatabaseChange(activity, settings, draftState, draftButton, draft, parent, false);
+    }
+
+    private static void runDatabaseChange(Activity activity, AiBetaSettings settings, DraftState draftState,
+                                          Button draftButton, AiBetaRegistryDraft.Draft draft,
+                                          AlertDialog parent, boolean apply) {
+        if (!AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
+        AiBetaTestDialog.IO.execute(() -> {
+            AiBetaRegistryDraft.Draft result = null;
+            String message = null;
+            boolean changed = false;
+            try {
+                JSONObject saved = settings.load();
+                AiBetaRegistryDraft.Draft persisted = AiBetaRegistryDraft.load(saved);
+                if (persisted == null || !persisted.sameProposal(draft) || !persisted.state.equals(draft.state))
+                    throw new IllegalStateException("La bozza è cambiata; nessuna scrittura eseguita.");
+                AiBetaRegistryApply.Journal journal = update -> {
+                    JSONObject current = settings.load();
+                    AiBetaRegistryDraft.Draft stored = AiBetaRegistryDraft.load(current);
+                    if (stored == null || !stored.sameProposal(draft))
+                        throw new IllegalStateException("La bozza cifrata è cambiata; transazione annullata.");
+                    AiBetaRegistryDraft.replace(current, update);
+                    settings.save(current);
+                };
+                try (android.database.sqlite.SQLiteDatabase db = AiBetaRegistryApply.openWritableCatalog(activity)) {
+                    result = apply ? AiBetaRegistryApply.apply(db, draft, journal)
+                            : AiBetaRegistryApply.restore(db, draft, journal);
+                }
+                changed = true;
+                message = apply ? "Correzione applicata; prima/dopo conservati per il ripristino."
+                        : "Valore precedente ripristinato; cronologia prima/dopo conservata.";
+            } catch (AiBetaRegistryApply.JournalPendingException pending) {
+                result = pending.recoverableDraft;
+                message = pending.getMessage();
+                changed = true;
+            } catch (Exception failure) {
+                message = failure.getMessage() == null ? "Operazione bloccata; controlla lo stato della scheda." : failure.getMessage();
+                try { result = AiBetaRegistryDraft.load(settings.load()); } catch (Exception ignored) { }
+            } finally {
+                AiBetaTestDialog.BUSY.set(false);
+            }
+            final AiBetaRegistryDraft.Draft finalDraft = result;
+            final String finalMessage = message;
+            final boolean finalChanged = changed;
+            activity.runOnUiThread(() -> {
+                if (activity.isFinishing() || activity.isDestroyed()) return;
+                if (finalDraft != null) draftState.draft = finalDraft;
+                updateDraftButton(draftButton, draftState);
+                if (finalChanged) parent.dismiss();
+                Toast.makeText(activity, finalMessage, Toast.LENGTH_LONG).show();
+            });
+        });
+    }
+
+    private static boolean sameState(AiBetaRegistryDraft.Draft left, AiBetaRegistryDraft.Draft right) {
+        return left != null && right != null && left.state.equals(right.state)
+                && same(left.appliedHash, right.appliedHash) && same(left.restoredHash, right.restoredHash);
+    }
+
+    private static boolean draftStillApplied(AiBetaRegistryDraft.Draft draft,
+                                             AiBetaRegistryView.LocalListing listing, boolean uniqueItemId) {
+        return draft != null && listing != null && uniqueItemId
+                && AiBetaRegistryDraft.APPLIED.equals(draft.state) && draft.appliedHash != null
+                && same(draft.itemId, listing.itemId) && same(draft.appliedHash, listing.sourceHash)
+                && same(draft.afterValue, AiBetaRegistryDraft.FIELD_CATEGORY.equals(draft.field)
+                ? listing.category : listing.language);
+    }
+
+    private static boolean draftStillRestored(AiBetaRegistryDraft.Draft draft,
+                                             AiBetaRegistryView.LocalListing listing) {
+        return draft != null && listing != null && AiBetaRegistryDraft.RESTORED.equals(draft.state)
+                && draft.restoredHash != null && same(draft.itemId, listing.itemId)
+                && same(draft.restoredHash, listing.sourceHash)
+                && same(draft.beforeValue, AiBetaRegistryDraft.FIELD_CATEGORY.equals(draft.field)
+                ? listing.category : listing.language);
+    }
+
+    private static boolean same(String left, String right) {
+        return left == null ? right == null : left.equals(right);
     }
 
     private static void clearDraft(Activity activity, AiBetaSettings settings, DraftState draftState,
                                    Button draftButton, AlertDialog dialog) {
+        if (draftState.draft == null || (!AiBetaRegistryDraft.STAGED.equals(draftState.draft.state)
+                && !AiBetaRegistryDraft.RESTORED.equals(draftState.draft.state))) {
+            Toast.makeText(activity, "Bozza conservata: prima/dopo non verranno eliminati mentre la correzione è applicata o in conflitto.", Toast.LENGTH_LONG).show();
+            return;
+        }
         if (!AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+        if (dialog.getButton(AlertDialog.BUTTON_POSITIVE) != null)
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+        if (dialog.getButton(AlertDialog.BUTTON_NEUTRAL) != null)
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setEnabled(false);
         AiBetaTestDialog.IO.execute(() -> {
             String error = null;
             boolean cleared = false;
@@ -336,7 +556,7 @@ final class AiBetaRegistryUi {
             button.setText("Bozza privata non leggibile · non sovrascritta");
             button.setEnabled(false);
         } else if (state.draft != null) {
-            button.setText("Bozza locale: " + state.draft.summary() + " · tocca per vedere/annullare");
+            button.setText("Bozza " + state.draft.state + ": " + state.draft.summary() + " · tocca per verificare");
             button.setEnabled(true);
         } else {
             button.setText("Nessuna bozza locale salvata");
