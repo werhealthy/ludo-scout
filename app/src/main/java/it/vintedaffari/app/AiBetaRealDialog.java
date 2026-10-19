@@ -6,11 +6,17 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Color;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.lang.ref.WeakReference;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -21,10 +27,12 @@ public final class AiBetaRealDialog {
  private final Activity activity;
  private final AiBetaSettings settings;
  private final TextView status;
- private final Button prepare, analyze, reanalyze, review, inspect, copy;
+ private final Button prepare, analyze, reanalyze, review, inspect, copy, importRegistry, showRegistry;
  private final AlertDialog dialog;
  private AiBetaRealListings.Snapshot snapshot;
+ private AiBetaRegistry registry;
  private boolean enabled, validProposal;
+ private static volatile WeakReference<AiBetaRealDialog> active = new WeakReference<>(null);
 
  private AiBetaRealDialog(Activity a) {
   activity=a; settings=new AiBetaSettings(a);
@@ -36,13 +44,17 @@ public final class AiBetaRealDialog {
   reanalyze=new Button(a);reanalyze.setText("Rianalizza con Qwen");reanalyze.setEnabled(false);box.addView(reanalyze);
   review=new Button(a);review.setText("Segna confronto come revisionato");review.setEnabled(false);box.addView(review);
   copy=new Button(a);copy.setText("Copia testo");copy.setEnabled(false);box.addView(copy);
+  importRegistry=new Button(a);importRegistry.setText("Importa registro AI (JSON)");box.addView(importRegistry);
+  showRegistry=new Button(a);showRegistry.setText("Mostra registro AI");showRegistry.setEnabled(false);box.addView(showRegistry);
   status=new TextView(a);status.setTextColor(Color.rgb(225,223,236));status.setTextSize(15);status.setPadding(0,pad,0,pad);status.setTextIsSelectable(true);status.setText("Caricamento…");box.addView(status);
   ScrollView scroll=new ScrollView(a);scroll.addView(box);
   dialog=new AlertDialog.Builder(a).setTitle("Annunci reali · confronto AI").setView(scroll).setNegativeButton("Chiudi",null).create();dialog.show();
-  prepare.setOnClickListener(v->prepare());inspect.setOnClickListener(v->inspect());analyze.setOnClickListener(v->analyze(false));reanalyze.setOnClickListener(v->analyze(true));review.setOnClickListener(v->review());copy.setOnClickListener(v->copyText());
+  active=new WeakReference<>(this);dialog.setOnDismissListener(ignored->{if(active.get()==this)active=new WeakReference<>(null);});
+  prepare.setOnClickListener(v->prepare());inspect.setOnClickListener(v->inspect());analyze.setOnClickListener(v->analyze(false));reanalyze.setOnClickListener(v->analyze(true));review.setOnClickListener(v->review());copy.setOnClickListener(v->copyText());importRegistry.setOnClickListener(v->AiBetaRegistryImportUi.start(activity));showRegistry.setOnClickListener(v->viewRegistry());
   prepare.setEnabled(false);
   AiBetaTestDialog.IO.execute(()->{
    try {
+    registry=AiBetaRegistryStore.load(a);
     JSONObject saved=settings.load();enabled=saved.optBoolean("enabled",false);
     JSONArray local=saved.optJSONArray("real_snapshot");
     if(local!=null) {
@@ -54,9 +66,13 @@ public final class AiBetaRealDialog {
   });
  }
  public static AlertDialog show(Activity a){return new AiBetaRealDialog(a).dialog;}
+ static void onRegistryImported(Activity a,AiBetaRegistry imported){
+  a.runOnUiThread(()->{AiBetaRealDialog current=active.get();if(current==null||current.activity!=a||!current.visible())return;current.registry=imported;current.showRegistry.setEnabled(!AiBetaTestDialog.BUSY.get());String note="Registro AI importato: "+imported.entries.size()+" record · AI — non verificato · catalogo invariato.";CharSequence existing=current.status.getText();if(existing==null||existing.length()==0)current.status.setText(note);else if(!existing.toString().contains("Registro AI importato:"))current.status.append("\n\n"+note);});
+ }
  private boolean visible(){return !activity.isFinishing()&&!activity.isDestroyed()&&dialog.isShowing();}
  private void update(AiBetaRealListings.Snapshot next,String message,boolean proposed) {
-  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(message);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);inspect.setEnabled(idle&&next!=null&&next.rows.length()>0);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);reanalyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0&&proposed);review.setEnabled(idle&&proposed);copy.setEnabled(message!=null&&!message.trim().isEmpty());});
+  String display=message;if(registry!=null&&display!=null&&!display.contains("Registro AI importato:"))display+="\n\nRegistro AI importato: "+registry.entries.size()+" record · AI — non verificato.";final String rendered=display;
+  activity.runOnUiThread(()->{if(!visible())return;snapshot=next;validProposal=proposed;status.setText(rendered);boolean idle=!AiBetaTestDialog.BUSY.get();prepare.setEnabled(idle);inspect.setEnabled(idle&&next!=null&&next.rows.length()>0);analyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0);reanalyze.setEnabled(idle&&enabled&&next!=null&&next.rows.length()>0&&proposed);review.setEnabled(idle&&proposed);copy.setEnabled(rendered!=null&&!rendered.trim().isEmpty());importRegistry.setEnabled(idle);showRegistry.setEnabled(idle&&registry!=null);});
  }
  private void copyText() {
   CharSequence value=status.getText();if(value==null||value.length()==0)return;
@@ -67,7 +83,23 @@ public final class AiBetaRealDialog {
  }
  private boolean begin(String message) {
   if(!AiBetaTestDialog.BUSY.compareAndSet(false,true))return false;
-  prepare.setEnabled(false);inspect.setEnabled(false);analyze.setEnabled(false);reanalyze.setEnabled(false);review.setEnabled(false);status.setText(message);return true;
+  prepare.setEnabled(false);inspect.setEnabled(false);analyze.setEnabled(false);reanalyze.setEnabled(false);review.setEnabled(false);importRegistry.setEnabled(false);showRegistry.setEnabled(false);status.setText(message);return true;
+ }
+ private void viewRegistryLegacy(){
+  final AiBetaRegistry chosen=registry;final AiBetaRealListings.Snapshot currentSnapshot=snapshot;
+  if(chosen==null||!begin("Lettura del registro importato in sola lettura…"))return;
+  AiBetaTestDialog.IO.execute(()->{
+   String[] rows=null;String error=null;
+   try{rows=AiBetaRegistryView.rows(activity,chosen);}catch(Exception failure){error="Registro o metadati locali non leggibili. Nessuna modifica effettuata.";}finally{AiBetaTestDialog.BUSY.set(false);}
+   if(error!=null){update(currentSnapshot,error,false);return;}
+   final String[] items=rows;update(currentSnapshot,"Registro AI letto in sola lettura · "+chosen.entries.size()+" record.",false);
+   activity.runOnUiThread(()->{if(!visible())return;float density=activity.getResources().getDisplayMetrics().density;int pad=Math.round(14*density);LinearLayout content=new LinearLayout(activity);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(pad,pad,pad,pad);TextView heading=new TextView(activity);heading.setText(AiBetaRegistryView.header(chosen));heading.setTextSize(13);heading.setTextColor(Color.rgb(225,223,236));content.addView(heading);EditText filter=new EditText(activity);filter.setSingleLine(true);filter.setHint("Filtra per ID, categoria o lingua");content.addView(filter);ArrayAdapter<String> adapter=new ArrayAdapter<String>(activity,android.R.layout.simple_list_item_1,items){@Override public android.view.View getView(int position,android.view.View convertView,android.view.ViewGroup parent){android.view.View row=super.getView(position,convertView,parent);TextView label=row.findViewById(android.R.id.text1);label.setSingleLine(false);label.setMaxLines(4);return row;}};ListView list=new ListView(activity);list.setAdapter(adapter);int screenDp=(int)(activity.getResources().getDisplayMetrics().heightPixels/density);int listHeight=Math.round(Math.max(140,Math.min(400,screenDp-250))*density);content.addView(list,new LinearLayout.LayoutParams(-1,listHeight));filter.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){adapter.getFilter().filter(s);}public void afterTextChanged(Editable editable){}});list.setOnItemClickListener((parent,row,position,id)->{String selected=adapter.getItem(position);if(selected==null)return;TextView detail=new TextView(activity);detail.setText(selected);detail.setTextSize(16);detail.setTextColor(Color.rgb(225,223,236));detail.setTextIsSelectable(true);detail.setPadding(pad,pad,pad,pad);ScrollView detailScroll=new ScrollView(activity);detailScroll.addView(detail);new AlertDialog.Builder(activity).setTitle("Dettaglio proposta · AI non verificata").setView(detailScroll).setNegativeButton("Chiudi",null).show();});new AlertDialog.Builder(activity).setTitle("Registro AI — non verificato").setView(content).setNegativeButton("Chiudi",null).show();});
+  });
+ }
+ private void viewRegistry() {
+  AiBetaRegistry chosen=registry;
+  if(chosen==null)return;
+  AiBetaRegistryUi.open(activity,chosen,settings);
  }
  private void inspect() {
   final AiBetaRealListings.Snapshot chosen=snapshot;

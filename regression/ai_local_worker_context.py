@@ -39,4 +39,10 @@ payload=seen["payload"]
 assert payload["messages"][0]["images"]==["c3ludGhldGljLWltYWdl"]
 assert payload["options"].get("num_ctx",0)>=8192, "photo prompts need a context larger than Ollama's 4096-token default"
 assert answer["proposed_type"]=="BASE_GAME"
-print("PASS local photo classification requests an 8192-token Ollama context")
+assert answer["language"]=="UNKNOWN", "the worker must preserve the model abstention"
+prompt=payload["messages"][0]["content"]
+assert "Una parola isolata non basta" in prompt
+assert "Vinted puo tradurli" in prompt
+assert "una espansione o contenuto extra incluso nella confezione non basta" in prompt
+assert "non richiede di verificare a vista tutti i componenti" in prompt
+print("PASS 8192-token photo context and language/category evidence prompt guards")

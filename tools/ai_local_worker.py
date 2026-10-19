@@ -171,15 +171,15 @@ Vinted puo tradurre automaticamente titolo e descrizione: usali per capire COSA 
 Campi realmente disponibili: descrizione={bool(source_text.strip())}; foto valide={len(images)} su URL={len(photo_urls)}.
 Non attribuire mai una prova a descrizione o foto se quel campo non e realmente disponibile.
 Se ci sono immagini, usale insieme: fronte, retro e componenti. Se foto=0, non citare immagini, foto o elementi visivi.
-BASE_GAME = gioco autonomo completo, incluse varianti standalone.
-EXPANSION = richiede o amplia un altro gioco.
-BUNDLE = piu prodotti distinti venduti insieme.
+BASE_GAME = gioco autonomo, incluse versioni standalone; non richiede di verificare a vista tutti i componenti.
+EXPANSION = prodotto che richiede un altro gioco o ne amplia il contenuto.
+BUNDLE = due o piu prodotti distinti venduti insieme; una espansione o contenuto extra incluso nella confezione non basta.
 ACCESSORY = organizer, playmat, insert, sleeves, storage.
 COMPONENT = pezzi, carte, dadi, miniature, token o ricambi separati.
 EMPTY_BOX = scatola vuota.
 NON_GAME = prodotto non tabletop.
 UNKNOWN = prove insufficienti.
-Per edition_language usa soprattutto testo realmente visibile sulla confezione; se non dimostrabile usa UNKNOWN. Distingui esplicitamente NL (olandese: spel, spelregels, het, straat, bankieren) da DE (tedesco: Spiel, Spielregeln, Straße, Bank). Non dedurre la lingua dal paese o dal titolo tradotto da Vinted.
+Per edition_language considera solo testo stampato realmente leggibile sulla confezione o sulle istruzioni nelle foto. Non dedurre la lingua da titolo/descrizione dell'annuncio, brand/editore, paese o nome del gioco: Vinted puo tradurli. Una parola isolata non basta: assegna IT/EN/DE/FR/ES/PT/NL solo quando piu indizi visivi chiari e coerenti identificano la lingua della copia. Usa MULTI solo per testi sostanziali in piu lingue; usa UNKNOWN se il testo visibile e assente, ambiguo o contraddittorio. Evidence cita una breve prova visibile e, quando possibile, il lato/posizione; senza prova visiva concreta non inventare e usa UNKNOWN.
 Non inventare. Evidence massimo 4 frasi brevi."""
  payload={"model":MODEL,"stream":False,"format":SCHEMA,"options":{"temperature":0,"num_predict":240,"num_ctx":8192},
           "messages":[{"role":"user","content":prompt,**({"images":images} if images else {})}]}
