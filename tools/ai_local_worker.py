@@ -97,47 +97,89 @@ def allowed_photo(url):
  try:
   u=urllib.parse.urlparse(url)
   host=(u.hostname or "").lower()
-  return u.scheme=="https" and (host=="vinted.net" or host.endswith(".vinted.net") or host=="vinted.com" or host.endswith(".vinted.com"))
+  return (u.scheme=="https" and u.username is None and u.password is None and u.port is None
+          and (host=="vinted.net" or host.endswith(".vinted.net") or host=="vinted.com" or host.endswith(".vinted.com")))
  except Exception:
   return False
 
+def image_dimensions(data):
+ if data.startswith(bytes([137,80,78,71,13,10,26,10])) and len(data)>=24:
+  return "image/png",int.from_bytes(data[16:20],"big"),int.from_bytes(data[20:24],"big")
+ if data.startswith(b"RIFF") and len(data)>=30 and data[8:12]==b"WEBP":
+  kind=data[12:16]
+  if kind==b"VP8X":
+   return "image/webp",1+int.from_bytes(data[24:27],"little"),1+int.from_bytes(data[27:30],"little")
+  if kind==b"VP8 " and len(data)>=30 and data[23:26]==bytes([157,1,42]):
+   return "image/webp",int.from_bytes(data[26:28],"little")&0x3fff,int.from_bytes(data[28:30],"little")&0x3fff
+  if kind==b"VP8L" and len(data)>=25 and data[20]==0x2f:
+   b1,b2,b3,b4=data[21:25]
+   return "image/webp",1+(((b2&0x3f)<<8)|b1),1+(((b4&0x0f)<<10)|(b3<<2)|((b2&0xc0)>>6))
+ if data.startswith(bytes([255,216])):
+  i=2
+  while i+4<=len(data):
+   if data[i]!=0xff:i+=1;continue
+   while i<len(data) and data[i]==0xff:i+=1
+   if i>=len(data):break
+   marker=data[i];i+=1
+   if marker in (0xd8,0xd9) or 0xd0<=marker<=0xd7:continue
+   if i+2>len(data):break
+   size=int.from_bytes(data[i:i+2],"big")
+   if size<2 or i+size>len(data):break
+   if marker in (0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf):
+    if size<7:return None
+    return "image/jpeg",int.from_bytes(data[i+5:i+7],"big"),int.from_bytes(data[i+3:i+5],"big")
+   i+=size
+ return None
+
+def valid_image(data,content_type):
+ info=image_dimensions(data)
+ if not info:return False
+ detected,width,height=info
+ declared=(content_type or "").split(";",1)[0].strip().lower()
+ return declared==detected and 0<width<=12000 and 0<height<=12000 and width*height<=40000000
+
 def fetch_image(url):
  if not allowed_photo(url): return None
- req=urllib.request.Request(url,headers={"User-Agent":"LudoScoutLocalAI/1.0"})
+ req=urllib.request.Request(url,headers={"User-Agent":"LudoScoutLocalAI/1.0","Accept":"image/jpeg,image/png,image/webp"})
  try:
   with NO_REDIRECT.open(req,timeout=10) as r:
    if not allowed_photo(r.geturl()): return None
    length=r.headers.get("content-length")
-   if length and int(length)>8*1024*1024: return None
+   if length and (not length.isdigit() or int(length)>8*1024*1024): return None
    data=r.read(8*1024*1024+1)
-   if len(data)>8*1024*1024: return None
+   if len(data)>8*1024*1024 or not valid_image(data,r.headers.get("content-type","")): return None
    return base64.b64encode(data).decode()
  except Exception:
   return None
 
 def classify(record):
  images=[]
- for url in record.get("photos",[])[:4]:
+ photo_urls=record.get("photos",[])
+ if not isinstance(photo_urls,list): photo_urls=[]
+ photo_urls=[url for url in photo_urls[:4] if isinstance(url,str)]
+ source_text=str(record.get("source_text",""))[:2000]
+ for url in photo_urls:
   data=fetch_image(url)
   if data: images.append(data)
  prompt=f"""Sei il riconoscitore multimodale di Ludo Scout.
 Titolo annuncio: {record.get('title','')}
 Brand: {record.get('brand','')}
-Descrizione acquisita: {record.get('source_text','')}
+Descrizione acquisita: {source_text}
+URL foto nell'annuncio: {len(photo_urls)}; immagini scaricate e validate: {len(images)}.
 
 Vinted puo tradurre automaticamente titolo e descrizione: usali per capire COSA viene venduto, non per dedurre la lingua fisica.
-Campi realmente disponibili: descrizione={bool(str(record.get('source_text','')).strip())}; foto={len(images)}.
+Campi realmente disponibili: descrizione={bool(source_text.strip())}; foto valide={len(images)} su URL={len(photo_urls)}.
 Non attribuire mai una prova a descrizione o foto se quel campo non e realmente disponibile.
 Se ci sono immagini, usale insieme: fronte, retro e componenti. Se foto=0, non citare immagini, foto o elementi visivi.
-BASE_GAME = gioco autonomo completo, incluse varianti standalone.
-EXPANSION = richiede o amplia un altro gioco.
-BUNDLE = piu prodotti distinti venduti insieme.
+BASE_GAME = gioco autonomo, incluse versioni standalone; non richiede di verificare a vista tutti i componenti.
+EXPANSION = prodotto che richiede un altro gioco o ne amplia il contenuto.
+BUNDLE = due o piu prodotti distinti venduti insieme; una espansione o contenuto extra incluso nella confezione non basta.
 ACCESSORY = organizer, playmat, insert, sleeves, storage.
 COMPONENT = pezzi, carte, dadi, miniature, token o ricambi separati.
 EMPTY_BOX = scatola vuota.
 NON_GAME = prodotto non tabletop.
 UNKNOWN = prove insufficienti.
-Per edition_language usa soprattutto testo realmente visibile sulla confezione; se non dimostrabile usa UNKNOWN. Distingui esplicitamente NL (olandese: spel, spelregels, het, straat, bankieren) da DE (tedesco: Spiel, Spielregeln, Straße, Bank). Non dedurre la lingua dal paese o dal titolo tradotto da Vinted.
+Per edition_language considera solo testo stampato realmente leggibile sulla confezione o sulle istruzioni nelle foto. Non dedurre la lingua da titolo/descrizione dell'annuncio, brand/editore, paese o nome del gioco: Vinted puo tradurli. Una parola isolata non basta: assegna IT/EN/DE/FR/ES/PT/NL solo quando piu indizi visivi chiari e coerenti identificano la lingua della copia. Usa MULTI solo per testi sostanziali in piu lingue; usa UNKNOWN se il testo visibile e assente, ambiguo o contraddittorio. Evidence cita una breve prova visibile e, quando possibile, il lato/posizione; senza prova visiva concreta non inventare e usa UNKNOWN.
 Non inventare. Evidence massimo 4 frasi brevi."""
  payload={"model":MODEL,"stream":False,"format":SCHEMA,"options":{"temperature":0,"num_predict":240,"num_ctx":8192},
           "messages":[{"role":"user","content":prompt,**({"images":images} if images else {})}]}
@@ -145,7 +187,7 @@ Non inventare. Evidence massimo 4 frasi brevi."""
  if status!=200: raise RuntimeError("ollama status")
  result=json.loads(response["message"]["content"])
  ptype=TYPE_MAP.get(result["product_type"],result["product_type"])
- source_text=str(record.get("source_text","")).strip()
+ source_text=source_text.strip()
  brand=str(record.get("brand","")).strip()
  grounded=[]
  for item in result.get("evidence",[]):

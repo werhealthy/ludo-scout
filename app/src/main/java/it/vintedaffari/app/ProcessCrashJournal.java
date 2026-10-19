@@ -61,6 +61,66 @@ public final class ProcessCrashJournal {
         }
     }
 
+    /** Returns only a crash header summary suitable for an in-app diagnostic view.
+     * Exception messages and stack traces are deliberately never returned. */
+    public static String safeLatestCrashSummary(Context context){
+        if(context==null)return "";
+        try{
+            File dir=new File(context.getFilesDir(),"process_crash_journal");
+            File[] files=dir.listFiles((d,n)->n.startsWith("crash-")&&n.endsWith(".txt"));
+            if(files==null)return "";
+            long latestAt=0L;String latest="";
+            for(File f:files){
+                long at=0L;String process="",phase="",error="";
+                try(BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(f),StandardCharsets.UTF_8))){
+                    String line;while((line=r.readLine())!=null){
+                        if(line.startsWith("at="))try{at=Long.parseLong(line.substring(3));}catch(NumberFormatException ignored){}
+                        else if(line.startsWith("process="))process=line.substring(8);
+                        else if(line.startsWith("phase="))phase=line.substring(6);
+                        else if(line.startsWith("error="))error=line.substring(6);
+                        if(line.startsWith("stack="))break;
+                    }
+                }catch(Exception ignored){}
+                if(at>latestAt){latestAt=at;latest=safeCrashSummary(at,process,phase,error);}
+            }
+            return latest;
+        }catch(Throwable ignored){return "";}
+    }
+
+    static String safeCrashSummary(long at,String process,String phase,String error){
+        if(at<=0L)return "";
+        String safePhase="UNCAUGHT".equals(phase)?"UNCAUGHT":"UNKNOWN";
+        String exception=error==null?"":error;
+        int message=exception.indexOf(':');if(message>=0)exception=exception.substring(0,message);
+        if(!exception.matches("[A-Za-z0-9_.$]{1,100}"))exception="UnknownException";
+        String processName=process==null||process.isEmpty()?"unknown":process.replaceAll("[^A-Za-z0-9._-]","_");
+        if(processName.length()>80)processName=processName.substring(0,80);
+        return "at="+at+";process="+processName+";phase="+safePhase+";exception="+exception;
+    }
+
+    /** Minimal fallback to Android's exit history; never returns descriptions or memory details. */
+    public static String safeLatestSystemExitSummary(Context context){
+        if(context==null||Build.VERSION.SDK_INT<30)return "";
+        try{
+            ActivityManager am=(ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
+            List<ApplicationExitInfo> exits=am==null?null:am.getHistoricalProcessExitReasons(null,0,32);
+            if(exits==null)return "";
+            String pkg=context.getPackageName();long latestAt=0L;String latest="";
+            for(ApplicationExitInfo exit:exits){
+                String process=exit.getProcessName();
+                if(TextUtils.isEmpty(process)||!(process.equals(pkg)||process.startsWith(pkg+":")))continue;
+                int reason=exit.getReason();
+                if(reason!=ApplicationExitInfo.REASON_CRASH
+                        &&reason!=ApplicationExitInfo.REASON_CRASH_NATIVE
+                        &&reason!=ApplicationExitInfo.REASON_ANR
+                        &&reason!=ApplicationExitInfo.REASON_INITIALIZATION_FAILURE)continue;
+                long at=exit.getTimestamp();
+                if(at>latestAt){latestAt=at;latest="at="+at+";process="+safeProcess(process)+";reason="+reasonName(reason);}
+            }
+            return latest;
+        }catch(Throwable ignored){return "";}
+    }
+
     public static String fileSummary(Context context){
         try{
             File dir=new File(context.getFilesDir(),"process_crash_journal");File[] files=dir.listFiles((d,n)->(n.startsWith("crash-")||n.startsWith("handled-"))&&n.endsWith(".txt"));

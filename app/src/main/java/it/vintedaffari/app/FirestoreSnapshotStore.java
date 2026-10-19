@@ -3,12 +3,17 @@ package it.vintedaffari.app;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+
 import android.database.sqlite.SQLiteStatement;
+import org.json.JSONObject;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.json.JSONArray;
 
 /** Bounded, resumable materialization kept separate from the authoritative catalog DB. */
 final class FirestoreSnapshotStore implements AutoCloseable {
@@ -29,44 +34,123 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         final long uploaded;
         final String previousId;
         final String previousCursor;
+        final int protocolVersion;
+        final boolean includesEvidence;
+        final boolean evidenceEnabled;
         Snapshot(String id, String state, long count, String contentHash,
-                 long uploaded, String previousId, String previousCursor) {
+                 long uploaded, String previousId, String previousCursor, int protocolVersion,
+                 boolean includesEvidence) {
             this.id=id; this.state=state; this.count=count; this.contentHash=contentHash;
             this.uploaded=uploaded; this.previousId=previousId; this.previousCursor=previousCursor;
+            this.protocolVersion=protocolVersion; this.includesEvidence=includesEvidence;
+            this.evidenceEnabled=includesEvidence;
         }
     }
 
+    static final class MetadataRead {
+        final Snapshot snapshot;
+        final boolean queryFailed;
+        private MetadataRead(Snapshot snapshot, boolean queryFailed) {
+            this.snapshot = snapshot;
+            this.queryFailed = queryFailed;
+        }
+    }
+
+    /** Reads the last published snapshot identity without creating or mutating the sidecar. */
+    static MetadataRead readMetadataReadOnly(Context context) {
+        File file = new File(context.getNoBackupFilesDir(), DB_NAME);
+        if (!file.isFile()) return new MetadataRead(null, false);
+        SQLiteDatabase readOnly = null;
+        try {
+            readOnly = SQLiteDatabase.openDatabase(file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+            try (Cursor c = readOnly.rawQuery("SELECT snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled FROM snapshot_meta WHERE singleton=1", null)) {
+                if (!c.moveToFirst()) return new MetadataRead(null, false);
+                Snapshot snapshot = new Snapshot(c.getString(0), c.getString(1), c.getLong(2), c.getString(3),
+                        c.getLong(4), c.getString(5), c.getString(6), c.getInt(7), c.getInt(8) == 1);
+                return new MetadataRead(snapshot, false);
+            }
+        } catch (Exception failure) {
+            return new MetadataRead(null, true);
+        } finally {
+            if (readOnly != null) readOnly.close();
+        }
+    }
+
+    static FirestoreSnapshotStore open(Context context) { return new FirestoreSnapshotStore(context.getApplicationContext()); }
+    static FirestoreSnapshotStore openForTest(Context context) { return new FirestoreSnapshotStore(context.getApplicationContext()); }
     private FirestoreSnapshotStore(Context context) {
         File file = new File(context.getNoBackupFilesDir(), DB_NAME);
         db = SQLiteDatabase.openOrCreateDatabase(file, null);
         long configuredMaximum = db.setMaximumSize(MAX_DATABASE_BYTES);
         if (configuredMaximum > MAX_DATABASE_BYTES) throw new IllegalStateException("snapshot_database_limit_unavailable");
-        db.execSQL("CREATE TABLE IF NOT EXISTS snapshot_meta (singleton INTEGER PRIMARY KEY CHECK(singleton=1), snapshot_id TEXT NOT NULL, state TEXT NOT NULL, row_count INTEGER NOT NULL, content_hash TEXT NOT NULL, uploaded_count INTEGER NOT NULL, previous_id TEXT NOT NULL, previous_cursor TEXT NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS snapshot_meta (singleton INTEGER PRIMARY KEY CHECK(singleton=1), snapshot_id TEXT NOT NULL, state TEXT NOT NULL, row_count INTEGER NOT NULL, content_hash TEXT NOT NULL, uploaded_count INTEGER NOT NULL, previous_id TEXT NOT NULL, previous_cursor TEXT NOT NULL, protocol_version INTEGER NOT NULL DEFAULT 2, evidence_enabled INTEGER NOT NULL DEFAULT 0)");
+        boolean hasProtocolVersion = false;
+        boolean hasEvidenceEnabled = false;
+        try (Cursor columns = db.rawQuery("PRAGMA table_info(snapshot_meta)", null)) {
+            int nameColumn = columns.getColumnIndex("name");
+            while (columns.moveToNext()) {
+                if ("protocol_version".equals(columns.getString(nameColumn))) hasProtocolVersion = true;
+                if ("evidence_enabled".equals(columns.getString(nameColumn))) hasEvidenceEnabled = true;
+            }
+        }
+        if (!hasProtocolVersion) db.execSQL("ALTER TABLE snapshot_meta ADD COLUMN protocol_version INTEGER NOT NULL DEFAULT 2");
+        if (!hasEvidenceEnabled) db.execSQL("ALTER TABLE snapshot_meta ADD COLUMN evidence_enabled INTEGER NOT NULL DEFAULT 0");
         db.execSQL("CREATE TABLE IF NOT EXISTS snapshot_rows (local_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, source_hash TEXT NOT NULL, uploaded INTEGER NOT NULL DEFAULT 0, upload_attempted INTEGER NOT NULL DEFAULT 0, cleaned INTEGER NOT NULL DEFAULT 0)");
+        boolean hasUploadAttempted = false;
+        try (Cursor columns = db.rawQuery("PRAGMA table_info(snapshot_rows)", null)) {
+            int nameColumn = columns.getColumnIndex("name");
+            while (columns.moveToNext()) if ("upload_attempted".equals(columns.getString(nameColumn))) hasUploadAttempted = true;
+        }
+        if (!hasUploadAttempted) db.execSQL("ALTER TABLE snapshot_rows ADD COLUMN upload_attempted INTEGER NOT NULL DEFAULT 0");
         verifySidecarBounds();
     }
 
-    static FirestoreSnapshotStore open(Context context) {
-        return new FirestoreSnapshotStore(context.getApplicationContext());
+    void resetIdle() {
+        db.beginTransaction();
+        try {
+            db.execSQL("DELETE FROM snapshot_rows");
+            db.execSQL("DELETE FROM snapshot_meta");
+            db.setTransactionSuccessful();
+        } finally { db.endTransaction(); }
+        verifySidecarBounds();
     }
 
     Snapshot snapshot() {
-        try (Cursor c = db.rawQuery("SELECT snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor FROM snapshot_meta WHERE singleton=1", null)) {
+        try (Cursor c = db.rawQuery("SELECT snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled FROM snapshot_meta WHERE singleton=1", null)) {
             if (!c.moveToFirst()) return null;
             return new Snapshot(c.getString(0), c.getString(1), c.getLong(2), c.getString(3),
-                    c.getLong(4), c.getString(5), c.getString(6));
+                    c.getLong(4), c.getString(5), c.getString(6), c.getInt(7), c.getInt(8) == 1);
         }
     }
 
-    void begin(String id, String previousId) {
-        deleteRowsInBatches();
-        db.beginTransaction();
-        try {
-            db.delete("snapshot_meta", null, null);
-            db.execSQL("INSERT INTO snapshot_meta VALUES(1,?,'MATERIALIZING',0,'',0,?,'')",
-                    new Object[]{id, previousId == null ? "" : previousId});
-            db.setTransactionSuccessful();
-        } finally { db.endTransaction(); }
+    void begin(String id, String previousId, boolean includesEvidence) {
+        begin(id, previousId, includesEvidence, "");
+    }
+
+    void begin(String id, String previousId, boolean includesEvidence, String previousCursor) {
+        Snapshot prior = snapshot();
+        boolean resumingMaterialization = prior != null && "MATERIALIZING".equals(prior.state)
+                && prior.evidenceEnabled == includesEvidence && prior.id.equals(id)
+                && prior.previousId.equals(previousId == null ? "" : previousId);
+        if (!includesEvidence && prior != null && prior.evidenceEnabled && !resumingMaterialization)
+            clearExistingEvidenceRows();
+        boolean changed = prior == null || !prior.id.equals(id) || !prior.previousId.equals(previousId == null ? "" : previousId)
+                || prior.evidenceEnabled != includesEvidence;
+        if (changed) {
+            db.beginTransaction();
+            try {
+                if (prior == null) {
+                    db.execSQL("DELETE FROM snapshot_rows");
+                    db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled) VALUES(1,?,'MATERIALIZING',0,'',0,?,?,6,?)",
+                            new Object[]{id, previousId == null ? "" : previousId, previousCursor == null ? "" : previousCursor, includesEvidence ? 1 : 0});
+                } else if (!resumingMaterialization) {
+                    db.execSQL("UPDATE snapshot_meta SET state='MATERIALIZING',row_count=0,content_hash='',uploaded_count=0,previous_id=?,previous_cursor=?,protocol_version=6,evidence_enabled=? WHERE singleton=1",
+                            new Object[]{previousId == null ? "" : previousId, previousCursor == null ? "" : previousCursor, includesEvidence ? 1 : 0});
+                    db.execSQL("DELETE FROM snapshot_rows");
+                }
+                db.setTransactionSuccessful();
+            } finally { db.endTransaction(); }
+        }
         verifySidecarBounds();
     }
 
@@ -142,28 +226,20 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         } finally { db.endTransaction(); }
     }
 
-    void clearAfterPublish(String publishedId, String contentHash) {
+    void clearAfterPublish(String publishedId, String contentHash, boolean includesEvidence) {
         deleteRowsInBatches();
         db.beginTransaction();
         try {
             db.delete("snapshot_meta",null,null);
-            db.execSQL("INSERT INTO snapshot_meta VALUES(1,?,'PUBLISHED',0,?,0,'','')",
-                    new Object[]{publishedId, contentHash});
+            db.execSQL("INSERT INTO snapshot_meta(singleton,snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled) VALUES(1,?,'PUBLISHED',0,?,0,'','',6,?)",
+                    new Object[]{publishedId, contentHash, includesEvidence ? 1 : 0});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
         verifySidecarBounds();
     }
 
-    void resetIdle() {
-        deleteRowsInBatches();
-        db.beginTransaction();
-        try { db.delete("snapshot_meta",null,null); db.setTransactionSuccessful(); }
-        finally { db.endTransaction(); }
-        verifySidecarBounds();
-    }
-
     void markCleanupPending(String oldId) {
-        db.execSQL("UPDATE snapshot_meta SET state='CLEAN_OLD',previous_id=?,previous_cursor='' WHERE singleton=1",
+        db.execSQL("UPDATE snapshot_meta SET state='CLEAN_OLD',previous_id=? WHERE singleton=1",
                 new Object[]{oldId == null ? "" : oldId});
     }
 
@@ -178,6 +254,101 @@ final class FirestoreSnapshotStore implements AutoCloseable {
             if (part.isFile()) total += part.length();
         }
         return total;
+    }
+
+    void prepareEvidenceRevocation() {
+        // Scrub evidence but retain snapshot identity/state so the worker can clean
+        // any incomplete remote generation before starting a metadata-only one.
+        clearExistingEvidenceRows();
+        db.beginTransaction();
+        try {
+            Snapshot state = snapshot();
+            // A pointer publication may already be in flight. Preserve PUBLISH so the worker
+            // can compare Firestore's current pointer and either finish or abort safely.
+            if (state != null && state.evidenceEnabled && !"PUBLISH".equals(state.state)
+                    && !"PUBLISHED".equals(state.state)) {
+                db.execSQL("UPDATE snapshot_meta SET state='ABORTING',evidence_enabled=0 WHERE singleton=1");
+            } else {
+                db.execSQL("UPDATE snapshot_meta SET evidence_enabled=0 WHERE singleton=1");
+            }
+            try (Cursor current = db.rawQuery("SELECT evidence_enabled FROM snapshot_meta WHERE singleton=1", null)) {
+                if (current.moveToFirst() && current.getInt(0) != 0)
+                    throw new IllegalStateException("evidence_revocation_not_persisted");
+            }
+            verifySidecarBounds();
+            db.setTransactionSuccessful();
+        } finally { db.endTransaction(); }
+    }
+
+    private void clearExistingEvidenceRows() {
+        db.beginTransaction();
+        try {
+            List<Long> ids = new ArrayList<>();
+            List<String> payloads = new ArrayList<>();
+            try (Cursor rows = db.rawQuery("SELECT local_id,payload FROM snapshot_rows", null)) {
+                while (rows.moveToNext()) { ids.add(rows.getLong(0)); payloads.add(rows.getString(1)); }
+            }
+            SQLiteStatement update = db.compileStatement("UPDATE snapshot_rows SET payload=?,source_hash=?,uploaded=0,upload_attempted=0,cleaned=0 WHERE local_id=?");
+            SQLiteStatement clear = db.compileStatement("UPDATE snapshot_rows SET payload='{}',source_hash='',uploaded=0,upload_attempted=0,cleaned=0 WHERE local_id=?");
+            try {
+                for (int i = 0; i < ids.size(); i++) {
+                    long id = ids.get(i);
+                    try {
+                        JSONObject original = new JSONObject(payloads.get(i));
+                        JSONObject metadata = new JSONObject();
+                        java.util.Iterator<String> keys = original.keys();
+                        while (keys.hasNext()) {
+                            String key = keys.next();
+                            if (!"observed_text".equals(key) && !"photo_urls".equals(key)) metadata.put(key, original.get(key));
+                        }
+                        String projection = canonical(metadata);
+                    String hash = hex(sha256().digest(projection.getBytes(StandardCharsets.UTF_8)));
+                        update.clearBindings();
+                        update.bindString(1, projection);
+                        update.bindString(2, hash);
+                        update.bindLong(3, id);
+                        update.executeUpdateDelete();
+                    } catch (Exception malformed) {
+                        clear.clearBindings();
+                        clear.bindLong(1, id);
+                        clear.executeUpdateDelete();
+                    }
+                }
+            } finally { update.close(); clear.close(); }
+            db.setTransactionSuccessful();
+        } catch (Exception failure) {
+            throw new IllegalStateException("evidence_revoke_local_scrub_failed", failure);
+        } finally { db.endTransaction(); }
+    }
+
+    private static String canonical(JSONObject value) throws Exception {
+        List<String> keys = new ArrayList<>();
+        java.util.Iterator<String> iterator = value.keys();
+        while (iterator.hasNext()) keys.add(iterator.next());
+        java.util.Collections.sort(keys);
+        StringBuilder out = new StringBuilder("{");
+        for (String key : keys) {
+            if (out.length() > 1) out.append(',');
+            Object item = value.get(key);
+            out.append(JSONObject.quote(key)).append(':').append(jsonValue(item));
+        }
+        return out.append('}').toString();
+    }
+
+    private static String jsonValue(Object value) throws Exception {
+        if (value == null || value == JSONObject.NULL) return "null";
+        if (value instanceof JSONObject) return canonical((JSONObject) value);
+        if (value instanceof JSONArray) {
+            JSONArray array = (JSONArray) value;
+            StringBuilder out = new StringBuilder("[");
+            for (int i = 0; i < array.length(); i++) {
+                if (i > 0) out.append(',');
+                Object item = array.get(i);
+                out.append(item instanceof JSONObject ? canonical((JSONObject) item) : JSONObject.wrap(item).toString());
+            }
+            return out.append(']').toString();
+        }
+        return JSONObject.wrap(value).toString();
     }
 
     private void verifySidecarBounds() {

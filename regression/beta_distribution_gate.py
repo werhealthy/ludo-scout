@@ -31,7 +31,7 @@ class BetaDistributionGateTests(unittest.TestCase):
         self.assertIn("version_code_suffix:", source)
         self.assertIn("required: true", source)
         self.assertIn("VERSION_CODE_SUFFIX: ${{ inputs.version_code_suffix }}", source)
-        self.assertIn("MIN_INSTALLED_VERSION_CODE = 1_002_301", (ROOT / "regression" / "manual_beta_version_code.py").read_text())
+        self.assertIn("MIN_INSTALLED_VERSION_CODE = 1_002_305", (ROOT / "regression" / "manual_beta_version_code.py").read_text())
         self.assertIn("regression/manual_beta_version_code.py", source)
         self.assertIn("github.event_name == 'workflow_dispatch' && inputs.version_code_suffix || github.run_number", source)
         self.assertRegex(source, r"push:\s+branches:\s+- beta")
@@ -46,11 +46,10 @@ class BetaDistributionGateTests(unittest.TestCase):
         self.assertNotRegex(source, r"(?:contents|id-token|actions): write")
 
     def test_manual_version_code_suffix_is_strictly_upgrade_compatible(self):
-        self.assertEqual(1002302, derive_version_code("2302"))
-        self.assertEqual(1002303, derive_version_code("2303"))
+        self.assertEqual(1002306, derive_version_code("2306"))
 
     def test_manual_version_code_rejects_bad_floor_and_overflow_inputs(self):
-        for value in ("", "abc", "-1", "2_302", "2033", "2301"):
+        for value in ("", "abc", "-1", "2_302", "2033", "2301", "2303", "2305"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 derive_version_code(value)
         with self.assertRaisesRegex(ValueError, "signed 32-bit"):
