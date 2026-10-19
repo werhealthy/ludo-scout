@@ -11,6 +11,9 @@ import java.util.Map;
 import static org.junit.Assert.*;
 
 public class AiBetaRegistryTest {
+    private static final String HASH_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private static final String HASH_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
     @Test public void preservesPairedOriginalAndCorrectedProposalsAndUnexecutedCandidate() throws Exception {
         AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistry());
         AiBetaRegistry.Entry entry = registry.entries.get(0);
@@ -69,7 +72,7 @@ public class AiBetaRegistryTest {
             fail("numeric coincidence accepted as identity");
         } catch (IllegalArgumentException expected) { }
         String details = AiBetaRegistryView.details(registry, entry, read);
-        assertTrue(details.contains("Candidato locale, non associato: Titolo candidato sintetico"));
+        assertTrue(details.contains("Riga locale osservata (associazione non dimostrata): Titolo candidato sintetico"));
         assertTrue(details.contains("categoria mancante · lingua mancante"));
         assertTrue(details.contains("corrispondenza non verificata"));
         assertTrue(details.contains("bloccata: corrispondenza non verificata"));
@@ -78,35 +81,111 @@ public class AiBetaRegistryTest {
         assertTrue(details.contains("hash"));
     }
 
+    @Test public void sourceHashAndSnapshotWithoutHistoricalItemIdRemainUnverified() throws Exception {
+        Map<String, Object> source = validRegistry();
+        @SuppressWarnings("unchecked") Map<String, Object> row =
+                (Map<String, Object>) ((java.util.List<?>) source.get("entries")).get(0);
+        row.put("source_id", 1016L);
+        row.put("source_hash", HASH_A);
+        row.put("source_hash_version", 1L);
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(source);
+        AiBetaRegistry.Entry entry = registry.entries.get(0);
+        AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
+                1016L, "vinted-900100", "Titolo sintetico", "BASE_GAME", "EN", HASH_A);
+        AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(entry, snapshotProofRead(local));
+        assertEquals(AiBetaRegistryView.MatchState.CONTENT_MATCH_PROJECTION_PROVEN, match.state);
+        assertFalse(match.isVerified());
+        assertTrue(match.contentMatched);
+        assertTrue(match.projectionContinuityProven);
+        assertEquals("bloccata: corrispondenza non verificata",
+                AiBetaRegistryView.acceptanceLabel(entry, match));
+    }
+
+
+    @Test public void hashMismatchSnapshotMismatchAndDuplicateExternalIdsFailClosed() throws Exception {
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemId("vinted-900100"));
+        AiBetaRegistry.Entry entry = registry.entries.get(0);
+        AiBetaRegistryView.LocalListing wrongHash = new AiBetaRegistryView.LocalListing(
+                1016L, "vinted-900100", "Titolo sintetico", "BASE_GAME", "EN", HASH_B);
+        assertEquals(AiBetaRegistryView.MatchState.DATA_CHANGED,
+                AiBetaRegistryView.resolve(entry, snapshotProofRead(wrongHash)).state);
+
+        AiBetaRegistryView.LocalListing exact = new AiBetaRegistryView.LocalListing(
+                1016L, "vinted-900100", "Titolo sintetico", "BASE_GAME", "EN", HASH_A);
+        AiBetaRegistryView.SnapshotProof wrongSnapshot = new AiBetaRegistryView.SnapshotProof(
+                "another-snapshot", "PUBLISHED", HASH_B, HASH_B, 6, true, false);
+        AiBetaRegistryView.Match noRootProof = AiBetaRegistryView.resolve(entry,
+                AiBetaRegistryView.CatalogRead.available(Arrays.asList(exact), wrongSnapshot));
+        assertEquals(AiBetaRegistryView.MatchState.CONTENT_MATCH_PROJECTION_UNPROVEN, noRootProof.state);
+        assertTrue(noRootProof.contentMatched);
+        assertFalse(noRootProof.projectionContinuityProven);
+
+        AiBetaRegistryView.LocalListing duplicate = new AiBetaRegistryView.LocalListing(
+                7002L, "vinted-900100", "Seconda riga", "BASE_GAME", "EN", HASH_A);
+        AiBetaRegistryView.Match externalDuplicate = AiBetaRegistryView.resolve(entry,
+                snapshotProofRead(exact, duplicate));
+        assertEquals(AiBetaRegistryView.MatchState.CONTENT_MATCH_PROJECTION_PROVEN, externalDuplicate.state);
+        assertFalse(externalDuplicate.isVerified());
+    }
+
+    @Test public void sourceIdConflictBlocksEvenWhenExternalIdAndHashMatch() throws Exception {
+        Map<String, Object> source = validRegistryWithItemId("vinted-900100");
+        @SuppressWarnings("unchecked") Map<String, Object> row =
+                (Map<String, Object>) ((java.util.List<?>) source.get("entries")).get(0);
+        row.put("source_id", 7001L);
+        AiBetaRegistry.Entry entry = AiBetaRegistry.parseObject(source).entries.get(0);
+        AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
+                7001L, "vinted-900100", "Titolo sintetico", "BASE_GAME", "EN", HASH_A);
+        assertEquals(AiBetaRegistryView.MatchState.SOURCE_ID_CONFLICT,
+                AiBetaRegistryView.resolve(entry, snapshotProofRead(local)).state);
+    }
+
     @Test public void failedQueryDoesNotLookLikeZeroMatches() throws Exception {
         AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistry());
         String header = AiBetaRegistryView.header(registry, AiBetaRegistryView.CatalogRead.queryFailed());
         assertTrue(header.contains("Query catalogo locale: query non riuscita"));
-        assertTrue(header.contains("ID esterno nel registro: 0/1"));
+        assertTrue(header.contains("item_id storico nel registro: 0/1"));
         assertTrue(header.contains("corrispondenze non valutabili finché la query non è completata"));
         assertFalse(header.contains("corrispondenze verificate: 0"));
     }
 
-    @Test public void exactExternalIdFindsLocalTitleEvenWhenLocalPrimaryKeyDiffers() throws Exception {
+    @Test public void currentExternalIdAndProjectionEvidenceStillDoNotProveHistoricalIdentity() throws Exception {
         Map<String, Object> source = validRegistryWithItemId("vinted-900100");
         AiBetaRegistry registry = AiBetaRegistry.parseObject(source);
         AiBetaRegistry.Entry entry = registry.entries.get(0);
         AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
-                7001L, "vinted-900100", "Titolo reale sintetico", "BASE_GAME", "EN");
-        AiBetaRegistryView.CatalogRead read = AiBetaRegistryView.CatalogRead.available(local);
+                1016L, "vinted-900100", "Titolo reale sintetico", "BASE_GAME", "EN", HASH_A);
+        AiBetaRegistryView.CatalogRead read = snapshotProofRead(local);
         AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(entry, read);
-        assertTrue(match.isVerified());
-        assertEquals(7001L, match.listing.localId);
-        assertTrue(AiBetaRegistryView.details(registry, entry, read).contains("Scheda locale: Titolo reale sintetico"));
+        assertFalse(match.isVerified());
+        assertTrue(match.contentMatched);
+        assertTrue(match.projectionContinuityProven);
+        assertEquals(1016L, match.listing.localId);
+        assertTrue(AiBetaRegistryView.details(registry, entry, read)
+                .contains("item_id Vinted attuale: vinted-900100 (dato attuale, non prova d’identità storica)"));
     }
 
-    @Test public void verifiedListingReportsMissingMetadataSeparatelyFromMissingId() throws Exception {
+    @Test public void currentExternalIdAloneIsOnlyAnUnverifiedCandidate() throws Exception {
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemIdOnly("vinted-900100"));
+        AiBetaRegistry.Entry entry = registry.entries.get(0);
+        AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
+                7001L, "vinted-900100", "Titolo attuale", "BASE_GAME", "EN");
+        AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(entry,
+                AiBetaRegistryView.CatalogRead.available(local));
+        assertEquals(AiBetaRegistryView.MatchState.CURRENT_ID_CANDIDATE_ONLY, match.state);
+        assertFalse(match.isVerified());
+        assertTrue(AiBetaRegistryView.details(registry, entry,
+                AiBetaRegistryView.CatalogRead.available(local))
+                .contains("valori uguali, ma la provenienza dell’item_id nel registro non è dimostrata"));
+    }
+
+    @Test public void projectionMatchReportsMissingMetadataAndCurrentExternalIdSeparately() throws Exception {
         AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemId("vinted-900100"));
         AiBetaRegistry.Entry entry = registry.entries.get(0);
         AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
-                7001L, "vinted-900100", "Titolo reale sintetico", null, "");
-        AiBetaRegistryView.CatalogRead read = AiBetaRegistryView.CatalogRead.available(local);
-        assertTrue(AiBetaRegistryView.resolve(entry, read).isVerified());
+                1016L, "vinted-900100", "Titolo reale sintetico", null, "", HASH_A);
+        AiBetaRegistryView.CatalogRead read = snapshotProofRead(local);
+        assertFalse(AiBetaRegistryView.resolve(entry, read).isVerified());
         assertTrue(AiBetaRegistryView.details(registry, entry, read)
                 .contains("Metadati attuali: categoria mancante · lingua mancante"));
         AiBetaRegistryView.Match absentLegacy = AiBetaRegistryView.resolve(
@@ -116,7 +195,7 @@ public class AiBetaRegistryTest {
     }
 
     @Test public void externalIdNotFoundDoesNotFallBackToEqualNumericIdAndQueryErrorsStayDistinct() throws Exception {
-        AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemId("vinted-missing"));
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemIdOnly("vinted-missing"));
         AiBetaRegistry.Entry entry = registry.entries.get(0);
         AiBetaRegistryView.LocalListing numericCoincidence = new AiBetaRegistryView.LocalListing(
                 entry.listingId, "vinted-other", "Non è la stessa inserzione", "BASE_GAME", "IT");
@@ -129,7 +208,58 @@ public class AiBetaRegistryTest {
         assertEquals(AiBetaRegistryView.MatchState.QUERY_FAILED,
                 AiBetaRegistryView.resolve(entry, AiBetaRegistryView.CatalogRead.queryFailed()).state);
         assertEquals(AiBetaRegistryView.MatchState.DATABASE_MISSING,
-                AiBetaRegistryView.resolve(entry, AiBetaRegistryView.CatalogRead.databaseMissing()).state);
+                        AiBetaRegistryView.resolve(entry, AiBetaRegistryView.CatalogRead.databaseMissing()).state);
+    }
+
+    @Test public void reusedLocalIdWithChangedProjectionIsReportedWithoutClaimingReuseOrIdentity() throws Exception {
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithSourceEvidence());
+        AiBetaRegistry.Entry entry = registry.entries.get(0);
+        AiBetaRegistryView.LocalListing reused = new AiBetaRegistryView.LocalListing(
+                entry.listingId, "vinted-new-current-id", "Titolo diverso", "EXPANSION", "FR", HASH_B);
+        AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(entry, snapshotProofRead(reused));
+        assertEquals(AiBetaRegistryView.MatchState.DATA_CHANGED, match.state);
+        assertTrue(match.dataChanged);
+        assertFalse(match.isVerified());
+        String details = AiBetaRegistryView.details(registry, entry, snapshotProofRead(reused));
+        assertTrue(details.contains("riuso dell’ID locale non è dimostrabile"));
+        assertTrue(details.contains("item_id Vinted attuale: vinted-new-current-id"));
+    }
+
+    @Test public void missingHistoricalLocalRowIsNotConfusedWithCurrentAnnouncementIdentity() throws Exception {
+        Map<String, Object> source = validRegistry();
+        @SuppressWarnings("unchecked") Map<String, Object> row =
+                (Map<String, Object>) ((java.util.List<?>) source.get("entries")).get(0);
+        row.put("source_id", 1016L);
+        row.put("source_hash", HASH_A);
+        row.put("source_hash_version", 1L);
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(source);
+        AiBetaRegistryView.LocalListing unrelated = new AiBetaRegistryView.LocalListing(
+                7001L, "vinted-current", "Titolo uguale non probante", "BASE_GAME", "EN", HASH_B);
+        AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(registry.entries.get(0),
+                snapshotProofRead(unrelated));
+        assertEquals(AiBetaRegistryView.MatchState.LOCAL_ROW_ABSENT, match.state);
+        assertFalse(match.isVerified());
+    }
+
+    @Test public void matchingProjectionWithoutCurrentVintedIdStillMatchesContentOnly() throws Exception {
+        Map<String, Object> source = validRegistry();
+        @SuppressWarnings("unchecked") Map<String, Object> row =
+                (Map<String, Object>) ((java.util.List<?>) source.get("entries")).get(0);
+        row.put("source_id", 1016L);
+        row.put("source_hash", HASH_A);
+        row.put("source_hash_version", 1L);
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(source);
+        AiBetaRegistryView.LocalListing missingExternalId = new AiBetaRegistryView.LocalListing(
+                1016L, null, "Titolo sintetico", "BASE_GAME", "EN", HASH_A);
+        AiBetaRegistryView.CatalogRead read = snapshotProofRead(missingExternalId);
+        AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(registry.entries.get(0), read);
+        assertEquals(AiBetaRegistryView.MatchState.CONTENT_MATCH_PROJECTION_PROVEN, match.state);
+        assertTrue(match.contentMatched);
+        assertTrue(match.externalIdentityMissing);
+        assertFalse(match.isVerified());
+        String header = AiBetaRegistryView.header(registry, read);
+        assertTrue(header.contains("Identità Vinted storica dimostrata: 0"));
+        assertTrue(header.contains("item_id corrente mancante: 1"));
     }
 
     @Test public void unknownProposalsAreNeverSelectableAndLocalChangesInvalidatePreview() throws Exception {
@@ -143,30 +273,17 @@ public class AiBetaRegistryTest {
         AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemId("vinted-900100"));
         AiBetaRegistry.Entry entry = registry.entries.get(0);
         AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
-                7001L, "vinted-900100", "Titolo reale sintetico", "BASE_GAME", "EN");
-        AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(entry,
-                AiBetaRegistryView.CatalogRead.available(local));
-        List<AiBetaRegistryDraft.Choice> choices = AiBetaRegistryDraft.choices(entry, local);
-        assertEquals(1, choices.size());
-        assertEquals(AiBetaRegistryDraft.FIELD_LANGUAGE, choices.get(0).field);
-        assertEquals(AiBetaRegistryDraft.SOURCE_CORRECTED, choices.get(0).source);
-        AiBetaRegistryDraft.Draft draft = AiBetaRegistryDraft.create(registry, entry, match, choices.get(0));
-        assertEquals("EN", draft.beforeValue);
-        assertEquals("IT", draft.afterValue);
-        assertTrue(draft.stillMatches(local));
-        assertFalse(draft.stillMatches(new AiBetaRegistryView.LocalListing(
-                7001L, "vinted-900100", "Titolo reale sintetico", "BASE_GAME", "FR")));
-        assertFalse(draft.stillMatches(new AiBetaRegistryView.LocalListing(
-                7001L, "vinted-900100", "Titolo modificato", "BASE_GAME", "EN")));
-        assertFalse(draft.stillMatches(new AiBetaRegistryView.LocalListing(
-                7002L, "vinted-900100", "Titolo reale sintetico", "BASE_GAME", "EN")));
-        assertFalse(draft.stillMatches(new AiBetaRegistryView.LocalListing(
-                7001L, "vinted-900101", "Titolo reale sintetico", "BASE_GAME", "EN")));
-        assertFalse(draft.stillMatches(new AiBetaRegistryView.LocalListing(
-                7001L, "vinted-900100", "Titolo reale sintetico", "EXPANSION", "EN")));
-        assertTrue(draft.details("invariati rispetto alla bozza").contains("Prima: EN"));
-        assertTrue(draft.details("invariati rispetto alla bozza").contains("Dopo: IT"));
-        assertTrue(draft.details("invariati rispetto alla bozza").contains("nessuna scrittura al catalogo"));
+                1016L, "vinted-900100", "Titolo reale sintetico", "BASE_GAME", "EN", HASH_A);
+        AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(entry, snapshotProofRead(local));
+        assertTrue(match.contentMatched);
+        assertFalse(match.isVerified());
+        assertEquals("bloccata: corrispondenza non verificata",
+                AiBetaRegistryView.acceptanceLabel(entry, match));
+        try {
+            AiBetaRegistryDraft.create(registry, entry, match,
+                    AiBetaRegistryDraft.choices(entry, local).get(0));
+            fail("draft accepted without historical identity proof");
+        } catch (IllegalArgumentException expected) { }
     }
 
     private static Map<String, Object> validRegistry() {
@@ -187,11 +304,40 @@ public class AiBetaRegistryTest {
         return root;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> validRegistryWithItemId(String itemId) {
         Map<String, Object> root = validRegistry();
-        ((Map<String, Object>) ((java.util.List<?>) root.get("entries")).get(0)).put("item_id", itemId);
+        @SuppressWarnings("unchecked") Map<String, Object> row =
+                (Map<String, Object>) ((java.util.List<?>) root.get("entries")).get(0);
+        row.put("item_id", itemId);
+        row.put("source_id", 1016L);
+        row.put("source_hash", HASH_A);
+        row.put("source_hash_version", 1L);
         return root;
+    }
+
+    private static Map<String, Object> validRegistryWithItemIdOnly(String itemId) {
+        Map<String, Object> root = validRegistry();
+        @SuppressWarnings("unchecked") Map<String, Object> row =
+                (Map<String, Object>) ((java.util.List<?>) root.get("entries")).get(0);
+        row.put("item_id", itemId);
+        return root;
+    }
+
+    private static Map<String, Object> validRegistryWithSourceEvidence() {
+        Map<String, Object> root = validRegistry();
+        @SuppressWarnings("unchecked") Map<String, Object> row =
+                (Map<String, Object>) ((java.util.List<?>) root.get("entries")).get(0);
+        row.put("source_id", 1016L);
+        row.put("source_hash", HASH_A);
+        row.put("source_hash_version", 1L);
+        return root;
+    }
+
+    private static AiBetaRegistryView.CatalogRead snapshotProofRead(AiBetaRegistryView.LocalListing... rows) {
+        AiBetaRegistryView.SnapshotProof proof = new AiBetaRegistryView.SnapshotProof(
+                "5c02314d-fd73-41b4-b1b3-be5448f374cd", "PUBLISHED", HASH_B, HASH_B,
+                6, true, false);
+        return AiBetaRegistryView.CatalogRead.available(Arrays.asList(rows), proof);
     }
 
     private static Map<String, Object> entry(long id, String originalType, String originalLanguage,

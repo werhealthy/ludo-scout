@@ -279,14 +279,21 @@ public final class FirestoreSnapshotWorker extends Worker {
             }finally{source.execSQL("ROLLBACK");}
         }
     }
-    private static String sourceHash(File file,boolean includeEvidence)throws Exception{
-        MessageDigest root=FirestoreSnapshotStore.sha256();try(SQLiteDatabase source=SQLiteDatabase.openDatabase(file.getAbsolutePath(),null,SQLiteDatabase.OPEN_READONLY)){
+    static String sourceHash(File file,boolean includeEvidence)throws Exception{
+        try(SQLiteDatabase source=SQLiteDatabase.openDatabase(file.getAbsolutePath(),null,SQLiteDatabase.OPEN_READONLY)){
             source.execSQL("BEGIN");
-            try(Cursor c=source.rawQuery(QUERY,null)){long count=0;while(c.moveToNext()){
-                Row r=project(c,includeEvidence);FirestoreSnapshotStore.updateRoot(root,r.id,r.hash);if(++count>FirestoreSnapshotStore.MAX_ROWS)throw new IllegalStateException("snapshot_row_limit");}
-            }finally{source.execSQL("ROLLBACK");}
+            try{return sourceHash(source,includeEvidence);}finally{source.execSQL("ROLLBACK");}
+        }
+    }
+    static String sourceHash(SQLiteDatabase source,boolean includeEvidence)throws Exception{
+        MessageDigest root=FirestoreSnapshotStore.sha256();
+        try(Cursor c=source.rawQuery(QUERY,null)){long count=0;while(c.moveToNext()){
+            Row r=project(c,includeEvidence);FirestoreSnapshotStore.updateRoot(root,r.id,r.hash);if(++count>FirestoreSnapshotStore.MAX_ROWS)throw new IllegalStateException("snapshot_row_limit");}
         }
         return FirestoreSnapshotStore.hex(root.digest());
+    }
+    static String sourceHashForRow(Cursor cursor,boolean includeEvidence)throws Exception{
+        return project(cursor,includeEvidence).hash;
     }
     private static Row project(Cursor c,boolean includeEvidence)throws Exception{
         long id=c.getLong(0);if(id<=0)throw new IllegalArgumentException("invalid local ID");Map<String,Object> v=new LinkedHashMap<>();

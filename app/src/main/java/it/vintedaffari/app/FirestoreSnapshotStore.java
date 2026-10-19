@@ -47,6 +47,35 @@ final class FirestoreSnapshotStore implements AutoCloseable {
         }
     }
 
+    static final class MetadataRead {
+        final Snapshot snapshot;
+        final boolean queryFailed;
+        private MetadataRead(Snapshot snapshot, boolean queryFailed) {
+            this.snapshot = snapshot;
+            this.queryFailed = queryFailed;
+        }
+    }
+
+    /** Reads the last published snapshot identity without creating or mutating the sidecar. */
+    static MetadataRead readMetadataReadOnly(Context context) {
+        File file = new File(context.getNoBackupFilesDir(), DB_NAME);
+        if (!file.isFile()) return new MetadataRead(null, false);
+        SQLiteDatabase readOnly = null;
+        try {
+            readOnly = SQLiteDatabase.openDatabase(file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+            try (Cursor c = readOnly.rawQuery("SELECT snapshot_id,state,row_count,content_hash,uploaded_count,previous_id,previous_cursor,protocol_version,evidence_enabled FROM snapshot_meta WHERE singleton=1", null)) {
+                if (!c.moveToFirst()) return new MetadataRead(null, false);
+                Snapshot snapshot = new Snapshot(c.getString(0), c.getString(1), c.getLong(2), c.getString(3),
+                        c.getLong(4), c.getString(5), c.getString(6), c.getInt(7), c.getInt(8) == 1);
+                return new MetadataRead(snapshot, false);
+            }
+        } catch (Exception failure) {
+            return new MetadataRead(null, true);
+        } finally {
+            if (readOnly != null) readOnly.close();
+        }
+    }
+
     static FirestoreSnapshotStore open(Context context) { return new FirestoreSnapshotStore(context.getApplicationContext()); }
     static FirestoreSnapshotStore openForTest(Context context) { return new FirestoreSnapshotStore(context.getApplicationContext()); }
     private FirestoreSnapshotStore(Context context) {

@@ -28,6 +28,7 @@ public final class AiBetaRegistry {
     private static final Set<String> REVIEW_FLAGS = immutableSet("LANGUAGE_REANALYSIS", "CATEGORY_REVIEW", "RECORD_UNRESOLVED");
     private static final Pattern REGISTRY_ID = Pattern.compile("[a-z0-9-]{1,80}");
     private static final Pattern COMMIT = Pattern.compile("[0-9a-f]{40}");
+    private static final Pattern SOURCE_HASH = Pattern.compile("[0-9a-f]{64}");
 
     public final String registryId;
     public final String sourceSnapshotId;
@@ -57,9 +58,14 @@ public final class AiBetaRegistry {
     }
 
     public static final class Entry {
+        public final String sourceSnapshotId;
         public final long listingId;
         /** Optional stable Vinted ID from the source snapshot; never the local SQLite primary key. */
         public final String itemId;
+        /** Optional exact source row key and v3 projection hash retained beside a proposal. */
+        public final Long sourceId;
+        public final String sourceHash;
+        public final Integer sourceHashVersion;
         public final String originalType;
         public final String originalLanguage;
         public final String originalSource;
@@ -69,11 +75,16 @@ public final class AiBetaRegistry {
         public final String recordState;
         public final List<String> reviewFlags;
 
-        private Entry(long listingId, String itemId, String originalType, String originalLanguage,
+        private Entry(String sourceSnapshotId, long listingId, String itemId, Long sourceId, String sourceHash,
+                      Integer sourceHashVersion, String originalType, String originalLanguage,
                       String originalSource, String correctedType, String correctedLanguage,
                       String correctedSource, String recordState, List<String> reviewFlags) {
+            this.sourceSnapshotId = sourceSnapshotId;
             this.listingId = listingId;
             this.itemId = itemId;
+            this.sourceId = sourceId;
+            this.sourceHash = sourceHash;
+            this.sourceHashVersion = sourceHashVersion;
             this.originalType = originalType;
             this.originalLanguage = originalLanguage;
             this.originalSource = originalSource;
@@ -142,6 +153,26 @@ public final class AiBetaRegistry {
             long id = requiredLong(row, "listing_id");
             if (id <= 0 || !seen.add(id)) throw new IllegalArgumentException("ID mancante o duplicato");
             String itemId = row.containsKey("item_id") ? requiredString(row, "item_id", 80) : null;
+            boolean hasSourceId = row.containsKey("source_id");
+            boolean hasSourceHash = row.containsKey("source_hash");
+            boolean hasSourceHashVersion = row.containsKey("source_hash_version");
+            if ((hasSourceId || hasSourceHash || hasSourceHashVersion)
+                    && !(hasSourceId && hasSourceHash && hasSourceHashVersion)) {
+                throw new IllegalArgumentException("Provenienza hash sorgente incompleta");
+            }
+            Long sourceId = null;
+            String sourceHash = null;
+            Integer sourceHashVersion = null;
+            if (hasSourceId) {
+                long parsedSourceId = requiredLong(row, "source_id");
+                if (parsedSourceId <= 0) throw new IllegalArgumentException("Source ID non valido");
+                sourceId = parsedSourceId;
+                sourceHash = requiredString(row, "source_hash", 64);
+                if (!SOURCE_HASH.matcher(sourceHash).matches()) throw new IllegalArgumentException("Hash sorgente non valido");
+                long parsedHashVersion = requiredLong(row, "source_hash_version");
+                if (parsedHashVersion != 1L) throw new IllegalArgumentException("Versione hash sorgente non supportata");
+                sourceHashVersion = (int) parsedHashVersion;
+            }
             String originalType = nullableCode(row, "original_type", TYPES);
             String originalLanguage = nullableCode(row, "original_language", LANGUAGES);
             String originalSource = requiredString(row, "original_source", 80);
@@ -170,7 +201,8 @@ public final class AiBetaRegistry {
             if ("UNRESOLVED".equals(recordState) != flags.contains("RECORD_UNRESOLVED")) {
                 throw new IllegalArgumentException("Flag unresolved incoerente");
             }
-            entries.add(new Entry(id, itemId, originalType, originalLanguage, originalSource,
+            entries.add(new Entry(snapshotId, id, itemId, sourceId, sourceHash, sourceHashVersion,
+                    originalType, originalLanguage, originalSource,
                     correctedType, correctedLanguage, correctedSource, recordState, flags));
         }
         return new AiBetaRegistry(registryId, snapshotId, generatedAt, modelId, modelIdStatus,
@@ -276,6 +308,9 @@ public final class AiBetaRegistry {
                 "record_state", "review_flags"));
         Set<String> allowed = new HashSet<>(required);
         allowed.add("item_id");
+        allowed.add("source_id");
+        allowed.add("source_hash");
+        allowed.add("source_hash_version");
         if (!object.keySet().containsAll(required) || !allowed.containsAll(object.keySet())) {
             throw new IllegalArgumentException("Campi JSON mancanti o inattesi");
         }

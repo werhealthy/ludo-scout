@@ -34,7 +34,7 @@ check("QUERY_FAILED" in view and "DATABASE_MISSING" in view, "query failure and 
 check("getWritableDatabase" not in view and "INSERT" not in view and "UPDATE" not in view and "DELETE" not in view, "registry view contains a catalog write")
 check("AiBetaRegistryImportUi.handle(this,request,result,data)" in activity, "MainActivity does not dispatch the SAF result")
 check("Importa registro AI (JSON)" in dialog and "Mostra registro AI" in dialog and "AiBetaRegistryUi.open" in dialog and "adapter.getFilter().filter(s)" in registry_ui, "registry controls/search absent from existing comparison UI")
-check("static String[] rows(Context context, AiBetaRegistry registry)" in view and "category_normalized" in view and "language_code" in view and "valueLabel" in view and "ID esterno nel registro" in view and "corrispondenze non valutabili" in view, "current metadata overlay list/status absent")
+check("static String[] rows(Context context, AiBetaRegistry registry)" in view and "category_normalized" in view and "language_code" in view and "valueLabel" in view and "Hash sorgente nel registro" in view and "corrispondenze non valutabili" in view, "current metadata overlay list/status absent")
 check("AI — non verificato" in view and "paired_ab_baseline" in view and "Proposta A/B corretta" in view and "esito non conservato" in view, "proposal provenance/review status presentation absent")
 check("AiBetaSettings" in registry_ui and "readByItemId" in registry_ui and "preview.stillMatches(current.listing)" in registry_ui, "draft is not encrypted or stale-checked")
 check("before_value" in draft and "after_value" in draft and "UNKNOWN" in draft and "never applies values" in draft, "single reversible non-catalog draft contract absent")
