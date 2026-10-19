@@ -81,7 +81,7 @@ final class FirestoreSyncSourceContract {
             while (root != null && !Files.isDirectory(root.resolve("app/src/main"))) root = root.getParent();
             if (root == null) return false;
             String source = new String(Files.readAllBytes(root.resolve("app/src/main/java/it/vintedaffari/app/FirestoreSync.java")), StandardCharsets.UTF_8);
-            int start = source.indexOf("public static boolean setEvidenceConsent(");
+            int start = source.indexOf("public static boolean persistEvidenceConsentOnly(");
             int end = source.indexOf("static boolean commitEvidenceConsent(", start);
             if (start < 0 || end < 0) return false;
             String method = source.substring(start, end);

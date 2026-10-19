@@ -41,8 +41,14 @@ public final class FirestoreSnapshotEvidenceTest {
         assertTrue(source.contains("sourceHash(File file,boolean includeEvidence)"));
     }
 
-    @Test public void legacySidecarIsCleanedBeforeProtocolMigration() {
-        assertTrue(FirestoreSyncSourceContract.legacySidecarIsCleanedBeforeMigration());
+    @Test public void consentCheckboxIsSharedByAllFirestoreDialogStates() throws Exception {
+        String source = readProjectSource("app/src/main/java/it/vintedaffari/app/FirestoreSyncDialog.java");
+        assertTrue(source.contains("showUnavailable(activity, \"Account Firestore scollegato."));
+        assertTrue(source.contains("showStateDialog(activity, \"Account collegato, sincronizzazione in pausa.\", true)"));
+        assertTrue(source.contains("addEvidenceConsent(activity, content, padding)"));
+        assertTrue(source.contains("FirestoreSync.persistEvidenceConsentOnly(activity, checked)"));
+        assertTrue(source.contains("FirestoreSync.existingAuth(activity)"));
+        assertTrue(source.contains("Se la sync è in pausa o l'account è scollegato, i dati già caricati restano online."));
     }
 
     @Test public void evidenceOptOutScrubsDurableLocalRowsBeforeMetadataOnlyGeneration() {
@@ -68,7 +74,6 @@ public final class FirestoreSnapshotEvidenceTest {
         assertFalse(FirestoreEvidenceConsentPolicy.accepts(true, ""));
         assertFalse(FirestoreEvidenceConsentPolicy.accepts(false, "description-photo-v1"));
         assertTrue(FirestoreSyncSourceContract.evidenceConsentDoesNotMigrateFromMetadata());
-        assertTrue(FirestoreSyncSourceContract.sourceDisconnectClearsBothConsents());
     }
 
     @Test public void fullEvidenceContract() throws Exception {
@@ -80,6 +85,10 @@ public final class FirestoreSnapshotEvidenceTest {
         explicitEvidenceConsentRequiresItsOwnVersion();
         photoProjectionKeepsOnlyFourUniqueHttpsVintedUrls();
     }
+    @Test public void disconnectRevokesMetadataAndEvidenceConsents() {
+        assertTrue(FirestoreSyncSourceContract.sourceDisconnectClearsBothConsents());
+    }
+
     private static void photoProjectionKeepsOnlyFourUniqueHttpsVintedUrls() {
         List<String> urls = FirestoreSnapshotWorker.photos(
                 "https://images1.vinted.net/a.jpg, https://vinted.com/b.jpg, https://evil.test/c.jpg, http://vinted.net/d.jpg, https://vinted.net:8443/port.jpg, https://vinted.net/e.jpg",

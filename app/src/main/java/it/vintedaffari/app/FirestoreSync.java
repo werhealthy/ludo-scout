@@ -81,6 +81,13 @@ public final class FirestoreSync {
                 && BuildConfig.LUDO_SYNC_OWNER_UID.equals(auth.getCurrentUser().getUid());
     }
 
+    /** Return only an existing auth session without initializing Firebase. */
+    public static FirebaseAuth existingAuth(Context context) {
+        if (!configured()) return null;
+        try { return FirebaseAuth.getInstance(FirebaseApp.getInstance(APP)); }
+        catch (IllegalStateException notInitialized) { return null; }
+    }
+
     private static SharedPreferences prefs(Context context) {
         return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
@@ -122,14 +129,20 @@ public final class FirestoreSync {
         return enabled(context) && evidenceConsented(context);
     }
 
-    /** Persist only an explicit, separately versioned evidence choice. */
-    public static boolean setEvidenceConsent(Context context, boolean enabled) {
-        if (enabled && !authorized(context)) return false;
+    /** Persist-only change; deliberately does not initialize Firebase or schedule any work. */
+    public static boolean persistEvidenceConsentOnly(Context context, boolean enabled) {
+        if (enabled && (!configured() || !authorized(context))) return false;
         synchronized (FirestoreSync.class) {
             SharedPreferences preferences = prefs(context);
             boolean scrubbed = enabled || scrubEvidenceSidecar(context);
             return commitEvidenceConsent(preferences, enabled, scrubbed);
         }
+    }
+
+    /** Existing interactive path for callers that require the authorized-account guard. */
+    public static boolean setEvidenceConsent(Context context, boolean enabled) {
+        if (enabled && !authorized(context)) return false;
+        return persistEvidenceConsentOnly(context, enabled);
     }
 
     /** Revocation remains fail-closed even when local evidence cleanup must be retried. */
