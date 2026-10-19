@@ -252,7 +252,7 @@ final class AiBetaRegistryDraft {
         List<Choice> result = new ArrayList<>();
         for (Choice choice : choices(entry)) {
             String current = FIELD_CATEGORY.equals(choice.field) ? listing.category : listing.language;
-            if (!same(current, choice.value)) result.add(choice);
+            if (!same(current, effectiveValue(choice.field, choice.value, current))) result.add(choice);
         }
         return Collections.unmodifiableList(result);
     }
@@ -283,10 +283,11 @@ final class AiBetaRegistryDraft {
         if (choice == null || !containsChoice(entry, choice)) throw new IllegalArgumentException("Proposta non disponibile");
         if ("UNKNOWN".equals(choice.value)) throw new IllegalArgumentException("UNKNOWN non è accettabile");
         String before = currentValue(match.listing, choice.field);
-        if (same(before, choice.value)) throw new IllegalArgumentException("Il valore locale è già uguale alla proposta");
+        String after = effectiveValue(choice.field, choice.value, before);
+        if (same(before, after)) throw new IllegalArgumentException("Il valore locale è già uguale alla proposta");
         return new Draft(registry.registryId, registry.sourceSnapshotId, entry.listingId, entry.itemId,
                 match.listing.localId, match.listing.title, choice.field, choice.source,
-                choice.provenance, match.listing.category, match.listing.language, before, choice.value);
+                choice.provenance, match.listing.category, match.listing.language, before, after);
     }
 
     static Draft createCurrentTarget(AiBetaRegistry registry, AiBetaRegistry.Entry entry,
@@ -308,11 +309,12 @@ final class AiBetaRegistryDraft {
         boolean reviewRequired = requiresReview(entry, choice.field);
         if (reviewRequired && !reviewed) throw new IllegalArgumentException("La proposta richiede revisione umana esplicita");
         String before = currentValue(match.listing, choice.field);
-        if (same(before, choice.value)) throw new IllegalArgumentException("Il valore locale è già uguale alla proposta");
+        String after = effectiveValue(choice.field, choice.value, before);
+        if (same(before, after)) throw new IllegalArgumentException("Il valore locale è già uguale alla proposta");
         return new Draft(registry.registryId, registry.sourceSnapshotId, entry.listingId,
                 match.listing.itemId, entry.itemId, match.listing.localId, match.listing.title,
                 choice.field, choice.source, choice.provenance, match.listing.category,
-                match.listing.language, before, choice.value, match.listing.sourceHash,
+                match.listing.language, before, after, match.listing.sourceHash,
                 null, null, entry.reviewFlags, reviewRequired, reviewed, STAGED);
     }
 
@@ -348,6 +350,12 @@ final class AiBetaRegistryDraft {
         if (FIELD_CATEGORY.equals(field)) return listing.category;
         if (FIELD_LANGUAGE.equals(field)) return listing.language;
         throw new IllegalArgumentException("Campo bozza non valido");
+    }
+
+    private static String effectiveValue(String field, String proposed, String current) {
+        if (FIELD_LANGUAGE.equals(field))
+            return ListingLanguageDetector.mergeWithDependency(proposed, current);
+        return proposed;
     }
 
     private static boolean same(String left, String right) {

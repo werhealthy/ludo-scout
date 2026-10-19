@@ -292,6 +292,70 @@ final class AiBetaRegistryView {
         }
     }
 
+    /** Reads a bounded set of current local rows in one read-only SQLite snapshot. */
+    static Map<Long, CurrentTargetRead> readCurrentTargets(Context context, List<Long> localIds) {
+        Set<Long> requested = new LinkedHashSet<>();
+        if (localIds != null) {
+            for (Long localId : localIds) {
+                if (localId != null && localId > 0) requested.add(localId);
+            }
+        }
+        if (requested.isEmpty()) return Collections.emptyMap();
+        if (context == null) return failedTargets(requested, CatalogRead.queryFailed());
+        File file = context.getDatabasePath("vinted_affari.db");
+        if (!file.isFile()) return failedTargets(requested, CatalogRead.databaseMissing());
+        SQLiteDatabase db = null;
+        try {
+            db = SQLiteDatabase.openDatabase(file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+            db.execSQL("BEGIN");
+            try {
+                List<LocalListing> rows = new ArrayList<>();
+                queryChunks(db, "id", requested, rows);
+                CatalogRead read = CatalogRead.available(rows);
+                Map<Long, CurrentTargetRead> targets = new LinkedHashMap<>();
+                for (Long localId : requested) {
+                    LocalListing listing = read.byLocalId.get(localId);
+                    if (listing == null) {
+                        targets.put(localId, new CurrentTargetRead(read, false, false, true));
+                        continue;
+                    }
+                    boolean unique = false;
+                    if (listing.itemId != null && !listing.itemId.trim().isEmpty()) {
+                        try (Cursor ids = db.rawQuery("SELECT id FROM market_listings WHERE vinted_item_id=? LIMIT 2",
+                                new String[]{listing.itemId})) {
+                            unique = ids.moveToFirst() && ids.getLong(0) == localId && !ids.moveToNext();
+                        }
+                    }
+                    boolean active = false;
+                    boolean manualReview = true;
+                    try (Cursor state = db.rawQuery(
+                            "SELECT lifecycle,COALESCE(manual_review_required,0) FROM market_listings WHERE id=?",
+                            new String[]{String.valueOf(localId)})) {
+                        if (state.moveToFirst()) {
+                            active = "ACTIVE".equals(state.getString(0));
+                            manualReview = state.getInt(1) != 0;
+                        }
+                    }
+                    targets.put(localId, new CurrentTargetRead(read, unique, active, manualReview));
+                }
+                return Collections.unmodifiableMap(targets);
+            } finally {
+                db.execSQL("ROLLBACK");
+            }
+        } catch (Exception failure) {
+            return failedTargets(requested, CatalogRead.queryFailed());
+        } finally {
+            if (db != null) db.close();
+        }
+    }
+
+    private static Map<Long, CurrentTargetRead> failedTargets(Set<Long> localIds, CatalogRead read) {
+        Map<Long, CurrentTargetRead> targets = new LinkedHashMap<>();
+        for (Long localId : localIds)
+            targets.put(localId, new CurrentTargetRead(read, false, false, true));
+        return Collections.unmodifiableMap(targets);
+    }
+
     static boolean canPrepareCurrentTarget(AiBetaRegistry.Entry entry, Match match,
                                            CurrentTargetRead target) {
         return entry != null && target != null && target.catalog.state == CatalogState.AVAILABLE

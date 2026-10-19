@@ -2,6 +2,7 @@ package it.vintedaffari.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Color;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -83,6 +84,12 @@ final class AiBetaRegistryUi {
         content.addView(draftButton);
         draftButton.setOnClickListener(v -> showDraft(activity, settings, draftState, draftButton));
 
+        Button sampleReportButton = new Button(activity);
+        sampleReportButton.setText("Leggi e condividi report campione (5) · sola lettura");
+        sampleReportButton.setEnabled(!AiBetaTestDialog.BUSY.get());
+        content.addView(sampleReportButton);
+        sampleReportButton.setOnClickListener(v -> shareSampleReport(activity, registry, sampleReportButton));
+
         EditText filter = new EditText(activity);
         filter.setSingleLine(true);
         filter.setHint("Filtra per ID, titolo, metadati o stato");
@@ -130,6 +137,47 @@ final class AiBetaRegistryUi {
         listDialog.show();
     }
 
+    private static void shareSampleReport(Activity activity, AiBetaRegistry registry, Button button) {
+        if (registry == null || !AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
+        button.setEnabled(false);
+        AiBetaTestDialog.IO.execute(() -> {
+            String report;
+            boolean available = true;
+            try {
+                List<Long> localIds = AiBetaRegistrySampleReport.localIdsToRead(registry);
+                java.util.Map<Long, AiBetaRegistryView.CurrentTargetRead> reads =
+                        AiBetaRegistryView.readCurrentTargets(activity, localIds);
+                report = AiBetaRegistrySampleReport.build(registry, reads);
+            } catch (Exception failure) {
+                report = "Ludo Scout · verifica campione AI\nReport non generato: lettura locale non riuscita. "
+                        + "Nessuna modifica al catalogo.";
+                available = false;
+            } finally {
+                AiBetaTestDialog.BUSY.set(false);
+            }
+            final String sharedReport = report;
+            final boolean canShare = available;
+            activity.runOnUiThread(() -> {
+                if (activity.isFinishing() || activity.isDestroyed()) return;
+                button.setEnabled(true);
+                if (!canShare) {
+                    new AlertDialog.Builder(activity).setTitle("Report non disponibile")
+                            .setMessage(sharedReport).setPositiveButton("Chiudi", null).show();
+                    return;
+                }
+                try {
+                    activity.startActivity(Intent.createChooser(
+                            AiBetaRegistrySampleReport.shareIntent(sharedReport), "Condividi report campione"));
+                } catch (RuntimeException failure) {
+                    new AlertDialog.Builder(activity).setTitle("Condivisione non disponibile")
+                            .setMessage("Android non ha restituito un’app di condivisione. "
+                                    + "Nessun report è stato copiato o inviato.")
+                            .setPositiveButton("Chiudi", null).show();
+                }
+            });
+        });
+    }
+
     private static void openEntry(Activity activity, AiBetaRegistry registry, AiBetaSettings settings,
                                   DraftState draftState, Button draftButton, RegistryRow row) {
         if (!AiBetaTestDialog.BUSY.compareAndSet(false, true)) return;
@@ -146,6 +194,19 @@ final class AiBetaRegistryUi {
                             + (AiBetaRegistryView.canPrepareCurrentTarget(row.entry, match, target)
                             ? "ID corrente univoco, scheda attiva e hash contenuti uguale; identità storica comunque non dimostrata."
                             : "non sufficiente per preparare una correzione; consultare i motivi riportati sopra.");
+                    if (sameJournalEntry(draftState.draft, registry, row.entry)) {
+                        if (AiBetaRegistryDraft.APPLIED.equals(draftState.draft.state)
+                                && draftStillApplied(draftState.draft, match.listing, target.uniqueCurrentItemId)) {
+                            details += "\n\nJournal: APPLIED; l’hash post-correzione e il valore dopo coincidono. "
+                                    + "La proposta storica resta nel registro, ma non va riproposta né trattata come nuova anomalia.";
+                        } else if (AiBetaRegistryDraft.APPLIED.equals(draftState.draft.state)) {
+                            details += "\n\nJournal: APPLIED registrato, ma i controlli correnti non coincidono. "
+                                    + "Non riproporre; aprire la bozza per riconciliare il conflitto.";
+                        } else if (AiBetaRegistryDraft.CONFLICT.equals(draftState.draft.state)) {
+                            details += "\n\nJournal: CONFLICT; dati o identità sono cambiati dopo la bozza. "
+                                    + "Nessuna nuova proposta o ripristino automatico.";
+                        }
+                    }
                 } else {
                     details = AiBetaRegistryView.registryOnlyDetails(registry, row.entry);
                 }
@@ -483,6 +544,14 @@ final class AiBetaRegistryUi {
     private static boolean sameState(AiBetaRegistryDraft.Draft left, AiBetaRegistryDraft.Draft right) {
         return left != null && right != null && left.state.equals(right.state)
                 && same(left.appliedHash, right.appliedHash) && same(left.restoredHash, right.restoredHash);
+    }
+
+    private static boolean sameJournalEntry(AiBetaRegistryDraft.Draft draft,
+                                            AiBetaRegistry registry, AiBetaRegistry.Entry entry) {
+        return draft != null && registry != null && entry != null
+                && same(draft.registryId, registry.registryId)
+                && same(draft.snapshotId, registry.sourceSnapshotId)
+                && draft.listingId == entry.listingId;
     }
 
     private static boolean draftStillApplied(AiBetaRegistryDraft.Draft draft,

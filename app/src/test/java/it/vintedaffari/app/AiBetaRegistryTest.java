@@ -316,8 +316,30 @@ public class AiBetaRegistryTest {
         assertEquals(HASH_A, draft.currentHash);
         assertTrue(draft.reviewed);
         assertTrue(draft.details("invariato").contains("non dimostra retroattivamente l’identità storica"));
+    }
 
+    @Test public void languageDraftPreservesIndependentDependencyMarkerAndSuppressesNoOp() throws Exception {
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemId("vinted-historic-id"));
+        AiBetaRegistry.Entry entry = registry.entries.get(0);
+        for (String current : new String[]{"?|DEP", "?|IND"}) {
+            AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
+                    1016L, "vinted-current-id", "Titolo attuale", "BASE_GAME", current, HASH_A);
+            AiBetaRegistryDraft.Choice language = null;
+            for (AiBetaRegistryDraft.Choice choice : AiBetaRegistryDraft.choices(entry, local))
+                if (AiBetaRegistryDraft.FIELD_LANGUAGE.equals(choice.field)) language = choice;
+            assertNotNull(language);
+            AiBetaRegistryView.Match match = AiBetaRegistryView.match(entry,
+                    AiBetaRegistryView.CatalogRead.available(local));
+            AiBetaRegistryDraft.Draft draft = AiBetaRegistryDraft.createCurrentTarget(
+                    registry, entry, match, language, true, true, false, true);
+            assertEquals(current, draft.beforeValue);
+            assertEquals("IT" + current.substring(current.indexOf('|')), draft.afterValue);
+        }
 
+        AiBetaRegistryView.LocalListing alreadyCorrect = new AiBetaRegistryView.LocalListing(
+                1016L, "vinted-current-id", "Titolo attuale", "BASE_GAME", "IT|DEP", HASH_A);
+        for (AiBetaRegistryDraft.Choice choice : AiBetaRegistryDraft.choices(entry, alreadyCorrect))
+            assertFalse(AiBetaRegistryDraft.FIELD_LANGUAGE.equals(choice.field));
     }
 
     private static Map<String, Object> validRegistry() {

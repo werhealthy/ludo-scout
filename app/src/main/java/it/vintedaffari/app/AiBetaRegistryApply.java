@@ -150,6 +150,10 @@ final class AiBetaRegistryApply {
 
     static AiBetaRegistryDraft.Draft reconcile(AiBetaRegistryDraft.Draft draft, Current current) {
         if (draft == null || current == null || current.listing == null) return draft;
+        if (AiBetaRegistryDraft.APPLIED.equals(draft.state)) {
+            if (isApplied(draft, current)) return draft;
+            return draft.transition(AiBetaRegistryDraft.CONFLICT, draft.appliedHash, null);
+        }
         if (AiBetaRegistryDraft.APPLY_PENDING.equals(draft.state)) {
             if (draft.appliedHash != null && isApplied(draft, current))
                 return draft.transition(AiBetaRegistryDraft.APPLIED, draft.appliedHash, null);
