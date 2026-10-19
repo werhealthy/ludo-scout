@@ -1,5 +1,13 @@
 # Ludo Scout — Current state
 
+## Read-only registry provenance audit — 2026-10-19
+
+Reader confirms the complete 1,658-row v3 snapshot `5c02314d-fd73-41b4-b1b3-be5448f374cd`, observed at `2026-10-16T14:17:44.492Z`; sampled rows 1, 100, 1290–1292 and 1658 returned source_id/source_hash/title/evidence but no Vinted item ID or URL. Stored registry has 1,658 entries/1,657 proposals, each with listing_id and proposal fields only; no source_id, Vinted identity, DB identity or export provenance. Manifest has source_id/source_hash only. Numeric equality is coverage, not proven lineage: 0 verified associations, 0 demonstrated conflicts, 1,658 without evidence, 0 updateable. Local catalog audit returned `single_authorized_device_required` (`device_count=0`), so current SQLite/history for changed/deleted/recreated rows was not read. No AI/Vinted/catalog write was performed.
+
+Firestore regression findings: test source history shows the protocol-v5 expectation added Oct 13; writer commit `a280608` (Oct 16) changed persisted protocol to v6, and `FirestoreSyncSourceContract` already expects v6. The failing v5 guard is stale, not proof of runtime regression. The revocation source-contract test from `d751c5c` expects the helper call directly inside `persistEvidenceConsentOnly`; implementation still calls the helper before consent commit and helper invokes `store.prepareEvidenceRevocation()`. This is a brittle stale source check; behavior/runtime revocation still needs dedicated verification before calling safety fully verified.
+
+Registry overlay regression and Android JUnit/build passed after retaining the source-ID conflict guard. Full Firestore source regressions remain ungreen for the two stale guards. Preserve prior dirty changes; do not claim historical association or post-snapshot local state without device reader access and export-chain proof.
+
 ## Cross-project workstation hold — 2026-10-06
 
 Model-heavy local Ludo Scout work on the owner's Windows workstation is temporarily gated on the approved resource supervisor in `werhealthy/personal-ai-stack`. Hermes will be the orchestration/control plane and an independent lightweight supervisor will own CPU/RAM/VRAM admission plus managed workload lifecycle. Until that supervisor is runtime-validated, avoid intentionally overlapping Ludo local AI workloads with Hermes/other local models. This does not reopen the completed backend AI recovery work and does not change Ludo's product behavior; it is an operational safety constraint for development/runtime on the shared workstation.
