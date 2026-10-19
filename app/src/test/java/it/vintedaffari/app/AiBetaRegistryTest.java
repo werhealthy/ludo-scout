@@ -74,8 +74,8 @@ public class AiBetaRegistryTest {
         String details = AiBetaRegistryView.details(registry, entry, read);
         assertTrue(details.contains("Riga locale osservata (associazione non dimostrata): Titolo candidato sintetico"));
         assertTrue(details.contains("categoria mancante · lingua mancante"));
-        assertTrue(details.contains("corrispondenza non verificata"));
-        assertTrue(details.contains("bloccata: corrispondenza non verificata"));
+        assertTrue(details.contains("non verificata: solo coincidenza con ID numerico locale"));
+        assertTrue(details.contains("bloccata: hash dei contenuti correnti diverso o non disponibile"));
         assertTrue(details.contains("Proposta A/B corretta (language_and_category_clarity_v1)"));
         assertTrue(details.contains("esito non conservato; flag: rianalisi lingua"));
         assertTrue(details.contains("hash"));
@@ -97,8 +97,8 @@ public class AiBetaRegistryTest {
         assertFalse(match.isVerified());
         assertTrue(match.contentMatched);
         assertTrue(match.projectionContinuityProven);
-        assertEquals("bloccata: corrispondenza non verificata",
-                AiBetaRegistryView.acceptanceLabel(entry, match));
+        assertTrue(AiBetaRegistryView.acceptanceLabel(entry, match)
+                        .contains("identità storica non dimostrata"));
     }
 
 
@@ -277,13 +277,47 @@ public class AiBetaRegistryTest {
         AiBetaRegistryView.Match match = AiBetaRegistryView.resolve(entry, snapshotProofRead(local));
         assertTrue(match.contentMatched);
         assertFalse(match.isVerified());
-        assertEquals("bloccata: corrispondenza non verificata",
-                AiBetaRegistryView.acceptanceLabel(entry, match));
+        assertTrue(AiBetaRegistryView.acceptanceLabel(entry, match)
+                        .contains("identità storica non dimostrata"));
         try {
             AiBetaRegistryDraft.create(registry, entry, match,
                     AiBetaRegistryDraft.choices(entry, local).get(0));
             fail("draft accepted without historical identity proof");
         } catch (IllegalArgumentException expected) { }
+    }
+
+    @Test public void currentTargetDraftKeepsHistoricalIdentityUnverifiedAndRequiresFlaggedReview() throws Exception {
+        AiBetaRegistry registry = AiBetaRegistry.parseObject(validRegistryWithItemId("vinted-historic-id"));
+        AiBetaRegistry.Entry entry = registry.entries.get(0);
+        AiBetaRegistryView.LocalListing local = new AiBetaRegistryView.LocalListing(
+                1016L, "vinted-current-id", "Titolo attuale", "BASE_GAME", "EN", HASH_A);
+        AiBetaRegistryView.CatalogRead read = AiBetaRegistryView.CatalogRead.available(local);
+        AiBetaRegistryView.Match match = AiBetaRegistryView.match(entry, read);
+        assertEquals(AiBetaRegistryView.MatchState.CONTENT_MATCH_PROJECTION_UNPROVEN, match.state);
+        assertTrue(match.contentMatched);
+        assertFalse(match.isVerified());
+
+        AiBetaRegistryDraft.Choice language = null;
+        for (AiBetaRegistryDraft.Choice choice : AiBetaRegistryDraft.choices(entry, local))
+            if (AiBetaRegistryDraft.FIELD_LANGUAGE.equals(choice.field)) language = choice;
+        assertNotNull(language);
+        assertTrue(language.reviewRequired);
+        try {
+            AiBetaRegistryDraft.createCurrentTarget(registry, entry, match, language,
+                    true, true, false, false);
+            fail("flagged proposal staged without human review");
+        } catch (IllegalArgumentException expected) { }
+
+        AiBetaRegistryDraft.Draft draft = AiBetaRegistryDraft.createCurrentTarget(
+                registry, entry, match, language, true, true, false, true);
+        assertTrue(draft.canApply());
+        assertEquals("vinted-current-id", draft.itemId);
+        assertEquals("vinted-historic-id", draft.sourceItemId);
+        assertEquals(HASH_A, draft.currentHash);
+        assertTrue(draft.reviewed);
+        assertTrue(draft.details("invariato").contains("non dimostra retroattivamente l’identità storica"));
+
+
     }
 
     private static Map<String, Object> validRegistry() {
