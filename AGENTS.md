@@ -1,5 +1,18 @@
 # Ludo Scout — istruzioni per gli agenti
 
+## Regole operative correnti — checkpoint 2026-10-23
+
+Questa sezione recepisce le istruzioni esplicite più recenti dell'utente e prevale sulle indicazioni operative storiche incompatibili.
+- Ogni risposta sul progetto inizia con: **Fase N/M — nome del risultato · avanzamento X% (base di calcolo) · chiusura prevista HH:MM–HH:MM Europe/Rome (confidenza)**. Se denominatore o tempi non sono stimabili, scrivere “non stimabile: manca …”, senza inventare percentuali o orari. Separare la scadenza desiderata dall'ETA previsto; chiedere l'ora attuale una sola volta se il runtime non la fornisce.
+- Percentuali basate su criteri di accettazione o casi contati, non su numero di build/test o tempo trascorso. Definire risultati e criteri di chiusura prima del lavoro; non riutilizzare le vecchie stime 70–80% come misure.
+- Risposte brevi e trasparenti: risultato concreto, prova e limite, blocco reale, azione successiva e responsabile. Distinguere sorgente, commit/push, APK, distribuzione, installazione, runtime e correttezza delle proposte AI. Non chiamare “live” una fixture. Non dichiarare lavoro in background senza processo/job identificabile.
+- Portare avanti sviluppo isolato, diagnosi e test già autorizzati senza richieste ripetute di “continua”. Per gli ostacoli: massimo tre tentativi con nuove evidenze; poi spiegare causa e prossimo percorso supportato. Non ampliare il task dopo verifiche verdi senza necessità.
+- Telefono non collegato: zero ADB non è un blocco del progetto. Percorso ordinario phone-first: App Tester, verifica/raccolta locale in app, un report condivisibile. Niente USB/debug USB o login Google nel browser automatizzato salvo nuova richiesta esplicita dell'utente. Riutilizzare Firebase CLI/API e autenticazione supportata già funzionante; non esporre token/URL firmati. Una scadenza di approvazione va gestita secondo il gate effettivo, senza elusione né divieti permanenti inventati.
+- Un ingresso “Diagnostica e report”, sezioni interne e report completo per il perimetro. Non aggiungere test di menu per singolo bug. Preservare journal/rollback e rimuovere strumenti ridondanti solo dopo verifica di copertura. Automatizzare il triage, poi chiedere solo le decisioni umane residue; al massimo una raccolta aggiuntiva necessaria per consegna.
+- Conservare risultati, deduplica, identità esterna e hash degli input; non ripetere l'intero catalogo AI né la ricerca candidati già conclusa. Analisi storiche riusabili soltanto con input pertinente riconciliato. Categoria, score BGG e hash non attestano da soli identità o correttezza.
+- Pilota seller fermo alla challenge persistita: niente reset, nuovi tentativi o percorsi di aggiramento. Gli altri lavori proseguono indipendentemente. Non forzare associazioni, non promuovere UNKNOWN, proteggere SOLD, decisioni umane, preferiti e dati esistenti. Nuove scritture operative richiedono il perimetro approvato.
+- Prima di concludere una sessione significativa aggiornare STATE con commit, risultati, prove, limiti e prossimo risultato. Il checkpoint deve consentire il recupero senza leggere la trascrizione; non presumere che il gateway apra automaticamente una nuova sessione.
+
 ## Ripresa del lavoro
 Il repository di lavoro è `werhealthy/ludo-scout`; il ramo operativo attuale è `beta`.
 Prima di qualsiasi lavoro significativo, a ogni nuova chat o ripresa:
