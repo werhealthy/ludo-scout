@@ -1,5 +1,45 @@
 # Ludo Scout — Current state
 
+## Checkpoint operativo prioritario — 2026-10-23 (Europe/Rome)
+
+Questa sezione prevale sulle prescrizioni operative incompatibili nelle sezioni storiche sottostanti. Non cancellare la cronologia. Fonte dello stato runtime qui riportato: report di Hermes e conferme dell'utente nella conversazione, non accesso diretto al telefono/PC da questa sessione. I soli controlli indipendenti qui sono lettura dei file GitHub e aggiornamento documentale; nessuna build, inferenza o modifica al catalogo è stata eseguita qui.
+
+### Obiettivo e stato
+Obiettivo finale: catalogo affidabile e secondo controllo AI locale automatico sui nuovi annunci osservati durante gli scroll, con poco intervento manuale, riuso dei risultati invariati e senza servizi AI a pagamento/Cloudflare/Actions come dipendenza runtime.
+La vecchia “fase 5/6, circa 80%” è una stima non misurata e va sostituita da milestone con criteri di accettazione e conteggi. Il desiderio di chiudere il catalogo in mattinata e lavorare sugli scroll nel pomeriggio non è un ETA verificato.
+Il secondo controllo automatico legato agli scroll NON risulta completato: esistono componenti di scansione opt-in, deduplica/cache, runner periodico e inferenza locale. Non confondere questi componenti con integrazione end-to-end verificata.
+
+### Risultati acquisiti da non riaprire
+- Device ID: 9f66c608-fef5-4377-9fda-e1d57abb0b02. Snapshot storico: 5c02314d-fd73-41b4-b1b3-be5448f374cd (16 ottobre). 1658 righe; 1657 proposte storiche uniche, 1291 irrisolto dopo due JSONDecodeError. Non rieseguire tutto. Proposte storiche non equivalgono a etichette indipendenti; originali senza provenienza completa. Cinque A/B: 1016,1034,1068,1099,1229.
+- Catalogo corrente nell'ultimo report: 1690 ID univoci, 596 collegati e 1094 senza game_id. Non sostituire questa fotografia con conteggi storici.
+- Batch applicato dall'utente: 844→BGG1406; 1238 e1572→4143;1267→2223;1285→245476;1371→2453. Review attiva per1179 e1306, associazioni mantenute. Tre giochi creati;1572 preservato SOLD/SOLD. Journal APPLIED,8righe,3giochi,digest ed8af905… verificato dal report locale, zero conflitti, rollback_ready=true. Nessun rollback eseguito. Non riapplicare o ripristinare per test.
+- Matcher Java/JS: fix riprodotti per identità parziale e filtro rating prima dell'identità; UNO non più parola generica. Patch/test non certificano accuratezza generale. Proteggere annunci estranei quando condividono game_id.
+- Seller:527presenti/1163mancanti nell'export1690;23gruppi/56annunci. Il pilota ha fatto due tentativi complessivi, zero recuperi, poi STOP_CHALLENGE su10252705501 (HTTP404); selezione/esiti persistiti. Non riavviare.
+- Report unico consolidato e due export ridondanti rimossi secondo Hermes. Non creare un'altra diagnostica per tre record. Ultima release nominata esplicitamente nella conversazione:5.12.330-beta/1002330,release4rkaet5adnq4g; il candidato consolidato successivo non ha versione/commit verificati qui: recuperarli dal worktree/checkpoint operatore, non presumere che1002330 sia l'ultima release.
+
+### Triage e blocco attuale
+I due gruppi223 sono distinti:223collisioni senza game_id e223BGG_MATCH_REVIEW nei596collegati (171attivi/52venduti). Altri collegati:331MATCHED (stato, non accuratezza verificata),37filtrati,3revisioni variante,2tipo non verificato.
+Gli1094scollegati comprendono223collisioni;847AUTO_FILTERED_NON_GAME (744UNCERTAIN,82BASE_GAME,15NON_GAME,6ACCESSORY);20BLOCKED_CLASSIFIER attivi/pending;3espansioni attivehold;1espansioneSOLD. Evitare doppio conteggio degli82.
+Diagnostica82:81NO_STRONG_BGG_CANDIDATE;78senza URLfoto validi;tre eleggibili1649,1656,1680.1651OTHER_REASON_PRESENT resta escluso. Esclusione conforme al codice non prova esclusione corretta sul prodotto. Nessuna riattivazione automatica.
+Ultimo report:1133righe invarianti e557cambiate nei soli campi confrontabili;triage riusato per985. Ricerca completata su126casi eleggibili:104con candidati,22senza,532suggerimenti totali. Non ripeterla.1649→Traditional Card Games solo candidato;1656nessuno;1680otto,nessuna scelta dimostrata.
+Blocco: il report diagnostico omette testo/foto necessari al confronto prodotto-candidati. Percorso evidence locale già funzionò in precedenza; Hermes ultimamente ha verificato solo il sorgente, non un'istanza attiva. Non assumere servizio spento o dati assenti senza verifica mirata. FotoURL non equivale a pixel in cache e immagine inviata non equivale a correttezza modello.
+
+### Riferimenti da recuperare prima di implementare
+RepoAndroid werhealthy/ludo-scout,operatore werhealthy/personal-ai-stack;runbook canonico operatore:99 System/Workflows/Phone-first Ludo Scout.md. Worktree recente riferito:D:/AI/hermes/worktrees/ludo-scout/ai-language-evidence-v1-integration;branch storico work/ai-registry-v3-reconcile. Identità HEAD/PR#318,stato merge/push e ultima release vanno letti live.
+Writer v3 storico a2806081308e9bfdff38944a8f6aec7c67481c01;non sostituirlo conwriter v2 diunworktreevecchio. Altri riferimenti storici:batchsource/evoluzione1002330 da recuperare;non inventarne SHA. Gli aggiornamenti localidiHermes possono non essere su beta.
+Ollama locale:qwen3-vl:8b-instruct-q4_K_M. Supervisore indipendente:budget precedentemente validato3072MBRAM/4608MBVRAM più riserve;modello residente veniva erroneamente ricontato come nuovo carico. Workaround verificato scarico keep_alive=0,/api/ps vuoto,nuovaadmission.Non abbassareguard/forzareprocessi.NienteAIcloud/costi.
+Firebase:ludo-scout,packageit.vintedaffari.app,appid1:977410404587:android:cc620ef66162ba4266ceae;certificatobetaC7DF7C31D0FE0D059307F4DE7B67BE5992DC87EC73E623CC9E8B4E87C63D8710. CLIupload/distribution + RESTinventory/readbackconADC già riusciti;comandoCLI appdistribution:releases:list inesistente.Non ripeterebrowserlogin.
+
+### Prossimo risultato e criteri di chiusura
+Unico prossimo risultato raccomandato:rendere eseguibile il confronto automatico dei126casi usando candidati salvati ed evidenze riconciliate, prima di un'altra raccolta/diagnostica.
+1.Verificare modello/reader/adapter effettivamente attivi e fonti già autorizzate.
+2.Se manca il percorso dati,preparare nelworktreeautorizzato la minima estensione della raccolta esistente dentroDiagnosticaeReport;distinguerepixel disponibili da URL.Non richiedereADB,non avviare nuove richiesteVinted néaggirarechallenge.
+3.Collegarecandidati ed evidenze con identità+hashinput;proposte conalternative nessuncandidato/accessorio/nongioco/UNKNOWN;nessunascritturaautomatica.Batchinterni,checkpoint,budget,stoperrorisistematici.Senzaevidenzasufficienteregistrareblocco eproseguireglialtri.
+4.Chiedere all'utente solo eventuale unica operazione necessaria sultelefono dopo candidato realmente pronto.Nonfermarsiauntestmocksenzaindicareilpassaggioruntime.
+La fase catalogo può chiudersi con casi irrisolti espliciti e protetti;non richiedere100%diassociazioniforzate.Ilcontrolloscroll deve dimostrare:trigger reale,ID stabile,deduplica/cacheinput,risorse/consensi,budget,codapersistente sePCassente,risultatovisibile,protezionecontroinputcambiati.Decidereseapplicazioneautomaticao sole proposte separatamente,senzaestenderepermessi.
+
+---
+
 ## Cross-project workstation hold — 2026-10-06
 
 Model-heavy local Ludo Scout work on the owner's Windows workstation is temporarily gated on the approved resource supervisor in `werhealthy/personal-ai-stack`. Hermes will be the orchestration/control plane and an independent lightweight supervisor will own CPU/RAM/VRAM admission plus managed workload lifecycle. Until that supervisor is runtime-validated, avoid intentionally overlapping Ludo local AI workloads with Hermes/other local models. This does not reopen the completed backend AI recovery work and does not change Ludo's product behavior; it is an operational safety constraint for development/runtime on the shared workstation.
